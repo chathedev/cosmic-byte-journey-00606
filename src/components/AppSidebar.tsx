@@ -163,158 +163,156 @@ export function AppSidebar() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {(!isMobile || open) && (
-          <motion.nav
-            initial={isMobile ? { x: -280, opacity: 0.8 } : false}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -280, opacity: 0 }}
-            transition={{ 
-              type: "tween",
-              duration: 0.2,
-              ease: "easeOut"
-            }}
-            className={`${
-              isMobile 
-                ? "fixed top-0 left-0 w-[280px] z-50" 
-                : "sticky top-0 shrink-0"
-            } border-r border-border bg-card flex flex-col mobile-inset-top`}
-            style={
-              isMobile 
-                ? {
-                    height: '100dvh',
-                    paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)',
-                    paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0px)',
-                  }
-                : {
-                    width: open ? "240px" : "fit-content",
-                    height: '100vh',
-                  }
-            }
-          >
-            {/* Header Section */}
-            <div className="shrink-0 p-2 pt-3">
-              {isMobile && (
-                <div className="flex justify-end mb-2">
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <FiX className="text-xl" />
-                  </button>
-                </div>
-              )}
-              <TitleSection 
-                open={open} 
-                user={user} 
-                userPlan={userPlan}
-                planLoading={planLoading}
+      
+      {/* Sidebar - always mounted to avoid layout flashes */}
+      <motion.nav
+        initial={false}
+        animate={{
+          x: isMobile && !open ? -280 : 0,
+          opacity: 1,
+          ...(isMobile ? {} : { width: open ? 240 : 64 }),
+        }}
+        transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
+        className={`${
+          isMobile 
+            ? "fixed top-0 left-0 w-[280px] z-50" 
+            : "sticky top-0 shrink-0"
+        } border-r border-border bg-card flex flex-col mobile-inset-top`}
+        style={
+          isMobile 
+            ? {
+                height: '100dvh',
+                paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)',
+                paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0px)',
+                pointerEvents: open ? 'auto' : 'none',
+              }
+            : {
+                height: '100vh',
+              }
+        }
+        aria-hidden={isMobile && !open}
+      >
+        {/* Header Section */}
+        <div className="shrink-0 p-2 pt-3">
+          {isMobile && (
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setOpen(false)}
+                className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <FiX className="text-xl" />
+              </button>
+            </div>
+          )}
+          <TitleSection 
+            open={open} 
+            user={user} 
+            userPlan={userPlan}
+            planLoading={planLoading}
+          />
+        </div>
+
+        {/* Scrollable Navigation Section */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-2">
+          <div className="space-y-1 py-1">
+            {navItems.map((item) => (
+              <Option
+                key={item.title}
+                Icon={item.Icon}
+                title={item.title}
+                selected={selected}
+                onClick={() => handleNavigation(item.path, item.title, item.locked)}
+                open={open}
+                locked={item.locked}
               />
-            </div>
+            ))}
 
-            {/* Scrollable Navigation Section */}
-            <div className="flex-1 overflow-y-auto overscroll-contain px-2">
-              <div className="space-y-1 py-1">
-                {navItems.map((item) => (
-                  <Option
-                    key={item.title}
-                    Icon={item.Icon}
-                    title={item.title}
-                    selected={selected}
-                    onClick={() => handleNavigation(item.path, item.title, item.locked)}
-                    open={open}
-                    locked={item.locked}
-                  />
-                ))}
+            {isAdmin && (
+              <AdminSection
+                open={open}
+                expanded={adminExpanded}
+                setExpanded={setAdminExpanded}
+                items={adminItems}
+                selected={selected}
+                onSelect={(path, title) => handleNavigation(path, title)}
+              />
+            )}
 
-                {isAdmin && (
-                  <AdminSection
-                    open={open}
-                    expanded={adminExpanded}
-                    setExpanded={setAdminExpanded}
-                    items={adminItems}
-                    selected={selected}
-                    onSelect={(path, title) => handleNavigation(path, title)}
-                  />
-                )}
-
-                {userPlan?.plan === 'enterprise' && open && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <motion.button
-                      layout
-                      onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
-                      className="relative flex h-10 w-full items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                    >
-                      <motion.div
-                        layout
-                        className="grid h-full w-10 place-content-center text-lg"
-                      >
-                        <FiMail />
-                      </motion.div>
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.125 }}
-                        className="text-xs font-medium"
-                      >
-                        Kontakta support
-                      </motion.span>
-                    </motion.button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Section - Upgrade & User Info */}
-            <div className="shrink-0 mt-auto">
-              {!planLoading && userPlan && !plusAccess && open && !unlimited && meetingsLeft !== null && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="px-2 py-2 border-t border-border"
-                >
-                  <div className="text-xs text-muted-foreground mb-2">
-                    {meetingsLeft} möten kvar
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowSubscribe(true)}
-                    className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium flex items-center justify-center gap-2"
-                  >
-                    <FiZap className="text-base" />
-                    Uppgradera
-                  </motion.button>
-                </motion.div>
-              )}
-
-              {!planLoading && userPlan && !plusAccess && !open && !unlimited && (
+            {userPlan?.plan === 'enterprise' && open && (
+              <div className="mt-4 pt-4 border-t border-border">
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowSubscribe(true)}
-                  className="mb-2 mx-2 w-10 h-10 bg-primary text-primary-foreground rounded-md flex items-center justify-center"
+                  layout
+                  onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
+                  className="relative flex h-10 w-full items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
-                  <FiZap className="text-lg" />
+                  <motion.div
+                    layout
+                    className="grid h-full w-10 place-content-center text-lg"
+                  >
+                    <FiMail />
+                  </motion.div>
+                  <motion.span
+                    layout
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.125 }}
+                    className="text-xs font-medium"
+                  >
+                    Kontakta support
+                  </motion.span>
                 </motion.button>
-              )}
-
-              <div className="px-2 pb-safe pb-3">
-                <UserSection
-                  open={open}
-                  user={user}
-                  userPlan={userPlan}
-                  planLoading={planLoading}
-                  onSettings={() => setShowSettings(true)}
-                />
               </div>
+            )}
+          </div>
+        </div>
 
-              {!isMobile && <ToggleClose open={open} setOpen={setOpen} />}
-            </div>
-          </motion.nav>
-        )}
-      </AnimatePresence>
+        {/* Bottom Section - Upgrade & User Info */}
+        <div className="shrink-0 mt-auto">
+          {!planLoading && userPlan && !plusAccess && open && !unlimited && meetingsLeft !== null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="px-2 py-2 border-t border-border"
+            >
+              <div className="text-xs text-muted-foreground mb-2">
+                {meetingsLeft} möten kvar
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowSubscribe(true)}
+                className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium flex items-center justify-center gap-2"
+              >
+                <FiZap className="text-base" />
+                Uppgradera
+              </motion.button>
+            </motion.div>
+          )}
+
+          {!planLoading && userPlan && !plusAccess && !open && !unlimited && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowSubscribe(true)}
+              className="mb-2 mx-2 w-10 h-10 bg-primary text-primary-foreground rounded-md flex items-center justify-center"
+            >
+              <FiZap className="text-lg" />
+            </motion.button>
+          )}
+
+          <div className="px-2 pb-safe pb-3">
+            <UserSection
+              open={open}
+              user={user}
+              userPlan={userPlan}
+              planLoading={planLoading}
+              onSettings={() => setShowSettings(true)}
+            />
+          </div>
+
+          {!isMobile && <ToggleClose open={open} setOpen={setOpen} />}
+        </div>
+      </motion.nav>
 
       <SettingsDialog 
         open={showSettings} 
@@ -327,6 +325,7 @@ export function AppSidebar() {
     </>
   );
 }
+
 
 const Option = ({ Icon, title, selected, onClick, open, locked = false, badge = undefined }) => {
   return (
