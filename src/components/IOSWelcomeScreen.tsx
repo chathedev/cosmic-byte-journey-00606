@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
+import { motion, AnimatePresence } from "framer-motion";
 import tivlyLogo from "@/assets/tivly-logo.png";
 
 interface IOSWelcomeScreenProps {
@@ -42,55 +43,139 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm">
-        <div className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-2xl shadow-2xl">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="w-full max-w-sm"
+      >
+        <div className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-2xl shadow-2xl overflow-hidden">
           <div className="p-8 space-y-6">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <img src={tivlyLogo} alt="Tivly" className="w-9 h-9 object-contain" />
-              </div>
-              <h1 className="text-2xl font-semibold text-foreground tracking-tight">Välkommen</h1>
-              <p className="text-sm text-muted-foreground text-center">
-                Snabb, enkel och säker mötesinspelning.
-              </p>
-            </div>
-
-            {step === 0 && (
-              <Button 
-                onClick={async () => {
-                  await hapticLight();
-                  setStep(1);
-                }} 
-                size="lg" 
-                className="w-full rounded-xl h-12"
+            <motion.div 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <motion.div 
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ 
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 15,
+                  delay: 0.4 
+                }}
+                className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
               >
-                Kom igång
-              </Button>
-            )}
+                <img src={tivlyLogo} alt="Tivly" className="w-9 h-9 object-contain" />
+              </motion.div>
+              <motion.h1 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                className="text-2xl font-semibold text-foreground tracking-tight"
+              >
+                Välkommen
+              </motion.h1>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                className="text-sm text-muted-foreground text-center"
+              >
+                Snabb, enkel och säker mötesinspelning.
+              </motion.p>
+            </motion.div>
 
-            {step === 1 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-background/60">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Mic className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-foreground">Mikrofonåtkomst</p>
-                    <p className="text-xs text-muted-foreground">Behövs för att spela in möten.</p>
-                  </div>
-                </div>
-                <Button onClick={requestMicrophonePermission} size="lg" className="w-full rounded-xl h-12">
-                  Tillåt mikrofon
-                </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  Du kan ändra detta senare i inställningar.
-                </p>
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {step === 0 && (
+                <motion.div
+                  key="step0"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Button 
+                    onClick={async () => {
+                      await hapticLight();
+                      setStep(1);
+                    }} 
+                    size="lg" 
+                    className="w-full rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  >
+                    Kom igång
+                  </Button>
+                </motion.div>
+              )}
+
+              {step === 1 && (
+                <motion.div 
+                  key="step1"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, duration: 0.3 }}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-background/60"
+                  >
+                    <motion.div 
+                      animate={{ 
+                        scale: [1, 1.1, 1],
+                      }}
+                      transition={{ 
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center"
+                    >
+                      <Mic className="w-5 h-5 text-primary" />
+                    </motion.div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-foreground">Mikrofonåtkomst</p>
+                      <p className="text-xs text-muted-foreground">Behövs för att spela in möten.</p>
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.3 }}
+                  >
+                    <Button 
+                      onClick={requestMicrophonePermission} 
+                      size="lg" 
+                      className="w-full rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    >
+                      Tillåt mikrofon
+                    </Button>
+                  </motion.div>
+                  <motion.p 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3, duration: 0.3 }}
+                    className="text-xs text-muted-foreground text-center"
+                  >
+                    Du kan ändra detta senare i inställningar.
+                  </motion.p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
