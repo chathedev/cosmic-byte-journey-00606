@@ -185,12 +185,12 @@ export function AppSidebar() {
               isMobile 
                 ? "fixed top-0 left-0 h-screen w-[280px] z-50" 
                 : "sticky top-0 h-screen shrink-0"
-            } border-r border-border bg-card flex flex-col`}
+            } border-r border-border bg-card flex flex-col mobile-inset-top`}
             style={!isMobile ? {
               width: open ? "240px" : "fit-content",
             } : {}}
           >
-            <div className="p-2">
+            <div className="p-2 pt-3">
               {isMobile && (
                 <div className="flex justify-end mb-2">
                   <button

@@ -885,10 +885,10 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Minimalistic Header */}
-      <div className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 mobile-compact mobile-inset-top">
+        <div className="max-w-5xl mx-auto px-3 md:px-4 py-2 md:py-3">
+          <div className="flex items-center justify-between gap-2 md:gap-4">
+            <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
               <div className={`w-2 h-2 rounded-full transition-all ${
                 !isPaused && !isMuted ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground/40'
               }`} />
@@ -900,23 +900,23 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                     onBlur={() => setIsEditingName(false)}
                     onKeyDown={(e) => e.key === "Enter" && setIsEditingName(false)}
                     autoFocus
-                    className="h-8 text-sm"
+                    className="h-7 md:h-8 text-xs md:text-sm"
                   />
-                  <Button onClick={() => setIsEditingName(false)} size="sm" variant="ghost" className="h-8 w-8 p-0">
+                  <Button onClick={() => setIsEditingName(false)} size="sm" variant="ghost" className="h-7 w-7 md:h-8 md:w-8 p-0">
                     <Check className="w-3 h-3" />
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 group cursor-pointer flex-1 min-w-0" onClick={() => setIsEditingName(true)}>
-                  <h1 className="text-sm font-medium truncate">{meetingName}</h1>
+                  <h1 className="text-xs md:text-sm font-medium truncate">{meetingName}</h1>
                   <Edit2 className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="font-mono text-xs">
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="flex items-center gap-1 md:gap-1.5">
+                <Clock className="w-3 md:w-3.5 h-3 md:h-3.5 text-muted-foreground" />
+                <span className="font-mono text-[10px] md:text-xs">
                   {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
                 </span>
               </div>
@@ -926,38 +926,38 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-4 gap-4">
+      <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-3 md:p-4 gap-3 md:gap-4 mobile-compact">
         
         
         {/* Centered Recording Interface */}
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-full max-w-3xl space-y-6">
+          <div className="w-full max-w-3xl space-y-4 md:space-y-6">
             
             {/* Recording Status Card */}
-            <div className="bg-card rounded-xl p-8 border shadow-sm">
-              <div className="flex flex-col items-center text-center space-y-5">
+            <div className="bg-card rounded-xl p-4 md:p-8 border shadow-sm">
+              <div className="flex flex-col items-center text-center space-y-3 md:space-y-5">
                 {/* Microphone Icon with Animation */}
                 <div className="relative">
                   {!isPaused && !isMuted && (
                     <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20" />
                   )}
-                  <div className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${
+                  <div className={`w-16 h-16 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all ${
                     !isPaused && !isMuted 
                       ? 'bg-red-500 shadow-lg shadow-red-500/30' 
                       : 'bg-muted'
                   }`}>
-                    <Mic className={`w-12 h-12 transition-all ${
+                    <Mic className={`w-8 h-8 md:w-12 md:h-12 transition-all ${
                       !isPaused && !isMuted ? 'text-white' : 'text-muted-foreground'
                     }`} />
                   </div>
                 </div>
 
                 {/* Status Text */}
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold">
+                <div className="space-y-1 md:space-y-2">
+                  <h2 className="text-base md:text-xl font-semibold">
                     {isMuted ? 'Mikrofon avstängd' : isPaused ? 'Pausad' : 'Inspelning pågår'}
                   </h2>
-                  <p className="text-sm text-muted-foreground max-w-md">
+                  <p className="text-xs md:text-sm text-muted-foreground max-w-md px-2">
                     {isMuted 
                       ? 'Klicka på "Slå på" nedan för att aktivera mikrofonen och börja spela in ditt möte' 
                       : isPaused 
@@ -969,14 +969,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
             </div>
 
             {/* Live Transcript View */}
-            <div className="bg-card rounded-xl p-5 border">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
+            <div className="bg-card rounded-xl p-3 md:p-5 border">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <h3 className="text-xs md:text-sm font-medium flex items-center gap-2">
+                  <FileText className="w-3.5 md:w-4 h-3.5 md:h-4" />
                   Transkription
                 </h3>
                 <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <SelectTrigger className="h-7 md:h-8 w-[120px] md:w-[140px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -988,7 +988,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
               </div>
               <div 
                 ref={transcriptViewRef}
-                className="h-56 overflow-y-auto bg-muted/30 rounded-lg p-4 text-sm leading-relaxed"
+                className="h-40 md:h-56 overflow-y-auto bg-muted/30 rounded-lg p-3 md:p-4 text-xs md:text-sm leading-relaxed"
               >
                 {transcript || interimTranscript ? (
                   <div className="space-y-2">
@@ -998,7 +998,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                     )}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground/40 text-center py-16 text-xs">
+                  <p className="text-muted-foreground/40 text-center py-12 md:py-16 text-xs">
                     Börja tala så visas texten här...
                   </p>
                 )}
@@ -1009,23 +1009,23 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       </div>
 
       {/* Simplified Bottom Controls */}
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg">
-        <div className="max-w-5xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg mobile-compact mobile-inset-bottom">
+        <div className="max-w-5xl mx-auto px-3 md:px-4 py-3 md:py-4">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-0">
             {/* Back Button */}
             <Button
               onClick={handleBackClick}
               variant="ghost"
               size="lg"
-              className="h-12"
+              className="h-10 md:h-12 order-2 md:order-1"
               title="Gå tillbaka till startsidan"
             >
-              <ArrowLeft className="w-5 h-5 mr-2" />
+              <ArrowLeft className="w-4 md:w-5 h-4 md:h-5 mr-2" />
               Tillbaka
             </Button>
 
             {/* Recording Controls */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3 order-1 md:order-2">
               {/* Pause/Resume Button */}
               {!isMuted && (
                 <Button
@@ -1033,18 +1033,20 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   variant="outline"
                   size="lg"
                   disabled={isGeneratingProtocol || isSaving}
-                  className="h-12 min-w-[140px]"
+                  className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[140px] text-xs md:text-sm"
                   title={isPaused ? "Återuppta inspelningen" : "Pausa inspelningen"}
                 >
                   {isPaused ? (
                     <>
-                      <Play className="w-5 h-5 mr-2" />
-                      Återuppta
+                      <Play className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
+                      <span className="hidden md:inline">Återuppta</span>
+                      <span className="md:hidden">Återuppta</span>
                     </>
                   ) : (
                     <>
-                      <Pause className="w-5 h-5 mr-2" />
-                      Pausa
+                      <Pause className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
+                      <span className="hidden md:inline">Pausa</span>
+                      <span className="md:hidden">Pausa</span>
                     </>
                   )}
                 </Button>
@@ -1055,18 +1057,19 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 variant="default"
                 size="lg"
                 disabled={isGeneratingProtocol || isSaving}
-                className="h-12 min-w-[180px] bg-red-500 hover:bg-red-600"
+                className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-xs md:text-sm"
                 title="Avsluta inspelningen och generera mötesprotokoll automatiskt"
               >
                 {isGeneratingProtocol ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2 animate-spin" />
                     Genererar...
                   </>
                 ) : (
                   <>
-                    <Square className="w-5 h-5 mr-2" />
-                    Avsluta & Generera
+                    <Square className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
+                    <span className="hidden md:inline">Avsluta & Generera</span>
+                    <span className="md:hidden">Avsluta</span>
                   </>
                 )}
               </Button>
@@ -1077,18 +1080,19 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   variant="outline"
                   size="lg"
                   disabled={isSaving || isGeneratingProtocol}
-                  className="h-12 min-w-[160px]"
+                  className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[160px] text-xs md:text-sm"
                   title="Spara endast transkriptionen till biblioteket utan att generera protokoll"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2 animate-spin" />
                       Sparar...
                     </>
                   ) : (
                     <>
-                      <FileText className="w-5 h-5 mr-2" />
-                      Spara
+                      <FileText className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
+                      <span className="hidden md:inline">Spara</span>
+                      <span className="md:hidden">Spara</span>
                     </>
                   )}
                 </Button>
