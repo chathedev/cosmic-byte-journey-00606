@@ -1,0 +1,646 @@
+import { useEffect, useState } from "react";
+import { ArrowLeft, Download, Loader2, Mail, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import { saveAs } from "file-saver";
+import { EmailDialog } from "./EmailDialog";
+import { ProtocolGenerationWidget } from "./ProtocolGenerationWidget";
+import { generateMeetingTitle } from "@/lib/titleGenerator";
+import { saveActionItems } from "@/lib/backend";
+import { hasPlusAccess } from "@/lib/accessCheck";
+
+const SmoothRevealText = ({ 
+  text, 
+  delay = 0 
+}: { 
+  text: string; 
+  delay?: number;
+}) => {
+  const [displayText, setDisplayText] = useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      let currentIndex = 0;
+      const interval = setInterval(() => {
+        if (currentIndex <= text.length) {
+          setDisplayText(text.slice(0, currentIndex));
+          currentIndex++;
+        } else {
+          clearInterval(interval);
+        }
+      }, 5);
+
+      return () => clearInterval(interval);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [text, delay]);
+
+  return <>{displayText}</>;
+};
+
+interface AIActionItem {
+  title: string;
+  description?: string;
+  owner?: string;
+  deadline?: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+}
+
+interface AIProtocol {
+  title: string;
+  summary: string;
+  mainPoints: string[];
+  decisions: string[];
+  actionItems: AIActionItem[];
+  nextMeetingSuggestions?: string[];
+}
+
+interface AutoProtocolGeneratorProps {
+  transcript: string;
+  aiProtocol: AIProtocol | null;
+  onBack: () => void;
+  isFreeTrialMode?: boolean;
+  showWidget?: boolean;
+  onProtocolReady?: () => void;
+  meetingCreatedAt?: string;
+  agendaId?: string;
+  meetingId?: string;
+  userId?: string;
+}
+
+export const AutoProtocolGenerator = ({ 
+  transcript, 
+  aiProtocol, 
+  onBack, 
+  isFreeTrialMode = false,
+  showWidget = false,
+  onProtocolReady,
+  meetingCreatedAt,
+  agendaId,
+  meetingId,
+  userId
+}: AutoProtocolGeneratorProps) => {
+  const [isGenerating, setIsGenerating] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [documentBlob, setDocumentBlob] = useState<Blob | null>(null);
+  const [fileName, setFileName] = useState<string>("");
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [protocol, setProtocol] = useState<AIProtocol | null>(aiProtocol);
+  const [showContent, setShowContent] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [agendaContent, setAgendaContent] = useState<string>("");
+  const { user } = useAuth();
+  const { userPlan } = useSubscription();
+  useEffect(() => setProtocol(aiProtocol), [aiProtocol]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Load agenda if provided
+    const loadAgenda = async () => {
+      if (agendaId) {
+        try {
+          const { agendaStorage } = await import('@/utils/agendaStorage');
+          const agenda = await agendaStorage.getAgenda(agendaId);
+          if (agenda) {
+            setAgendaContent(agenda.content);
+          }
+        } catch (error) {
+          console.error('Failed to load agenda:', error);
+        }
+      }
+    };
+    loadAgenda();
+  }, [agendaId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const generateDocument = async () => {
+      try {
+        setIsGenerating(true);
+        setProgress(10);
+        // Wait a moment to show loading state with progress message
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setProgress(15);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        setProgress(20);
+
+        // Use meeting creation date instead of current date
+        const meetingDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
+        const dateStr = meetingDate.toLocaleDateString('sv-SE');
+        const timeStr = meetingDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+
+        // If no AI protocol provided, try to generate it here
+        let finalProtocol: AIProtocol | null = protocol;
+        if (!finalProtocol && transcript && transcript.trim().length >= 20) {
+          try {
+            setProgress(30);
+            const { analyzeMeeting } = await import('@/lib/backend');
+            setProgress(40);
+            const data: any = await analyzeMeeting({ 
+              transcript, 
+              meetingName: `Mötesprotokoll ${dateStr}`,
+              agenda: agendaContent 
+            });
+            setProgress(70);
+            if (data) {
+              // Generate AI title if not provided
+              const aiTitle = data.title || await generateMeetingTitle(transcript);
+              
+              // Best-effort normalization
+              finalProtocol = {
+                title: aiTitle || `Mötesprotokoll ${dateStr}`,
+                summary: data.summary ?? (Array.isArray(data.mainPoints) ? data.mainPoints.join('\n') : ''),
+                mainPoints: Array.isArray(data.mainPoints) ? data.mainPoints : [],
+                decisions: Array.isArray(data.decisions) ? data.decisions : [],
+                actionItems: Array.isArray(data.actionItems) ? data.actionItems : [],
+                nextMeetingSuggestions: Array.isArray(data.nextMeetingSuggestions) ? data.nextMeetingSuggestions : [],
+              };
+              if (!cancelled) setProtocol(finalProtocol);
+              
+              // Save action items to backend for Plus/Admin users
+              const hasAccess = hasPlusAccess(user, userPlan);
+              if (hasAccess && meetingId && userId && data.actionItems && Array.isArray(data.actionItems) && data.actionItems.length > 0) {
+                try {
+                  await saveActionItems({
+                    meetingId,
+                    userId,
+                    actionItems: data.actionItems
+                  });
+                  console.log('✅ Saved action items to backend');
+                } catch (e) {
+                  console.warn('Failed to save action items:', e);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('AI analysis failed in protocol view, falling back to simple doc:', e);
+          }
+        }
+
+        // Heuristic fallback to make protocol rich even with short transcripts
+        if (!finalProtocol && transcript) {
+          const text = transcript.trim();
+          const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+          const summary = sentences.slice(0, 3).join(' ');
+          const mainPoints = sentences.slice(0, 8).map(s => s.replace(/^[-•\d.\s]+/, ''));
+          finalProtocol = {
+            title: `Mötesprotokoll ${dateStr}`,
+            summary: summary || 'Sammanfattning av mötet baserat på inspelad transkription.',
+            mainPoints: mainPoints.length ? mainPoints : [text],
+            decisions: [],
+            actionItems: [],
+          };
+          if (!cancelled) setProtocol(finalProtocol);
+        }
+
+        const title = finalProtocol?.title || `Mötesprotokoll ${dateStr}`;
+        
+        const doc = new Document({
+          sections: [
+            {
+              properties: {},
+              children: [
+                // Title
+                new Paragraph({
+                  text: "MÖTESPROTOKOLL",
+                  heading: HeadingLevel.TITLE,
+                  alignment: AlignmentType.CENTER,
+                  spacing: { after: 400 },
+                }),
+                
+                // Meeting title
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: title,
+                      bold: true,
+                      size: 32,
+                    }),
+                  ],
+                  spacing: { after: 300 },
+                }),
+
+                // Date and time
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Datum: ", bold: true }),
+                    new TextRun(dateStr),
+                    new TextRun({ text: " | Tid: ", bold: true }),
+                    new TextRun(timeStr),
+                  ],
+                  spacing: { after: 300 },
+                }),
+
+                // Divider
+                new Paragraph({
+                  text: "─────────────────────────────────────────",
+                  spacing: { after: 300 },
+                }),
+
+                // AI-generated content (if available)
+                ...(finalProtocol ? [
+                  // Summary
+                  new Paragraph({
+                    text: "Sammanfattning",
+                    heading: HeadingLevel.HEADING_1,
+                    spacing: { before: 200, after: 200 },
+                  }),
+                  new Paragraph({ text: finalProtocol.summary, spacing: { after: 300 } }),
+
+                  // Main Points
+                  new Paragraph({
+                    text: "Huvudpunkter",
+                    heading: HeadingLevel.HEADING_1,
+                    spacing: { before: 200, after: 200 },
+                  }),
+                  ...finalProtocol.mainPoints.map(point => new Paragraph({ text: `• ${point}`, spacing: { after: 100 } })),
+
+                  // Decisions (if any)
+                  ...(finalProtocol.decisions.length > 0 ? [
+                    new Paragraph({ text: "Beslut", heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 200 } }),
+                    ...finalProtocol.decisions.map(decision => new Paragraph({ text: `• ${decision}`, spacing: { after: 100 } })),
+                  ] : []),
+
+                  // Action Items (if any)
+                  ...(finalProtocol.actionItems.length > 0 ? [
+                    new Paragraph({ text: "Åtgärdspunkter", heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 200 } }),
+                    ...finalProtocol.actionItems.map((item: AIActionItem) => {
+                      const itemText = typeof item === 'string' 
+                        ? item 
+                        : `${item.title}${item.description ? ` - ${item.description}` : ''}${item.owner ? ` (${item.owner})` : ''}${item.deadline ? ` [Deadline: ${item.deadline}]` : ''} [Priority: ${item.priority}]`;
+                      return new Paragraph({ text: `• ${itemText}`, spacing: { after: 100 } });
+                    }),
+                  ] : []),
+                ] : []),
+
+                // Watermark for free users
+                ...(isFreeTrialMode ? [
+                  new Paragraph({ text: "", spacing: { before: 600 } }),
+                  new Paragraph({
+                    text: "─────────────────────────────────────────",
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 200 },
+                  }),
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: "TIVLY - GRATIS PLAN",
+                        bold: true,
+                        size: 24,
+                      }),
+                    ],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 100 },
+                  }),
+                  new Paragraph({
+                    text: "Uppgradera till Standard eller Plus för obegränsade protokoll utan vattenstämpel",
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 200 },
+                  }),
+                  new Paragraph({
+                    text: "─────────────────────────────────────────",
+                    alignment: AlignmentType.CENTER,
+                  }),
+                ] : []),
+              ],
+            },
+          ],
+        });
+
+        if (cancelled) return;
+
+        setProgress(85);
+        const blob = await Packer.toBlob(doc);
+        const generatedFileName = `Motesprotokoll_${dateStr}_${timeStr.replace(':', '-')}.docx`;
+        
+        setProgress(95);
+        setDocumentBlob(blob);
+        setFileName(generatedFileName);
+        setProgress(100);
+        
+        // Small delay before showing content
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setIsGenerating(false);
+        setShowContent(true);
+
+        if (onProtocolReady) {
+          onProtocolReady();
+        } else {
+          toast({ title: "Protokoll klart!", description: "Du kan nu se och ladda ner ditt protokoll." });
+        }
+      } catch (error) {
+        console.error("Fel vid generering av protokoll:", error);
+        setIsGenerating(false);
+        toast({ title: "Fel", description: "Kunde inte skapa protokollet.", variant: "destructive" });
+      }
+    };
+
+    generateDocument();
+    return () => { cancelled = true; };
+  }, [transcript, protocol, toast]);
+
+  const handleDownload = () => {
+    if (documentBlob && fileName) {
+      saveAs(documentBlob, fileName);
+      toast({
+        title: "Nedladdning startad!",
+        description: `${fileName} laddas ner nu.`,
+      });
+    }
+  };
+
+  // Use meeting creation date instead of current date for display
+  const displayDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
+  const dateStr = displayDate.toLocaleDateString('sv-SE');
+  const timeStr = displayDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+
+  // If showing widget mode, don't render the full UI
+  if (showWidget) {
+    return (
+      <ProtocolGenerationWidget
+        isGenerating={isGenerating}
+        progress={progress}
+        onComplete={onProtocolReady}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 flex flex-col">
+      {/* Content */}
+      <div className="flex-1 container max-w-5xl mx-auto px-4 py-8 md:py-12">
+        {isGenerating ? (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center space-y-6">
+              <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto" />
+              <div className="space-y-2">
+                <p className="text-xl font-semibold text-foreground">Genererar mötesprotokoll</p>
+                <p className="text-base text-muted-foreground animate-pulse">
+                  {progress < 30 && "Förbereder analys..."}
+                  {progress >= 30 && progress < 50 && "Analyserar transkription..."}
+                  {progress >= 50 && progress < 75 && "Sammanställer huvudpunkter..."}
+                  {progress >= 75 && progress < 90 && "Skapar dokument..."}
+                  {progress >= 90 && "Färdigställer protokoll..."}
+                </p>
+                <div className="w-64 h-2 bg-muted rounded-full overflow-hidden mx-auto mt-4">
+                  <div 
+                    className="h-full bg-primary transition-all duration-300 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">{Math.round(progress)}%</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8 animate-fade-in">
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                Protokoll klart!
+              </h1>
+              <p className="text-muted-foreground">Ditt mötesprotokoll är genererat och redo att användas</p>
+            </div>
+
+            {/* Protocol Card */}
+            <Card className="border-2 shadow-xl overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b-2 space-y-4 py-8">
+                <div className="space-y-3">
+                  <CardTitle className="text-3xl md:text-4xl font-bold text-center">
+                    MÖTESPROTOKOLL
+                  </CardTitle>
+                  <h2 className="text-xl md:text-2xl font-semibold text-center text-primary">
+                    {protocol?.title || `Mötesprotokoll ${dateStr}`}
+                  </h2>
+                  <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                    <span className="font-medium">📅 {dateStr}</span>
+                    <span className="text-border">•</span>
+                    <span className="font-medium">🕐 {timeStr}</span>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="py-8 px-6 md:px-10">
+                {protocol && showContent ? (
+                  <div className="space-y-8 animate-fade-in">
+                    {/* Summary Section */}
+                    {protocol.summary && (
+                      <div className="space-y-3">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Sammanfattning
+                        </h3>
+                        <p className="text-base leading-relaxed text-foreground/90 pl-4">
+                          <SmoothRevealText text={protocol.summary} delay={0} />
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Main Points Section */}
+                    {protocol.mainPoints && protocol.mainPoints.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Huvudpunkter
+                        </h3>
+                        <ul className="space-y-3 pl-4">
+                          {protocol.mainPoints.map((point, index) => (
+                            <li key={index} className="flex gap-3 items-start group">
+                              <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">•</span>
+                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                <SmoothRevealText text={point} delay={index * 100} />
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Decisions Section */}
+                    {protocol.decisions && protocol.decisions.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Beslut
+                        </h3>
+                        <ul className="space-y-3 pl-4">
+                          {protocol.decisions.map((decision, index) => (
+                            <li key={index} className="flex gap-3 items-start group">
+                              <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">✓</span>
+                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                <SmoothRevealText text={decision} delay={index * 100} />
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Action Items Section with Smart Display */}
+                    {protocol.actionItems && protocol.actionItems.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Åtgärdspunkter
+                        </h3>
+                        <div className="space-y-4 pl-4">
+                          {protocol.actionItems.map((item, index) => {
+                            const isSmartItem = typeof item === 'object' && item.priority;
+                            if (!isSmartItem) {
+                              // Legacy string format
+                              return (
+                                <div key={index} className="flex gap-3 items-start group">
+                                  <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">→</span>
+                                  <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                    <SmoothRevealText text={typeof item === 'string' ? item : item.title} delay={index * 100} />
+                                  </span>
+                                </div>
+                              );
+                            }
+                            
+                            // Smart action item display
+                            const priorityColors = {
+                              critical: 'bg-red-500/10 text-red-700 border-red-200 dark:text-red-400',
+                              high: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:text-orange-400',
+                              medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:text-yellow-400',
+                              low: 'bg-green-500/10 text-green-700 border-green-200 dark:text-green-400'
+                            };
+                            
+                            return (
+                              <div key={index} className="border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <h4 className="font-semibold text-foreground flex-1">
+                                    <SmoothRevealText text={item.title} delay={index * 100} />
+                                  </h4>
+                                  <Badge variant="outline" className={priorityColors[item.priority]}>
+                                    {item.priority === 'critical' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                    {item.priority.toUpperCase()}
+                                  </Badge>
+                                </div>
+                                {item.description && (
+                                  <p className="text-sm text-muted-foreground mb-2">
+                                    <SmoothRevealText text={item.description} delay={index * 100 + 50} />
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                                  {item.owner && (
+                                    <div className="flex items-center gap-1">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>{item.owner}</span>
+                                    </div>
+                                  )}
+                                  {item.deadline && (
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-3.5 h-3.5" />
+                                      <span>{new Date(item.deadline).toLocaleDateString('sv-SE')}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Next Meeting Suggestions - Plus users only */}
+                    {hasPlusAccess(user, userPlan) && protocol.nextMeetingSuggestions && protocol.nextMeetingSuggestions.length > 0 && (
+                      <div className="space-y-3 bg-primary/5 rounded-lg p-5 border border-primary/20">
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Förslag för nästa möte
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-3">AI-genererade förslag baserade på detta möte</p>
+                        <ul className="space-y-3 pl-4">
+                          {protocol.nextMeetingSuggestions.map((suggestion, index) => (
+                            <li key={index} className="flex gap-3 items-start group">
+                              <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">→</span>
+                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                <SmoothRevealText text={suggestion} delay={index * 100} />
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Transcript Toggle Section */}
+                    <div className="border-t pt-6 mt-6">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowTranscript(!showTranscript)}
+                        className="w-full"
+                      >
+                        {showTranscript ? "Dölj fullständig transkription" : "Visa fullständig transkription"}
+                      </Button>
+                      
+                      {showTranscript && (
+                        <div className="mt-4 space-y-3 animate-fade-in">
+                          <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                            <span className="w-1 h-6 bg-primary rounded-full" />
+                            Fullständig transkription
+                          </h3>
+                          <div className="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                            <p className="text-base leading-relaxed text-foreground/80 whitespace-pre-wrap">
+                              {transcript}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+              {!isFreeTrialMode && (
+                <Button onClick={onBack} variant="outline" size="lg" className="gap-2 min-w-[160px]">
+                  <ArrowLeft className="w-4 h-4" />
+                  Nytt möte
+                </Button>
+              )}
+              <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 min-w-[160px]">
+                <Mail className="w-4 h-4" />
+                E-posta
+              </Button>
+              <Button onClick={handleDownload} size="lg" className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                <Download className="w-4 h-4" />
+                Ladda ner
+              </Button>
+            </div>
+            
+            {/* Free trial notice */}
+            {isFreeTrialMode && (
+              <div className="mt-6 p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-2 border-primary/20 rounded-xl text-center">
+                <p className="text-sm leading-relaxed">
+                  <strong className="text-primary">Gratis testversion:</strong>{" "}
+                  <span className="text-muted-foreground">
+                    Du har använt ditt gratis möte och protokoll. Uppgradera för att skapa fler möten och protokoll!
+                  </span>
+                </p>
+              </div>
+            )}
+
+            {/* Email Dialog */}
+            {documentBlob && (
+              <EmailDialog
+                open={emailDialogOpen}
+                onOpenChange={setEmailDialogOpen}
+                documentBlob={documentBlob}
+                fileName={fileName}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

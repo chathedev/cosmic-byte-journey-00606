@@ -1,0 +1,603 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useNavigate } from "react-router-dom";
+import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
+import { SubscribeDialog } from "@/components/SubscribeDialog";
+import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
+import { MeetingChat } from "@/components/MeetingChat";
+import { ChatUpgradeBanner } from "@/components/ChatUpgradeBanner";
+import { isLibraryLocked as checkLibraryLocked, hasPlusAccess } from "@/lib/accessCheck";
+
+const Library = () => {
+  const { user } = useAuth();
+  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting } = useSubscription();
+  const [meetings, setMeetings] = useState<MeetingSession[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>("Alla");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isAddingFolder, setIsAddingFolder] = useState(false);
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [deletingMeetingId, setDeletingMeetingId] = useState<string | null>(null);
+  const [selectedProtocol, setSelectedProtocol] = useState<{ transcript: string; aiProtocol: any } | null>(null);
+  const [isGeneratingProtocol, setIsGeneratingProtocol] = useState(false);
+  const [generatingProtocolData, setGeneratingProtocolData] = useState<{ transcript: string; aiProtocol: any } | null>(null);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState('');
+  const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
+  const [chatMeeting, setChatMeeting] = useState<MeetingSession | null>(null);
+  const [showAgendaDialog, setShowAgendaDialog] = useState(false);
+  const [pendingMeetingData, setPendingMeetingData] = useState<any>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
+  
+  // Lock library only for free users without admin-granted unlimited access
+  const isLibraryLocked = checkLibraryLocked(user, userPlan);
+
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  // Don't redirect - allow viewing library but show upgrade prompts for actions
+
+  const loadData = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const userMeetings = await meetingStorage.getMeetings(user.uid);
+      // De-duplicate meetings created accidentally by guarding on a signature
+      const map = new Map<string, MeetingSession>();
+      for (const m of userMeetings) {
+        const key = `${m.title}|${m.createdAt}|${m.folder}|${(m.transcript || '').length}`;
+        const existing = map.get(key);
+        if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
+          map.set(key, m);
+        }
+      }
+      const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
+      setMeetings(deduped);
+      
+      const allFolders = await meetingStorage.getFolders(user.uid);
+      setFolders(allFolders.map(f => f.name));
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      toast({
+        title: "Laddar...",
+        description: "Index byggs fortfarande. Vänta ett ögonblick.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartNewMeeting = async () => {
+    const { allowed, reason } = await canGenerateProtocol('', 0).then(() => ({ allowed: true as const })).catch(() => ({ allowed: true as const })) as any; // placeholder to keep type
+    // Use canCreateMeeting from context instead of canGenerateProtocol
+  };
+  const handleDeleteMeeting = async (id: string) => {
+    if (userPlan?.plan === 'free') {
+      toast({
+        title: 'Kan inte ta bort',
+        description: 'Gratisplanen tillåter inte att du tar bort ditt testmöte.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Prevent double-click
+    if (deletingMeetingId === id) return;
+    
+    try {
+      setDeletingMeetingId(id);
+      
+      // Soft-delete the meeting
+      await meetingStorage.deleteMeeting(id);
+      
+      // Immediately reload data to show updated list
+      await loadData();
+      
+      // Refresh plan from backend
+      await refreshPlan();
+      
+      toast({
+        title: 'Borttaget',
+        description: 'Mötet har tagits bort',
+      });
+    } catch (error) {
+      console.error('Failed to delete meeting:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte ta bort mötet',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingMeetingId(null);
+    }
+  };
+
+  const handleAddFolder = async () => {
+    if (!newFolderName.trim() || !user) return;
+    
+    const trimmedName = newFolderName.trim();
+    
+    if (folders.includes(trimmedName)) {
+      toast({
+        title: "Fel",
+        description: "Mappen finns redan",
+        variant: "destructive",
+      });
+      setNewFolderName("");
+      setIsAddingFolder(false);
+      return;
+    }
+
+    try {
+      await meetingStorage.addFolder(trimmedName, user.uid);
+      await loadData();
+      setNewFolderName("");
+      setIsAddingFolder(false);
+      toast({
+        title: "Mapp skapad",
+        description: `Mappen "${trimmedName}" har skapats`,
+      });
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte skapa mappen. Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteFolder = async (folder: string) => {
+    if (folder === "Allmänt" || folder === "__Trash") {
+      toast({
+        title: "Kan inte ta bort",
+        description: "Denna mapp är skyddad och kan inte tas bort",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user) return;
+
+    try {
+      await meetingStorage.deleteFolder(folder, user.uid);
+      if (selectedFolder === folder) {
+        setSelectedFolder("Alla");
+      }
+      await loadData();
+      toast({
+        title: "Mapp borttagen",
+        description: "Möten flyttades till Allmänt",
+      });
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte ta bort mappen. Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleStartEdit = (meeting: MeetingSession) => {
+    setEditingMeetingId(meeting.id);
+    setEditName(meeting.title);
+  };
+
+  const handleSaveEdit = async (meeting: MeetingSession) => {
+    if (!editName.trim()) {
+      setEditName(meeting.title);
+      setEditingMeetingId(null);
+      return;
+    }
+
+    const updated = { ...meeting, title: editName, updatedAt: new Date().toISOString() };
+    await meetingStorage.saveMeeting(updated);
+    setEditingMeetingId(null);
+    loadData();
+    toast({
+      title: "Sparat",
+      description: "Mötesnamnet har uppdaterats",
+    });
+  };
+
+  const handleMoveToFolder = async (meeting: MeetingSession, newFolder: string) => {
+    const updated = { ...meeting, folder: newFolder, updatedAt: new Date().toISOString() };
+    await meetingStorage.saveMeeting(updated);
+    loadData();
+    toast({
+      title: "Flyttat",
+      description: `Mötet har flyttats till "${newFolder}"`,
+    });
+  };
+
+  const handleContinueMeeting = (meeting: MeetingSession) => {
+    // Free users cannot continue meetings
+    if (userPlan?.plan === 'free') {
+      setUpgradeReason('Funktionen "Fortsätt möte" är endast tillgänglig för betalande användare. Uppgradera för att fortsätta inspelningar!');
+      setShowSubscribeDialog(true);
+      return;
+    }
+    navigate(`/?continue=${meeting.id}`);
+  };
+
+  const handleCreateProtocol = async (meeting: MeetingSession) => {
+    // Always refresh latest meeting data to avoid stale counts
+    const latest = await meetingStorage.getMeeting(meeting.id);
+    const effectiveMeeting = latest || meeting;
+
+    if (!effectiveMeeting.transcript || effectiveMeeting.transcript.length < 20) {
+      toast({
+        title: "Otillräcklig text",
+        description: "Transkriptionen måste vara minst 20 tecken.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Show agenda selection dialog
+    setPendingMeetingData({
+      id: effectiveMeeting.id,
+      transcript: effectiveMeeting.transcript,
+      title: effectiveMeeting.title,
+      createdAt: effectiveMeeting.createdAt,
+    });
+    setShowAgendaDialog(true);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("sv-SE", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
+
+  const filteredMeetings = selectedFolder === "Alla" 
+    ? meetings 
+    : meetings.filter(m => m.folder === selectedFolder);
+
+
+  // If showing protocol, display the protocol generator
+  if (selectedProtocol) {
+    return (
+      <AutoProtocolGenerator
+        transcript={selectedProtocol.transcript}
+        aiProtocol={selectedProtocol.aiProtocol}
+        onBack={() => setSelectedProtocol(null)}
+        showWidget={false}
+      />
+    );
+  }
+
+  // Widget mode for background generation
+  const handleProtocolReady = () => {
+    setIsGeneratingProtocol(false);
+    if (generatingProtocolData) {
+      setSelectedProtocol(generatingProtocolData);
+      setGeneratingProtocolData(null);
+    }
+  };
+
+  // Show locked library screen only for free users
+  if (isLibraryLocked) {
+    return (
+      <>
+        <div className="flex items-center justify-center min-h-[70vh] px-4 animate-fade-in">
+          <Card className="max-w-md w-full animate-scale-in">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Lock className="w-8 h-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Biblioteket är låst</CardTitle>
+              <CardDescription className="text-base mt-2">
+                Uppgradera till Standard eller Plus för att få tillgång till biblioteket och alla dess funktioner!
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-muted rounded-lg p-4 space-y-2">
+                <p className="text-sm font-medium">Med en uppgradering får du:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>✓ Tillgång till biblioteket</li>
+                  <li>✓ Skapa fler möten</li>
+                  <li>✓ Generera fler protokoll</li>
+                  <li>✓ Organisera i mappar</li>
+                </ul>
+              </div>
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={() => setShowSubscribeDialog(true)}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Uppgradera nu
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/')}
+              >
+                Tillbaka till start
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <SubscribeDialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3">
+        <h1 className="text-lg font-semibold">Mina möten</h1>
+      </div>
+
+      {/* Loading bar */}
+      {isLoading && (
+        <div className="h-1 bg-gradient-to-r from-primary via-primary/60 to-primary animate-pulse">
+          <div className="h-full w-full bg-gradient-to-r from-transparent via-background/20 to-transparent animate-[slide-in-right_1s_ease-in-out_infinite]" />
+        </div>
+      )}
+
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Chat Upgrade Banner - Show only for users without Plus access */}
+        {!hasPlusAccess(user, userPlan) && (
+          <ChatUpgradeBanner onUpgrade={() => setShowSubscribeDialog(true)} />
+        )}
+
+        {/* Folder Management */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant={selectedFolder === "Alla" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedFolder("Alla")}
+            >
+              Alla möten ({meetings.length})
+            </Button>
+            {/* Always show Allmänt folder first */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant={selectedFolder === "Allmänt" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedFolder("Allmänt")}
+              >
+                <Folder className="w-3 h-3 mr-1" />
+                Allmänt ({meetings.filter(m => !m.folder || m.folder === "Allmänt").length})
+              </Button>
+            </div>
+            {/* Show other folders */}
+            {folders.filter(f => f !== "Allmänt").map(folder => (
+              <div key={folder} className="flex items-center gap-1">
+                <Button
+                  variant={selectedFolder === folder ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedFolder(folder)}
+                >
+                  <Folder className="w-3 h-3 mr-1" />
+                  {folder} ({meetings.filter(m => m.folder === folder).length})
+                </Button>
+                {folder !== "Allmänt" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteFolder(folder)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {isAddingFolder ? (
+            <div className="flex gap-2">
+              <Input
+                placeholder="Mappnamn..."
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
+                autoFocus
+              />
+              <Button onClick={handleAddFolder} size="sm">
+                <Check className="w-4 h-4" />
+              </Button>
+              <Button onClick={() => {
+                setIsAddingFolder(false);
+                setNewFolderName("");
+              }} variant="ghost" size="sm">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={() => setIsAddingFolder(true)} variant="outline" size="sm">
+              <FolderPlus className="w-4 h-4 mr-2" />
+              Ny mapp
+            </Button>
+          )}
+        </div>
+
+        {/* Meetings List */}
+          {filteredMeetings.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                {selectedFolder === "Alla" ? "Inga möten ännu" : `Inga möten i "${selectedFolder}"`}
+              </p>
+            </div>
+          ) : (
+          <div className="grid gap-4">
+            {filteredMeetings.map((meeting) => (
+              <Card key={meeting.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      {editingMeetingId === meeting.id ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSaveEdit(meeting)}
+                            autoFocus
+                          />
+                          <Button onClick={() => handleSaveEdit(meeting)} size="sm">
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button onClick={() => setEditingMeetingId(null)} variant="ghost" size="sm">
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">{meeting.title}</CardTitle>
+                          <Button
+                            onClick={() => handleStartEdit(meeting)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
+                      <CardDescription className="mt-2 flex items-center gap-4 text-xs flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {formatDate(meeting.createdAt)}
+                        </span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-muted-foreground">
+                          Uppdaterad: {formatDate(meeting.updatedAt)}
+                        </span>
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                    {meeting.transcript || "Ingen transkription ännu..."}
+                  </p>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <Button
+                      onClick={() => handleContinueMeeting(meeting)}
+                      size="sm"
+                      variant="default"
+                      disabled={userPlan?.plan === 'free'}
+                      title={userPlan?.plan === 'free' ? 'Endast för betalande användare' : undefined}
+                    >
+                      <Play className="w-4 h-4 mr-1" />
+                      Fortsätt möte
+                    </Button>
+                    <Button
+                      onClick={() => handleCreateProtocol(meeting)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      {userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll'}
+                    </Button>
+                    {userPlan?.plan === 'plus' && (
+                      <Button
+                        onClick={() => setChatMeeting(meeting)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-1" />
+                        Chatta
+                      </Button>
+                    )}
+                    <Select value={(folders.includes(meeting.folder) || meeting.folder === 'Allmänt') ? meeting.folder : undefined} onValueChange={(value) => handleMoveToFolder(meeting, value)}>
+                      <SelectTrigger className="w-[160px] h-9">
+                        <SelectValue placeholder="Klicka för att välja mapp" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Allmänt", ...folders.filter(f => f !== "Allmänt")].map(folder => (
+                          <SelectItem key={folder} value={folder}>
+                            <div className="flex items-center gap-2">
+                              <Folder className="w-3 h-3" />
+                              {folder}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={() => handleDeleteMeeting(meeting.id)}
+                      size="sm"
+                      variant="destructive"
+                      disabled={userPlan?.plan === 'free' || deletingMeetingId === meeting.id}
+                      title={userPlan?.plan === 'free' ? 'Inte tillåtet på gratisplanen' : deletingMeetingId === meeting.id ? 'Tar bort...' : undefined}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Ta bort
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Widget for background protocol generation */}
+      {isGeneratingProtocol && generatingProtocolData && (
+        <AutoProtocolGenerator
+          transcript={generatingProtocolData.transcript}
+          aiProtocol={generatingProtocolData.aiProtocol}
+          onBack={() => {
+            setIsGeneratingProtocol(false);
+            setGeneratingProtocolData(null);
+          }}
+          showWidget={true}
+          onProtocolReady={handleProtocolReady}
+        />
+      )}
+
+      {/* Chat Dialog */}
+      {chatMeeting && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl h-[600px]">
+            <MeetingChat
+              transcript={chatMeeting.transcript}
+              meetingTitle={chatMeeting.title}
+              onClose={() => setChatMeeting(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Agenda Selection Dialog */}
+      {pendingMeetingData && (
+        <AgendaSelectionDialog
+          open={showAgendaDialog}
+          onOpenChange={setShowAgendaDialog}
+          meetingData={pendingMeetingData}
+        />
+      )}
+
+      {/* Upgrade Dialog */}
+      <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
+      <SubscribeDialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog} />
+    </>
+  );
+};
+
+export default Library;

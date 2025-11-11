@@ -1,0 +1,27 @@
+{
+  "appId": "se.tivly.app",
+  "appName": "Tivly",
+  "webDir": ".",
+  "server": {
+    "url": "https://app.tivly.se",
+    "cleartext": true
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "allowNavigation": [
+      "app.tivly.se",
+      "api.tivly.se",
+      "accounts.google.com",
+      "oauth2.googleapis.com"
+    ],
+    "scheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "showSpinner": true
+    }
+  }
+}
