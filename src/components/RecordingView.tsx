@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AgendaSelectionDialog } from "./AgendaSelectionDialog";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
+import { RecordingInstructions } from "./RecordingInstructions";
 
 interface AIActionItem {
   title: string;
@@ -83,6 +84,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const isFinalizingRef = useRef(false);
   const [selectedLanguage, setSelectedLanguage] = useState<'sv-SE' | 'en-US'>(initialLanguage);
   const wakeLockRef = useRef<any>(null);
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  // Check if user has seen instructions before
+  useEffect(() => {
+    const hasSeenInstructions = localStorage.getItem('hasSeenRecordingInstructions');
+    if (!hasSeenInstructions && !continuedMeeting) {
+      setShowInstructions(true);
+    }
+  }, [continuedMeeting]);
 
   // Removed automatic upgrade dialog - only show when trying to create NEW meeting
 
@@ -1172,6 +1182,11 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RecordingInstructions 
+        isOpen={showInstructions} 
+        onClose={() => setShowInstructions(false)} 
+      />
     </div>
   );
 };
