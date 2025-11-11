@@ -345,7 +345,7 @@ const Library = () => {
   }
 
   return (
-    <div className="animate-fade-in pt-4">
+    <div className="animate-fade-in pt-6 md:pt-8">
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-4 shadow-sm">
         <h1 className="text-lg font-semibold">Mina möten</h1>
       </div>
@@ -357,7 +357,7 @@ const Library = () => {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 animate-in slide-in-from-bottom-4 duration-500">
         {/* Chat Upgrade Banner - Show only for users without Plus access */}
         {!hasPlusAccess(user, userPlan) && (
           <ChatUpgradeBanner onUpgrade={() => setShowSubscribeDialog(true)} />

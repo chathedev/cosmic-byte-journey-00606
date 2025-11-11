@@ -136,11 +136,11 @@ export default function Agendas() {
 
   return (
     <>
-      <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card shadow-sm mt-4">
+      <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card shadow-sm mt-6 md:mt-8">
         <h1 className="text-lg font-semibold">Mötesagendor</h1>
       </header>
 
-          <main className="flex-1 p-6 animate-fade-in">
+          <main className="flex-1 p-6 pt-8 md:p-8 md:pt-10 animate-fade-in">
             {isLocked ? (
               <div className="max-w-4xl mx-auto">
                 <Card className="border-2 border-primary/20">
