@@ -34,8 +34,8 @@ import { isMobileDevice } from "@/utils/mobileDetection";
 import tivlyLogo from "@/assets/tivly-logo.png";
 
 export function AppSidebar() {
-  const [isMobile, setIsMobile] = useState(false);
-  const [open, setOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
+  const [open, setOpen] = useState(() => !isMobileDevice());
   const [selected, setSelected] = useState("Hem");
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
@@ -49,19 +49,14 @@ export function AppSidebar() {
   const location = useLocation();
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(isMobileDevice());
-    checkMobile();
+    const checkMobile = () => {
+      const mobile = isMobileDevice();
+      setIsMobile(mobile);
+      setOpen(!mobile);
+    };
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  useEffect(() => {
-    if (isMobile) {
-      setOpen(false);
-    } else {
-      setOpen(true);
-    }
-  }, [isMobile]);
 
   const unlimited = planLoading ? false : hasUnlimitedAccess(user, userPlan);
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
