@@ -277,7 +277,7 @@ export const Chat = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-background via-background to-muted/20 animate-fade-in">
+    <div className="flex flex-col h-screen bg-gradient-to-b from-background via-background to-muted/20 animate-fade-in pt-4">
       {/* Modern Header */}
       <div className="border-b bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container max-w-5xl mx-auto px-4 py-4">

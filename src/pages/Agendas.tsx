@@ -136,7 +136,7 @@ export default function Agendas() {
 
   return (
     <>
-      <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card shadow-sm">
+      <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card shadow-sm mt-4">
         <h1 className="text-lg font-semibold">Mötesagendor</h1>
       </header>
 

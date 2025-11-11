@@ -248,7 +248,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   return (
     <div className="min-h-screen bg-background flex flex-col mobile-compact">
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 pt-6 md:p-6 md:pt-8 lg:p-8 lg:pt-10">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 pt-12 md:p-6 md:pt-16 lg:p-8 lg:pt-20">
         <div className="max-w-4xl w-full space-y-12">
           {/* Hero section */}
           <div className="text-center space-y-6">
