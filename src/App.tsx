@@ -91,19 +91,26 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 // Global gate to wait for subscription plan to load before rendering the app
 const PlanGate = ({ children }: { children: React.ReactNode }) => {
   const { isLoading } = useSubscription();
-  const [overlayActive, setOverlayActive] = useState(true);
-  const hasCompletedRef = useRef(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const loadingTimer = useRef<number | null>(null);
 
+  // Only show overlay if loading takes longer than 200ms to avoid flicker
   useEffect(() => {
-    if (!isLoading && !hasCompletedRef.current) {
-      hasCompletedRef.current = true;
-      setOverlayActive(false);
+    if (isLoading) {
+      if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
+      loadingTimer.current = window.setTimeout(() => setShowOverlay(true), 200);
+    } else {
+      if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
+      setShowOverlay(false);
     }
+    return () => {
+      if (loadingTimer.current) window.clearTimeout(loadingTimer.current);
+    };
   }, [isLoading]);
 
-  if (overlayActive) {
+  if (showOverlay) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-background/80 backdrop-blur-sm flex items-center justify-center">
+      <div className="fixed inset-0 z-[9999] bg-background/80 backdrop-blur-sm flex items-center justify-center transition-opacity">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
