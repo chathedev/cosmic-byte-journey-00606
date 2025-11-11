@@ -9,6 +9,7 @@ import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
 import { AdminRoute } from "@/components/AdminRoute";
+import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
@@ -135,54 +136,75 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ErrorBoundary>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
-          <SubscriptionProvider>
-            <PlanGate>
-              <BrowserRouter>
-                <AppLayout>
-                  <Suspense
-                    fallback={
-                      <div className="min-h-screen bg-background flex items-center justify-center">
-                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
-                      </div>
-                    }
-                  >
-                    <Routes>
-                      <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
-                      <Route path="/magic-login" element={<MagicLogin />} />
-                      <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                      <Route path="/free-trial" element={<FreeTrial />} />
-                      <Route path="/generate-protocol" element={<GenerateProtocol />} />
-                      <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
-                      <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
-                      <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                      <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-                      <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
-                      <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
-                      <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-                      <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
-                      <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
-                      <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
-                      <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
-                      <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
-                      <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </AppLayout>
-              </BrowserRouter>
-            </PlanGate>
-          </SubscriptionProvider>
-        </AuthProvider>
-      </TooltipProvider>
-    </ErrorBoundary>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(() => {
+    return localStorage.getItem('tivly_welcome_completed') === 'true';
+  });
+
+  const handleWelcomeComplete = () => {
+    localStorage.setItem('tivly_welcome_completed', 'true');
+    setHasSeenWelcome(true);
+  };
+
+  if (!hasSeenWelcome) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <IOSWelcomeScreen onComplete={handleWelcomeComplete} />
+        </ErrorBoundary>
+      </QueryClientProvider>
+    );
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
+            <SubscriptionProvider>
+              <PlanGate>
+                <BrowserRouter>
+                  <AppLayout>
+                    <Suspense
+                      fallback={
+                        <div className="min-h-screen bg-background flex items-center justify-center">
+                          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+                        </div>
+                      }
+                    >
+                      <Routes>
+                        <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                        <Route path="/magic-login" element={<MagicLogin />} />
+                        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                        <Route path="/free-trial" element={<FreeTrial />} />
+                        <Route path="/generate-protocol" element={<GenerateProtocol />} />
+                        <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
+                        <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
+                        <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+                        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                        <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
+                        <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+                        <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                        <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
+                        <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
+                        <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+                        <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
+                        <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                        <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </AppLayout>
+                </BrowserRouter>
+              </PlanGate>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </ErrorBoundary>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

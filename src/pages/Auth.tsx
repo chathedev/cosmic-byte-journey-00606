@@ -158,59 +158,59 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-12 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse-slow" />
-        <div className="absolute bottom-1/4 -right-12 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }} />
-      </div>
-
-      <Card className="w-full max-w-md shadow-2xl border-2 relative z-10 backdrop-blur-sm bg-card/95 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <CardHeader className="space-y-4 text-center pb-8">
-          <div className="mx-auto w-24 h-24 relative">
-            <img 
-              src={tivlyLogo}
-              alt="Tivly Logo" 
-              className="w-full h-full object-contain drop-shadow-2xl"
-            />
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 safe-area-inset">
+      <Card className="w-full max-w-md shadow-2xl border border-border/50 relative z-10 backdrop-blur-xl bg-card/90 rounded-3xl">
+        <CardHeader className="space-y-6 text-center pb-8 pt-10">
+          <div className="mx-auto relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl blur-2xl opacity-30 animate-pulse-glow" />
+            <div className="relative w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-xl">
+              <img 
+                src={tivlyLogo}
+                alt="Tivly Logo" 
+                className="w-12 h-12 object-contain"
+              />
+            </div>
           </div>
           
           <div className="space-y-2">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient">
-              Välkommen till Tivly
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+              Välkommen
             </CardTitle>
-            <CardDescription className="text-base">
-              {linkSent ? 'Kontrollera din e-post' : 'Logga in med e-post'}
+            <CardDescription className="text-base text-muted-foreground">
+              {linkSent ? 'Kontrollera din e-post' : 'Logga in för att fortsätta'}
             </CardDescription>
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-8 pb-10">
           {linkSent ? (
-            <div className="text-center space-y-4 py-6 animate-in fade-in zoom-in duration-300">
-              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-primary animate-in zoom-in duration-500" />
+            <div className="text-center space-y-6 py-4 animate-in fade-in zoom-in duration-300">
+              <div className="mx-auto w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-green-500 animate-in zoom-in duration-500" />
               </div>
-              <div className="space-y-2">
-                <p className="font-medium text-lg">E-post skickad!</p>
-                <p className="text-sm text-muted-foreground">
-                  Vi har skickat en inloggningslänk till <strong className="text-foreground">{email}</strong>
-                </p>
-                <p className="text-xs text-muted-foreground/80">
+              <div className="space-y-3">
+                <p className="font-semibold text-xl">E-post skickad!</p>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    Vi har skickat en inloggningslänk till<br/>
+                    <strong className="font-semibold">{email}</strong>
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
                   Länken är giltig i 15 minuter
                 </p>
                 {isPolling && (
-                  <div className="flex items-center justify-center gap-2 text-xs text-primary mt-3">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                    <span>Väntar på inloggning från annan enhet...</span>
+                  <div className="flex items-center justify-center gap-2 text-xs text-blue-600 dark:text-blue-400 mt-3 bg-blue-50 dark:bg-blue-900/20 rounded-full py-2 px-4">
+                    <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-pulse" />
+                    <span>Väntar på inloggning...</span>
                   </div>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleSendMagicLink}
                   variant="outline"
-                  className="flex-1 transition-all duration-200"
+                  className="flex-1 h-12 rounded-2xl border-2 font-semibold touch-manipulation"
                   disabled={cooldown > 0 || isLoading}
                 >
                   {isLoading ? (
@@ -228,24 +228,24 @@ const Auth = () => {
                     setCooldown(0);
                   }}
                   variant="ghost"
-                  className="flex-1 transition-all duration-200"
+                  className="flex-1 h-12 rounded-2xl font-semibold touch-manipulation"
                 >
-                  Använd annan e-post
+                  Annan e-post
                 </Button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSendMagicLink} className="space-y-4">
-              <div className="space-y-2">
+            <form onSubmit={handleSendMagicLink} className="space-y-6">
+              <div className="space-y-3">
                 <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary z-10" />
                   <Input
                     type="email"
                     placeholder="din@email.se"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
-                    className="pl-10 h-12 text-base transition-all duration-200"
+                    className="pl-12 h-14 text-base rounded-2xl border-2 focus:border-primary transition-all touch-manipulation"
                     required
                   />
                 </div>
@@ -254,7 +254,7 @@ const Auth = () => {
               <Button
                 type="submit"
                 disabled={isLoading || !email}
-                className="w-full h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                className="w-full h-14 text-base font-semibold rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl shadow-blue-500/30 touch-manipulation"
                 size="lg"
               >
                 {isLoading ? (
@@ -269,10 +269,10 @@ const Auth = () => {
             </form>
           )}
           
-          <div className="space-y-3 pt-4 border-t border-border/50">
-            <p className="text-xs text-muted-foreground/80 text-center leading-relaxed">
+          <div className="space-y-3 pt-2">
+            <p className="text-xs text-center text-muted-foreground leading-relaxed px-2">
               {linkSent 
-                ? 'Klicka på länken i e-posten för att logga in säkert. Du kan också öppna länken på en annan enhet.'
+                ? 'Klicka på länken i e-posten för att logga in säkert.'
                 : 'Vi skickar en säker inloggningslänk till din e-post. Inget lösenord krävs.'}
             </p>
           </div>

@@ -8,83 +8,95 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 240 20% 99%;
-    --foreground: 240 10% 10%;
+    /* iOS-inspired color palette */
+    --background: 220 25% 97%;
+    --foreground: 220 10% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 10%;
+    --card-foreground: 220 10% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10%;
+    --popover-foreground: 220 10% 15%;
 
-    --primary: 250 90% 65%;
+    --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 70% 95%;
-    --secondary-foreground: 240 10% 10%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 220 10% 15%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 240 5% 45%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 220 8% 46%;
 
-    --accent: 280 80% 70%;
+    --accent: 208 100% 47%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 75% 55%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 91%;
-    --input: 220 14% 91%;
-    --ring: 250 90% 65%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 211 100% 50%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    --sidebar-background: 245 30% 97%;
-    --sidebar-foreground: 240 10% 20%;
-    --sidebar-primary: 250 90% 65%;
+    /* iOS gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(211 100% 50%), hsl(208 100% 47%));
+    --gradient-secondary: linear-gradient(135deg, hsl(210 40% 96%), hsl(220 25% 97%));
+    --gradient-hero: linear-gradient(180deg, hsl(211 100% 50% / 0.1), hsl(208 100% 47% / 0.05));
+
+    --sidebar-background: 220 25% 98%;
+    --sidebar-foreground: 220 10% 15%;
+    --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 70% 95%;
-    --sidebar-accent-foreground: 240 10% 10%;
-    --sidebar-border: 220 14% 91%;
-    --sidebar-ring: 250 90% 65%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 220 10% 15%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 211 100% 50%;
   }
 
   .dark {
-    --background: 240 10% 6%;
-    --foreground: 240 5% 96%;
+    /* iOS dark mode */
+    --background: 220 20% 8%;
+    --foreground: 220 10% 96%;
 
-    --card: 240 10% 10%;
-    --card-foreground: 240 5% 96%;
+    --card: 220 20% 11%;
+    --card-foreground: 220 10% 96%;
 
-    --popover: 240 10% 10%;
-    --popover-foreground: 240 5% 96%;
+    --popover: 220 20% 11%;
+    --popover-foreground: 220 10% 96%;
 
-    --primary: 250 90% 65%;
+    --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 15%;
-    --secondary-foreground: 240 5% 96%;
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 220 10% 96%;
 
-    --muted: 240 5% 18%;
-    --muted-foreground: 240 5% 60%;
+    --muted: 220 15% 20%;
+    --muted-foreground: 220 10% 65%;
 
-    --accent: 280 80% 70%;
+    --accent: 208 100% 47%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 70% 50%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 5% 20%;
-    --input: 240 5% 20%;
-    --ring: 250 90% 65%;
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 211 100% 50%;
     
-    --sidebar-background: 240 10% 8%;
-    --sidebar-foreground: 240 5% 90%;
-    --sidebar-primary: 250 90% 65%;
+    /* iOS dark mode gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(211 100% 50%), hsl(208 100% 47%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 15% 18%), hsl(220 20% 11%));
+    --gradient-hero: linear-gradient(180deg, hsl(211 100% 50% / 0.15), hsl(208 100% 47% / 0.08));
+
+    --sidebar-background: 220 20% 10%;
+    --sidebar-foreground: 220 10% 92%;
+    --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 15%;
-    --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 240 5% 20%;
-    --sidebar-ring: 250 90% 65%;
+    --sidebar-accent: 220 15% 18%;
+    --sidebar-accent-foreground: 220 10% 96%;
+    --sidebar-border: 220 15% 22%;
+    --sidebar-ring: 211 100% 50%;
   }
 }
 
@@ -95,6 +107,24 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* iOS safe area support */
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

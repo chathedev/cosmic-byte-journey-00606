@@ -1,11 +1,11 @@
 {
-  "name": "Mötes Inspelare",
-  "short_name": "Möten",
-  "description": "Spela in och transkribera möten",
+  "name": "Tivly - AI Mötesassistent",
+  "short_name": "Tivly",
+  "description": "Transkribera dina möten i realtid med AI. 100% privat och säkert.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1EAEDB",
+  "background_color": "#007AFF",
+  "theme_color": "#007AFF",
   "orientation": "portrait",
   "icons": [
     {

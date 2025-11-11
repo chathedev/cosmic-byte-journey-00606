@@ -1,27 +1,35 @@
 {
   "appId": "se.tivly.app",
   "appName": "Tivly",
-  "webDir": ".",
+  "webDir": "dist",
   "server": {
     "url": "https://app.tivly.se",
     "cleartext": true
   },
   "ios": {
-    "contentInset": "automatic",
+    "contentInset": "always",
     "allowNavigation": [
       "app.tivly.se",
       "api.tivly.se",
       "accounts.google.com",
       "oauth2.googleapis.com"
     ],
-    "scheme": "https"
+    "scheme": "https",
+    "preferredContentMode": "mobile"
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 3000,
+      "launchShowDuration": 2000,
       "launchAutoHide": true,
-      "backgroundColor": "#ffffff",
-      "showSpinner": true
+      "backgroundColor": "#007AFF",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "androidSpinnerStyle": "large",
+      "iosSpinnerStyle": "small",
+      "spinnerColor": "#FFFFFF",
+      "splashFullScreen": true,
+      "splashImmersive": true
     }
   }
 }
