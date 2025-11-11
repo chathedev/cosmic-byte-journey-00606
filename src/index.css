@@ -152,6 +152,14 @@ All colors MUST be HSL.
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* Hardware acceleration for smooth animations */
+  nav, .sidebar-nav {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
   
   
   @media (max-width: 768px) {

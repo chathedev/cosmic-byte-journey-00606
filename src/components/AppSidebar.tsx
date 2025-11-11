@@ -146,42 +146,44 @@ export function AppSidebar() {
     <>
       {/* Mobile hamburger button */}
       {isMobile && !open && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => setOpen(true)}
-          className="fixed z-50 w-11 h-11 bg-background/80 backdrop-blur-md border border-border/50 rounded-lg flex items-center justify-center text-foreground shadow-md hover:shadow-lg transition-all"
+          className="fixed z-50 w-11 h-11 bg-background/80 backdrop-blur-md border border-border/50 rounded-lg flex items-center justify-center text-foreground shadow-md active:scale-95 transition-transform"
           style={{
             top: 'calc(max(env(safe-area-inset-top, 12px), 12px) + 8px)',
             left: 'calc(max(env(safe-area-inset-left, 12px), 12px) + 8px)',
           }}
         >
           <FiMenu className="text-lg" />
-        </motion.button>
+        </button>
       )}
 
       {/* Backdrop for mobile */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {isMobile && open && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={() => setOpen(false)}
             className="fixed inset-0 bg-black/50 z-40"
           />
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {(!isMobile || open) && (
           <motion.nav
             initial={isMobile ? { x: -300 } : false}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            transition={{ 
+              type: "spring", 
+              damping: 25, 
+              stiffness: 250,
+              mass: 0.8
+            }}
             className={`${
               isMobile 
                 ? "fixed top-0 left-0 w-[280px] z-50" 
@@ -338,29 +340,19 @@ export function AppSidebar() {
 
 const Option = ({ Icon, title, selected, onClick, open, locked = false, badge = undefined }) => {
   return (
-    <motion.button
-      layout
+    <button
       onClick={onClick}
-      className={`relative flex h-10 w-full items-center rounded-md transition-colors ${
+      className={`relative flex h-10 w-full items-center rounded-md transition-all duration-200 ${
         selected === title 
           ? "bg-primary/10 text-primary" 
           : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       }`}
     >
-      <motion.div
-        layout
-        className="grid h-full w-10 place-content-center text-lg"
-      >
+      <div className="grid h-full w-10 shrink-0 place-content-center text-lg">
         <Icon />
-      </motion.div>
+      </div>
       {open && (
-        <motion.span
-          layout
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.125 }}
-          className="text-xs font-medium flex items-center gap-2"
-        >
+        <span className="text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
           {title}
           {locked && <Lock className="h-3 w-3" />}
           {badge && !locked && (
@@ -368,87 +360,58 @@ const Option = ({ Icon, title, selected, onClick, open, locked = false, badge = 
               {badge}
             </span>
           )}
-        </motion.span>
+        </span>
       )}
-    </motion.button>
+    </button>
   );
 };
 
 const AdminSection = ({ open, expanded, setExpanded, items, selected, onSelect }) => {
   return (
     <div className="mt-4 pt-4 border-t border-border">
-      <motion.button
-        layout
+      <button
         onClick={() => setExpanded(!expanded)}
         className="relative flex h-10 w-full items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors mb-1"
       >
-        <motion.div
-          layout
-          className="grid h-full w-10 place-content-center text-lg"
-        >
+        <div className="grid h-full w-10 shrink-0 place-content-center text-lg">
           <FiShield />
-        </motion.div>
+        </div>
         {open && (
           <>
-            <motion.span
-              layout
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.125 }}
-              className="text-xs font-medium"
-            >
+            <span className="text-xs font-medium animate-in fade-in slide-in-from-left-2 duration-200">
               Admin
-            </motion.span>
-            <motion.div
-              animate={{ rotate: expanded ? 180 : 0 }}
-              className="ml-auto mr-2"
+            </span>
+            <div
+              className={`ml-auto mr-2 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             >
               <FiChevronDown className="text-sm" />
-            </motion.div>
+            </div>
           </>
         )}
-      </motion.button>
+      </button>
 
-      <AnimatePresence>
-        {expanded && open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden space-y-1 pl-2"
-          >
-            {items.map((item) => (
-              <motion.button
-                key={item.title}
-                layout
-                onClick={() => onSelect(item.path, item.title)}
-                className={`relative flex h-9 w-full items-center rounded-md transition-colors ${
-                  selected === item.title 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                }`}
-              >
-                <motion.div
-                  layout
-                  className="grid h-full w-10 place-content-center text-base"
-                >
-                  <item.Icon />
-                </motion.div>
-                <motion.span
-                  layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="text-xs font-medium"
-                >
-                  {item.title}
-                </motion.span>
-              </motion.button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {expanded && open && (
+        <div className="space-y-1 pl-2 animate-in slide-in-from-top-2 duration-200">
+          {items.map((item) => (
+            <button
+              key={item.title}
+              onClick={() => onSelect(item.path, item.title)}
+              className={`relative flex h-9 w-full items-center rounded-md transition-all duration-200 ${
+                selected === item.title 
+                  ? "bg-primary/10 text-primary" 
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              <div className="grid h-full w-10 shrink-0 place-content-center text-base">
+                <item.Icon />
+              </div>
+              <span className="text-xs font-medium">
+                {item.title}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -461,12 +424,7 @@ const TitleSection = ({ open, user, userPlan, planLoading }) => {
       <div className="flex items-center gap-2">
         <Logo />
         {open && (
-          <motion.div
-            layout
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.125 }}
-          >
+          <div className="animate-in fade-in slide-in-from-left-2 duration-200">
             {planLoading ? (
               <div className="space-y-1">
                 <div className="h-3 w-10 bg-muted rounded animate-pulse" />
@@ -478,7 +436,7 @@ const TitleSection = ({ open, user, userPlan, planLoading }) => {
                 <span className="block text-xs text-muted-foreground">{planLabel}</span>
               </>
             )}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
@@ -487,16 +445,13 @@ const TitleSection = ({ open, user, userPlan, planLoading }) => {
 
 const Logo = () => {
   return (
-    <motion.div
-      layout
-      className="grid size-10 shrink-0 place-content-center rounded-md bg-primary overflow-hidden p-1"
-    >
+    <div className="grid size-10 shrink-0 place-content-center rounded-md bg-primary overflow-hidden p-1">
       <img 
         src={tivlyLogo} 
         alt="Tivly"
         className="w-full h-full object-contain"
       />
-    </motion.div>
+    </div>
   );
 };
 
