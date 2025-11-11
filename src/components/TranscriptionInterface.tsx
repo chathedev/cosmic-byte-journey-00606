@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mic, AlertCircle, FileText, Loader2, Upload } from "lucide-react";
+import { Mic, AlertCircle, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TranscriptPreview } from "./TranscriptPreview";
@@ -266,58 +266,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </div>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          {/* CTA Button */}
+          <div className="flex justify-center">
             <Button
               onClick={handleStartRecording}
               size="lg"
-              className="px-10 py-6 text-lg font-medium shadow-md hover:shadow-lg transition-all"
+              className="px-12 py-6 text-lg font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
             >
               <Mic className="mr-2 h-5 w-5" />
               Spela in möte
             </Button>
-            
-            <Button
-              onClick={() => document.getElementById('audio-file-input')?.click()}
-              size="lg"
-              variant="outline"
-              className="px-10 py-6 text-lg font-medium shadow-md hover:shadow-lg transition-all"
-            >
-              <Upload className="mr-2 h-5 w-5" />
-              Ladda upp MP3
-            </Button>
-            
-            <input
-              id="audio-file-input"
-              type="file"
-              accept=".mp3,audio/mp3,audio/mpeg"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-                e.target.value = '';
-              }}
-            />
-          </div>
-
-          {/* Upload Instructions */}
-          <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6 max-w-2xl mx-auto">
-            <div className="flex items-start gap-3">
-              <Upload className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-              <div className="space-y-2">
-                <h3 className="font-semibold text-foreground">Har du redan spelat in ett möte?</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Ladda upp din inspelade fil (MP3) med knappen <strong>"Ladda upp MP3"</strong> ovan. 
-                  Du kan sedan generera ett protokoll direkt.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  • Stödda format: MP3 (max 500MB)<br />
-                  • Uppladdade möten: upp till 8 timmar<br />
-                  • Inspelade möten på plattformen: mycket längre möten möjliga<br />
-                  • Transkribering tar cirka 1-2 minuter beroende på filens längd
-                </p>
-              </div>
-            </div>
           </div>
           {/* Features grid */}
           <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
