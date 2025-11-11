@@ -43,6 +43,12 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(211 100% 50%), hsl(208 100% 47%));
     --gradient-secondary: linear-gradient(135deg, hsl(210 40% 96%), hsl(220 25% 97%));
     --gradient-hero: linear-gradient(180deg, hsl(211 100% 50% / 0.1), hsl(208 100% 47% / 0.05));
+    
+    /* Safe area insets for iOS notch/dynamic island */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
 
     --sidebar-background: 220 25% 98%;
     --sidebar-foreground: 220 10% 15%;
@@ -109,22 +115,13 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
-
-  /* iOS safe area support */
-  .safe-area-inset {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-
-  .safe-area-top {
-    padding-top: env(safe-area-inset-top);
-  }
-
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+  
+  html, body, #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 }
 
@@ -249,5 +246,13 @@ All colors MUST be HSL.
     .hover-scale:active {
       transform: scale(0.98);
     }
+  }
+  
+  /* Safe area inset support for iOS notch/dynamic island */
+  .safe-area-inset {
+    padding-top: max(env(safe-area-inset-top), 1.5rem);
+    padding-bottom: max(env(safe-area-inset-bottom), 1.5rem);
+    padding-left: max(env(safe-area-inset-left), 1.5rem);
+    padding-right: max(env(safe-area-inset-right), 1.5rem);
   }
 }

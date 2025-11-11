@@ -82,7 +82,7 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6"
+      className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6 safe-area-inset"
     >
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
