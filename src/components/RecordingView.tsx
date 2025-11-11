@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { Square, FileText, Pause, Play, Edit2, Check, MicOff, Mic, Clock, Loader2, Radio, ArrowLeft } from "lucide-react";
-import { RecordingTutorial } from "./RecordingTutorial";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -84,15 +83,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const isFinalizingRef = useRef(false);
   const [selectedLanguage, setSelectedLanguage] = useState<'sv-SE' | 'en-US'>(initialLanguage);
   const wakeLockRef = useRef<any>(null);
-  const [showTutorial, setShowTutorial] = useState(() => {
-    const hasSeenTutorial = localStorage.getItem('hasSeenRecordingTutorial');
-    return !hasSeenTutorial;
-  });
-
-  const handleCloseTutorial = () => {
-    localStorage.setItem('hasSeenRecordingTutorial', 'true');
-    setShowTutorial(false);
-  };
 
   // Removed automatic upgrade dialog - only show when trying to create NEW meeting
 
@@ -1097,9 +1087,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           </div>
         </div>
       </div>
-
-      {/* Tutorial Dialog */}
-      <RecordingTutorial open={showTutorial} onClose={handleCloseTutorial} />
 
       {/* Agenda Selection Dialog */}
       {pendingMeetingData && (
