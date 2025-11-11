@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { TranscriptionInterface } from "@/components/TranscriptionInterface";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNavigate } from "react-router-dom";
 
@@ -29,10 +29,7 @@ const FreeTrial = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        <main className="flex-1 overflow-auto relative">
-          <div className="fixed top-4 left-4 z-50 mobile-inset-top">
-            <SidebarTrigger className="bg-card/80 backdrop-blur-sm border shadow-lg hover:bg-card" />
-          </div>
+        <main className="flex-1 overflow-auto">
           <TranscriptionInterface isFreeTrialMode={true} />
         </main>
       </div>

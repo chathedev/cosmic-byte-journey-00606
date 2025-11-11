@@ -152,10 +152,16 @@ export function AppSidebar() {
       {/* Mobile hamburger button */}
       {isMobile && !open && (
         <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => setOpen(true)}
-          className="fixed top-4 left-4 z-50 w-10 h-10 bg-card border border-border rounded-md flex items-center justify-center text-foreground shadow-lg"
+          className="fixed z-50 w-12 h-12 bg-card/95 backdrop-blur-sm border border-border rounded-xl flex items-center justify-center text-foreground shadow-lg hover:shadow-xl transition-shadow mobile-inset-top"
+          style={{
+            top: 'max(env(safe-area-inset-top, 16px), 16px)',
+            left: 'max(env(safe-area-inset-left, 16px), 16px)',
+          }}
         >
           <FiMenu className="text-xl" />
         </motion.button>
