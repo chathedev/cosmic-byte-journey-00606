@@ -128,7 +128,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto relative">
+          <div className="fixed top-4 left-4 z-50 mobile-inset-top">
+            <SidebarTrigger className="bg-card/80 backdrop-blur-sm border shadow-lg hover:bg-card" />
+          </div>
           {children}
         </main>
       </div>
