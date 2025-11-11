@@ -177,7 +177,7 @@ const Auth = () => {
                   <img 
                     src={tivlyLogo}
                     alt="Tivly Logo" 
-                    className="w-12 h-12 object-contain brightness-0 invert"
+                    className="w-12 h-12 object-contain"
                   />
                 </div>
               </div>
