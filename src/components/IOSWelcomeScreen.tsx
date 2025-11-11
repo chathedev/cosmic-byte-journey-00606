@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import tivlyLogo from "@/assets/tivly-logo.png";
 
 interface IOSWelcomeScreenProps {
@@ -10,13 +11,32 @@ interface IOSWelcomeScreenProps {
 export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
   const [step, setStep] = useState<0 | 1>(0);
 
+  const hapticLight = async () => {
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch (e) {
+      // Haptics not available (web browser)
+    }
+  };
+
+  const hapticMedium = async () => {
+    try {
+      await Haptics.impact({ style: ImpactStyle.Medium });
+    } catch (e) {
+      // Haptics not available
+    }
+  };
+
   const requestMicrophonePermission = async () => {
+    await hapticMedium();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
+      await Haptics.notification({ type: NotificationType.Success });
       onComplete();
     } catch (error) {
       console.error("Microphone permission denied:", error);
+      await Haptics.notification({ type: NotificationType.Error });
       alert("Mikrofonåtkomst krävs för att spela in möten.");
     }
   };
@@ -37,7 +57,14 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
             </div>
 
             {step === 0 && (
-              <Button onClick={() => setStep(1)} size="lg" className="w-full rounded-xl h-12">
+              <Button 
+                onClick={async () => {
+                  await hapticLight();
+                  setStep(1);
+                }} 
+                size="lg" 
+                className="w-full rounded-xl h-12"
+              >
                 Kom igång
               </Button>
             )}

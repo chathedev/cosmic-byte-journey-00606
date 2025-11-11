@@ -13,6 +13,7 @@
   "dependencies": {
     "@capacitor/app": "^7.1.0",
     "@capacitor/core": "^7.4.4",
+    "@capacitor/haptics": "^7.0.2",
     "@capacitor/ios": "^7.4.4",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
