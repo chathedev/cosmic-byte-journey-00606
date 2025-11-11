@@ -48,6 +48,16 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Prevent background scroll and stabilize viewport when sidebar is open on mobile
+  useEffect(() => {
+    if (!isMobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = open ? 'hidden' : prev || '';
+    return () => {
+      document.body.style.overflow = prev || '';
+    };
+  }, [isMobile, open]);
+
   const unlimited = planLoading ? false : hasUnlimitedAccess(user, userPlan);
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
   const libraryLocked = planLoading ? false : isLibraryLocked(user, userPlan);
@@ -150,16 +160,15 @@ export function AppSidebar() {
         </motion.button>
       )}
 
-      {/* Backdrop - Mobile Only */}
-      {isMobile && open && (
+      {/* Backdrop - Mobile Only (always mounted to avoid flashes) */}
+      {isMobile && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-          style={{ willChange: 'opacity' }}
+          initial={false}
+          animate={{ opacity: open ? 1 : 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          onClick={() => open && setOpen(false)}
+          className="fixed inset-0 z-40 bg-black/50"
+          style={{ pointerEvents: open ? 'auto' : 'none', willChange: 'opacity' }}
         />
       )}
 
