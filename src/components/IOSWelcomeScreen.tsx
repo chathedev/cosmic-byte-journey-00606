@@ -29,16 +29,47 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
   };
 
   const requestMicrophonePermission = async () => {
-    await hapticMedium();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop());
-      await Haptics.notification({ type: NotificationType.Success });
-      onComplete();
+      await hapticMedium();
+    } catch (e) {
+      // Haptics may not be available
+    }
+    
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      // Clean up the stream
+      stream.getTracks().forEach((track) => track.stop());
+      
+      // Success haptic
+      try {
+        await Haptics.notification({ type: NotificationType.Success });
+      } catch (e) {
+        // Haptics not available
+      }
+      
+      // Small delay for iOS to process
+      setTimeout(() => {
+        onComplete();
+      }, 100);
+      
     } catch (error) {
       console.error("Microphone permission denied:", error);
-      await Haptics.notification({ type: NotificationType.Error });
-      alert("Mikrofonåtkomst krävs för att spela in möten.");
+      
+      try {
+        await Haptics.notification({ type: NotificationType.Error });
+      } catch (e) {
+        // Haptics not available
+      }
+      
+      alert("Mikrofonåtkomst krävs för att spela in möten. Gå till Inställningar för att aktivera.");
     }
   };
 
@@ -105,11 +136,15 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                 >
                   <Button 
                     onClick={async () => {
-                      await hapticLight();
+                      try {
+                        await hapticLight();
+                      } catch (e) {
+                        // Haptics not available
+                      }
                       setStep(1);
                     }} 
                     size="lg" 
-                    className="w-full rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    className="w-full rounded-xl h-12 active:scale-95 transition-transform touch-manipulation"
                   >
                     Kom igång
                   </Button>
@@ -157,7 +192,7 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                     <Button 
                       onClick={requestMicrophonePermission} 
                       size="lg" 
-                      className="w-full rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                      className="w-full rounded-xl h-12 active:scale-95 transition-transform touch-manipulation"
                     >
                       Tillåt mikrofon
                     </Button>
