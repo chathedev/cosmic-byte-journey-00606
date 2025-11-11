@@ -342,16 +342,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </div>
           </div>
 
-          {/* Browser compatibility alert */}
-          <div className="max-w-2xl mx-auto">
-            <Alert className="border-primary/20 bg-primary/5">
-              <AlertCircle className="h-4 w-4 text-primary" />
-              <AlertDescription className="text-sm">
-                <strong>Realtidsinspelning:</strong> Fungerar endast i Google Chrome för bästa prestanda.<br />
-                <strong>Filuppladdning:</strong> Stöds i alla moderna webbläsare.
-              </AlertDescription>
-            </Alert>
-          </div>
         </div>
       </div>
 
