@@ -185,31 +185,32 @@ export function AppSidebar() {
               isMobile 
                 ? "fixed top-0 left-0 h-screen w-[280px] z-50" 
                 : "sticky top-0 h-screen shrink-0"
-            } border-r border-border bg-card p-2 flex flex-col`}
+            } border-r border-border bg-card flex flex-col`}
             style={!isMobile ? {
               width: open ? "240px" : "fit-content",
             } : {}}
           >
-            {/* Close button for mobile */}
-            {isMobile && (
-              <div className="flex justify-end mb-2">
-                <button
-                  onClick={() => setOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground"
-                >
-                  <FiX className="text-xl" />
-                </button>
-              </div>
-            )}
-            <TitleSection 
-              open={open} 
-              user={user} 
-              userPlan={userPlan}
-              planLoading={planLoading}
-            />
+            <div className="p-2">
+              {isMobile && (
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                  >
+                    <FiX className="text-xl" />
+                  </button>
+                </div>
+              )}
+              <TitleSection 
+                open={open} 
+                user={user} 
+                userPlan={userPlan}
+                planLoading={planLoading}
+              />
+            </div>
 
-            <div className="space-y-1 flex-1 overflow-y-auto min-h-0">
-              {navItems.map((item) => (
+            <div className="flex-1 overflow-y-auto min-h-0 px-2">
+              <div className="space-y-1">{navItems.map((item) => (
               <Option
                 key={item.title}
                 Icon={item.Icon}
@@ -257,9 +258,11 @@ export function AppSidebar() {
               </motion.button>
             </div>
           )}
+              </div>
             </div>
 
-            {!planLoading && userPlan && !plusAccess && open && !unlimited && meetingsLeft !== null && (
+            <div className="mt-auto">
+              {!planLoading && userPlan && !plusAccess && open && !unlimited && meetingsLeft !== null && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -285,21 +288,24 @@ export function AppSidebar() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowSubscribe(true)}
-                className="mb-2 w-10 h-10 bg-primary text-primary-foreground rounded-md flex items-center justify-center"
+                className="mb-2 mx-2 w-10 h-10 bg-primary text-primary-foreground rounded-md flex items-center justify-center"
               >
                 <FiZap className="text-lg" />
               </motion.button>
             )}
 
-            <UserSection
-              open={open}
-              user={user}
-              userPlan={userPlan}
-              planLoading={planLoading}
-              onSettings={() => setShowSettings(true)}
-            />
+            <div className="px-2">
+              <UserSection
+                open={open}
+                user={user}
+                userPlan={userPlan}
+                planLoading={planLoading}
+                onSettings={() => setShowSettings(true)}
+              />
+            </div>
 
             {!isMobile && <ToggleClose open={open} setOpen={setOpen} />}
+            </div>
           </motion.nav>
         )}
       </AnimatePresence>
