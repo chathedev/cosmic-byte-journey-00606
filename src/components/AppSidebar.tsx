@@ -34,7 +34,7 @@ import { isMobileDevice } from "@/utils/mobileDetection";
 import tivlyLogo from "@/assets/tivly-logo.png";
 
 export function AppSidebar() {
-  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
+  const [isMobile] = useState(() => isMobileDevice());
   const [open, setOpen] = useState(() => !isMobileDevice());
   const [selected, setSelected] = useState("Hem");
   const [showSettings, setShowSettings] = useState(false);
@@ -48,15 +48,6 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = isMobileDevice();
-      setIsMobile(mobile);
-      setOpen(!mobile);
-    };
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const unlimited = planLoading ? false : hasUnlimitedAccess(user, userPlan);
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
@@ -159,30 +150,29 @@ export function AppSidebar() {
       )}
 
       {/* Backdrop for mobile */}
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {isMobile && open && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-[2px]"
           />
         )}
       </AnimatePresence>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {(!isMobile || open) && (
           <motion.nav
-            initial={isMobile ? { x: -300 } : false}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
+            initial={isMobile ? { x: -280, opacity: 0.8 } : false}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -280, opacity: 0 }}
             transition={{ 
-              type: "spring", 
-              damping: 25, 
-              stiffness: 250,
-              mass: 0.8
+              type: "tween",
+              duration: 0.2,
+              ease: "easeOut"
             }}
             className={`${
               isMobile 
