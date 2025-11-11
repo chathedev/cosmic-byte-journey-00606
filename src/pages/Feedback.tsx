@@ -105,9 +105,9 @@ const Feedback = () => {
   const timeLeft = getTimeUntilNextSubmission();
 
   return (
-    <div className="animate-fade-in pt-6 md:pt-8">
+    <div className="animate-fade-in">
           
-          <div className="container max-w-2xl mx-auto p-6 md:p-8 pt-10 md:pt-14">
+          <div className="container max-w-2xl mx-auto p-6 md:p-8">
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               {/* Header */}
               <div className="text-center space-y-3">

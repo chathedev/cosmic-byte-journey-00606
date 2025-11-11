@@ -277,7 +277,7 @@ export const Chat = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-background via-background to-muted/20 animate-fade-in pt-2 md:pt-4">
+    <div className="flex flex-col h-screen bg-gradient-to-b from-background via-background to-muted/20 animate-fade-in">
       {/* Modern Header */}
       <div className="border-b bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container max-w-5xl mx-auto px-4 py-4">
@@ -417,6 +417,11 @@ export const Chat = () => {
       {/* Input Area */}
       <div className="border-t bg-card/50 backdrop-blur-xl sticky bottom-0">
         <div className="container max-w-4xl mx-auto px-4 py-4">
+          <div className="mb-3 text-center">
+            <p className="text-xs text-muted-foreground">
+              💡 Fråga om dina möten, hitta specifika beslut, eller få sammanfattningar – AI:n söker i alla dina transkriptioner
+            </p>
+          </div>
           <div className="flex gap-3 items-end">
             <div className="flex-1 relative">
               <Input

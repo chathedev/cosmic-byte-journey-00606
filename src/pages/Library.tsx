@@ -345,7 +345,7 @@ const Library = () => {
   }
 
   return (
-    <div className="animate-fade-in pt-6 md:pt-8">
+    <div className="animate-fade-in">
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-4 shadow-sm">
         <h1 className="text-lg font-semibold">Mina möten</h1>
       </div>
