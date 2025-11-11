@@ -185,25 +185,28 @@ export function AppSidebar() {
             className={`${
               isMobile 
                 ? "fixed top-0 left-0 w-[280px] z-50" 
-                : "sticky top-0 h-screen shrink-0"
+                : "sticky top-0 shrink-0"
             } border-r border-border bg-card flex flex-col mobile-inset-top`}
             style={
               isMobile 
                 ? {
-                    height: 'calc(100vh - env(safe-area-inset-bottom, 0px))',
-                    paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 12px)',
+                    height: '100dvh',
+                    paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)',
+                    paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0px)',
                   }
                 : {
                     width: open ? "240px" : "fit-content",
+                    height: '100vh',
                   }
             }
           >
-            <div className="p-2 pt-3">
+            {/* Header Section */}
+            <div className="shrink-0 p-2 pt-3">
               {isMobile && (
                 <div className="flex justify-end mb-2">
                   <button
                     onClick={() => setOpen(false)}
-                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                    className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <FiX className="text-xl" />
                   </button>
@@ -217,102 +220,105 @@ export function AppSidebar() {
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-2">
-              <div className="space-y-1">{navItems.map((item) => (
-              <Option
-                key={item.title}
-                Icon={item.Icon}
-                title={item.title}
-                selected={selected}
-                onClick={() => handleNavigation(item.path, item.title, item.locked)}
-                open={open}
-                locked={item.locked}
-              />
-          ))}
+            {/* Scrollable Navigation Section */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-2">
+              <div className="space-y-1 py-1">
+                {navItems.map((item) => (
+                  <Option
+                    key={item.title}
+                    Icon={item.Icon}
+                    title={item.title}
+                    selected={selected}
+                    onClick={() => handleNavigation(item.path, item.title, item.locked)}
+                    open={open}
+                    locked={item.locked}
+                  />
+                ))}
 
-          {isAdmin && (
-            <AdminSection
-              open={open}
-              expanded={adminExpanded}
-              setExpanded={setAdminExpanded}
-              items={adminItems}
-              selected={selected}
-              onSelect={(path, title) => handleNavigation(path, title)}
-            />
-          )}
+                {isAdmin && (
+                  <AdminSection
+                    open={open}
+                    expanded={adminExpanded}
+                    setExpanded={setAdminExpanded}
+                    items={adminItems}
+                    selected={selected}
+                    onSelect={(path, title) => handleNavigation(path, title)}
+                  />
+                )}
 
-          {userPlan?.plan === 'enterprise' && open && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <motion.button
-                layout
-                onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
-                className="relative flex h-10 w-full items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-              >
-                <motion.div
-                  layout
-                  className="grid h-full w-10 place-content-center text-lg"
-                >
-                  <FiMail />
-                </motion.div>
-                <motion.span
-                  layout
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.125 }}
-                  className="text-xs font-medium"
-                >
-                  Kontakta support
-                </motion.span>
-              </motion.button>
-            </div>
-          )}
+                {userPlan?.plan === 'enterprise' && open && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <motion.button
+                      layout
+                      onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
+                      className="relative flex h-10 w-full items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <motion.div
+                        layout
+                        className="grid h-full w-10 place-content-center text-lg"
+                      >
+                        <FiMail />
+                      </motion.div>
+                      <motion.span
+                        layout
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.125 }}
+                        className="text-xs font-medium"
+                      >
+                        Kontakta support
+                      </motion.span>
+                    </motion.button>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="mt-auto shrink-0">
+            {/* Bottom Section - Upgrade & User Info */}
+            <div className="shrink-0 mt-auto">
               {!planLoading && userPlan && !plusAccess && open && !unlimited && meetingsLeft !== null && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="px-2 py-2 border-t border-border"
-          >
-            <div className="text-xs text-muted-foreground mb-2">
-              {meetingsLeft} möten kvar
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowSubscribe(true)}
-              className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium flex items-center justify-center gap-2"
-            >
-              <FiZap className="text-base" />
-              Uppgradera
-            </motion.button>
-          </motion.div>
-        )}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="px-2 py-2 border-t border-border"
+                >
+                  <div className="text-xs text-muted-foreground mb-2">
+                    {meetingsLeft} möten kvar
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowSubscribe(true)}
+                    className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <FiZap className="text-base" />
+                    Uppgradera
+                  </motion.button>
+                </motion.div>
+              )}
 
-            {!planLoading && userPlan && !plusAccess && !open && !unlimited && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowSubscribe(true)}
-                className="mb-2 mx-2 w-10 h-10 bg-primary text-primary-foreground rounded-md flex items-center justify-center"
-              >
-                <FiZap className="text-lg" />
-              </motion.button>
-            )}
+              {!planLoading && userPlan && !plusAccess && !open && !unlimited && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowSubscribe(true)}
+                  className="mb-2 mx-2 w-10 h-10 bg-primary text-primary-foreground rounded-md flex items-center justify-center"
+                >
+                  <FiZap className="text-lg" />
+                </motion.button>
+              )}
 
-            <div className="px-2 pb-2">
-              <UserSection
-                open={open}
-                user={user}
-                userPlan={userPlan}
-                planLoading={planLoading}
-                onSettings={() => setShowSettings(true)}
-              />
-            </div>
+              <div className="px-2 pb-safe pb-3">
+                <UserSection
+                  open={open}
+                  user={user}
+                  userPlan={userPlan}
+                  planLoading={planLoading}
+                  onSettings={() => setShowSettings(true)}
+                />
+              </div>
 
-            {!isMobile && <ToggleClose open={open} setOpen={setOpen} />}
+              {!isMobile && <ToggleClose open={open} setOpen={setOpen} />}
             </div>
           </motion.nav>
         )}

@@ -134,13 +134,25 @@ All colors MUST be HSL.
     padding-right: max(env(safe-area-inset-right), 16px);
   }
   
+  /* iOS specific safe area handling */
   .mobile-inset-top {
-    padding-top: max(env(safe-area-inset-top), 8px);
+    padding-top: max(env(safe-area-inset-top), 0px);
   }
   
   .mobile-inset-bottom {
     padding-bottom: max(env(safe-area-inset-bottom), 16px);
   }
+
+  /* Smooth sidebar scrolling */
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 12px);
+  }
+
+  .overscroll-contain {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  
   
   @media (max-width: 768px) {
     .mobile-compact {
