@@ -345,8 +345,8 @@ const Library = () => {
   }
 
   return (
-    <>
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3">
+    <div className="animate-fade-in">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-4 shadow-sm">
         <h1 className="text-lg font-semibold">Mina möten</h1>
       </div>
 
@@ -357,7 +357,7 @@ const Library = () => {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6 animate-in slide-in-from-bottom-4 duration-500">
         {/* Chat Upgrade Banner - Show only for users without Plus access */}
         {!hasPlusAccess(user, userPlan) && (
           <ChatUpgradeBanner onUpgrade={() => setShowSubscribeDialog(true)} />
@@ -445,8 +445,12 @@ const Library = () => {
             </div>
           ) : (
           <div className="grid gap-4">
-            {filteredMeetings.map((meeting) => (
-              <Card key={meeting.id} className="hover:shadow-lg transition-shadow">
+            {filteredMeetings.map((meeting, index) => (
+              <Card 
+                key={meeting.id} 
+                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
@@ -596,7 +600,7 @@ const Library = () => {
       {/* Upgrade Dialog */}
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
       <SubscribeDialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog} />
-    </>
+    </div>
   );
 };
 

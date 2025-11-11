@@ -136,11 +136,11 @@ export default function Agendas() {
 
   return (
     <>
-      <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card">
+      <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card shadow-sm">
         <h1 className="text-lg font-semibold">Mötesagendor</h1>
       </header>
 
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-6 animate-fade-in">
             {isLocked ? (
               <div className="max-w-4xl mx-auto">
                 <Card className="border-2 border-primary/20">
@@ -191,8 +191,12 @@ export default function Agendas() {
                   </Card>
                 ) : (
                   <div className="grid gap-4">
-                    {agendas.map((agenda) => (
-                      <Card key={agenda.id}>
+                    {agendas.map((agenda, index) => (
+                      <Card 
+                        key={agenda.id}
+                        className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
                         <CardHeader>
                           <div className="flex justify-between items-start">
                             <div className="flex-1">

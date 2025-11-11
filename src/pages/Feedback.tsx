@@ -105,10 +105,10 @@ const Feedback = () => {
   const timeLeft = getTimeUntilNextSubmission();
 
   return (
-    <>
+    <div className="animate-fade-in">
           
-          <div className="container max-w-2xl mx-auto p-6 md:p-8">
-            <div className="space-y-8">
+          <div className="container max-w-2xl mx-auto p-6 md:p-8 pt-8">
+            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
               {/* Header */}
               <div className="text-center space-y-3">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
@@ -140,7 +140,7 @@ const Feedback = () => {
               )}
 
               {/* Feedback Form */}
-              <Card>
+              <Card className="hover:shadow-lg transition-all duration-300">
                 <CardHeader>
                   <CardTitle>Din feedback</CardTitle>
                   <CardDescription>
@@ -226,7 +226,7 @@ const Feedback = () => {
               </Card>
             </div>
         </div>
-    </>
+    </div>
   );
 };
 
