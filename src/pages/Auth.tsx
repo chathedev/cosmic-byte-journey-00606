@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const Auth = () => {
@@ -158,70 +158,105 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-600 to-blue-700 flex items-center justify-center p-6 relative overflow-hidden safe-area-inset">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 left-10 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
-      </div>
-
-      <div className="relative z-10 w-full max-w-md">
-        {/* Glass Card */}
-        <div className="bg-white/15 backdrop-blur-2xl border border-white/25 rounded-3xl shadow-2xl overflow-hidden">
-          <div className="p-8 space-y-8">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="w-full max-w-sm"
+      >
+        <div className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-2xl shadow-2xl overflow-hidden">
+          <div className="p-8 space-y-6">
             {/* Logo Section */}
-            <div className="text-center space-y-6">
-              <div className="mx-auto relative inline-block">
-                <div className="absolute inset-0 bg-white/30 rounded-3xl blur-xl" />
-                <div className="relative w-20 h-20 bg-white/20 backdrop-blur-xl border border-white/30 rounded-3xl flex items-center justify-center shadow-xl">
-                  <img 
-                    src={tivlyLogo}
-                    alt="Tivly Logo" 
-                    className="w-12 h-12 object-contain"
-                  />
-                </div>
-              </div>
+            <motion.div 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <motion.div 
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ 
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 15,
+                  delay: 0.4 
+                }}
+                className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+              >
+                <img 
+                  src={tivlyLogo}
+                  alt="Tivly Logo" 
+                  className="w-9 h-9 object-contain"
+                />
+              </motion.div>
               
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-white">
-                  Välkommen
-                </h1>
-                <p className="text-base text-white/80">
-                  {linkSent ? 'Kontrollera din e-post' : 'Logga in för att fortsätta'}
-                </p>
-              </div>
-            </div>
+              <motion.h1 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                className="text-2xl font-semibold text-foreground tracking-tight"
+              >
+                {linkSent ? 'E-post skickad' : 'Logga in'}
+              </motion.h1>
+              
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                className="text-sm text-muted-foreground text-center"
+              >
+                {linkSent ? 'Kontrollera din inkorg' : 'Ange din e-post för att fortsätta'}
+              </motion.p>
+            </motion.div>
 
             {/* Content */}
-            <div className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.7 }}
+              className="space-y-6"
+            >
               {linkSent ? (
-                <div className="text-center space-y-6 py-2">
-                  <div className="mx-auto w-20 h-20 rounded-full bg-green-500/20 backdrop-blur-sm border border-green-400/30 flex items-center justify-center">
-                    <CheckCircle2 className="w-10 h-10 text-green-400 animate-in zoom-in duration-500" />
-                  </div>
+                <div className="text-center space-y-5">
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", delay: 0.2 }}
+                    className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+                  >
+                    <CheckCircle2 className="w-8 h-8 text-primary" />
+                  </motion.div>
+                  
                   <div className="space-y-3">
-                    <p className="font-semibold text-xl text-white">E-post skickad!</p>
-                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4">
-                      <p className="text-sm text-white/90">
-                        Vi har skickat en inloggningslänk till<br/>
+                    <div className="p-4 rounded-xl border border-border/50 bg-background/60">
+                      <p className="text-sm text-foreground">
+                        Vi har skickat en länk till<br/>
                         <strong className="font-semibold">{email}</strong>
                       </p>
                     </div>
-                    <p className="text-xs text-white/70">
+                    <p className="text-xs text-muted-foreground">
                       Länken är giltig i 15 minuter
                     </p>
                     {isPolling && (
-                      <div className="flex items-center justify-center gap-2 text-xs text-white/90 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full py-2 px-4">
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                         <span>Väntar på inloggning...</span>
                       </div>
                     )}
                   </div>
+                  
                   <div className="flex gap-3 pt-2">
                     <Button
                       onClick={handleSendMagicLink}
                       variant="outline"
-                      className="flex-1 h-12 rounded-2xl bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white font-semibold hover:bg-white/20 touch-manipulation"
+                      className="flex-1 h-11 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
                       disabled={cooldown > 0 || isLoading}
                     >
                       {isLoading ? (
@@ -239,33 +274,31 @@ const Auth = () => {
                         setCooldown(0);
                       }}
                       variant="ghost"
-                      className="flex-1 h-12 rounded-2xl font-semibold text-white hover:bg-white/10 touch-manipulation"
+                      className="flex-1 h-11 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     >
                       Annan e-post
                     </Button>
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSendMagicLink} className="space-y-6">
-                  <div className="space-y-3">
-                    <div className="relative group">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/70 transition-colors group-focus-within:text-white z-10" />
-                      <Input
-                        type="email"
-                        placeholder="din@email.se"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                        className="pl-12 h-14 text-base rounded-2xl bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white placeholder:text-white/60 focus:border-white/50 transition-all touch-manipulation"
-                        required
-                      />
-                    </div>
+                <form onSubmit={handleSendMagicLink} className="space-y-4">
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-foreground z-10" />
+                    <Input
+                      type="email"
+                      placeholder="din@email.se"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                      className="pl-12 h-12 rounded-xl"
+                      required
+                    />
                   </div>
                   
                   <Button
                     type="submit"
                     disabled={isLoading || !email}
-                    className="w-full h-14 text-base font-semibold rounded-2xl bg-white text-blue-600 hover:bg-white/95 shadow-2xl touch-manipulation transition-all"
+                    className="w-full h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     size="lg"
                   >
                     {isLoading ? (
@@ -277,21 +310,17 @@ const Auth = () => {
                       'Skicka inloggningslänk'
                     )}
                   </Button>
+                  
+                  <p className="text-xs text-center text-muted-foreground leading-relaxed pt-2">
+                    Vi skickar en säker länk till din e-post. Inget lösenord krävs.
+                  </p>
                 </form>
               )}
-              
-              <div className="pt-2">
-                <p className="text-xs text-center text-white/70 leading-relaxed px-2">
-                  {linkSent 
-                    ? 'Klicka på länken i e-posten för att logga in säkert.'
-                    : 'Vi skickar en säker inloggningslänk till din e-post. Inget lösenord krävs.'}
-                </p>
-              </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
