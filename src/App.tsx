@@ -111,6 +111,17 @@ const PlanGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Scroll to top on route change
+const ScrollToTop = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+  
+  return null;
+};
+
 // Layout wrapper for pages with sidebar
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -166,6 +177,7 @@ const App = () => {
             <SubscriptionProvider>
               <PlanGate>
                 <BrowserRouter>
+                  <ScrollToTop />
                   <AppLayout>
                     <Suspense
                       fallback={

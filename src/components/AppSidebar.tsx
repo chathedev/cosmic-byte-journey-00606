@@ -157,13 +157,13 @@ export function AppSidebar() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setOpen(true)}
-          className="fixed z-50 w-12 h-12 bg-card/95 backdrop-blur-sm border border-border rounded-xl flex items-center justify-center text-foreground shadow-lg hover:shadow-xl transition-shadow mobile-inset-top"
+          className="fixed z-50 w-11 h-11 bg-background/80 backdrop-blur-md border border-border/50 rounded-lg flex items-center justify-center text-foreground shadow-md hover:shadow-lg transition-all"
           style={{
-            top: 'max(env(safe-area-inset-top, 16px), 16px)',
-            left: 'max(env(safe-area-inset-left, 16px), 16px)',
+            top: 'calc(max(env(safe-area-inset-top, 12px), 12px) + 8px)',
+            left: 'calc(max(env(safe-area-inset-left, 12px), 12px) + 8px)',
           }}
         >
-          <FiMenu className="text-xl" />
+          <FiMenu className="text-lg" />
         </motion.button>
       )}
 
