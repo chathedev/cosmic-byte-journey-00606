@@ -230,12 +230,20 @@ All colors MUST be HSL.
     box-shadow: 0 10px 25px -5px hsl(var(--primary) / 0.2);
   }
 
-  /* Mobile optimizations - instant interactions */
+  /* Mobile optimizations - responsive but not instant */
   @media (max-width: 768px) {
-    /* Remove all transitions on mobile for instant feel */
-    *, *::before, *::after {
-      transition-duration: 0ms !important;
-      animation-duration: 0.1s !important;
+    /* Faster transitions on mobile for responsive feel, but keep loading animations normal */
+    *:not(.animate-spin):not(.animate-pulse):not(.animate-pulse-glow) {
+      transition-duration: 150ms !important;
+    }
+
+    /* Keep loading animations at normal speed */
+    .animate-spin {
+      animation-duration: 1.5s !important;
+    }
+
+    .animate-pulse {
+      animation-duration: 2s !important;
     }
 
     /* Instant button feedback */

@@ -189,12 +189,19 @@ export function AppSidebar() {
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className={`${
               isMobile 
-                ? "fixed top-0 left-0 h-screen w-[280px] z-50" 
+                ? "fixed top-0 left-0 w-[280px] z-50" 
                 : "sticky top-0 h-screen shrink-0"
             } border-r border-border bg-card flex flex-col mobile-inset-top`}
-            style={!isMobile ? {
-              width: open ? "240px" : "fit-content",
-            } : {}}
+            style={
+              isMobile 
+                ? {
+                    height: 'calc(100vh - env(safe-area-inset-bottom, 0px))',
+                    paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 12px)',
+                  }
+                : {
+                    width: open ? "240px" : "fit-content",
+                  }
+            }
           >
             <div className="p-2 pt-3">
               {isMobile && (
@@ -215,7 +222,7 @@ export function AppSidebar() {
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0 px-2">
+            <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-2">
               <div className="space-y-1">{navItems.map((item) => (
               <Option
                 key={item.title}
@@ -267,12 +274,12 @@ export function AppSidebar() {
               </div>
             </div>
 
-            <div className="mt-auto">
+            <div className="mt-auto shrink-0">
               {!planLoading && userPlan && !plusAccess && open && !unlimited && meetingsLeft !== null && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="px-2 py-3 border-t border-border"
+            className="px-2 py-2 border-t border-border"
           >
             <div className="text-xs text-muted-foreground mb-2">
               {meetingsLeft} möten kvar
@@ -300,7 +307,7 @@ export function AppSidebar() {
               </motion.button>
             )}
 
-            <div className="px-2">
+            <div className="px-2 pb-2">
               <UserSection
                 open={open}
                 user={user}

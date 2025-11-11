@@ -128,6 +128,14 @@ export default {
           "50%": {
             transform: "translateY(-20px)"
           }
+        },
+        "spin": {
+          from: {
+            transform: "rotate(0deg)"
+          },
+          to: {
+            transform: "rotate(360deg)"
+          }
         }
       },
       animation: {
@@ -135,6 +143,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.5s ease-out",
         "float": "float 6s ease-in-out infinite",
+        "spin": "spin 1.5s linear infinite",
       },
     },
   },
