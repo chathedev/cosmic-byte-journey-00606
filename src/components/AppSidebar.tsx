@@ -164,19 +164,19 @@ export function AppSidebar() {
       </AnimatePresence>
 
       
+      
       {/* Sidebar - always mounted to avoid layout flashes */}
       <motion.nav
         initial={false}
         animate={{
-          x: isMobile && !open ? -280 : 0,
+          x: isMobile ? (open ? 0 : -280) : (open ? 0 : -176),
           opacity: 1,
-          ...(isMobile ? {} : { width: open ? 240 : 64 }),
         }}
         transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
         className={`${
           isMobile 
             ? "fixed top-0 left-0 w-[280px] z-50" 
-            : "sticky top-0 shrink-0"
+            : "sticky top-0 shrink-0 w-[240px]"
         } border-r border-border bg-card flex flex-col mobile-inset-top`}
         style={
           isMobile 
