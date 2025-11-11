@@ -135,17 +135,17 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* Mobile hamburger button */}
+      {/* Mobile hamburger button - positioned at bottom left to avoid content overlap */}
       {isMobile && !open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed z-50 w-11 h-11 bg-background/80 backdrop-blur-md border border-border/50 rounded-lg flex items-center justify-center text-foreground shadow-md active:scale-95 transition-transform"
+          className="fixed z-50 w-12 h-12 bg-primary/90 backdrop-blur-md border border-primary/20 rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all duration-200"
           style={{
-            top: 'calc(max(env(safe-area-inset-top, 12px), 12px) + 8px)',
-            left: 'calc(max(env(safe-area-inset-left, 12px), 12px) + 8px)',
+            bottom: 'calc(max(env(safe-area-inset-bottom, 16px), 16px) + 16px)',
+            left: 'calc(max(env(safe-area-inset-left, 16px), 16px) + 16px)',
           }}
         >
-          <FiMenu className="text-lg" />
+          <FiMenu className="text-xl" />
         </button>
       )}
 

@@ -142,6 +142,17 @@ All colors MUST be HSL.
     padding-bottom: max(env(safe-area-inset-bottom), 16px);
   }
 
+  /* Mobile safe area for hamburger button */
+  .pl-safe-mobile {
+    padding-left: 0;
+  }
+
+  @media (max-width: 768px) {
+    .pl-safe-mobile {
+      padding-left: max(env(safe-area-inset-left), 0px);
+    }
+  }
+
   /* Smooth sidebar scrolling */
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 12px);
