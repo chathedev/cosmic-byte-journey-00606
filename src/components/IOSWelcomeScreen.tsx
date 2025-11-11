@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mic } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,6 +11,8 @@ interface IOSWelcomeScreenProps {
 
 export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
   const [step, setStep] = useState<0 | 1>(0);
+  const [requesting, setRequesting] = useState(false);
+  const [completed, setCompleted] = useState(false);
 
   const hapticLight = async () => {
     try {
@@ -28,15 +30,25 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
     }
   };
 
+  const proceedOnce = () => {
+    if (completed) return;
+    setCompleted(true);
+    onComplete();
+  };
   const requestMicrophonePermission = async () => {
+    setRequesting(true);
     try {
       await hapticMedium();
     } catch (e) {
       // Haptics may not be available
     }
+
+    // Fallback: continue after a short delay to avoid iOS webview stalls
+    const fallback = setTimeout(() => {
+      proceedOnce();
+    }, 400);
     
     try {
-      // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -44,32 +56,24 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
           autoGainControl: true
         } 
       });
-      
-      // Clean up the stream
       stream.getTracks().forEach((track) => track.stop());
-      
-      // Success haptic
       try {
         await Haptics.notification({ type: NotificationType.Success });
-      } catch (e) {
-        // Haptics not available
-      }
-      
-      // Small delay for iOS to process
+      } catch {}
+      clearTimeout(fallback);
       setTimeout(() => {
-        onComplete();
-      }, 100);
-      
+        proceedOnce();
+      }, 120);
     } catch (error) {
-      console.error("Microphone permission denied:", error);
-      
+      console.error("Microphone permission request issue:", error);
       try {
         await Haptics.notification({ type: NotificationType.Error });
-      } catch (e) {
-        // Haptics not available
-      }
-      
-      alert("Mikrofonåtkomst krävs för att spela in möten. Gå till Inställningar för att aktivera.");
+      } catch {}
+      clearTimeout(fallback);
+      // Proceed anyway; recording screen will re-request with proper prompts
+      proceedOnce();
+    } finally {
+      setRequesting(false);
     }
   };
 
@@ -192,9 +196,17 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                     <Button 
                       onClick={requestMicrophonePermission} 
                       size="lg" 
+                      disabled={requesting}
                       className="w-full rounded-xl h-12 active:scale-95 transition-transform touch-manipulation"
                     >
-                      Tillåt mikrofon
+                      {requesting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Tillåter...
+                        </>
+                      ) : (
+                        'Tillåt mikrofon'
+                      )}
                     </Button>
                   </motion.div>
                   <motion.p 
