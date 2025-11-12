@@ -38,24 +38,65 @@ interface SendEmailResponse {
 }
 
 export const analyzeMeeting = async (data: AnalyzeMeetingRequest): Promise<AnalyzeMeetingResponse> => {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      transcript: data.transcript,
-      meetingName: data.meetingName,
-      agenda: data.agenda
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to analyze meeting' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  const token = localStorage.getItem('authToken');
+  
+  if (!token) {
+    throw new Error('No authentication token found');
   }
 
-  return response.json();
+  // Import encryption utilities
+  const { encryptPayload, SENSITIVE_FIELDS } = await import('./fieldEncryption');
+  
+  try {
+    // Encrypt sensitive meeting analysis fields
+    const fieldsToEncrypt = [
+      { path: SENSITIVE_FIELDS.TRANSCRIPT, encoding: 'utf8' as const }
+    ];
+    
+    if (data.agenda) {
+      fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.AGENDA, encoding: 'utf8' as const });
+    }
+    
+    const encryptedPayload = await encryptPayload(token, data, fieldsToEncrypt);
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(encryptedPayload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to analyze meeting' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Failed to encrypt analyze-meeting payload:', error);
+    // Fallback to unencrypted for backward compatibility
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        transcript: data.transcript,
+        meetingName: data.meetingName,
+        agenda: data.agenda
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to analyze meeting' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
 };
 
 export const sendProtocolEmail = async (data: SendEmailRequest): Promise<SendEmailResponse> => {

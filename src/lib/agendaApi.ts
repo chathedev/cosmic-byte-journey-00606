@@ -55,21 +55,53 @@ export const agendaApi = {
   async saveAgenda(data: SaveAgendaRequest): Promise<SaveAgendaResponse> {
     const token = getAuthToken();
     
-    const response = await fetch(`${BACKEND_URL}/agenda/save`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
+    // Import encryption utilities
+    const { encryptPayload, SENSITIVE_FIELDS } = await import('./fieldEncryption');
+    
+    try {
+      // Encrypt sensitive agenda content
+      const encryptedPayload = await encryptPayload(
+        token,
+        data,
+        [
+          { path: 'textContent', encoding: 'utf8' },
+        ]
+      );
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to save agenda' }));
-      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+      const response = await fetch(`${BACKEND_URL}/agenda/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(encryptedPayload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to save agenda' }));
+        throw new Error(error.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Failed to encrypt agenda payload:', error);
+      // Fallback to unencrypted for backward compatibility
+      const response = await fetch(`${BACKEND_URL}/agenda/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to save agenda' }));
+        throw new Error(error.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
     }
-
-    return response.json();
   },
 
   async listAgendas(userId: string): Promise<AgendaListResponse> {

@@ -1,7 +1,6 @@
 import { getUserIP } from '@/utils/ipDetection';
 
 const API_BASE_URL = 'https://api.tivly.se';
-import { encryptPayload, clearEncryptionKeys, SENSITIVE_FIELDS } from './fieldEncryption';
 
 interface User {
   id: string;
@@ -362,6 +361,9 @@ class ApiClient {
 
   async logout(): Promise<void> {
     this.clearToken();
+    // Clear encryption keys on logout
+    const { clearEncryptionKeys } = await import('./fieldEncryption');
+    clearEncryptionKeys();
   }
 
   async updatePlan(planData: any): Promise<User> {
@@ -433,40 +435,110 @@ class ApiClient {
     [key: string]: any;
   }): Promise<{ meeting: any; meetings: any[]; meetingCount: number; meetingLimit: number; meetingSlotsRemaining: number }> {
     const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/meetings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
+    
+    // Import encryption utilities
+    const { encryptPayload, SENSITIVE_FIELDS } = await import('./fieldEncryption');
+    
+    try {
+      // Encrypt sensitive meeting fields
+      const fieldsToEncrypt = [];
+      if (data.transcript) fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.TRANSCRIPT, encoding: 'utf8' as const });
+      if (data.protocol) fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.PROTOCOL, encoding: 'utf8' as const });
+      if (data.notes) fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.NOTES, encoding: 'utf8' as const });
+      
+      let payload = data;
+      if (fieldsToEncrypt.length > 0) {
+        payload = await encryptPayload(token, data, fieldsToEncrypt);
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to create meeting');
+      const response = await fetch(`${API_BASE_URL}/meetings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create meeting');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Failed to encrypt meeting payload:', error);
+      // Fallback to unencrypted for backward compatibility
+      const response = await fetch(`${API_BASE_URL}/meetings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create meeting');
+      }
+
+      return response.json();
     }
-
-    return response.json();
   }
 
   async updateMeeting(id: string, data: any): Promise<{ meeting: any; meetings: any[]; meetingCount: number; meetingLimit: number; meetingSlotsRemaining: number }> {
     const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
+    
+    // Import encryption utilities
+    const { encryptPayload, SENSITIVE_FIELDS } = await import('./fieldEncryption');
+    
+    try {
+      // Encrypt sensitive meeting fields
+      const fieldsToEncrypt = [];
+      if (data.transcript) fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.TRANSCRIPT, encoding: 'utf8' as const });
+      if (data.protocol) fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.PROTOCOL, encoding: 'utf8' as const });
+      if (data.notes) fieldsToEncrypt.push({ path: SENSITIVE_FIELDS.NOTES, encoding: 'utf8' as const });
+      
+      let payload = data;
+      if (fieldsToEncrypt.length > 0) {
+        payload = await encryptPayload(token, data, fieldsToEncrypt);
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to update meeting');
+      const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update meeting');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Failed to encrypt meeting update payload:', error);
+      // Fallback to unencrypted for backward compatibility
+      const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update meeting');
+      }
+
+      return response.json();
     }
-
-    return response.json();
   }
 
   async deleteMeeting(id: string): Promise<{ meetings: any[]; meetingCount: number; meetingLimit: number; meetingSlotsRemaining: number }> {
