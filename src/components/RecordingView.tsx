@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AgendaSelectionDialog } from "./AgendaSelectionDialog";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
+import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
 
 interface AIActionItem {
   title: string;
@@ -85,6 +86,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [selectedLanguage, setSelectedLanguage] = useState<'sv-SE' | 'en-US'>(initialLanguage);
   const wakeLockRef = useRef<any>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(false);
+  const testCleanupRef = useRef<(() => void) | null>(null);
 
   // Check if user has seen instructions before
   useEffect(() => {
@@ -109,13 +112,13 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     }
 
     const recognition = new SpeechRecognition();
-    // Use selected language
+    // Use selected language with enhanced settings
     recognition.lang = selectedLanguage;
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = 3; // Get multiple alternatives for better accuracy
     
-    // Enhanced recognition settings for better precision
+    // Enhanced recognition settings for better precision and speed
     if ('webkitSpeechRecognition' in window) {
       (recognition as any).serviceURI = undefined; // Use default service
     }
@@ -124,24 +127,41 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       let interim = '';
       let final = '';
 
+      // Process all results from the current index
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcriptText = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += transcriptText + ' ';
+        // Use the best alternative (highest confidence)
+        const result = event.results[i];
+        let bestTranscript = result[0].transcript;
+        let bestConfidence = result[0].confidence || 0;
+        
+        // Check alternatives for better confidence
+        for (let j = 1; j < result.length && j < 3; j++) {
+          if (result[j].confidence > bestConfidence) {
+            bestTranscript = result[j].transcript;
+            bestConfidence = result[j].confidence;
+          }
+        }
+        
+        if (result.isFinal) {
+          final += bestTranscript + ' ';
         } else {
-          interim += transcriptText;
+          interim += bestTranscript;
         }
       }
 
+      // Immediate state updates for faster display
       if (final) {
-        console.log('Final transcript:', final);
-        setTranscript(prev => prev + final);
+        console.log('✅ Final transcript:', final, 'confidence:', event.results[event.resultIndex]?.[0]?.confidence);
+        setTranscript(prev => {
+          const newText = prev + final;
+          return newText;
+        });
         setInterimTranscript('');
         setHasSpoken(true);
       }
       
-      if (interim) {
-        console.log('Interim transcript:', interim);
+      if (interim && !final) {
+        console.log('⏳ Interim:', interim);
         setInterimTranscript(interim);
       }
     };
@@ -550,14 +570,45 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     };
   }, [isRecording, isPaused]);
 
-  const addTestTranscript = () => {
-    const testText = "Detta är en testtranskription på sjuttio ord för att testa protokollgenerering utan att behöva spela in ett riktigt möte vilket sparar tid och gör det enkelt att demonstrera funktionaliteten snabbt och effektivt för användare som vill se hur systemet fungerar direkt utan att vänta eller prata in text manuellt.";
-    setTranscript(prev => prev + (prev ? ' ' : '') + testText);
-    setHasSpoken(true);
+  const startTestMode = () => {
+    if (isTestMode) return;
+    
+    setIsTestMode(true);
+    setIsRecording(true);
+    setIsMuted(false);
+    setIsPaused(false);
+    
     toast({
-      title: "Testtext tillagd",
-      description: "70 ord har lagts till i transkriptionen",
+      title: "🎭 Testläge aktiverat",
+      description: "Simulerar realistiskt möte med ~100 ord",
     });
+
+    // Cleanup previous test if any
+    if (testCleanupRef.current) {
+      testCleanupRef.current();
+    }
+
+    // Start simulation
+    const cleanup = simulateMeetingAudio((text, isFinal) => {
+      if (isFinal) {
+        setTranscript(prev => prev + (prev ? ' ' : '') + text + ' ');
+        setInterimTranscript('');
+        setHasSpoken(true);
+      } else {
+        setInterimTranscript(text);
+      }
+    });
+
+    testCleanupRef.current = cleanup;
+
+    // Auto-stop after simulation completes
+    setTimeout(() => {
+      setIsTestMode(false);
+      toast({
+        title: "Testläge avslutat",
+        description: "Simulerat möte klart",
+      });
+    }, 15000); // Simulation duration
   };
 
   const toggleMute = () => {
@@ -988,13 +1039,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
               </div>
               <div 
                 ref={transcriptViewRef}
-                className="h-40 md:h-56 overflow-y-auto bg-muted/30 rounded-lg p-3 md:p-4 text-xs md:text-sm leading-relaxed"
+                className="h-40 md:h-56 overflow-y-auto bg-muted/30 rounded-lg p-3 md:p-4 text-xs md:text-sm leading-relaxed relative"
               >
                 {transcript || interimTranscript ? (
-                  <div className="space-y-2">
-                    <p className="whitespace-pre-wrap">{transcript}</p>
+                  <div className="whitespace-pre-wrap">
+                    {transcript}
                     {interimTranscript && (
-                      <p className="text-muted-foreground/60 italic whitespace-pre-wrap">{interimTranscript}</p>
+                      <span className="text-muted-foreground/70 italic bg-muted/50 px-1 rounded transition-opacity duration-100">
+                        {interimTranscript}
+                      </span>
                     )}
                   </div>
                 ) : (
@@ -1002,6 +1055,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                     Börja tala så visas texten här...
                   </p>
                 )}
+                
+                {/* Hidden test button - triple click on corner */}
+                <button
+                  onClick={startTestMode}
+                  className="absolute bottom-1 right-1 w-4 h-4 opacity-0 hover:opacity-5 transition-opacity"
+                  title="Test mode"
+                  disabled={isTestMode}
+                />
               </div>
             </div>
           </div>
