@@ -82,6 +82,9 @@ export default function AdminEnterprise() {
   const [editingMember, setEditingMember] = useState<CompanyMember | null>(null);
   const [deletingMember, setDeletingMember] = useState<CompanyMember | null>(null);
   
+  // Company deletion
+  const [deletingCompany, setDeletingCompany] = useState<Company | null>(null);
+  
   // Meetings view
   const [showMeetings, setShowMeetings] = useState(false);
   const [companyMeetings, setCompanyMeetings] = useState<any>(null);
@@ -373,6 +376,35 @@ export default function AdminEnterprise() {
     }
   };
 
+  const handleDeleteCompany = async () => {
+    if (!deletingCompany) return;
+
+    try {
+      setIsSubmitting(true);
+      await apiClient.deleteEnterpriseCompany(deletingCompany.id);
+      
+      toast({
+        title: 'Företag borttaget',
+        description: `${deletingCompany.name} har tagits bort permanent`,
+      });
+      
+      setDeletingCompany(null);
+      if (selectedCompany?.id === deletingCompany.id) {
+        setSelectedCompany(null);
+      }
+      loadCompanies();
+    } catch (error) {
+      console.error('Failed to delete company:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte ta bort företaget. Kontrollera att det inte har aktiva medlemmar eller data.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const viewCompanyDetails = async (companyId: string) => {
     try {
       const data = await apiClient.getEnterpriseCompany(companyId);
@@ -535,6 +567,14 @@ export default function AdminEnterprise() {
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeletingCompany(selectedCompany)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Ta bort
                     </Button>
                     <Button
                       variant="outline"
@@ -966,6 +1006,42 @@ export default function AdminEnterprise() {
             <AlertDialogAction onClick={handleDeleteMember} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Company Confirmation */}
+      <AlertDialog open={!!deletingCompany} onOpenChange={() => setDeletingCompany(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ta bort företag permanent</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Är du säker på att du vill ta bort <strong>{deletingCompany?.name}</strong> permanent?
+              </p>
+              <p className="text-destructive font-semibold">
+                ⚠️ Detta tar bort:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Alla företagets medlemmar ({deletingCompany?.members?.length || 0} st)</li>
+                <li>All företagsdata och inställningar</li>
+                <li>Medlemmarnas tillgång till enterprise-funktioner</li>
+              </ul>
+              <p className="text-sm text-muted-foreground mt-2">
+                Denna åtgärd kan inte ångras.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteCompany} 
+              disabled={isSubmitting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Ta bort permanent
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

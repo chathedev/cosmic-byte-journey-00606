@@ -783,6 +783,17 @@ class ApiClient {
     return response.json();
   }
 
+  async deleteEnterpriseCompany(companyId: string): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!response.ok) throw new Error('Failed to delete company');
+    return response.json();
+  }
+
   // Admin operations
   async getAdminUsers(): Promise<any> {
     const response = await this.fetchWithAuth('/admin/users');
