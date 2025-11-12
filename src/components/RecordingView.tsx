@@ -14,6 +14,7 @@ import { AgendaSelectionDialog } from "./AgendaSelectionDialog";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
+import { isUserAdmin } from "@/lib/accessCheck";
 
 interface AIActionItem {
   title: string;
@@ -88,6 +89,18 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [showInstructions, setShowInstructions] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const testCleanupRef = useRef<(() => void) | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (user) {
+        const adminStatus = await isUserAdmin(user);
+        setIsAdmin(adminStatus);
+      }
+    };
+    checkAdmin();
+  }, [user]);
 
   // Check if user has seen instructions before
   useEffect(() => {
@@ -1056,13 +1069,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   </p>
                 )}
                 
-                {/* Hidden test button - triple click on corner */}
-                <button
-                  onClick={startTestMode}
-                  className="absolute bottom-1 right-1 w-4 h-4 opacity-0 hover:opacity-5 transition-opacity"
-                  title="Test mode"
-                  disabled={isTestMode}
-                />
+                {/* Admin-only test button */}
+                {isAdmin && (
+                  <button
+                    onClick={startTestMode}
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Simulera realistiskt möte (~100 ord)"
+                    disabled={isTestMode}
+                  >
+                    {isTestMode ? '🎭 Testing...' : '🎭 Test'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
