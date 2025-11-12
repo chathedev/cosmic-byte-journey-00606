@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const Auth = () => {
@@ -159,18 +159,50 @@ const Auth = () => {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6 pt-8 safe-area-inset"
+      className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center p-4 sm:p-6 safe-area-inset relative overflow-hidden"
     >
-      <div 
-        className="w-full max-w-sm"
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/20 rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.2, 0.4, 0.2],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1,
+          }}
+          className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-accent/20 rounded-full blur-3xl"
+        />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-md relative z-10"
       >
-        <div className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-2xl shadow-2xl overflow-hidden">
-          <div className="p-8 space-y-6">
+        <div className="rounded-3xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden">
+          <div className="p-6 sm:p-8 space-y-6">
             {/* Logo Section */}
             <motion.div 
-              initial={{ y: -20, opacity: 0 }}
+              initial={{ y: -30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
               className="flex flex-col items-center gap-4"
             >
               <motion.div 
@@ -178,79 +210,117 @@ const Auth = () => {
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ 
                   type: "spring",
-                  stiffness: 200,
-                  damping: 15,
-                  delay: 0.4 
+                  stiffness: 180,
+                  damping: 12,
+                  delay: 0.2 
                 }}
-                className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
               >
                 <img 
                   src={tivlyLogo}
                   alt="Tivly Logo" 
-                  className="w-9 h-9 object-contain"
+                  className="w-10 h-10 object-contain"
                 />
               </motion.div>
               
               <motion.h1 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
-                className="text-2xl font-semibold text-foreground tracking-tight"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight"
               >
-                {linkSent ? 'E-post skickad' : 'Logga in'}
+                {linkSent ? 'E-post skickad' : 'Välkommen tillbaka'}
               </motion.h1>
               
               <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
-                className="text-sm text-muted-foreground text-center"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="text-sm text-muted-foreground text-center max-w-xs"
               >
-                {linkSent ? 'Kontrollera din inkorg' : 'Ange din e-post för att fortsätta'}
+                {linkSent ? 'Vi har skickat en inloggningslänk till din e-post' : 'Ange din e-postadress för att få en säker inloggningslänk'}
               </motion.p>
             </motion.div>
 
             {/* Content */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.7 }}
-              className="space-y-6"
-            >
+            <AnimatePresence mode="wait">
               {linkSent ? (
-                <div className="text-center space-y-5">
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-center space-y-6"
+                >
                   <motion.div 
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", delay: 0.2 }}
-                    className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ 
+                      type: "spring",
+                      stiffness: 200,
+                      damping: 15,
+                      delay: 0.1 
+                    }}
+                    className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
                   >
-                    <CheckCircle2 className="w-8 h-8 text-primary" />
+                    <CheckCircle2 className="w-10 h-10 text-primary" />
                   </motion.div>
                   
-                  <div className="space-y-3">
-                    <div className="p-4 rounded-xl border border-border/50 bg-background/60">
-                      <p className="text-sm text-foreground">
-                        Vi har skickat en länk till<br/>
-                        <strong className="font-semibold">{email}</strong>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="space-y-4"
+                  >
+                    <div className="p-5 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm">
+                      <p className="text-sm text-foreground leading-relaxed">
+                        En säker inloggningslänk har skickats till
+                      </p>
+                      <p className="text-base font-semibold text-foreground mt-2 break-all">
+                        {email}
                       </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Länken är giltig i 15 minuter
-                    </p>
-                    {isPolling && (
+                    
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="space-y-3"
+                    >
                       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                        <span>Väntar på inloggning...</span>
+                        <div className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full" />
+                        <span>Länken är giltig i 15 minuter</span>
                       </div>
-                    )}
-                  </div>
+                      
+                      {isPolling && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center justify-center gap-2.5 py-2 px-4 rounded-xl bg-primary/5 border border-primary/20"
+                        >
+                          <motion.div 
+                            animate={{ scale: [1, 1.3, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className="w-2 h-2 bg-primary rounded-full"
+                          />
+                          <span className="text-xs font-medium text-primary">Väntar på inloggning...</span>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  </motion.div>
                   
-                  <div className="flex gap-3 pt-2">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="flex gap-3 pt-2"
+                  >
                     <Button
                       onClick={handleSendMagicLink}
                       variant="outline"
-                      className="flex-1 h-11 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                      className="flex-1 h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all hover:border-primary/50"
                       disabled={cooldown > 0 || isLoading}
                     >
                       {isLoading ? (
@@ -258,7 +328,9 @@ const Auth = () => {
                       ) : (
                         <Mail className="w-4 h-4 mr-2" />
                       )}
-                      {cooldown > 0 ? `Vänta ${cooldown}s` : 'Skicka igen'}
+                      <span className="text-sm font-medium">
+                        {cooldown > 0 ? `Vänta ${cooldown}s` : 'Skicka igen'}
+                      </span>
                     </Button>
                     <Button
                       onClick={() => {
@@ -268,52 +340,89 @@ const Auth = () => {
                         setCooldown(0);
                       }}
                       variant="ghost"
-                      className="flex-1 h-11 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                      className="flex-1 h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
                     >
-                      Annan e-post
+                      <span className="text-sm font-medium">Annan e-post</span>
                     </Button>
-                  </div>
-                </div>
+                  </motion.div>
+                </motion.div>
               ) : (
-                <form onSubmit={handleSendMagicLink} className="space-y-4">
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-foreground z-10" />
-                    <Input
-                      type="email"
-                      placeholder="din@email.se"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
-                      className="pl-12 h-12 rounded-xl"
-                      required
-                    />
-                  </div>
-                  
-                  <Button
-                    type="submit"
-                    disabled={isLoading || !email}
-                    className="w-full h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
-                    size="lg"
+                <motion.form 
+                  key="form"
+                  onSubmit={handleSendMagicLink} 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-5"
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
                   >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Skickar...
-                      </>
-                    ) : (
-                      'Skicka inloggningslänk'
-                    )}
-                  </Button>
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-all duration-200 group-focus-within:text-primary group-focus-within:scale-110 z-10" />
+                      <Input
+                        type="email"
+                        placeholder="din@email.se"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                        className="pl-12 h-14 rounded-xl border-border/60 focus:border-primary/50 transition-all duration-200 text-base"
+                        required
+                      />
+                    </div>
+                  </motion.div>
                   
-                  <p className="text-xs text-center text-muted-foreground leading-relaxed pt-2">
-                    Vi skickar en säker länk till din e-post. Inget lösenord krävs.
-                  </p>
-                </form>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <Button
+                      type="submit"
+                      disabled={isLoading || !email}
+                      className="w-full h-14 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-base font-semibold shadow-lg disabled:opacity-50"
+                      size="lg"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Skickar länk...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="mr-2 h-5 w-5" />
+                          Skicka inloggningslänk
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                      <span>Inget lösenord krävs</span>
+                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                      <span>Säker inloggning</span>
+                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                    </div>
+                    <p className="text-xs text-center text-muted-foreground leading-relaxed px-4">
+                      Vi skickar en engångslänk till din e-post som är giltig i 15 minuter
+                    </p>
+                  </motion.div>
+                </motion.form>
               )}
-            </motion.div>
+            </AnimatePresence>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

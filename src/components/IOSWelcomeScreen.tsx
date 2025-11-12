@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mic, Loader2 } from "lucide-react";
+import { Mic, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { motion, AnimatePresence } from "framer-motion";
@@ -79,15 +79,49 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-primary/30 via-accent/20 to-primary/50 flex items-center justify-center p-6 safe-area-inset"
+      className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center p-4 sm:p-6 safe-area-inset relative overflow-hidden"
     >
-      <div className="w-full max-w-sm">
-        <div className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-2xl shadow-2xl overflow-hidden">
-          <div className="p-8 space-y-6">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/20 rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.2, 0.4, 0.2],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1,
+          }}
+          className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-accent/20 rounded-full blur-3xl"
+        />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-md relative z-10"
+      >
+        <div className="rounded-3xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden">
+          <div className="p-6 sm:p-8 space-y-6">
             <motion.div 
-              initial={{ y: -20, opacity: 0 }}
+              initial={{ y: -30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
               className="flex flex-col items-center gap-4"
             >
               <motion.div 
@@ -95,29 +129,30 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ 
                   type: "spring",
-                  stiffness: 200,
-                  damping: 15,
-                  delay: 0.4 
+                  stiffness: 180,
+                  damping: 12,
+                  delay: 0.2 
                 }}
-                className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center"
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
               >
-                <img src={tivlyLogo} alt="Tivly" className="w-9 h-9 object-contain" />
+                <img src={tivlyLogo} alt="Tivly" className="w-10 h-10 object-contain" />
               </motion.div>
               <motion.h1 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
-                className="text-2xl font-semibold text-foreground tracking-tight"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight"
               >
-                Välkommen
+                Välkommen till Tivly
               </motion.h1>
               <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
-                className="text-sm text-muted-foreground text-center"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="text-sm text-muted-foreground text-center max-w-xs leading-relaxed"
               >
-                Snabb, enkel och säker mötesinspelning.
+                Snabb, enkel och säker mötesinspelning med AI-genererade protokoll
               </motion.p>
             </motion.div>
 
@@ -127,59 +162,102 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                   key="step0"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
+                  exit={{ opacity: 0, x: -30, scale: 0.95 }}
+                  transition={{ duration: 0.4, delay: 0.5 }}
+                  className="space-y-4"
                 >
-                  <Button 
-                    onClick={async () => {
-                      try {
-                        await hapticLight();
-                      } catch (e) {
-                        // Haptics not available
-                      }
-                      setStep(1);
-                    }} 
-                    size="lg" 
-                    className="w-full rounded-xl h-12 active:scale-95 transition-transform touch-manipulation"
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="space-y-3 p-5 rounded-2xl border border-border/60 bg-muted/30"
                   >
-                    Kom igång
-                  </Button>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center mt-0.5">
+                        <Mic className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">Spela in möten</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Högkvalitativa inspelningar direkt från din enhet
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-px bg-border/50" />
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center mt-0.5">
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">AI-protokoll</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Automatiskt genererade och formaterade protokoll
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          await hapticLight();
+                        } catch (e) {
+                          // Haptics not available
+                        }
+                        setStep(1);
+                      }} 
+                      size="lg" 
+                      className="w-full rounded-xl h-14 active:scale-95 transition-all duration-200 touch-manipulation text-base font-semibold shadow-lg"
+                    >
+                      Kom igång
+                    </Button>
+                  </motion.div>
                 </motion.div>
               )}
 
               {step === 1 && (
                 <motion.div 
                   key="step1"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
+                  initial={{ opacity: 0, x: 30, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 30 }}
+                  transition={{ duration: 0.4 }}
+                  className="space-y-5"
                 >
                   <motion.div 
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.1, duration: 0.3 }}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-background/60"
+                    transition={{ delay: 0.1, duration: 0.4 }}
+                    className="p-5 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm"
                   >
-                    <motion.div 
-                      animate={{ 
-                        scale: [1, 1.1, 1],
-                      }}
-                      transition={{ 
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center"
-                    >
-                      <Mic className="w-5 h-5 text-primary" />
-                    </motion.div>
-                    <div className="text-left">
-                      <p className="text-sm font-medium text-foreground">Mikrofonåtkomst</p>
-                      <p className="text-xs text-muted-foreground">Behövs för att spela in möten.</p>
+                    <div className="flex items-start gap-4">
+                      <motion.div 
+                        animate={{ 
+                          scale: [1, 1.15, 1],
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
+                      >
+                        <Mic className="w-6 h-6 text-primary" />
+                      </motion.div>
+                      <div className="flex-1 text-left space-y-1.5">
+                        <p className="text-base font-semibold text-foreground">Mikrofonåtkomst</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Vi behöver tillgång till mikrofonen för att kunna spela in dina möten med högsta kvalitet
+                        </p>
+                      </div>
                     </div>
                   </motion.div>
+                  
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -189,32 +267,43 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                       onClick={requestMicrophonePermission} 
                       size="lg" 
                       disabled={requesting}
-                      className="w-full rounded-xl h-12 active:scale-95 transition-transform touch-manipulation"
+                      className="w-full rounded-xl h-14 active:scale-95 transition-all duration-200 touch-manipulation text-base font-semibold shadow-lg disabled:opacity-50"
                     >
                       {requesting ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Tillåter...
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Begär tillåtelse...
                         </>
                       ) : (
-                        'Tillåt mikrofon'
+                        <>
+                          <Mic className="mr-2 h-5 w-5" />
+                          Tillåt mikrofon
+                        </>
                       )}
                     </Button>
                   </motion.div>
-                  <motion.p 
+                  
+                  <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3, duration: 0.3 }}
-                    className="text-xs text-muted-foreground text-center"
+                    className="space-y-2"
                   >
-                    Du kan ändra detta senare i inställningar.
-                  </motion.p>
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                      <span>Säker och privat</span>
+                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center leading-relaxed px-4">
+                      Du kan när som helst ändra detta i enhetens inställningar
+                    </p>
+                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
