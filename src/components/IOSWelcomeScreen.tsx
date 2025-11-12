@@ -13,6 +13,7 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
   const [step, setStep] = useState<0 | 1>(0);
   const [requesting, setRequesting] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const hapticLight = async () => {
     try {
@@ -37,16 +38,13 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
   };
   const requestMicrophonePermission = async () => {
     setRequesting(true);
+    setPermissionDenied(false);
+    
     try {
       await hapticMedium();
     } catch (e) {
       // Haptics may not be available
     }
-
-    // Fallback: continue after a short delay to avoid iOS webview stalls
-    const fallback = setTimeout(() => {
-      proceedOnce();
-    }, 400);
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -56,23 +54,28 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
           autoGainControl: true
         } 
       });
+      
+      // Permission granted - clean up and proceed
       stream.getTracks().forEach((track) => track.stop());
+      
       try {
         await Haptics.notification({ type: NotificationType.Success });
       } catch {}
-      clearTimeout(fallback);
+      
+      // Wait a moment for the success haptic, then proceed
       setTimeout(() => {
         proceedOnce();
-      }, 120);
-    } catch (error) {
-      console.error("Microphone permission request issue:", error);
+      }, 200);
+      
+    } catch (error: any) {
+      console.error("Microphone permission denied:", error);
+      
+      // Permission denied
       try {
         await Haptics.notification({ type: NotificationType.Error });
       } catch {}
-      clearTimeout(fallback);
-      // Proceed anyway; recording screen will re-request with proper prompts
-      proceedOnce();
-    } finally {
+      
+      setPermissionDenied(true);
       setRequesting(false);
     }
   };
@@ -233,26 +236,39 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.4 }}
-                    className="p-5 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm"
+                    className={`p-5 rounded-2xl border backdrop-blur-sm ${
+                      permissionDenied 
+                        ? 'border-destructive/60 bg-destructive/10' 
+                        : 'border-border/60 bg-muted/30'
+                    }`}
                   >
                     <div className="flex items-start gap-4">
                       <motion.div 
-                        animate={{ 
+                        animate={!permissionDenied ? { 
                           scale: [1, 1.15, 1],
-                        }}
+                        } : {}}
                         transition={{ 
                           duration: 2,
                           repeat: Infinity,
                           ease: "easeInOut"
                         }}
-                        className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
+                        className={`w-12 h-12 shrink-0 rounded-xl border shadow-lg flex items-center justify-center ${
+                          permissionDenied
+                            ? 'bg-destructive/20 border-destructive/30'
+                            : 'bg-gradient-to-br from-primary/20 to-primary/10 border-primary/30'
+                        }`}
                       >
-                        <Mic className="w-6 h-6 text-primary" />
+                        <Mic className={`w-6 h-6 ${permissionDenied ? 'text-destructive' : 'text-primary'}`} />
                       </motion.div>
                       <div className="flex-1 text-left space-y-1.5">
-                        <p className="text-base font-semibold text-foreground">Mikrofonåtkomst</p>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Vi behöver tillgång till mikrofonen för att kunna spela in dina möten med högsta kvalitet
+                        <p className={`text-base font-semibold ${permissionDenied ? 'text-destructive' : 'text-foreground'}`}>
+                          {permissionDenied ? 'Åtkomst nekad' : 'Mikrofonåtkomst'}
+                        </p>
+                        <p className={`text-sm leading-relaxed ${permissionDenied ? 'text-destructive/90' : 'text-muted-foreground'}`}>
+                          {permissionDenied 
+                            ? 'Vi behöver tillgång till mikrofonen för att kunna spela in möten. Vänligen aktivera mikrofonåtkomst i webbläsarens inställningar.'
+                            : 'Vi behöver tillgång till mikrofonen för att kunna spela in dina möten med högsta kvalitet'
+                          }
                         </p>
                       </div>
                     </div>
@@ -267,12 +283,18 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                       onClick={requestMicrophonePermission} 
                       size="lg" 
                       disabled={requesting}
+                      variant={permissionDenied ? "destructive" : "default"}
                       className="w-full rounded-xl h-14 active:scale-95 transition-all duration-200 touch-manipulation text-base font-semibold shadow-lg disabled:opacity-50"
                     >
                       {requesting ? (
                         <>
                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Begär tillåtelse...
+                          Väntar på tillåtelse...
+                        </>
+                      ) : permissionDenied ? (
+                        <>
+                          <Mic className="mr-2 h-5 w-5" />
+                          Försök igen
                         </>
                       ) : (
                         <>
@@ -283,21 +305,23 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                     </Button>
                   </motion.div>
                   
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3, duration: 0.3 }}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
-                      <span>Säker och privat</span>
-                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center leading-relaxed px-4">
-                      Du kan när som helst ändra detta i enhetens inställningar
-                    </p>
-                  </motion.div>
+                  {!permissionDenied && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3, duration: 0.3 }}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                        <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                        <span>Säker och privat</span>
+                        <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center leading-relaxed px-4">
+                        Du kan när som helst ändra detta i enhetens inställningar
+                      </p>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
