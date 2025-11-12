@@ -36,6 +36,7 @@ import tivlyLogo from "@/assets/tivly-logo.png";
 export function AppSidebar() {
   const [isMobile] = useState(() => isMobileDevice());
   const [open, setOpen] = useState(() => !isMobileDevice());
+  const [collapsed, setCollapsed] = useState(false);
   const [selected, setSelected] = useState("Hem");
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
@@ -176,6 +177,7 @@ export function AppSidebar() {
       <motion.aside
         animate={{
           x: isMobile ? (open ? 0 : -280) : 0,
+          width: isMobile ? '280px' : (collapsed ? '70px' : '280px'),
         }}
         transition={{
           type: "tween",
@@ -184,21 +186,34 @@ export function AppSidebar() {
         }}
         className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-card border-r border-border`}
         style={{
-          width: '280px',
           height: isMobile ? '100dvh' : '100vh',
           paddingTop: isMobile ? 'max(env(safe-area-inset-top, 0px), 0px)' : 0,
           paddingBottom: isMobile ? 'max(env(safe-area-inset-bottom, 0px), 0px)' : 0,
-          willChange: 'transform',
+          willChange: 'transform, width',
         }}
       >
-        {/* Close Button - Mobile Only */}
-        {isMobile && (
+        {/* Toggle Buttons */}
+        {isMobile ? (
           <div className="flex justify-end p-2">
             <button
               onClick={() => setOpen(false)}
               className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent"
             >
               <FiX className="text-xl" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end p-2">
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent"
+            >
+              <motion.div
+                animate={{ rotate: collapsed ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <FiChevronsRight className="text-xl" />
+              </motion.div>
             </button>
           </div>
         )}
@@ -209,24 +224,26 @@ export function AppSidebar() {
             <div className="w-10 h-10 shrink-0 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
               <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
             </div>
-            <div className="flex-1 min-w-0">
-              {planLoading ? (
-                <div className="space-y-1">
-                  <div className="h-3 w-16 bg-muted rounded animate-pulse" />
-                  <div className="h-3 w-20 bg-muted/80 rounded animate-pulse" />
-                </div>
-              ) : (
-                <>
-                  <div className="text-sm font-semibold text-foreground truncate">Tivly</div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {userPlan?.plan === 'enterprise' ? 'Enterprise' : 
-                     userPlan?.plan === 'unlimited' ? 'Unlimited' : 
-                     userPlan?.plan === 'plus' ? 'Plus' : 
-                     userPlan?.plan === 'standard' ? 'Standard' : 'Free'}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                {planLoading ? (
+                  <div className="space-y-1">
+                    <div className="h-3 w-16 bg-muted rounded animate-pulse" />
+                    <div className="h-3 w-20 bg-muted/80 rounded animate-pulse" />
                   </div>
-                </>
-              )}
-            </div>
+                ) : (
+                  <>
+                    <div className="text-sm font-semibold text-foreground truncate">Tivly</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {userPlan?.plan === 'enterprise' ? 'Enterprise' : 
+                       userPlan?.plan === 'unlimited' ? 'Unlimited' : 
+                       userPlan?.plan === 'plus' ? 'Plus' : 
+                       userPlan?.plan === 'standard' ? 'Standard' : 'Free'}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -237,20 +254,25 @@ export function AppSidebar() {
               <button
                 key={item.title}
                 onClick={() => handleNavigation(item.path, item.title, item.locked)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg transition-all duration-200 ${
                   selected === item.title
                     ? 'bg-primary/10 text-primary font-medium'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
+                title={collapsed ? item.title : undefined}
               >
                 <item.Icon className="text-lg shrink-0" />
-                <span className="text-sm truncate">{item.title}</span>
-                {item.locked && <Lock className="ml-auto h-3.5 w-3.5 shrink-0" />}
+                {!collapsed && (
+                  <>
+                    <span className="text-sm truncate">{item.title}</span>
+                    {item.locked && <Lock className="ml-auto h-3.5 w-3.5 shrink-0" />}
+                  </>
+                )}
               </button>
             ))}
 
             {/* Admin Section */}
-            {isAdmin && (
+            {isAdmin && !collapsed && (
               <div className="mt-4 pt-4 border-t border-border">
                 <button
                   onClick={() => setAdminExpanded(!adminExpanded)}
@@ -285,9 +307,22 @@ export function AppSidebar() {
                 )}
               </div>
             )}
+            
+            {/* Admin Icon Only - Collapsed State */}
+            {isAdmin && collapsed && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <button
+                  onClick={() => setCollapsed(false)}
+                  className="w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                  title="Admin"
+                >
+                  <FiShield className="text-lg shrink-0" />
+                </button>
+              </div>
+            )}
 
             {/* Enterprise Contact */}
-            {userPlan?.plan === 'enterprise' && (
+            {userPlan?.plan === 'enterprise' && !collapsed && (
               <div className="mt-4 pt-4 border-t border-border">
                 <button
                   onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
@@ -302,7 +337,7 @@ export function AppSidebar() {
         </div>
 
         {/* Upgrade Section */}
-        {!planLoading && userPlan && !plusAccess && !unlimited && meetingsLeft !== null && (
+        {!planLoading && userPlan && !plusAccess && !unlimited && meetingsLeft !== null && !collapsed && (
           <div className="shrink-0 p-3 border-t border-border">
             <div className="text-xs text-muted-foreground mb-2 px-1">
               {meetingsLeft} möten kvar
@@ -319,37 +354,63 @@ export function AppSidebar() {
 
         {/* User Section */}
         <div className="shrink-0 border-t border-border p-3">
-          <div className="flex items-center gap-3 mb-2">
-            <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                {user?.email?.[0]?.toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-foreground truncate">
-                {user?.email?.split('@')[0] || 'Användare'}
-              </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {user?.email || ''}
-              </div>
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <Avatar className="h-9 w-9 shrink-0">
+                <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                  {user?.email?.[0]?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                title="Inställningar"
+              >
+                <FiSettings className="text-base" />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+                title="Logga ut"
+              >
+                <FiLogOut className="text-base" />
+              </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-2">
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                    {user?.email?.[0]?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground truncate">
+                    {user?.email?.split('@')[0] || 'Användare'}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {user?.email || ''}
+                  </div>
+                </div>
+              </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-            >
-              <FiSettings className="text-base" />
-              <span>Inställningar</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
-            >
-              <FiLogOut className="text-base" />
-            </button>
-          </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                >
+                  <FiSettings className="text-base" />
+                  <span>Inställningar</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+                >
+                  <FiLogOut className="text-base" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </motion.aside>
 
