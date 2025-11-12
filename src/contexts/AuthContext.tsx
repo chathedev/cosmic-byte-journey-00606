@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     await apiClient.logout();
     setUser(null);
+    // Encryption keys are cleared in apiClient.logout()
   };
 
   return (

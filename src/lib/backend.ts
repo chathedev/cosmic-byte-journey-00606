@@ -61,21 +61,58 @@ export const analyzeMeeting = async (data: AnalyzeMeetingRequest): Promise<Analy
 export const sendProtocolEmail = async (data: SendEmailRequest): Promise<SendEmailResponse> => {
   const token = localStorage.getItem('authToken');
   
-  const response = await fetch(`${BACKEND_URL}/send-protocol-email`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to send email' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  if (!token) {
+    throw new Error('No authentication token found');
   }
 
-  return response.json();
+  // Import encryption utilities dynamically
+  const { encryptPayload, SENSITIVE_FIELDS } = await import('./fieldEncryption');
+  
+  try {
+    // Encrypt sensitive email content
+    const encryptedPayload = await encryptPayload(
+      token,
+      data,
+      [
+        { path: SENSITIVE_FIELDS.MESSAGE, encoding: 'utf8' },
+        { path: 'documentBlob', encoding: 'utf8' },
+      ]
+    );
+
+    const response = await fetch(`${BACKEND_URL}/send-protocol-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(encryptedPayload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to send email' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Failed to encrypt email payload:', error);
+    // Fallback to unencrypted (for backward compatibility)
+    const response = await fetch(`${BACKEND_URL}/send-protocol-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to send email' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
 };
 
 interface SaveActionItemsRequest {
@@ -87,17 +124,50 @@ interface SaveActionItemsRequest {
 export const saveActionItems = async (data: SaveActionItemsRequest): Promise<void> => {
   const token = localStorage.getItem('authToken');
   
-  const response = await fetch(`${BACKEND_URL}/action-items`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to save action items' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+  // Import encryption utilities dynamically
+  const { encryptPayload, SENSITIVE_FIELDS } = await import('./fieldEncryption');
+  
+  try {
+    // Encrypt action item descriptions
+    const fieldsToEncrypt = data.actionItems.map((_, index) => ({
+      path: `actionItems[${index}].${SENSITIVE_FIELDS.DESCRIPTION}`,
+      encoding: 'utf8' as const,
+    }));
+
+    const encryptedPayload = await encryptPayload(token, data, fieldsToEncrypt);
+
+    const response = await fetch(`${BACKEND_URL}/action-items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(encryptedPayload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to save action items' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Failed to encrypt action items:', error);
+    // Fallback to unencrypted
+    const response = await fetch(`${BACKEND_URL}/action-items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to save action items' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
   }
 };

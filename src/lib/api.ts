@@ -1,6 +1,7 @@
 import { getUserIP } from '@/utils/ipDetection';
 
-const API_URL = 'https://api.tivly.se';
+const API_BASE_URL = 'https://api.tivly.se';
+import { encryptPayload, clearEncryptionKeys, SENSITIVE_FIELDS } from './fieldEncryption';
 
 interface User {
   id: string;
@@ -94,7 +95,7 @@ class ApiClient {
       (headers as any)['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...fetchOptions,
       headers,
     });
@@ -127,7 +128,7 @@ class ApiClient {
     try {
       const userIP = await getUserIP();
       
-      const response = await fetch(`${API_URL}/auth/email`, {
+      const response = await fetch(`${API_BASE_URL}/auth/email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,7 +206,7 @@ class ApiClient {
     sessionId: string;
     isNewUser: boolean;
   }> {
-    const response = await fetch(`${API_URL}/auth/magic-link`, {
+    const response = await fetch(`${API_BASE_URL}/auth/magic-link`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -231,7 +232,7 @@ class ApiClient {
     expiresAt?: string;
     redeemedAt?: string | null;
   }> {
-    const response = await fetch(`${API_URL}/auth/magic-link/status`, {
+    const response = await fetch(`${API_BASE_URL}/auth/magic-link/status`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -256,7 +257,7 @@ class ApiClient {
   }
 
   async verifyMagicLink(token: string, options?: { storeToken?: boolean }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/magic-link/verify`, {
+    const response = await fetch(`${API_BASE_URL}/auth/magic-link/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -403,7 +404,7 @@ class ApiClient {
     meetingSlotsRemaining: number | null 
   }> {
     const token = this.getToken();
-    const url = folderId ? `${API_URL}/meetings?folderId=${folderId}` : `${API_URL}/meetings`;
+    const url = folderId ? `${API_BASE_URL}/meetings?folderId=${folderId}` : `${API_BASE_URL}/meetings`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -432,7 +433,7 @@ class ApiClient {
     [key: string]: any;
   }): Promise<{ meeting: any; meetings: any[]; meetingCount: number; meetingLimit: number; meetingSlotsRemaining: number }> {
     const token = this.getToken();
-    const response = await fetch(`${API_URL}/meetings`, {
+    const response = await fetch(`${API_BASE_URL}/meetings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -451,7 +452,7 @@ class ApiClient {
 
   async updateMeeting(id: string, data: any): Promise<{ meeting: any; meetings: any[]; meetingCount: number; meetingLimit: number; meetingSlotsRemaining: number }> {
     const token = this.getToken();
-    const response = await fetch(`${API_URL}/meetings/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -470,7 +471,7 @@ class ApiClient {
 
   async deleteMeeting(id: string): Promise<{ meetings: any[]; meetingCount: number; meetingLimit: number; meetingSlotsRemaining: number }> {
     const token = this.getToken();
-    const response = await fetch(`${API_URL}/meetings/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -512,7 +513,7 @@ class ApiClient {
   }
 
   async resetPassword(email: string): Promise<{ success: boolean }> {
-    const response = await fetch(`${API_URL}/reset-password`, {
+    const response = await fetch(`${API_BASE_URL}/reset-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -591,7 +592,7 @@ class ApiClient {
 
   // Unlimited invite methods
   async createUnlimitedInvite(recipientEmail: string, inviteSecret: string): Promise<{ redemptionUrl: string }> {
-    const response = await fetch(`${API_URL}/invites/unlimited`, {
+    const response = await fetch(`${API_BASE_URL}/invites/unlimited`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -609,7 +610,7 @@ class ApiClient {
   }
 
   async validateUnlimitedInvite(token: string): Promise<{ valid: boolean; error?: string }> {
-    const response = await fetch(`${API_URL}/invites/unlimited/${token}`, {
+    const response = await fetch(`${API_BASE_URL}/invites/unlimited/${token}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
