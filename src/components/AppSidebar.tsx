@@ -351,16 +351,6 @@ export function AppSidebar() {
             </button>
           </div>
         </div>
-
-        {/* Desktop Toggle */}
-        {!isMobile && (
-          <button
-            onClick={() => setOpen(!open)}
-            className="absolute -right-3 top-20 w-6 h-6 bg-background border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all shadow-sm"
-          >
-            <FiChevronsRight className={`text-sm transition-transform ${open ? '' : 'rotate-180'}`} />
-          </button>
-        )}
       </motion.aside>
 
       {/* Dialogs */}
