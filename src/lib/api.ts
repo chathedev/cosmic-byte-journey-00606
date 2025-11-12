@@ -784,13 +784,23 @@ class ApiClient {
   }
 
   async deleteEnterpriseCompany(companyId: string): Promise<any> {
-    const response = await this.fetchWithAuth(
-      `/admin/enterprise/companies/${companyId}`,
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-enterprise/${companyId}`,
       {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       }
     );
-    if (!response.ok) throw new Error('Failed to delete company');
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to delete company' }));
+      throw new Error(error.error || 'Failed to delete company');
+    }
+    
     return response.json();
   }
 
