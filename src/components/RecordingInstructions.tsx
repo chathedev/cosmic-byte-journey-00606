@@ -159,46 +159,54 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                     className="pt-3 mt-1 border-t border-border/30 space-y-4"
                   >
                     <div>
-                      <p className="text-sm font-bold text-foreground mb-3 text-center">⚠️ VIKTIGA KNAPPFÖRKLARINGAR ⚠️</p>
-                      <div className="space-y-3 text-xs">
-                        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                          <span className="text-red-500 font-bold min-w-[80px] flex-shrink-0 text-sm">🔴 AVSLUTA</span>
+                      <p className="text-sm font-bold text-foreground mb-3 text-center">Viktiga Knappförklaringar</p>
+                      <div className="space-y-2.5 text-xs">
+                        <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                          <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-red-500 font-bold text-sm">A</span>
+                          </div>
                           <div className="flex-1">
-                            <p className="font-bold text-foreground mb-1">Stoppar + Skapar Protokoll</p>
-                            <p className="text-muted-foreground">Detta avslutar inspelningen OCH genererar automatiskt ett komplett AI-protokoll med sammanfattning, beslut och åtgärder. Använd detta när mötet är slut och du vill ha ett färdigt protokoll!</p>
+                            <p className="font-bold text-foreground mb-1">AVSLUTA: Stoppar + Skapar Protokoll</p>
+                            <p className="text-muted-foreground">Avslutar inspelningen OCH genererar automatiskt ett komplett AI-protokoll med sammanfattning, beslut och åtgärder. Använd när mötet är slut!</p>
                           </div>
                         </div>
                         
-                        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-primary/10 border border-primary/20">
-                          <span className="font-bold min-w-[80px] flex-shrink-0 text-sm">💾 SPARA</span>
+                        <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-primary font-bold text-sm">S</span>
+                          </div>
                           <div className="flex-1">
-                            <p className="font-bold text-foreground mb-1">Endast Transkription</p>
-                            <p className="text-muted-foreground">Sparar BARA texten till biblioteket - INGET protokoll skapas. Perfekt när du bara vill ha transkriptionen utan AI-analys eller när du vill fortsätta mötet senare.</p>
+                            <p className="font-bold text-foreground mb-1">SPARA: Endast Transkription</p>
+                            <p className="text-muted-foreground">Sparar BARA texten till biblioteket - INGET protokoll skapas. Perfekt när du bara vill ha transkriptionen utan AI-analys.</p>
                           </div>
                         </div>
                         
-                        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-background/60 border border-border/50">
-                          <span className="font-bold min-w-[80px] flex-shrink-0 text-sm">⏸️ PAUSA</span>
+                        <div className="flex items-start gap-3 p-3 rounded-lg bg-background/60 border border-border/50">
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-foreground font-bold text-sm">P</span>
+                          </div>
                           <div className="flex-1">
-                            <p className="font-bold text-foreground mb-1">Pausa Tillfälligt</p>
-                            <p className="text-muted-foreground">Pausar/återupptar inspelningen. Smart vid kaffepaus eller när någon pratar utanför mötet. Tryck igen för att fortsätta.</p>
+                            <p className="font-bold text-foreground mb-1">PAUSA: Pausa Tillfälligt</p>
+                            <p className="text-muted-foreground">Pausar/återupptar inspelningen. Smart vid kaffepaus. Tryck igen för att fortsätta.</p>
                           </div>
                         </div>
                         
-                        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-background/60 border border-border/50">
-                          <span className="font-bold min-w-[80px] flex-shrink-0 text-sm">🔇 LJUD AV</span>
+                        <div className="flex items-start gap-3 p-3 rounded-lg bg-background/60 border border-border/50">
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Volume2 className="w-4 h-4 text-muted-foreground" />
+                          </div>
                           <div className="flex-1">
-                            <p className="font-bold text-foreground mb-1">Tyst Återkoppling</p>
-                            <p className="text-muted-foreground">Stänger av ljudåterkopplingen från mikrofonen. Inspelningen fortsätter som vanligt - detta påverkar INTE inspelningen!</p>
+                            <p className="font-bold text-foreground mb-1">LJUD AV: Tyst Återkoppling</p>
+                            <p className="text-muted-foreground">Stänger av ljudåterkopplingen från mikrofonen. Inspelningen fortsätter som vanligt!</p>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                      <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">⚠️ VARNING: Stäng inte appen!</p>
+                      <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">Varning: Stäng inte appen!</p>
                       <p className="text-xs text-muted-foreground">
-                        Om du trycker på tillbaka-knappen (<ArrowLeft className="inline w-3 h-3" />) eller stänger appen under inspelningen kommer du få en varning om att inspelningen går förlorad. Spara alltid innan du lämnar!
+                        Om du trycker på tillbaka-knappen (<ArrowLeft className="inline w-3 h-3" />) eller stänger appen under inspelningen kommer du få en varning. Spara alltid innan du lämnar!
                       </p>
                     </div>
                   </motion.div>
