@@ -101,7 +101,7 @@ class ApiClient {
 
     // Only clear token and redirect for actual authentication failures
     // Don't clear token on network errors or other issues
-    if (response.status === 401 && !suppressAuthRedirect) {
+    if (response.status === 401 && !suppressAuthRedirect && !(token && token.startsWith('test_unlimited_user_'))) {
       // Only clear token if we got a proper 401 response from the server
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {

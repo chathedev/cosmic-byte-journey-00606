@@ -102,6 +102,9 @@ const Auth = () => {
         const testToken = 'test_unlimited_user_' + Date.now();
         apiClient.applyAuthToken(testToken);
         
+        // Grace period while user state initializes
+        try { sessionStorage.setItem('pendingTestLogin', '1'); } catch {}
+        
         // Store test user email
         localStorage.setItem('userEmail', email);
         
