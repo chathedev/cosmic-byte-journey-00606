@@ -131,26 +131,47 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                     </div>
                   </motion.div>
 
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="flex items-start gap-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <p className="text-sm font-medium text-foreground">Långa möten? Inga problem!</p>
+                      <p className="text-xs text-muted-foreground">
+                        Appen håller skärmen aktiv och hanterar möten på 2-8+ timmar utan problem
+                      </p>
+                    </div>
+                  </motion.div>
+
                   {/* Button explanations */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 }}
-                    className="pt-2 border-t border-border/30"
+                    transition={{ delay: 0.7 }}
+                    className="pt-3 mt-1 border-t border-border/30"
                   >
-                    <p className="text-xs font-medium text-foreground mb-2">Vad gör knapparna?</p>
-                    <div className="space-y-2 text-xs text-muted-foreground">
-                      <div className="flex gap-2">
-                        <span className="text-red-500 font-semibold">Avsluta:</span>
-                        <span>Stoppar inspelning + skapar protokoll med AI</span>
+                    <p className="text-xs font-semibold text-foreground mb-2.5">Vad gör knapparna?</p>
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex items-start gap-2">
+                        <span className="text-red-500 font-bold min-w-[60px] flex-shrink-0">🔴 Avsluta:</span>
+                        <span className="text-muted-foreground">Stoppar inspelningen <strong>OCH</strong> skapar automatiskt ett komplett protokoll med AI-analys (sammanfattning, beslut, åtgärder)</span>
                       </div>
-                      <div className="flex gap-2">
-                        <span className="font-semibold">Spara:</span>
-                        <span>Sparar transkription utan att skapa protokoll</span>
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold min-w-[60px] flex-shrink-0">💾 Spara:</span>
+                        <span className="text-muted-foreground">Sparar <strong>endast</strong> transkriptionen till biblioteket - inget protokoll skapas (använd när du bara vill ha texten)</span>
                       </div>
-                      <div className="flex gap-2">
-                        <span className="font-semibold">Pausa:</span>
-                        <span>Pausar/återupptar inspelningen tillfälligt</span>
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold min-w-[60px] flex-shrink-0">⏸️ Pausa:</span>
+                        <span className="text-muted-foreground">Pausar inspelningen tillfälligt - tryck igen för att fortsätta (smart vid pauser eller när någon pratar utanför mötet)</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold min-w-[60px] flex-shrink-0">🔇 Ljud av:</span>
+                        <span className="text-muted-foreground">Stänger av ljudfeedback från mikrofonen - inspelningen fortsätter normalt</span>
                       </div>
                     </div>
                   </motion.div>
