@@ -377,25 +377,52 @@ export const AutoProtocolGenerator = ({
       <div className="flex-1 container max-w-5xl mx-auto px-4 py-8 md:py-12">
         {isGenerating ? (
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center space-y-6">
-              <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto" />
-              <div className="space-y-2">
-                <p className="text-xl font-semibold text-foreground">Genererar mötesprotokoll</p>
-                <p className="text-base text-muted-foreground animate-pulse">
-                  {progress < 30 && "Förbereder analys..."}
-                  {progress >= 30 && progress < 50 && "Analyserar transkription..."}
-                  {progress >= 50 && progress < 75 && "Sammanställer huvudpunkter..."}
-                  {progress >= 75 && progress < 90 && "Skapar dokument..."}
-                  {progress >= 90 && "Färdigställer protokoll..."}
-                </p>
-                <div className="w-64 h-2 bg-muted rounded-full overflow-hidden mx-auto mt-4">
-                  <div 
-                    className="h-full bg-primary transition-all duration-300 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
+            <div className="text-center space-y-8 max-w-md">
+              {/* Elegant loading animation */}
+              <div className="relative w-32 h-32 mx-auto">
+                {/* Outer rotating circle */}
+                <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-spin" 
+                     style={{ animationDuration: '3s' }}>
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full"></div>
                 </div>
-                <p className="text-sm text-muted-foreground">{Math.round(progress)}%</p>
+                {/* Inner pulsing circle */}
+                <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 animate-pulse flex items-center justify-center">
+                  <svg className="w-12 h-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
               </div>
+
+              {/* Status text */}
+              <div className="space-y-3">
+                <h3 className="text-2xl font-semibold text-foreground">
+                  Skapar ditt protokoll
+                </h3>
+                <p className="text-base text-muted-foreground leading-relaxed">
+                  {progress < 30 && "Analyserar innehållet och förbereder strukturen..."}
+                  {progress >= 30 && progress < 60 && "Identifierar huvudpunkter och beslut..."}
+                  {progress >= 60 && progress < 85 && "Formulerar sammanfattning och åtgärder..."}
+                  {progress >= 85 && "Färdigställer ditt professionella protokoll..."}
+                </p>
+              </div>
+
+              {/* Modern progress bar */}
+              <div className="space-y-2">
+                <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden backdrop-blur">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary via-primary/80 to-primary rounded-full transition-all duration-500 ease-out relative"
+                    style={{ width: `${progress}%` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground font-medium">{Math.round(progress)}% slutfört</p>
+              </div>
+
+              {/* Subtle hint */}
+              <p className="text-xs text-muted-foreground/70 italic">
+                Detta tar vanligtvis 10-15 sekunder
+              </p>
             </div>
           </div>
         ) : (
