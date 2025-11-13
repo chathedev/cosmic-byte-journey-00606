@@ -104,7 +104,6 @@ const Auth = () => {
         
         // Store test user email
         localStorage.setItem('userEmail', email);
-        localStorage.setItem('isTestUser', 'true');
         
         await refreshUser();
         

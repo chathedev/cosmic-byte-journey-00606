@@ -331,11 +331,9 @@ class ApiClient {
   }
 
   async getMe(): Promise<User> {
-    // Handle test user
-    const isTestUser = localStorage.getItem('isTestUser') === 'true';
+    // Handle test user - return immediately without backend call
     const token = this.getToken();
-    
-    if (isTestUser && token?.startsWith('test_unlimited_user_')) {
+    if (token?.startsWith('test_unlimited_user_')) {
       const testUser: User = {
         id: 'test-user-id',
         uid: 'test-user-id',
@@ -384,7 +382,6 @@ class ApiClient {
 
   async logout(): Promise<void> {
     this.clearToken();
-    localStorage.removeItem('isTestUser');
     // Clear encryption keys on logout
     const { clearEncryptionKeys } = await import('./fieldEncryption');
     clearEncryptionKeys();
