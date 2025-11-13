@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, CheckCircle2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const Auth = () => {
@@ -159,164 +158,63 @@ const Auth = () => {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center p-4 sm:p-6 safe-area-inset relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center p-4 sm:p-6 safe-area-inset"
     >
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/20 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 1,
-          }}
-          className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-accent/20 rounded-full blur-3xl"
-        />
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="w-full max-w-md relative z-10"
-      >
+      <div className="w-full max-w-md">
         <div className="rounded-3xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden">
           <div className="p-6 sm:p-8 space-y-6">
             {/* Logo Section */}
-            <motion.div 
-              initial={{ y: -30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-              className="flex flex-col items-center gap-4"
-            >
-              <motion.div 
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ 
-                  type: "spring",
-                  stiffness: 180,
-                  damping: 12,
-                  delay: 0.2 
-                }}
-                whileHover={{ scale: 1.05, rotate: 5 }}
-                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
-              >
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg">
                 <img 
                   src={tivlyLogo}
                   alt="Tivly Logo" 
                   className="w-10 h-10 object-contain"
                 />
-              </motion.div>
+              </div>
               
-              <motion.h1 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight"
-              >
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
                 {linkSent ? 'E-post skickad' : 'Välkommen tillbaka'}
-              </motion.h1>
+              </h1>
               
-              <motion.p 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className="text-sm text-muted-foreground text-center max-w-xs"
-              >
+              <p className="text-sm text-muted-foreground text-center max-w-xs">
                 {linkSent ? 'Vi har skickat en inloggningslänk till din e-post' : 'Ange din e-postadress för att få en säker inloggningslänk'}
-              </motion.p>
-            </motion.div>
+              </p>
+            </div>
 
             {/* Content */}
-            <AnimatePresence mode="wait">
-              {linkSent ? (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3 }}
-                  className="text-center space-y-6"
-                >
-                  <motion.div 
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ 
-                      type: "spring",
-                      stiffness: 200,
-                      damping: 15,
-                      delay: 0.1 
-                    }}
-                    className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg"
-                  >
-                    <CheckCircle2 className="w-10 h-10 text-primary" />
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="space-y-4"
-                  >
+            {linkSent ? (
+              <div className="text-center space-y-6">
+                <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg">
+                  <CheckCircle2 className="w-10 h-10 text-primary" />
+                </div>
+                
+                <div className="space-y-4">
                     <div className="p-5 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm">
                       <p className="text-sm text-foreground leading-relaxed">
                         En säker inloggningslänk har skickats till
                       </p>
                       <p className="text-base font-semibold text-foreground mt-2 break-all">
-                        {email}
-                      </p>
-                    </div>
-                    
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3 }}
-                      className="space-y-3"
-                    >
+                      {email}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
                       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                         <div className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full" />
                         <span>Länken är giltig i 15 minuter</span>
+                    </div>
+                    
+                    {isPolling && (
+                      <div className="flex items-center justify-center gap-2.5 py-2 px-4 rounded-xl bg-primary/5 border border-primary/20">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                        <span className="text-xs font-medium text-primary">Väntar på inloggning...</span>
                       </div>
-                      
-                      {isPolling && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center justify-center gap-2.5 py-2 px-4 rounded-xl bg-primary/5 border border-primary/20"
-                        >
-                          <motion.div 
-                            animate={{ scale: [1, 1.3, 1] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                            className="w-2 h-2 bg-primary rounded-full"
-                          />
-                          <span className="text-xs font-medium text-primary">Väntar på inloggning...</span>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="flex gap-3 pt-2"
-                  >
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 pt-2">
                     <Button
                       onClick={handleSendMagicLink}
                       variant="outline"
@@ -344,23 +242,14 @@ const Auth = () => {
                     >
                       <span className="text-sm font-medium">Annan e-post</span>
                     </Button>
-                  </motion.div>
-                </motion.div>
+                  </div>
+                </div>
               ) : (
-                <motion.form 
-                  key="form"
+                <form 
                   onSubmit={handleSendMagicLink} 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3 }}
                   className="space-y-5"
                 >
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                  >
+                  <div>
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-all duration-200 group-focus-within:text-primary group-focus-within:scale-110 z-10" />
                       <Input
@@ -373,13 +262,9 @@ const Auth = () => {
                         required
                       />
                     </div>
-                  </motion.div>
+                  </div>
                   
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 }}
-                  >
+                  <div>
                     <Button
                       type="submit"
                       disabled={isLoading || !email}
@@ -398,14 +283,9 @@ const Auth = () => {
                         </>
                       )}
                     </Button>
-                  </motion.div>
+                  </div>
                   
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.7 }}
-                    className="space-y-2"
-                  >
+                  <div className="space-y-2">
                     <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                       <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
                       <span>Inget lösenord krävs</span>
@@ -416,13 +296,12 @@ const Auth = () => {
                     <p className="text-xs text-center text-muted-foreground leading-relaxed px-4">
                       Vi skickar en engångslänk till din e-post som är giltig i 15 minuter
                     </p>
-                  </motion.div>
-                </motion.form>
+                  </div>
+                </form>
               )}
-            </AnimatePresence>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };
