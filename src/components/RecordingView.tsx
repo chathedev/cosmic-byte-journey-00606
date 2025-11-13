@@ -1088,22 +1088,33 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
       {/* Simplified Bottom Controls */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg mobile-compact mobile-inset-bottom">
-        <div className="max-w-5xl mx-auto px-3 md:px-4 py-3 md:py-4">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-0">
-            {/* Back Button */}
+        <div className="max-w-5xl mx-auto px-2 md:px-4 py-2 md:py-4">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-3">
+            {/* Back Button - Desktop only */}
             <Button
               onClick={handleBackClick}
               variant="ghost"
               size="lg"
-              className="h-10 md:h-12 order-2 md:order-1"
+              className="hidden md:flex h-12"
               title="Gå tillbaka till startsidan"
             >
-              <ArrowLeft className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+              <ArrowLeft className="w-5 h-5 mr-2" />
               Tillbaka
             </Button>
 
             {/* Recording Controls */}
-            <div className="flex items-center gap-2 md:gap-3 order-1 md:order-2">
+            <div className="flex items-center gap-1.5 md:gap-3 w-full md:w-auto">
+              {/* Back Button - Mobile (compact) */}
+              <Button
+                onClick={handleBackClick}
+                variant="ghost"
+                size="sm"
+                className="md:hidden h-10 px-2"
+                title="Gå tillbaka"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+
               {/* Pause/Resume Button */}
               {!isMuted && (
                 <Button
@@ -1116,61 +1127,60 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 >
                   {isPaused ? (
                     <>
-                      <Play className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
-                      <span className="hidden md:inline">Återuppta</span>
-                      <span className="md:hidden">Återuppta</span>
+                      <Play className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                      <span className="hidden sm:inline ml-1">Återuppta</span>
                     </>
                   ) : (
                     <>
-                      <Pause className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
-                      <span className="hidden md:inline">Pausa</span>
-                      <span className="md:hidden">Pausa</span>
+                      <Pause className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                      <span className="hidden sm:inline ml-1">Pausa</span>
                     </>
                   )}
                 </Button>
               )}
 
+              {/* Stop & Generate Button */}
               <Button
                 onClick={stopRecording}
                 variant="default"
                 size="lg"
                 disabled={isGeneratingProtocol || isSaving}
-                className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-xs md:text-sm"
-                title="Avsluta inspelningen och generera mötesprotokoll automatiskt"
+                className="h-10 md:h-12 flex-[2] md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-xs md:text-sm font-semibold"
+                title="Stoppar inspelningen och skapar protokoll automatiskt med AI"
               >
                 {isGeneratingProtocol ? (
                   <>
-                    <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2 animate-spin" />
-                    Genererar...
+                    <Loader2 className="w-4 md:w-5 h-4 md:h-5 md:mr-2 animate-spin" />
+                    <span className="hidden sm:inline ml-1">Genererar...</span>
                   </>
                 ) : (
                   <>
-                    <Square className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
-                    <span className="hidden md:inline">Avsluta & Generera</span>
-                    <span className="md:hidden">Avsluta</span>
+                    <Square className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                    <span className="hidden md:inline">Avsluta & Skapa</span>
+                    <span className="hidden sm:inline md:hidden ml-1">Avsluta</span>
                   </>
                 )}
               </Button>
 
+              {/* Save to Library Button */}
               {userPlan?.plan !== 'free' && (
                 <Button
                   onClick={saveToLibrary}
                   variant="outline"
                   size="lg"
                   disabled={isSaving || isGeneratingProtocol}
-                  className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[160px] text-xs md:text-sm"
+                  className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[140px] text-xs md:text-sm"
                   title="Spara endast transkriptionen till biblioteket utan att generera protokoll"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2 animate-spin" />
-                      Sparar...
+                      <Loader2 className="w-4 md:w-5 h-4 md:h-5 md:mr-2 animate-spin" />
+                      <span className="hidden sm:inline ml-1">Sparar...</span>
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 md:w-5 h-4 md:h-5 mr-1 md:mr-2" />
-                      <span className="hidden md:inline">Spara</span>
-                      <span className="md:hidden">Spara</span>
+                      <FileText className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                      <span className="hidden sm:inline ml-1">Spara</span>
                     </>
                   )}
                 </Button>
