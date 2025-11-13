@@ -593,7 +593,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     
     toast({
       title: "🎭 Testläge aktiverat",
-      description: "Simulerar realistiskt möte med ~100 ord",
+      description: "Simulerar realistiskt Tivly-möte med ~1000 ord",
     });
 
     // Cleanup previous test if any
@@ -1074,7 +1074,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   <button
                     onClick={startTestMode}
                     className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Simulera realistiskt möte (~100 ord)"
+                    title="Simulera realistiskt Tivly-möte (~1000 ord om funktioner, ekonomi, etc.)"
                     disabled={isTestMode}
                   >
                     {isTestMode ? '🎭 Testing...' : '🎭 Test'}
