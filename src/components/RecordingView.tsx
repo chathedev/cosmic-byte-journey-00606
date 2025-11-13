@@ -760,11 +760,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   };
 
   const handleBackClick = () => {
-    // Allow exit anytime - no blocking
-    if (userPlan?.plan === 'free' && transcript && !isFinalizingRef.current) {
+    // Check if there's any unsaved content
+    const hasContent = transcript.trim().length > 0 || durationSec > 30;
+    
+    // Show warning if there's content and we're not in the process of saving/finalizing
+    if (hasContent && !isFinalizingRef.current && !isSaving) {
       setShowExitWarning(true);
       return;
     }
+    
     onBack();
   };
 
@@ -1123,17 +1127,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   size="lg"
                   disabled={isGeneratingProtocol || isSaving}
                   className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[140px] text-xs md:text-sm"
-                  title={isPaused ? "Återuppta inspelningen" : "Pausa inspelningen"}
+                  title={isPaused ? "⏸️ ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "⏸️ PAUSA: Pausar inspelningen tillfälligt - tryck igen för att fortsätta. Smart vid pauser eller när någon pratar utanför mötet."}
                 >
                   {isPaused ? (
                     <>
                       <Play className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden sm:inline ml-1">Återuppta</span>
+                      <span className="hidden sm:inline ml-1">▶️ Återuppta</span>
                     </>
                   ) : (
                     <>
                       <Pause className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden sm:inline ml-1">Pausa</span>
+                      <span className="hidden sm:inline ml-1">⏸️ Pausa</span>
                     </>
                   )}
                 </Button>
@@ -1146,7 +1150,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 size="lg"
                 disabled={isGeneratingProtocol || isSaving}
                 className="h-10 md:h-12 flex-[2] md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-xs md:text-sm font-semibold"
-                title="Stoppar inspelningen och skapar protokoll automatiskt med AI"
+                title="🔴 AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett komplett AI-protokoll med sammanfattning, beslut och åtgärder"
               >
                 {isGeneratingProtocol ? (
                   <>
@@ -1156,8 +1160,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 ) : (
                   <>
                     <Square className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                    <span className="hidden md:inline">Avsluta & Skapa</span>
-                    <span className="hidden sm:inline md:hidden ml-1">Avsluta</span>
+                    <span className="hidden md:inline">🔴 Avsluta & Skapa</span>
+                    <span className="hidden sm:inline md:hidden ml-1">🔴 Avsluta</span>
                   </>
                 )}
               </Button>
@@ -1170,7 +1174,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   size="lg"
                   disabled={isSaving || isGeneratingProtocol}
                   className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[140px] text-xs md:text-sm"
-                  title="Spara endast transkriptionen till biblioteket utan att generera protokoll"
+                  title="💾 SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas. Perfekt när du bara vill ha texten eller fortsätta senare."
                 >
                   {isSaving ? (
                     <>
@@ -1180,7 +1184,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   ) : (
                     <>
                       <FileText className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden sm:inline ml-1">Spara</span>
+                      <span className="hidden md:inline">💾 Spara</span>
+                      <span className="hidden sm:inline md:hidden ml-1">💾</span>
                     </>
                   )}
                 </Button>
@@ -1223,33 +1228,66 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Exit Warning for Free Users */}
+      {/* Exit Warning - Enhanced */}
       <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>⚠️ Varning - Mötet sparas inte</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                <strong>Om du lämnar nu kommer ditt möte inte att sparas.</strong>
-              </p>
-              <p>
-                För att spara mötet måste du antingen:
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Skapa ett protokoll (tryck "Slutför")</li>
-                <li>Uppgradera till Standard eller Plus för att spara utan att generera protokoll</li>
-              </ul>
+            <AlertDialogTitle className="text-xl flex items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              Du håller på att lämna!
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4 text-left">
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="font-semibold text-destructive mb-2">
+                  ❌ Din inspelning är INTE sparad ännu!
+                </p>
+                <div className="text-sm space-y-1 text-muted-foreground">
+                  <p>📊 Inspelningstid: <strong>{Math.floor(durationSec / 60)} min {durationSec % 60} sek</strong></p>
+                  <p>📝 Ord inspelade: <strong>{transcript.split(/\s+/).filter(w => w).length} ord</strong></p>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <p className="font-medium text-foreground">
+                  För att INTE förlora din inspelning, välj ett av dessa:
+                </p>
+                <div className="space-y-2">
+                  <div className="flex gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <span className="text-red-500 font-bold flex-shrink-0">🔴</span>
+                    <div>
+                      <p className="font-semibold text-foreground">Avsluta & Skapa Protokoll</p>
+                      <p className="text-xs text-muted-foreground">Sparar + skapar AI-protokoll</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+                    <span className="font-bold flex-shrink-0">💾</span>
+                    <div>
+                      <p className="font-semibold text-foreground">Spara Till Bibliotek</p>
+                      <p className="text-xs text-muted-foreground">Sparar bara transkriptionen</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  💡 Tips: Använd "Spara" om du vill fortsätta mötet senare eller bara vill ha texten!
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowExitWarning(false)}>
-              Fortsätt spela in
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={() => setShowExitWarning(false)} className="w-full sm:w-auto">
+              🔙 Tillbaka till inspelning
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              setShowExitWarning(false);
-              onBack();
-            }} className="bg-destructive hover:bg-destructive/90">
-              Lämna utan att spara
+            <AlertDialogAction 
+              onClick={() => {
+                setShowExitWarning(false);
+                onBack();
+              }} 
+              className="bg-destructive hover:bg-destructive/90 w-full sm:w-auto"
+            >
+              ⚠️ Lämna UTAN att spara
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
