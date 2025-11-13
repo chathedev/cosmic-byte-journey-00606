@@ -19,71 +19,76 @@ serve(async (req) => {
     }
 
     const wordCount = transcript.trim().split(/\s+/).length;
+    
+    const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
+    const agendaNote = agenda ? 'OBS: Använd mötesagendan ovan för att strukturera protokollet och säkerställ att alla agendapunkter täcks.' : '';
+    const shortNote = wordCount < 50 ? 'OBS: Utskriften är mycket kort. Inkludera ett meddelande i sammanfattningen om att mötet innehöll begränsad information.' : '';
+
+    const promptContent = `Analysera följande mötesutskrift och skapa ett professionellt mötesprotokoll.
+
+Möte: ${meetingName || 'Namnlöst möte'}
+Längd: ${wordCount} ord${agendaSection}
+
+Utskrift:
+${transcript}
+
+Skapa ett detaljerat och välskrivet protokoll med följande delar:
+
+1. SAMMANFATTNING (3-5 meningar):
+   - VIKTIGT: KOPIERA INTE texten från utskriften
+   - Syntetisera och sammanfatta mötets övergripande syfte och resultat
+   - Skriv med professionell ton och välformulerade meningar
+   - Ge en överblick av vad som diskuterades och huvudsakliga slutsatser
+
+2. HUVUDPUNKTER (6-10 punkter):
+   - VIKTIGT: Skriv OM och SAMMANFATTA innehållet, kopiera inte ordagrant
+   - Formulera varje punkt som en tydlig, fullständig mening
+   - Fokusera på viktiga diskussioner, insikter och konkreta ämnen
+   - Varje punkt ska innehålla substans och kontext
+   - Använd professionellt språk och god struktur
+
+3. BESLUT:
+   - Lista konkreta beslut som fattades under mötet
+   - Om inga explicita beslut fattades, markera detta tydligt
+
+4. ÅTGÄRDSPUNKTER:
+   - Skapa specifika, handlingsbara uppgifter från diskussionen
+   - För varje uppgift, inkludera titel, beskrivning, ansvarig, deadline och prioritet
+   - Prioritet: critical (blockerar arbete), high (viktigt), medium (standard), low (önskvärt)
+   - Deadline: Realistisk deadline baserat på prioritet
+
+5. NÄSTA MÖTE - FÖRSLAG (3-5 punkter):
+   - Föreslå konkreta ämnen baserat på olösta frågor
+   - Inkludera uppföljning av beslut och åtgärdspunkter
+   - Håll förslagen specifika och handlingsbara
+
+${agendaNote}
+${shortNote}
+
+KRITISKT VIKTIGT:
+- SAMMANFATTA och OMFORMULERA - kopiera ALDRIG text ordagrant från utskriften
+- Använd professionell, välskriven svenska (eller engelska om utskriften är på engelska)
+- Varje del ska kännas som den skrivits av en professionell sekreterare
+- Skapa substans och värde i varje punkt
+
+Svara i JSON-format (använd svenska språket om utskriften är på svenska).`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: "Bearer " + LOVABLE_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
-            content: "Du är en mötesassistent som kan arbeta på både svenska och engelska. Analysera transkriptionen och ge en detaljerad strukturerad sammanfattning. Svara på samma språk som transkriptionen är skriven på (svenska eller engelska)."
+            content: "Du är en professionell mötessekreterare som skapar välformulerade och strukturerade mötesprotokoll. Du analyserar mötestranskriberingar och syntetiserar informationen till tydliga, koncisa och professionella sammanfattningar. Svara ALLTID på samma språk som transkriptionen är skriven på (svenska eller engelska)."
           },
           {
             role: "user",
-            content: `Analyze the following meeting transcript and create a detailed protocol.
-
-Meeting: ${meetingName || 'Unnamed Meeting'}
-Length: ${wordCount} words
-${agenda ? `\nMeeting Agenda:\n${agenda}\n` : ''}
-
-Transcript:
-${transcript}
-
-Create a detailed protocol with:
-1. A summary (3-4 sentences)
-2. Main points (5-8 detailed bullet points with substantial content)
-3. Decisions that were made
-4. Smart action items with:
-   - Title (clear, actionable task)
-   - Description (what needs to be done)
-   - Owner (who should do it - identify from transcript or suggest "To be assigned")
-   - Deadline (suggest realistic deadline based on urgency, format: YYYY-MM-DD)
-   - Priority (critical/high/medium/low based on importance and urgency)
-5. Next meeting suggestions (3-5 topics/items that should be discussed at the next meeting based on open issues, action items, and follow-ups from this meeting)
-
-IMPORTANT for action items:
-- Identify SPECIFIC people mentioned in the transcript as owners
-- Estimate realistic deadlines (1-7 days for critical, 1-2 weeks for high, 2-4 weeks for medium/low)
-- Mark as "critical" if it blocks other work or has immediate impact
-- Mark as "high" if important but not blocking
-- Mark as "medium" for standard follow-ups
-- Mark as "low" for nice-to-have improvements
-
-IMPORTANT for next meeting suggestions:
-- Suggest 3-5 concrete topics based on unresolved issues from this meeting
-- Include follow-ups on action items
-- Suggest topics that naturally arise from decisions made
-- Keep suggestions specific and actionable
-
-${agenda ? 'NOTE: Use the meeting agenda above to structure the protocol and ensure all agenda items are covered.' : ''}
-${wordCount < 50 ? 'NOTE: The transcript is very short. Include a message in the summary that the meeting contained limited information.' : ''}
-
-IMPORTANT: Respond in the SAME LANGUAGE as the transcript (Swedish or English).
-
-Respond in JSON format:
-{
-  "title": "Meeting title",
-  "summary": "Detailed summary",
-  "mainPoints": ["detailed point 1", "detailed point 2", ...],
-  "decisions": ["decision 1", ...],
-  "actionItems": ["action 1", ...],
-  "nextMeetingSuggestions": ["suggestion 1", "suggestion 2", ...]
-}`
+            content: promptContent
           }
         ],
         tools: [
@@ -150,7 +155,7 @@ Respond in JSON format:
       }
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error("AI gateway error: " + response.status);
     }
 
     const result = await response.json();
