@@ -1,1 +1,4 @@
 project_id = "szgvcpseqcpmwyddaosm"
+
+[functions.analyze-meeting]
+verify_jwt = false

@@ -77,7 +77,6 @@ export const analyzeMeeting = async (data: AnalyzeMeetingRequest): Promise<Analy
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(encryptedPayload),
     });
@@ -95,7 +94,6 @@ export const analyzeMeeting = async (data: AnalyzeMeetingRequest): Promise<Analy
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         transcript: data.transcript,
