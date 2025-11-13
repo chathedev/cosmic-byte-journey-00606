@@ -24,7 +24,19 @@ serve(async (req) => {
     const agendaNote = agenda ? 'OBS: Använd mötesagendan ovan för att strukturera protokollet och säkerställ att alla agendapunkter täcks.' : '';
     const shortNote = wordCount < 50 ? 'OBS: Utskriften är mycket kort. Inkludera ett meddelande i sammanfattningen om att mötet innehöll begränsad information.' : '';
 
-    const promptContent = `Analysera följande mötesutskrift och skapa ett professionellt mötesprotokoll.
+    const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett välskrivet protokoll.
+
+🚫 ABSOLUT FÖRBJUDET:
+- Kopiera NÅGON mening direkt från utskriften
+- Klistra in fraser ordagrant från transkriptionen
+- Upprepa meningar eller stycken från originaltexten
+- Lista punkter som är direkta citat
+
+✅ DU MÅSTE:
+- OMFORMULERA allt innehåll med egna ord
+- SYNTETISERA information från flera delar av mötet
+- SKRIVA professionella, välformulerade meningar
+- SAMMANFATTA och PARAFRASERA diskussionerna
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -32,46 +44,48 @@ Längd: ${wordCount} ord${agendaSection}
 Utskrift:
 ${transcript}
 
-Skapa ett detaljerat och välskrivet protokoll med följande delar:
+Skapa ett professionellt protokoll:
 
 1. SAMMANFATTNING (3-5 meningar):
-   - VIKTIGT: KOPIERA INTE texten från utskriften
-   - Syntetisera och sammanfatta mötets övergripande syfte och resultat
-   - Skriv med professionell ton och välformulerade meningar
-   - Ge en överblick av vad som diskuterades och huvudsakliga slutsatser
+   - OMSKRIVNING OBLIGATORISK: Varje mening måste vara omformulerad med egna ord
+   - Beskriv mötets SYFTE, HUVUDSAKLIGA DISKUSSIONER och RESULTAT
+   - Använd professionell sekreterar-ton
+   - Sammanfatta HELHETEN, inte detaljer
+   
+   EXEMPEL PÅ FEL: "Vi ska idag diskutera tre viktiga punkter" (direkt citat)
+   EXEMPEL PÅ RÄTT: "Mötet behandlade tre centrala frågeställningar kring projektets utveckling och budget"
 
 2. HUVUDPUNKTER (6-10 punkter):
-   - VIKTIGT: Skriv OM och SAMMANFATTA innehållet, kopiera inte ordagrant
-   - Formulera varje punkt som en tydlig, fullständig mening
-   - Fokusera på viktiga diskussioner, insikter och konkreta ämnen
-   - Varje punkt ska innehålla substans och kontext
-   - Använd professionellt språk och god struktur
+   - INGEN PUNKT får vara ett direkt citat från transkriptionen
+   - SYNTETISERA diskussioner till koncisa, professionella sammanfattningar
+   - Varje punkt: en fullständig, välformulerad mening
+   - Fokusera på SUBSTANS: vad diskuterades, vilka insikter framkom, vad beslutades
+   
+   EXEMPEL PÅ FEL: "För det första behöver vi gå igenom projektets nuvarande status" (direkt citat)
+   EXEMPEL PÅ RÄTT: "Projektets nuläge genomgicks med fokus på leveranser och eventuella flaskhalsar"
 
 3. BESLUT:
-   - Lista konkreta beslut som fattades under mötet
-   - Om inga explicita beslut fattades, markera detta tydligt
+   - Lista konkreta beslut, omskrivna professionellt
+   - Om inga beslut: "Inga formella beslut fattades under mötet"
 
 4. ÅTGÄRDSPUNKTER:
-   - Skapa specifika, handlingsbara uppgifter från diskussionen
-   - För varje uppgift, inkludera titel, beskrivning, ansvarig, deadline och prioritet
-   - Prioritet: critical (blockerar arbete), high (viktigt), medium (standard), low (önskvärt)
-   - Deadline: Realistisk deadline baserat på prioritet
+   - Skapa specifika uppgifter baserat på diskussionen
+   - Inkludera: titel, beskrivning, ansvarig, deadline, prioritet
+   - Prioritet: critical, high, medium, low
 
 5. NÄSTA MÖTE - FÖRSLAG (3-5 punkter):
-   - Föreslå konkreta ämnen baserat på olösta frågor
-   - Inkludera uppföljning av beslut och åtgärdspunkter
-   - Håll förslagen specifika och handlingsbara
+   - Konkreta uppföljningsämnen
+   - Baserat på olösta frågor och beslut
 
 ${agendaNote}
 ${shortNote}
 
-KRITISKT VIKTIGT:
-- SAMMANFATTA och OMFORMULERA - kopiera ALDRIG text ordagrant från utskriften
-- Använd professionell, välskriven svenska (eller engelska om utskriften är på engelska)
-- Varje del ska kännas som den skrivits av en professionell sekreterare
-- Skapa substans och värde i varje punkt
+🔴 KVALITETSKONTROLL - INNAN DU SVARAR:
+1. Läs igenom din sammanfattning - innehåller den NÅGON mening från transkriptionen? → SKRIV OM
+2. Läs igenom huvudpunkterna - är NÅGON punkt ett direkt citat? → OMFORMULERA
+3. Har du PARAFRASERAT och SYNTETISERAT informationen? → Om nej, gör om
 
-Svara i JSON-format (använd svenska språket om utskriften är på svenska).`;
+Svara i JSON-format på samma språk som transkriptionen.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
