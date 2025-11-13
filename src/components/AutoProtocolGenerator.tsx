@@ -152,11 +152,17 @@ export const AutoProtocolGenerator = ({
               // Generate AI title if not provided
               const aiTitle = data.title || await generateMeetingTitle(transcript);
               
+              // Anti-copy guards: remove any point that appears verbatim in transcript and drop summary if it matches transcript text
+              const rawPoints = Array.isArray(data.mainPoints) ? data.mainPoints : [];
+              const cleanedMainPoints = rawPoints.filter((p: string) => p && !transcript.includes(p.trim()));
+              const rawSummary = typeof data.summary === 'string' ? data.summary : '';
+              const cleanedSummary = rawSummary && transcript.includes(rawSummary.trim()) ? '' : rawSummary;
+              
               // Best-effort normalization
               finalProtocol = {
                 title: aiTitle || `Mötesprotokoll ${dateStr}`,
-                summary: data.summary ?? (Array.isArray(data.mainPoints) ? data.mainPoints.join('\n') : ''),
-                mainPoints: Array.isArray(data.mainPoints) ? data.mainPoints : [],
+                summary: cleanedSummary || (cleanedMainPoints.length ? cleanedMainPoints.join('\n') : ''),
+                mainPoints: cleanedMainPoints,
                 decisions: Array.isArray(data.decisions) ? data.decisions : [],
                 actionItems: Array.isArray(data.actionItems) ? data.actionItems : [],
                 nextMeetingSuggestions: Array.isArray(data.nextMeetingSuggestions) ? data.nextMeetingSuggestions : [],
@@ -183,20 +189,12 @@ export const AutoProtocolGenerator = ({
           }
         }
 
-        // Heuristic fallback to make protocol rich even with short transcripts
-        if (!finalProtocol && transcript) {
-          const text = transcript.trim();
-          const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
-          const summary = sentences.slice(0, 3).join(' ');
-          const mainPoints = sentences.slice(0, 8).map(s => s.replace(/^[-•\d.\s]+/, ''));
-          finalProtocol = {
-            title: `Mötesprotokoll ${dateStr}`,
-            summary: summary || 'Sammanfattning av mötet baserat på inspelad transkription.',
-            mainPoints: mainPoints.length ? mainPoints : [text],
-            decisions: [],
-            actionItems: [],
-          };
-          if (!cancelled) setProtocol(finalProtocol);
+        // Removed heuristic fallback to avoid using transcript text in the protocol
+        // If AI fails to generate, we keep sections empty and suggest retrying via UI/toast.
+        if (!finalProtocol) {
+          if (!cancelled) {
+            toast({ title: "Kunde inte generera AI‑protokoll", description: "Försök igen om en liten stund." });
+          }
         }
 
         const title = finalProtocol?.title || `Mötesprotokoll ${dateStr}`;
@@ -597,30 +595,7 @@ export const AutoProtocolGenerator = ({
                       </div>
                     )}
 
-                    {/* Transcript Toggle Section */}
-                    <div className="border-t pt-6 mt-6">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowTranscript(!showTranscript)}
-                        className="w-full"
-                      >
-                        {showTranscript ? "Dölj fullständig transkription" : "Visa fullständig transkription"}
-                      </Button>
-                      
-                      {showTranscript && (
-                        <div className="mt-4 space-y-3 animate-fade-in">
-                          <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                            <span className="w-1 h-6 bg-primary rounded-full" />
-                            Fullständig transkription
-                          </h3>
-                          <div className="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                            <p className="text-base leading-relaxed text-foreground/80 whitespace-pre-wrap">
-                              {transcript}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    {/* Transcript section intentionally removed to prevent exposing raw transcript in protocol view */} */
                   </div>
                 ) : null}
               </CardContent>
