@@ -79,7 +79,7 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                 </div>
 
                 {/* Instructions */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -92,7 +92,7 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                     <div className="text-left flex-1">
                       <p className="text-sm font-medium text-foreground">Håll telefonen nära</p>
                       <p className="text-xs text-muted-foreground">
-                        För bäst ljudkvalitet, placera telefonen 30-50 cm från talarna
+                        Placera telefonen 30-50 cm från talarna
                       </p>
                     </div>
                   </motion.div>
@@ -130,13 +130,37 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                       </p>
                     </div>
                   </motion.div>
+
+                  {/* Button explanations */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="pt-2 border-t border-border/30"
+                  >
+                    <p className="text-xs font-medium text-foreground mb-2">Vad gör knapparna?</p>
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                      <div className="flex gap-2">
+                        <span className="text-red-500 font-semibold">Avsluta:</span>
+                        <span>Stoppar inspelning + skapar protokoll med AI</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="font-semibold">Spara:</span>
+                        <span>Sparar transkription utan att skapa protokoll</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="font-semibold">Pausa:</span>
+                        <span>Pausar/återupptar inspelningen tillfälligt</span>
+                      </div>
+                    </div>
+                  </motion.div>
                 </div>
 
                 {/* CTA Button */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
+                  transition={{ delay: 0.7 }}
                 >
                   <Button
                     onClick={handleClose}
@@ -159,7 +183,7 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.7 }}
+                    transition={{ delay: 0.8 }}
                     className="text-xs text-center text-muted-foreground"
                   >
                     Läs igenom tipsen innan du fortsätter
