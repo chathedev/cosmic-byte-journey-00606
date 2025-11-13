@@ -138,15 +138,15 @@ export const meetingStorage = {
   // Increment protocol count - ALWAYS count meeting to backend
   async incrementProtocolCount(meetingId: string): Promise<void> {
     try {
-      // Skip if temp ID (not yet saved to backend)
-      if (!isValidUUID(meetingId)) {
-        console.log('⏭️ Skipping incrementProtocolCount for temp meeting:', meetingId);
-        return;
-      }
-      
-      // ALWAYS count meeting when generating protocol
+      // ALWAYS count meeting when generating protocol (even for temp/test meetings)
       console.log('📊 Counting meeting on protocol generation - ALWAYS:', meetingId);
       await apiClient.incrementMeetings(1);
+      
+      // Skip backend protocolCount update if temp ID (not yet saved to backend)
+      if (!isValidUUID(meetingId)) {
+        console.log('⏭️ Skipping protocolCount update for temp meeting:', meetingId);
+        return;
+      }
       
       // Fetch current to compute next count
       const { meetings } = await apiClient.getMeetings();
@@ -157,7 +157,6 @@ export const meetingStorage = {
       console.error('Error incrementing protocol count (API):', error);
     }
   },
-
   async markCompleted(meetingId: string): Promise<void> {
     try {
       // Skip if temp ID (not yet saved to backend)

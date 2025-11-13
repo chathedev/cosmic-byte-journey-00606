@@ -589,7 +589,7 @@ export const AutoProtocolGenerator = ({
                       </div>
                     )}
 
-                    {/* Transcript section intentionally removed to prevent exposing raw transcript in protocol view */} */
+                    {/* Transcript section intentionally removed to prevent exposing raw transcript in protocol view */}
                   </div>
                 ) : null}
               </CardContent>
