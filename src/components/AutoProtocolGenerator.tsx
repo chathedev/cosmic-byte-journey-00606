@@ -152,17 +152,11 @@ export const AutoProtocolGenerator = ({
               // Generate AI title if not provided
               const aiTitle = data.title || await generateMeetingTitle(transcript);
               
-              // Anti-copy guards: remove any point that appears verbatim in transcript and drop summary if it matches transcript text
-              const rawPoints = Array.isArray(data.mainPoints) ? data.mainPoints : [];
-              const cleanedMainPoints = rawPoints.filter((p: string) => p && !transcript.includes(p.trim()));
-              const rawSummary = typeof data.summary === 'string' ? data.summary : '';
-              const cleanedSummary = rawSummary && transcript.includes(rawSummary.trim()) ? '' : rawSummary;
-              
-              // Best-effort normalization
+              // Best-effort normalization (trust backend to paraphrase and avoid verbatim copy)
               finalProtocol = {
                 title: aiTitle || `Mötesprotokoll ${dateStr}`,
-                summary: cleanedSummary || (cleanedMainPoints.length ? cleanedMainPoints.join('\n') : ''),
-                mainPoints: cleanedMainPoints,
+                summary: typeof data.summary === 'string' ? data.summary : (Array.isArray(data.mainPoints) ? data.mainPoints.join('\n') : ''),
+                mainPoints: Array.isArray(data.mainPoints) ? data.mainPoints : [],
                 decisions: Array.isArray(data.decisions) ? data.decisions : [],
                 actionItems: Array.isArray(data.actionItems) ? data.actionItems : [],
                 nextMeetingSuggestions: Array.isArray(data.nextMeetingSuggestions) ? data.nextMeetingSuggestions : [],

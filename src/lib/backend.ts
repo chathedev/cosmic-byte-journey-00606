@@ -39,9 +39,23 @@ interface SendEmailResponse {
 
 export const analyzeMeeting = async (data: AnalyzeMeetingRequest): Promise<AnalyzeMeetingResponse> => {
   const token = localStorage.getItem('authToken');
-  
+
+  // If no token, call public edge function without auth (function is public)
   if (!token) {
-    throw new Error('No authentication token found');
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transcript: data.transcript,
+        meetingName: data.meetingName,
+        agenda: data.agenda
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to analyze meeting' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
   }
 
   // Import encryption utilities
