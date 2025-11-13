@@ -94,6 +94,35 @@ const Auth = () => {
       return;
     }
 
+    // Test user bypass for review@tivly.se
+    if (email.toLowerCase() === 'review@tivly.se') {
+      setIsLoading(true);
+      try {
+        // Create a test token and mock unlimited user
+        const testToken = 'test_unlimited_user_' + Date.now();
+        apiClient.applyAuthToken(testToken);
+        
+        // Store test user email
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('isTestUser', 'true');
+        
+        await refreshUser();
+        
+        toast({
+          title: "Test-inloggning",
+          description: "Inloggad som obegränsad testanvändare",
+        });
+        
+        navigate('/');
+        return;
+      } catch (error) {
+        console.error('Test login error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     if (cooldown > 0) {
       toast({
         title: "Vänta lite",

@@ -331,6 +331,29 @@ class ApiClient {
   }
 
   async getMe(): Promise<User> {
+    // Handle test user
+    const isTestUser = localStorage.getItem('isTestUser') === 'true';
+    const token = this.getToken();
+    
+    if (isTestUser && token?.startsWith('test_unlimited_user_')) {
+      const testUser: User = {
+        id: 'test-user-id',
+        uid: 'test-user-id',
+        email: 'review@tivly.se',
+        displayName: 'Test User',
+        emailVerified: true,
+        plan: {
+          plan: 'unlimited',
+          type: 'unlimited',
+          meetingsUsed: 0,
+          meetingsLimit: null,
+          protocolsUsed: 0,
+          protocolsLimit: null,
+        }
+      };
+      return testUser;
+    }
+
     const response = await this.fetchWithAuth('/me', { suppressAuthRedirect: true });
 
     if (!response.ok) {
@@ -361,6 +384,7 @@ class ApiClient {
 
   async logout(): Promise<void> {
     this.clearToken();
+    localStorage.removeItem('isTestUser');
     // Clear encryption keys on logout
     const { clearEncryptionKeys } = await import('./fieldEncryption');
     clearEncryptionKeys();
