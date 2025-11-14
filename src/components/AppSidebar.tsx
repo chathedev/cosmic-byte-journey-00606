@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FiHome,
@@ -43,19 +43,54 @@ export function AppSidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
   
+  const scrollYRef = useRef(0);
   const { user, logout } = useAuth();
   const { userPlan, isLoading: planLoading, refreshPlan } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Prevent background scroll and stabilize viewport when sidebar is open on mobile
+  // Prevent background scroll and stabilize viewport when sidebar is open on mobile (iOS-safe lock)
   useEffect(() => {
     if (!isMobile) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = open ? 'hidden' : prev || '';
+    const body = document.body;
+
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+
+    if (open) {
+      scrollYRef.current = window.scrollY || window.pageYOffset || 0;
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollYRef.current}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.width = '100%';
+      body.style.overflow = 'hidden';
+    } else {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      if (scrollYRef.current) {
+        window.scrollTo(0, scrollYRef.current);
+      }
+    }
+
     return () => {
-      document.body.style.overflow = prev || '';
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
     };
   }, [isMobile, open]);
 
@@ -184,9 +219,10 @@ export function AppSidebar() {
 
       {/* Sidebar Navigation - Always Rendered */}
       <motion.aside
+        initial={false}
         animate={{
           x: isMobile ? (open ? 0 : -280) : 0,
-          width: isMobile ? '280px' : (collapsed ? '70px' : '280px'),
+          ...(isMobile ? {} : { width: collapsed ? '70px' : '280px' }),
         }}
         transition={{
           type: "tween",
@@ -203,6 +239,8 @@ export function AppSidebar() {
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
           perspective: 1000,
+          contain: 'paint',
+          touchAction: 'manipulation',
         }}
       >
         {/* Toggle Buttons */}
