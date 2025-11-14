@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Square, FileText, Pause, Play, Edit2, Check, MicOff, Mic, Clock, Loader2, Radio, ArrowLeft } from "lucide-react";
+import { Square, FileText, Pause, Play, Edit2, Check, MicOff, Mic, Clock, Loader2, Radio, ArrowLeft, AlertTriangle, X, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -1081,7 +1081,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                     title="Simulera realistiskt Tivly-möte (~1000 ord om funktioner, ekonomi, etc.)"
                     disabled={isTestMode}
                   >
-                    {isTestMode ? '🎭 Testing...' : '🎭 Test'}
+                    {isTestMode ? 'Testing...' : 'Test'}
                   </button>
                 )}
               </div>
@@ -1128,17 +1128,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   size="lg"
                   disabled={isGeneratingProtocol || isSaving}
                   className="h-10 md:h-12 w-full sm:flex-1 md:flex-none md:min-w-[140px] text-sm"
-                  title={isPaused ? "⏸️ ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "⏸️ PAUSA: Pausar inspelningen tillfälligt"}
+                  title={isPaused ? "ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "PAUSA: Pausar inspelningen tillfälligt"}
                 >
                   {isPaused ? (
                     <>
                       <Play className="w-4 md:w-5 h-4 md:h-5 mr-2" />
-                      <span>▶️ Återuppta</span>
+                      <span>Återuppta</span>
                     </>
                   ) : (
                     <>
                       <Pause className="w-4 md:w-5 h-4 md:h-5 mr-2" />
-                      <span>⏸️ Pausa</span>
+                      <span>Pausa</span>
                     </>
                   )}
                 </Button>
@@ -1151,7 +1151,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 size="lg"
                 disabled={isGeneratingProtocol || isSaving}
                 className="h-10 md:h-12 w-full sm:flex-[2] md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-sm font-semibold"
-                title="🔴 AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett AI-protokoll"
+                title="AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett AI-protokoll"
               >
                 {isGeneratingProtocol ? (
                   <>
@@ -1161,9 +1161,9 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 ) : (
                   <>
                     <Square className="w-4 md:w-5 h-4 md:h-5 mr-2" />
-                    <span className="sm:hidden">🔴 Avsluta & Skapa</span>
-                    <span className="hidden sm:inline md:hidden">🔴 Avsluta</span>
-                    <span className="hidden md:inline">🔴 Avsluta & Skapa</span>
+                    <span className="sm:hidden">Avsluta & Protokoll</span>
+                    <span className="hidden sm:inline md:hidden">Avsluta & Protokoll</span>
+                    <span className="hidden md:inline">Avsluta & Skapa Protokoll</span>
                   </>
                 )}
               </Button>
@@ -1176,7 +1176,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   size="lg"
                   disabled={isSaving || isGeneratingProtocol}
                   className="h-10 md:h-12 w-full sm:flex-1 md:flex-none md:min-w-[140px] text-sm"
-                  title="💾 SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas"
+                  title="SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas"
                 >
                   {isSaving ? (
                     <>
@@ -1186,7 +1186,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   ) : (
                     <>
                       <FileText className="w-4 md:w-5 h-4 md:h-5 mr-2" />
-                      <span>💾 Spara</span>
+                      <span>Spara</span>
                     </>
                   )}
                 </Button>
@@ -1234,17 +1234,24 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl flex items-center gap-2">
-              <span className="text-2xl">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-destructive" />
               Du håller på att lämna!
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4 text-left">
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                <p className="font-semibold text-destructive mb-2">
-                  ❌ Din inspelning är INTE sparad ännu!
+                <p className="font-semibold text-destructive mb-2 flex items-center gap-2">
+                  <X className="w-4 h-4" />
+                  Din inspelning är INTE sparad ännu!
                 </p>
                 <div className="text-sm space-y-1 text-muted-foreground">
-                  <p>📊 Inspelningstid: <strong>{Math.floor(durationSec / 60)} min {durationSec % 60} sek</strong></p>
-                  <p>📝 Ord inspelade: <strong>{transcript.split(/\s+/).filter(w => w).length} ord</strong></p>
+                  <p className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    Inspelningstid: <strong>{Math.floor(durationSec / 60)} min {durationSec % 60} sek</strong>
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    Ord inspelade: <strong>{transcript.split(/\s+/).filter(w => w).length} ord</strong>
+                  </p>
                 </div>
               </div>
 
@@ -1254,14 +1261,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 </p>
                 <div className="space-y-2">
                   <div className="flex gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <span className="text-red-500 font-bold flex-shrink-0">🔴</span>
+                    <Square className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-foreground">Avsluta & Skapa Protokoll</p>
                       <p className="text-xs text-muted-foreground">Sparar + skapar AI-protokoll</p>
                     </div>
                   </div>
                   <div className="flex gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-                    <span className="font-bold flex-shrink-0">💾</span>
+                    <FileText className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-foreground">Spara Till Bibliotek</p>
                       <p className="text-xs text-muted-foreground">Sparar bara transkriptionen</p>
@@ -1271,8 +1278,9 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
               </div>
 
               <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                  💡 Tips: Använd "Spara" om du vill fortsätta mötet senare eller bara vill ha texten!
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-start gap-2">
+                  <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <span>Tips: Använd "Spara" om du vill fortsätta mötet senare eller bara vill ha texten!</span>
                 </p>
               </div>
             </AlertDialogDescription>
