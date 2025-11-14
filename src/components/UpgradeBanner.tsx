@@ -10,7 +10,11 @@ export const UpgradeBanner = () => {
 
   if (!userPlan) return null;
 
-  const isUnlimited = userPlan.meetingsLimit === null;
+  // Enterprise, Standard, and Unlimited plans have unlimited access
+  const isUnlimited = userPlan.meetingsLimit === null || 
+    userPlan.plan === 'standard' || 
+    userPlan.plan === 'unlimited' || 
+    userPlan.plan === 'enterprise';
   const displayLimit = userPlan.meetingsLimit ?? 0;
   
   const progress = isUnlimited ? 0 : Math.min((userPlan.meetingsUsed / displayLimit) * 100, 100);

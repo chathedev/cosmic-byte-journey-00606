@@ -52,7 +52,12 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
 
   const used = userPlan.meetingsUsed;
   const limit = userPlan.meetingsLimit;
-  const isUnlimited = isAdmin || limit === null;
+  // Enterprise, Standard, and Unlimited plans have unlimited access
+  const isUnlimited = isAdmin || 
+    limit === null || 
+    userPlan.plan === 'standard' || 
+    userPlan.plan === 'unlimited' || 
+    userPlan.plan === 'enterprise';
   const progress = isUnlimited ? 0 : Math.min((used / limit) * 100, 100);
 
   const getPlanTitle = () => {
