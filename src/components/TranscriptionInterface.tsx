@@ -246,58 +246,35 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col mobile-compact">
-      {/* Enhanced animated background layers */}
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-primary/5 to-secondary/10" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-secondary/15 via-transparent to-transparent" />
-      
-      {/* Animated orbs */}
-      <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-primary/20 to-transparent rounded-full blur-3xl animate-pulse opacity-60" />
-      <div className="absolute bottom-1/4 left-1/4 w-[600px] h-[600px] bg-gradient-to-br from-secondary/20 to-transparent rounded-full blur-3xl animate-pulse delay-1000 opacity-60" />
-      
+    <div className="min-h-screen bg-background flex flex-col mobile-compact">
       {/* Main content */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 pt-8 md:p-8 md:pt-12 lg:p-12 lg:pt-16 xl:p-16 xl:pt-20">
-        <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl w-full space-y-10 lg:space-y-14 xl:space-y-16">
-          {/* Hero section with premium design */}
-          <div className="text-center space-y-6 lg:space-y-8 xl:space-y-10 animate-fade-in">
-            {/* Icon with glow effect */}
-            <div className="relative inline-block animate-slide-in-from-top">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-[2rem] lg:rounded-[3rem] blur-3xl opacity-40 animate-pulse" />
-              <div className="relative inline-flex items-center justify-center w-24 h-24 lg:w-36 lg:h-36 xl:w-44 xl:h-44 rounded-[2rem] lg:rounded-[3rem] bg-gradient-to-br from-primary/30 to-secondary/30 border-2 border-primary/40 shadow-2xl backdrop-blur-sm transform hover:scale-105 transition-all duration-300 group">
-                <Mic className="w-12 h-12 lg:w-18 lg:h-18 xl:w-22 xl:h-22 text-primary drop-shadow-2xl group-hover:scale-110 transition-transform" />
-              </div>
+      <div className="flex-1 flex flex-col items-center justify-center p-4 pt-8 md:p-8">
+        <div className="max-w-4xl w-full space-y-8">
+          {/* Hero section */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-4">
+              <Mic className="w-10 h-10 text-primary" />
             </div>
             
-            {/* Headline with gradient */}
-            <div className="space-y-4 lg:space-y-6 xl:space-y-7 animate-slide-in-from-bottom">
-              <h1 className="text-4xl md:text-5xl lg:text-7xl xl:text-8xl 2xl:text-9xl font-bold tracking-tight">
-                <span className="bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
-                  Mötestranskribering
-                </span>
+            <div className="space-y-3">
+              <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight">
+                Mötestranskribering
               </h1>
-              <p className="text-base md:text-lg lg:text-2xl xl:text-3xl text-muted-foreground max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto leading-relaxed font-medium">
-                Transkribera dina möten i realtid med AI eller ladda upp inspelade möten
-                <span className="block mt-2">och skapa professionella protokoll automatiskt</span>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                Transkribera dina möten i realtid med svensk taligenkänning eller ladda upp inspelade möten och skapa professionella protokoll.
               </p>
             </div>
           </div>
 
-          {/* CTA Button with premium styling */}
-          <div className="flex justify-center animate-slide-in-from-bottom delay-200">
+          {/* CTA Button */}
+          <div className="flex justify-center">
             <Button
               onClick={handleStartRecording}
               size="lg"
-              className="group relative px-12 py-7 lg:px-20 lg:py-10 xl:px-24 xl:py-12 text-lg lg:text-2xl xl:text-3xl font-semibold rounded-2xl lg:rounded-3xl shadow-2xl hover:shadow-primary/30 transform hover:scale-105 active:scale-95 transition-all duration-300 overflow-hidden"
+              className="px-8 py-6 text-lg font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
             >
-              {/* Button glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary to-secondary opacity-90 group-hover:opacity-100 transition-opacity" />
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 group-hover:translate-x-full transition-all duration-700" />
-              
-              <span className="relative flex items-center gap-3 lg:gap-4">
-                <Mic className="w-6 h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 group-hover:scale-110 transition-transform" />
-                Spela in möte
-              </span>
+              <Mic className="mr-2 h-5 w-5" />
+              Spela in möte
             </Button>
           </div>
           {/* Features grid */}
