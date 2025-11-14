@@ -150,11 +150,15 @@ export function AppSidebar() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
+          transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
           onClick={() => setOpen(true)}
           className="fixed z-50 w-12 h-12 bg-primary backdrop-blur-md border-2 border-primary/20 rounded-full flex items-center justify-center text-primary-foreground shadow-xl transition-transform hover:scale-110 active:scale-95"
           style={{
             bottom: 'calc(max(env(safe-area-inset-bottom, 16px), 16px) + 16px)',
             left: 'calc(max(env(safe-area-inset-left, 16px), 16px) + 16px)',
+            willChange: 'transform, opacity',
+            transform: 'translate3d(0, 0, 0)',
+            backfaceVisibility: 'hidden',
           }}
         >
           <FiMenu className="text-xl" />
@@ -166,10 +170,15 @@ export function AppSidebar() {
         <motion.div
           initial={false}
           animate={{ opacity: open ? 1 : 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
           onClick={() => open && setOpen(false)}
           className="fixed inset-0 z-40 bg-black/50"
-          style={{ pointerEvents: open ? 'auto' : 'none', willChange: 'opacity' }}
+          style={{ 
+            pointerEvents: open ? 'auto' : 'none', 
+            willChange: 'opacity',
+            transform: 'translate3d(0, 0, 0)',
+            backfaceVisibility: 'hidden',
+          }}
         />
       )}
 
@@ -181,7 +190,7 @@ export function AppSidebar() {
         }}
         transition={{
           type: "tween",
-          duration: 0.25,
+          duration: 0.2,
           ease: [0.25, 0.1, 0.25, 1],
         }}
         className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-card border-r border-border`}
@@ -189,7 +198,11 @@ export function AppSidebar() {
           height: isMobile ? '100dvh' : '100vh',
           paddingTop: isMobile ? 'max(env(safe-area-inset-top, 0px), 0px)' : 0,
           paddingBottom: isMobile ? 'max(env(safe-area-inset-bottom, 0px), 0px)' : 0,
-          willChange: 'transform, width',
+          willChange: 'transform',
+          transform: 'translate3d(0, 0, 0)',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          perspective: 1000,
         }}
       >
         {/* Toggle Buttons */}
