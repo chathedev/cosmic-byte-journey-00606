@@ -189,51 +189,73 @@ const Auth = () => {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center p-4 sm:p-6 safe-area-inset"
+      className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 sm:p-6 safe-area-inset"
     >
-      <div className="w-full max-w-md">
-        <div className="rounded-3xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-          <div className="p-6 sm:p-8 space-y-6">
-            {/* Logo Section */}
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg">
-                <img 
-                  src={tivlyLogo}
-                  alt="Tivly Logo" 
-                  className="w-10 h-10 object-contain"
-                />
+      {/* Animated background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10 animate-gradient" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-secondary/20 via-transparent to-transparent" />
+      
+      {/* Decorative elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/5 rounded-full blur-3xl animate-pulse delay-1000" />
+      
+      <div className="w-full max-w-md relative z-10">
+        <div className="rounded-3xl border border-border/40 bg-card/80 backdrop-blur-2xl shadow-2xl overflow-hidden animate-fade-in">
+          {/* Gradient border effect */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 rounded-3xl opacity-50" />
+          
+          <div className="relative p-6 sm:p-10 space-y-8">
+            {/* Logo Section with animation */}
+            <div className="flex flex-col items-center gap-5 animate-slide-in-from-top">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-500" />
+                <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/30 to-secondary/30 border-2 border-primary/40 flex items-center justify-center shadow-xl transform group-hover:scale-105 transition-transform duration-300">
+                  <img 
+                    src={tivlyLogo}
+                    alt="Tivly Logo" 
+                    className="w-12 h-12 object-contain"
+                  />
+                </div>
               </div>
               
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                {linkSent ? 'E-post skickad' : 'Välkommen tillbaka'}
-              </h1>
-              
-              <p className="text-sm text-muted-foreground text-center max-w-xs">
-                {linkSent ? 'Vi har skickat en inloggningslänk till din e-post' : 'Ange din e-postadress för att få en säker inloggningslänk'}
-              </p>
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent tracking-tight">
+                  {linkSent ? 'Länk skickad!' : 'Välkommen'}
+                </h1>
+                
+                <p className="text-sm sm:text-base text-muted-foreground text-center max-w-sm leading-relaxed">
+                  {linkSent 
+                    ? 'Kolla din inkorg för att logga in säkert' 
+                    : 'Ange din e-post för en säker inloggningslänk – ingen lösenord behövs'}
+                </p>
+              </div>
             </div>
 
             {/* Content */}
             {linkSent ? (
-              <div className="text-center space-y-6">
-                <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center shadow-lg">
-                  <CheckCircle2 className="w-10 h-10 text-primary" />
+              <div className="text-center space-y-8 animate-slide-in-from-bottom">
+                <div className="relative mx-auto w-24 h-24 group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-3xl blur-xl opacity-40 animate-pulse" />
+                  <div className="relative rounded-3xl bg-gradient-to-br from-primary/20 to-secondary/20 border-2 border-primary/40 flex items-center justify-center shadow-2xl">
+                    <CheckCircle2 className="w-12 h-12 text-primary animate-scale-in" />
+                  </div>
                 </div>
                 
-                <div className="space-y-4">
-                    <div className="p-5 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm">
-                      <p className="text-sm text-foreground leading-relaxed">
-                        En säker inloggningslänk har skickats till
-                      </p>
-                      <p className="text-base font-semibold text-foreground mt-2 break-all">
+                <div className="space-y-5">
+                  <div className="p-6 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-transparent backdrop-blur-sm shadow-lg">
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                      En säker inloggningslänk skickades till
+                    </p>
+                    <p className="text-lg font-semibold text-foreground break-all bg-gradient-to-br from-primary/10 to-transparent px-4 py-2 rounded-lg">
                       {email}
                     </p>
                   </div>
                   
-                  <div className="space-y-3">
-                      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                        <div className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full" />
-                        <span>Länken är giltig i 15 minuter</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground bg-muted/30 rounded-xl p-3">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                      <span>Länken är giltig i 15 minuter</span>
                     </div>
                     
                     {isPolling && (
