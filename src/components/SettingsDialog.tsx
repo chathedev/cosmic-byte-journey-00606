@@ -349,9 +349,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                               <div>
                                 <p className="text-xs text-muted-foreground mb-1">Möten denna månad</p>
                                 <p className="text-lg font-bold">
-                                  {userPlan?.plan === 'free'
-                                    ? `${userPlan?.meetingsUsed || 0} / ${userPlan?.meetingsLimit || 1}`
-                                    : 'Obegränsad'}
+                                  {userPlan?.plan !== 'free'
+                                    ? 'Obegränsad'
+                                    : `${userPlan?.meetingsUsed || 0} / ${userPlan?.meetingsLimit || 1}`}
                                 </p>
                               </div>
                               <div>
