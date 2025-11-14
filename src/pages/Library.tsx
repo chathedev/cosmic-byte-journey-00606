@@ -240,10 +240,13 @@ const Library = () => {
     const latest = await meetingStorage.getMeeting(meeting.id);
     const effectiveMeeting = latest || meeting;
 
-    if (!effectiveMeeting.transcript || effectiveMeeting.transcript.length < 20) {
+    // Validate minimum word count
+    const wordCount = effectiveMeeting.transcript ? effectiveMeeting.transcript.trim().split(/\s+/).filter(w => w).length : 0;
+    
+    if (!effectiveMeeting.transcript || wordCount < 50) {
       toast({
-        title: "Otillräcklig text",
-        description: "Transkriptionen måste vara minst 20 tecken.",
+        title: "För kort transkription",
+        description: `Transkriptionen innehåller ${wordCount} ord. Minst 50 ord krävs för att skapa ett kvalitativt protokoll.`,
         variant: "destructive",
       });
       return;

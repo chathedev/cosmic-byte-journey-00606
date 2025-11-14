@@ -65,7 +65,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [showExitWarning, setShowExitWarning] = useState(false);
   const MAX_DURATION_SECONDS = 28800; // 8 hours instead of 2
   const MIN_DURATION_SECONDS = 5;
-  const MIN_WORD_COUNT = 5;
+  const MIN_WORD_COUNT = 50;
   const recognitionRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -800,8 +800,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       isFinalizingRef.current = false;
       return;
     }
-    const wordCount = finalTranscript.split(/\s+/).length;
-    if (wordCount < 30) {
+    const wordCount = finalTranscript.split(/\s+/).filter(w => w).length;
+    if (wordCount < MIN_WORD_COUNT) {
       setShowShortTranscriptDialog(true);
       isFinalizingRef.current = false;
       return;
@@ -1212,19 +1212,30 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       <AlertDialog open={showShortTranscriptDialog} onOpenChange={setShowShortTranscriptDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Kort transkription</AlertDialogTitle>
-            <AlertDialogDescription>
-              Din transkription är väldigt kort (under 30 ord). AI-protokollet fungerar bäst med 50+ ord - ju längre desto bättre resultat. 
-              Du kan fortsätta spela in för bättre resultat, eller generera protokoll nu ändå.
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              För kort transkription
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-left">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-sm text-foreground">
+                  Din transkription innehåller <strong>mindre än 50 ord</strong> vilket är minimum för att skapa ett kvalitativt protokoll.
+                </p>
+              </div>
+              <div className="text-sm space-y-2">
+                <p className="font-medium text-foreground">Rekommendation:</p>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                  <li>Fortsätt spela in tills du har minst 50 ord</li>
+                  <li>Ju mer innehåll, desto bättre protokoll</li>
+                  <li>AI:n behöver tillräckligt med kontext</li>
+                </ul>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setShowShortTranscriptDialog(false)}>
               Fortsätt spela in
             </AlertDialogCancel>
-            <AlertDialogAction onClick={proceedWithShortTranscript}>
-              Generera protokoll nu
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

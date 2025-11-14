@@ -88,6 +88,19 @@ export default function GenerateProtocol() {
         return;
       }
 
+      // Validate minimum word count
+      const wordCount = payload.transcript.trim().split(/\s+/).filter(w => w).length;
+      if (wordCount < 50) {
+        console.warn('⛔ Transcript too short', { wordCount });
+        toast({
+          title: "För kort transkription",
+          description: `Transkriptionen innehåller ${wordCount} ord. Minst 50 ord krävs för att skapa ett kvalitativt protokoll.`,
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
+
       // 3) Prevent duplicates only when we have a real meetingId
       if (payload.meetingId) {
         const protocolKey = `protocol_generated_${payload.meetingId}`;
