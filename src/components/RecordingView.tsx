@@ -1107,16 +1107,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
             </Button>
 
             {/* Recording Controls */}
-            <div className="flex items-center gap-1.5 md:gap-3 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1.5 md:gap-3 w-full md:w-auto">
               {/* Back Button - Mobile (compact) */}
               <Button
                 onClick={handleBackClick}
                 variant="ghost"
                 size="sm"
-                className="md:hidden h-10 px-2"
+                className="md:hidden h-10"
                 title="Gå tillbaka"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Tillbaka
               </Button>
 
               {/* Pause/Resume Button */}
@@ -1126,18 +1127,18 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   variant="outline"
                   size="lg"
                   disabled={isGeneratingProtocol || isSaving}
-                  className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[140px] text-xs md:text-sm"
-                  title={isPaused ? "⏸️ ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "⏸️ PAUSA: Pausar inspelningen tillfälligt - tryck igen för att fortsätta. Smart vid pauser eller när någon pratar utanför mötet."}
+                  className="h-10 md:h-12 w-full sm:flex-1 md:flex-none md:min-w-[140px] text-sm"
+                  title={isPaused ? "⏸️ ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "⏸️ PAUSA: Pausar inspelningen tillfälligt"}
                 >
                   {isPaused ? (
                     <>
-                      <Play className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden sm:inline ml-1">▶️ Återuppta</span>
+                      <Play className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                      <span>▶️ Återuppta</span>
                     </>
                   ) : (
                     <>
-                      <Pause className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden sm:inline ml-1">⏸️ Pausa</span>
+                      <Pause className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                      <span>⏸️ Pausa</span>
                     </>
                   )}
                 </Button>
@@ -1149,19 +1150,20 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 variant="default"
                 size="lg"
                 disabled={isGeneratingProtocol || isSaving}
-                className="h-10 md:h-12 flex-[2] md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-xs md:text-sm font-semibold"
-                title="🔴 AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett komplett AI-protokoll med sammanfattning, beslut och åtgärder"
+                className="h-10 md:h-12 w-full sm:flex-[2] md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-sm font-semibold"
+                title="🔴 AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett AI-protokoll"
               >
                 {isGeneratingProtocol ? (
                   <>
-                    <Loader2 className="w-4 md:w-5 h-4 md:h-5 md:mr-2 animate-spin" />
-                    <span className="hidden sm:inline ml-1">Genererar...</span>
+                    <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-2 animate-spin" />
+                    <span>Genererar...</span>
                   </>
                 ) : (
                   <>
-                    <Square className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                    <Square className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                    <span className="sm:hidden">🔴 Avsluta & Skapa</span>
+                    <span className="hidden sm:inline md:hidden">🔴 Avsluta</span>
                     <span className="hidden md:inline">🔴 Avsluta & Skapa</span>
-                    <span className="hidden sm:inline md:hidden ml-1">🔴 Avsluta</span>
                   </>
                 )}
               </Button>
@@ -1173,19 +1175,18 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   variant="outline"
                   size="lg"
                   disabled={isSaving || isGeneratingProtocol}
-                  className="h-10 md:h-12 flex-1 md:flex-none md:min-w-[140px] text-xs md:text-sm"
-                  title="💾 SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas. Perfekt när du bara vill ha texten eller fortsätta senare."
+                  className="h-10 md:h-12 w-full sm:flex-1 md:flex-none md:min-w-[140px] text-sm"
+                  title="💾 SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-4 md:w-5 h-4 md:h-5 md:mr-2 animate-spin" />
-                      <span className="hidden sm:inline ml-1">Sparar...</span>
+                      <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-2 animate-spin" />
+                      <span>Sparar...</span>
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden md:inline">💾 Spara</span>
-                      <span className="hidden sm:inline md:hidden ml-1">💾</span>
+                      <FileText className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                      <span>💾 Spara</span>
                     </>
                   )}
                 </Button>
