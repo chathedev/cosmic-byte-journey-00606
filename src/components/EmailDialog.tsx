@@ -73,6 +73,20 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
         throw new Error('Not authenticated');
       }
 
+      // Convert Blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          const base64 = base64data.split(',')[1]; // Remove data:xxx;base64, prefix
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(documentBlob);
+      });
+
+      const base64Document = await base64Promise;
+
       const response = await fetch('https://api.tivly.se/send-protocol-email', {
         method: 'POST',
         headers: {
@@ -83,13 +97,14 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
           recipients: validRecipients,
           subject: subject.trim(),
           message: message.trim(),
-          documentBlob: documentBlob,
+          documentBlob: base64Document,
           fileName: fileName,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send email');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send email');
       }
 
       setSending(false);
@@ -109,7 +124,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
       
       toast({
         title: "Kunde inte skicka e-post",
-        description: "Ett fel uppstod vid skickandet. Försök igen.",
+        description: error.message || "Ett fel uppstod vid skickandet. Försök igen.",
         variant: "destructive",
       });
     }
