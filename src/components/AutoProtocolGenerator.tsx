@@ -1,44 +1,53 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Mic, FileText, ListChecks, CheckCircle2, Target, Save, Sparkles } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSubscription } from "@/contexts/SubscriptionContext";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
+import { Card } from "@/components/ui/card";
+import { Download, Save, ArrowLeft, FileText, CheckCircle2, Clock, Users, Target, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Document, Paragraph, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
-import { generateMeetingTitle } from "@/lib/titleGenerator";
-import { saveActionItems } from "@/lib/backend";
-import { hasPlusAccess } from "@/lib/accessCheck";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { generateMeetingTitle } from "@/lib/titleGenerator";
+import { useToast } from "@/hooks/use-toast";
 
-const TypeWriter = ({ text, delay = 0 }: { text: string; delay?: number }) => {
+// TypeWriter component for smooth text reveal
+const TypeWriter = ({ 
+  text, 
+  delay = 0,
+  speed = 15 
+}: { 
+  text: string; 
+  delay?: number;
+  speed?: number;
+}) => {
   const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      let currentIndex = 0;
-      const interval = setInterval(() => {
-        if (currentIndex <= text.length) {
-          setDisplayedText(text.slice(0, currentIndex));
-          currentIndex++;
-        } else {
-          setIsComplete(true);
-          clearInterval(interval);
-        }
-      }, 12);
-      return () => clearInterval(interval);
-    }, delay * 1000);
-    return () => clearTimeout(timer);
-  }, [text, delay]);
+    const startTimer = setTimeout(() => {
+      setStarted(true);
+    }, delay);
 
-  return (
-    <div className={`transition-opacity duration-300 ${isComplete ? 'opacity-100' : 'opacity-95'}`}>
-      {displayedText}
-      {!isComplete && <span className="inline-block w-0.5 h-4 ml-0.5 bg-primary animate-pulse" />}
-    </div>
-  );
+    return () => clearTimeout(startTimer);
+  }, [delay]);
+
+  useEffect(() => {
+    if (!started) return;
+    
+    let currentIndex = 0;
+    const interval = setInterval(() => {
+      if (currentIndex <= text.length) {
+        setDisplayedText(text.slice(0, currentIndex));
+        currentIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, speed);
+
+    return () => clearInterval(interval);
+  }, [text, started, speed]);
+
+  return <span>{displayedText}</span>;
 };
 
 interface AIActionItem {
@@ -62,505 +71,574 @@ interface AutoProtocolGeneratorProps {
   transcript: string;
   aiProtocol: AIProtocol | null;
   onBack: () => void;
-  isFreeTrialMode?: boolean;
   showWidget?: boolean;
   onProtocolReady?: () => void;
+  isFreeTrialMode?: boolean;
   meetingCreatedAt?: string;
   agendaId?: string;
   meetingId?: string;
   userId?: string;
 }
 
-export const AutoProtocolGenerator = ({ 
-  transcript, 
-  aiProtocol, 
-  onBack, 
-  isFreeTrialMode = false,
+export const AutoProtocolGenerator = ({
+  transcript,
+  aiProtocol,
+  onBack,
+  showWidget = true,
   onProtocolReady,
+  isFreeTrialMode = false,
   meetingCreatedAt,
+  agendaId,
   meetingId,
-  userId
+  userId,
 }: AutoProtocolGeneratorProps) => {
-  const [isGenerating, setIsGenerating] = useState(true);
-  const [currentStep, setCurrentStep] = useState("");
-  const [progress, setProgress] = useState(0);
+  const [generatedProtocol, setGeneratedProtocol] = useState<AIProtocol | null>(aiProtocol);
+  const [isGenerating, setIsGenerating] = useState(!aiProtocol);
+  const [generationStep, setGenerationStep] = useState(0);
   const [documentBlob, setDocumentBlob] = useState<Blob | null>(null);
-  const [fileName, setFileName] = useState<string>("");
-  const [protocol, setProtocol] = useState<AIProtocol | null>(aiProtocol);
-  const [showContent, setShowContent] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const { user } = useAuth();
-  const { userPlan } = useSubscription();
-  const { toast } = useToast();
+  const [fileName, setFileName] = useState("Mötesprotokoll.docx");
+  const [isExpanded, setIsExpanded] = useState(true);
   const navigate = useNavigate();
-  
-  useEffect(() => {
-    setProtocol(aiProtocol);
-  }, [aiProtocol]);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const hasGeneratedRef = useRef(false);
+
+  const generationSteps = [
+    { icon: Sparkles, text: "Analyserar transkription...", duration: 800 },
+    { icon: Users, text: "Identifierar deltagare och samtalsämnen...", duration: 1000 },
+    { icon: Target, text: "Extraherar viktiga beslut och åtgärdspunkter...", duration: 1200 },
+    { icon: FileText, text: "Strukturerar protokollet...", duration: 800 },
+    { icon: CheckCircle2, text: "Färdigställer dokument...", duration: 600 },
+  ];
 
   useEffect(() => {
-    let cancelled = false;
+    if (aiProtocol || hasGeneratedRef.current) return;
+    hasGeneratedRef.current = true;
 
-    const generateDocument = async () => {
-      if (!protocol) return;
+    const generateProtocol = async () => {
+      setIsGenerating(true);
+      
+      // Animate through steps
+      for (let i = 0; i < generationSteps.length; i++) {
+        setGenerationStep(i);
+        await new Promise(resolve => setTimeout(resolve, generationSteps[i].duration));
+      }
 
       try {
-        // Simulate progress with realistic steps
-        const steps = [
-          { text: "Analyserar mötesinnehållet...", progress: 15 },
-          { text: "Identifierar huvudpunkter...", progress: 35 },
-          { text: "Sammanställer beslut...", progress: 55 },
-          { text: "Formaterar åtgärdspunkter...", progress: 75 },
-          { text: "Färdigställer protokollet...", progress: 95 }
-        ];
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-meeting`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              transcript,
+              meetingName: fileName.replace('.docx', ''),
+              agenda: agendaId ? await fetchAgendaContent(agendaId) : undefined,
+            }),
+          }
+        );
 
-        for (const step of steps) {
-          if (cancelled) return;
-          setCurrentStep(step.text);
-          setProgress(step.progress);
-          await new Promise(resolve => setTimeout(resolve, 800));
+        if (!response.ok) {
+          throw new Error("Failed to generate protocol");
         }
+
+        const data = await response.json();
+        setGeneratedProtocol(data);
 
         // Generate title
-        const generatedTitle = await generateMeetingTitle(transcript);
-        const finalTitle = generatedTitle || protocol.title || "Mötesprotokoll";
+        const title = await generateMeetingTitle(transcript);
+        setFileName(`${title}.docx`);
+
+        // Save action items if we have meeting data
+        if (meetingId && user && data.actionItems?.length > 0) {
+          await saveActionItems(data.actionItems, meetingId, user.uid);
+        }
+
+        // Generate document
+        await generateDocument(data, title);
         
-        // Update protocol with generated title
-        const updatedProtocol = { ...protocol, title: finalTitle };
-        setProtocol(updatedProtocol);
-
-        // Create document sections
-        const docChildren: Paragraph[] = [
-          new Paragraph({
-            text: "MÖTESPROTOKOLL",
-            heading: HeadingLevel.HEADING_1,
-            spacing: { after: 200 }
-          }),
-          new Paragraph({
-            text: finalTitle,
-            heading: HeadingLevel.HEADING_2,
-            spacing: { after: 400 }
-          }),
-        ];
-
-        // Add summary
-        if (updatedProtocol.summary) {
-          docChildren.push(
-            new Paragraph({
-              text: "Sammanfattning",
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 }
-            }),
-            new Paragraph({
-              text: updatedProtocol.summary,
-              spacing: { after: 400 }
-            })
-          );
+        if (onProtocolReady) {
+          onProtocolReady();
         }
-
-        // Add main points
-        if (updatedProtocol.mainPoints && updatedProtocol.mainPoints.length > 0) {
-          docChildren.push(
-            new Paragraph({
-              text: "Huvudpunkter",
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 }
-            })
-          );
-          updatedProtocol.mainPoints.forEach(point => {
-            docChildren.push(
-              new Paragraph({
-                text: `• ${point}`,
-                spacing: { after: 100 }
-              })
-            );
-          });
-        }
-
-        // Add decisions
-        if (updatedProtocol.decisions && updatedProtocol.decisions.length > 0) {
-          docChildren.push(
-            new Paragraph({
-              text: "Beslut",
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 }
-            })
-          );
-          updatedProtocol.decisions.forEach(decision => {
-            docChildren.push(
-              new Paragraph({
-                text: `• ${decision}`,
-                spacing: { after: 100 }
-              })
-            );
-          });
-        }
-
-        // Add action items
-        if (updatedProtocol.actionItems && updatedProtocol.actionItems.length > 0) {
-          docChildren.push(
-            new Paragraph({
-              text: "Åtgärdspunkter",
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 }
-            })
-          );
-          updatedProtocol.actionItems.forEach(item => {
-            const itemText = typeof item === 'string' ? item : item.title;
-            docChildren.push(
-              new Paragraph({
-                text: `• ${itemText}`,
-                spacing: { after: 100 }
-              })
-            );
-          });
-        }
-
-        const doc = new Document({
-          sections: [{
-            properties: {},
-            children: docChildren
-          }]
-        });
-
-        const blob = await Packer.toBlob(doc);
-        setDocumentBlob(blob);
-        setFileName(`protokoll_${finalTitle.replace(/\s+/g, '_')}.docx`);
-
-        // Save action items if needed
-        if (updatedProtocol.actionItems && updatedProtocol.actionItems.length > 0 && meetingId && user) {
-          try {
-            await saveActionItems({
-              actionItems: updatedProtocol.actionItems,
-              meetingId: meetingId,
-              userId: user.uid
-            });
-          } catch (error) {
-            console.error('Failed to save action items:', error);
-          }
-        }
-
-        setProgress(100);
-        setIsGenerating(false);
-        
-        setTimeout(() => {
-          setShowContent(true);
-          onProtocolReady?.();
-        }, 300);
       } catch (error) {
-        console.error('Document generation error:', error);
-        if (!cancelled) {
-          toast({
-            title: "Ett fel uppstod",
-            description: "Kunde inte generera dokumentet. Försök igen.",
-            variant: "destructive",
-          });
-        }
+        console.error("Error generating protocol:", error);
+        toast({
+          title: "Fel vid generering",
+          description: "Kunde inte generera protokollet. Försök igen.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsGenerating(false);
       }
     };
 
-    generateDocument();
+    generateProtocol();
+  }, [transcript, aiProtocol]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [protocol, transcript, toast, meetingCreatedAt, isFreeTrialMode, onProtocolReady, userPlan, user, meetingId]);
-
-  const handleSave = async () => {
-    setIsSaving(true);
+  const fetchAgendaContent = async (id: string): Promise<string> => {
     try {
-      // Simulate save
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({
-        title: "Protokoll sparat!",
-        description: "Ditt protokoll har sparats i biblioteket.",
-      });
-      navigate("/library");
+      const { data, error } = await supabase
+        .from('meeting_agendas')
+        .select('content')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data?.content || '';
     } catch (error) {
-      toast({
-        title: "Ett fel uppstod",
-        description: "Kunde inte spara protokollet.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
+      console.error('Error fetching agenda:', error);
+      return '';
     }
+  };
+
+  const saveActionItems = async (items: AIActionItem[], meetingId: string, userId: string) => {
+    try {
+      const actionItems = items.map(item => ({
+        meeting_id: meetingId,
+        user_id: userId,
+        title: item.title,
+        description: item.description || null,
+        owner: item.owner || null,
+        deadline: item.deadline || null,
+        priority: item.priority,
+        status: 'pending',
+      }));
+
+      const { error } = await supabase
+        .from('action_items')
+        .insert(actionItems);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving action items:', error);
+    }
+  };
+
+  const generateDocument = async (protocol: AIProtocol, title: string) => {
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            text: title,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          new Paragraph({
+            text: `Datum: ${new Date(meetingCreatedAt || Date.now()).toLocaleDateString('sv-SE')}`,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          new Paragraph({
+            text: "Sammanfattning",
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 300, after: 200 },
+          }),
+          new Paragraph({
+            text: protocol.summary,
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            text: "Huvudpunkter",
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 300, after: 200 },
+          }),
+          ...protocol.mainPoints.map(point => 
+            new Paragraph({
+              text: point,
+              bullet: { level: 0 },
+              spacing: { after: 100 },
+            })
+          ),
+          new Paragraph({
+            text: "Beslut",
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 300, after: 200 },
+          }),
+          ...protocol.decisions.map(decision => 
+            new Paragraph({
+              text: decision,
+              bullet: { level: 0 },
+              spacing: { after: 100 },
+            })
+          ),
+          new Paragraph({
+            text: "Åtgärdspunkter",
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 300, after: 200 },
+          }),
+          ...protocol.actionItems.flatMap(item => [
+            new Paragraph({
+              text: item.title,
+              bullet: { level: 0 },
+              spacing: { after: 50 },
+            }),
+            ...(item.description ? [new Paragraph({
+              text: item.description,
+              bullet: { level: 1 },
+              spacing: { after: 50 },
+            })] : []),
+            ...(item.owner ? [new Paragraph({
+              text: `Ansvarig: ${item.owner}`,
+              bullet: { level: 1 },
+              spacing: { after: 50 },
+            })] : []),
+            ...(item.deadline ? [new Paragraph({
+              text: `Deadline: ${item.deadline}`,
+              bullet: { level: 1 },
+              spacing: { after: 100 },
+            })] : []),
+          ]),
+        ],
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    setDocumentBlob(blob);
   };
 
   const handleDownload = () => {
-    setIsDownloading(true);
-    try {
-      if (documentBlob && fileName) {
-        saveAs(documentBlob, fileName);
-        toast({
-          title: "Protokoll nedladdat!",
-          description: `${fileName} har laddats ner.`,
-        });
-      }
-    } finally {
-      setTimeout(() => setIsDownloading(false), 1000);
+    if (documentBlob) {
+      saveAs(documentBlob, fileName);
+      toast({
+        title: "Nedladdning startad",
+        description: "Protokollet laddas ner till din enhet.",
+      });
     }
   };
 
-  const handleBackToHome = () => {
-    navigate("/");
+  const handleSave = () => {
+    toast({
+      title: "Protokoll sparat",
+      description: "Protokollet finns nu i ditt bibliotek.",
+    });
+    navigate("/library");
   };
 
-  const handleNewRecording = () => {
-    navigate("/recording");
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20';
+      case 'high': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20';
+      case 'medium': return 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20';
+      case 'low': return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20';
+      default: return 'bg-muted text-muted-foreground';
+    }
   };
 
-  const meetingTitle = protocol?.title || "Mötesprotokoll";
-
-  const parsedSections = {
-    summary: protocol?.summary || "",
-    mainPoints: protocol?.mainPoints || [],
-    decisions: protocol?.decisions || [],
-    actionItems: protocol?.actionItems?.map(item => typeof item === 'string' ? item : item.title) || []
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'Kritisk';
+      case 'high': return 'Hög';
+      case 'medium': return 'Medium';
+      case 'low': return 'Låg';
+      default: return priority;
+    }
   };
 
   if (isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-muted/10 flex items-center justify-center p-6">
-        <div className="w-full max-w-3xl space-y-10">
-          <div className="text-center space-y-6">
-            <div className="inline-flex items-center gap-4 mb-8">
-              <div className="relative">
-                <Sparkles className="w-10 h-10 text-primary animate-pulse" />
-                <div className="absolute inset-0 w-10 h-10 bg-primary/20 rounded-full blur-xl animate-pulse" />
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full">
+          <Card className="p-8 md:p-12 backdrop-blur-sm bg-card/80 border-primary/10 shadow-2xl">
+            <div className="space-y-8">
+              {/* Logo/Icon */}
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
+                    <FileText className="w-10 h-10 text-primary-foreground" />
+                  </div>
+                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping"></div>
+                </div>
               </div>
-              <h1 className="text-5xl font-bold tracking-tight">
-                <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+
+              {/* Title */}
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                   Genererar protokoll
-                </span>
-              </h1>
-              <div className="relative">
-                <Sparkles className="w-10 h-10 text-primary animate-pulse" />
-                <div className="absolute inset-0 w-10 h-10 bg-primary/20 rounded-full blur-xl animate-pulse" />
+                </h2>
+                <p className="text-muted-foreground">AI analyserar ditt möte och skapar ett strukturerat protokoll</p>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="space-y-4 py-8">
+                {generationSteps.map((step, index) => {
+                  const StepIcon = step.icon;
+                  const isActive = index === generationStep;
+                  const isCompleted = index < generationStep;
+                  
+                  return (
+                    <div 
+                      key={index}
+                      className={`flex items-center gap-4 p-4 rounded-lg transition-all duration-500 ${
+                        isActive 
+                          ? 'bg-primary/10 scale-105 shadow-lg shadow-primary/10' 
+                          : isCompleted
+                          ? 'bg-muted/50 opacity-60'
+                          : 'bg-muted/20 opacity-40'
+                      }`}
+                      style={{
+                        animation: isActive ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
+                      }}
+                    >
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' 
+                          : isCompleted
+                          ? 'bg-primary/60 text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      } transition-all duration-500`}>
+                        <StepIcon className={`w-6 h-6 ${isActive ? 'animate-bounce' : ''}`} />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`font-medium transition-colors duration-500 ${
+                          isActive ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>
+                          {step.text}
+                        </p>
+                      </div>
+                      {isCompleted && (
+                        <CheckCircle2 className="w-6 h-6 text-primary animate-scale-in" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all duration-500 ease-out"
+                    style={{ width: `${((generationStep + 1) / generationSteps.length) * 100}%` }}
+                  />
+                </div>
+                <p className="text-sm text-center text-muted-foreground">
+                  {Math.round(((generationStep + 1) / generationSteps.length) * 100)}% färdigt
+                </p>
               </div>
             </div>
-            
-            <div className="w-full max-w-xl mx-auto space-y-3">
-              <div className="relative bg-card/30 backdrop-blur-md rounded-2xl p-3 shadow-2xl border border-border/30">
-                <div 
-                  className="h-4 bg-gradient-to-r from-primary/90 via-primary to-primary/80 rounded-xl transition-all duration-1000 ease-out shadow-[0_0_30px_rgba(var(--primary),0.6)]"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <p className="text-base text-muted-foreground/80 font-medium animate-fade-in">
-                {currentStep}
-              </p>
-            </div>
-          </div>
+          </Card>
         </div>
       </div>
     );
   }
 
+  if (!generatedProtocol) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background/98 to-muted/5 py-12 px-4">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="space-y-4 opacity-0 animate-fade-in" style={{ animationDelay: "0s", animationFillMode: "forwards" }}>
-          <div className="flex items-center gap-4 mb-2">
-            <FileText className="w-8 h-8 text-primary" />
-            <h1 className="text-4xl font-bold tracking-tight text-foreground">
-              {meetingTitle}
-            </h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              className="hover:bg-muted"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Tillbaka
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                disabled={!documentBlob}
+                className="hover:bg-primary/10"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Ladda ner
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Spara i bibliotek
+              </Button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground ml-12">
-            Möte genomfört • Protokoll genererat automatiskt
-          </p>
-          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent ml-12" />
         </div>
+      </div>
 
-        {/* Summary */}
-        {parsedSections.summary && (
-          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
-            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.2s forwards"
-          }}>
-            <CardHeader className="pb-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <FileText className="w-6 h-6 text-primary" />
-                <CardTitle className="text-2xl font-semibold">Sammanfattning</CardTitle>
+      {/* Content */}
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="space-y-6">
+          {/* Title Card */}
+          <Card className="p-8 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '100ms' }}>
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
+                <FileText className="w-7 h-7 text-primary-foreground" />
               </div>
-              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed">
-                <TypeWriter text={parsedSections.summary} delay={0.4} />
+              <div className="flex-1">
+                <h1 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  <TypeWriter text={fileName.replace('.docx', '')} speed={30} />
+                </h1>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{new Date(meetingCreatedAt || Date.now()).toLocaleDateString('sv-SE')}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                    <span className="text-primary font-medium">Färdigt</span>
+                  </div>
+                </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
-        )}
 
-        {/* Main Points */}
-        {parsedSections.mainPoints && parsedSections.mainPoints.length > 0 && (
-          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
-            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.5s forwards"
-          }}>
-            <CardHeader className="pb-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <ListChecks className="w-6 h-6 text-primary" />
-                <CardTitle className="text-2xl font-semibold">Huvudpunkter</CardTitle>
+          {/* Summary Card */}
+          <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '200ms' }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary" />
               </div>
-              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="space-y-5">
-                {parsedSections.mainPoints.map((point, index) => (
-                  <div key={index} className="flex gap-4 group">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/30 transition-all">
-                      {index + 1}
+              <h2 className="text-2xl font-semibold">Sammanfattning</h2>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              <TypeWriter text={generatedProtocol.summary} delay={300} speed={8} />
+            </p>
+          </Card>
+
+          {/* Main Points Card */}
+          <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '300ms' }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl font-semibold">Huvudpunkter</h2>
+            </div>
+            <ul className="space-y-3">
+              {generatedProtocol.mainPoints.map((point, index) => (
+                <li 
+                  key={index} 
+                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors animate-fadeInUp"
+                  style={{ animationDelay: `${400 + index * 100}ms` }}
+                >
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                    <span className="text-xs font-bold text-primary">{index + 1}</span>
+                  </div>
+                  <p className="text-muted-foreground flex-1">
+                    <TypeWriter text={point} delay={400 + index * 100} speed={5} />
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {/* Decisions Card */}
+          {generatedProtocol.decisions.length > 0 && (
+            <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '500ms' }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <h2 className="text-2xl font-semibold">Beslut</h2>
+              </div>
+              <ul className="space-y-3">
+                {generatedProtocol.decisions.map((decision, index) => (
+                  <li 
+                    key={index} 
+                    className="flex items-start gap-3 p-3 rounded-lg bg-green-500/5 hover:bg-green-500/10 transition-colors border border-green-500/20 animate-fadeInUp"
+                    style={{ animationDelay: `${600 + index * 100}ms` }}
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-muted-foreground flex-1">
+                      <TypeWriter text={decision} delay={600 + index * 100} speed={5} />
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {/* Action Items Card */}
+          {generatedProtocol.actionItems.length > 0 && (
+            <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '700ms' }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <h2 className="text-2xl font-semibold">Åtgärdspunkter</h2>
+              </div>
+              <div className="space-y-4">
+                {generatedProtocol.actionItems.map((item, index) => (
+                  <div 
+                    key={index}
+                    className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all border border-border/50 hover:border-primary/30 animate-fadeInUp"
+                    style={{ animationDelay: `${800 + index * 100}ms` }}
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <h3 className="font-semibold text-lg flex-1">
+                        <TypeWriter text={item.title} delay={800 + index * 100} speed={10} />
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(item.priority)}`}>
+                        {getPriorityLabel(item.priority)}
+                      </span>
                     </div>
-                    <div className="flex-1 pt-0.5 text-foreground/85">
-                      <TypeWriter text={point} delay={0.7 + index * 0.3} />
+                    {item.description && (
+                      <p className="text-sm text-muted-foreground mb-3">
+                        <TypeWriter text={item.description} delay={900 + index * 100} speed={5} />
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      {item.owner && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Users className="w-4 h-4" />
+                          <span>{item.owner}</span>
+                        </div>
+                      )}
+                      {item.deadline && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="w-4 h-4" />
+                          <span>{item.deadline}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </Card>
+          )}
 
-        {/* Decisions */}
-        {parsedSections.decisions && parsedSections.decisions.length > 0 && (
-          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
-            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.8s forwards"
-          }}>
-            <CardHeader className="pb-4 space-y-3">
+          {/* Transcript Card (Collapsible) */}
+          <Card className="backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '900ms' }}>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="w-full p-6 flex items-center justify-between hover:bg-muted/20 transition-colors"
+            >
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-primary" />
-                <CardTitle className="text-2xl font-semibold">Beslut</CardTitle>
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <h2 className="text-2xl font-semibold">Transkription</h2>
               </div>
-              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="space-y-5">
-                {parsedSections.decisions.map((decision, index) => {
-                  const decisionKey = `decision-${index}`;
-                  return (
-                    <div key={decisionKey} className="group">
-                      <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border/30 transition-all">
-                        <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 text-foreground/85">
-                          <TypeWriter text={decision} delay={1.1 + index * 0.3} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              {isExpanded ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+            {isExpanded && (
+              <div className="px-6 pb-6">
+                <div className="p-4 rounded-lg bg-muted/30 max-h-96 overflow-y-auto">
+                  <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    {transcript}
+                  </p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Action Items */}
-        {parsedSections.actionItems && parsedSections.actionItems.length > 0 && (
-          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
-            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 1.1s forwards"
-          }}>
-            <CardHeader className="pb-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <Target className="w-6 h-6 text-primary" />
-                <CardTitle className="text-2xl font-semibold">Åtgärdspunkter</CardTitle>
-              </div>
-              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="space-y-5">
-                {parsedSections.actionItems.map((item, index) => {
-                  const itemKey = `action-${index}`;
-                  const parts = item.split(/(\[.*?\])/g).filter(Boolean);
-                  return (
-                    <div key={itemKey} className="group">
-                      <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border/30 hover:border-primary/30 transition-all">
-                        <Target className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="text-foreground/85">
-                            <TypeWriter 
-                              text={parts.map(part => 
-                                part.startsWith('[') && part.endsWith(']') 
-                                  ? part.slice(1, -1)
-                                  : part
-                              ).join('')} 
-                              delay={1.4 + index * 0.3} 
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 pt-6 opacity-0" style={{
-          animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 1.4s forwards"
-        }}>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
-          >
-            {isSaving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Sparar...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-5 w-5" />
-                Spara protokoll
-              </>
             )}
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className="flex-1 h-12 text-base font-semibold border-2 hover:shadow-lg transition-all hover:scale-[1.02]"
-          >
-            {isDownloading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
-                Laddar ner...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2 h-5 w-5" />
-                Ladda ner (.docx)
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Bottom Navigation */}
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 opacity-0" style={{
-          animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 1.7s forwards"
-        }}>
-          <Button
-            variant="ghost"
-            onClick={handleBackToHome}
-            className="flex-1 h-11 text-base border border-border/40 hover:border-border transition-all hover:scale-[1.01]"
-          >
-            <ArrowLeft className="mr-2 h-5 w-5" />
-            Tillbaka till startsidan
-          </Button>
-
-          <Button
-            variant="ghost"
-            onClick={handleNewRecording}
-            className="flex-1 h-11 text-base border border-border/40 hover:border-border transition-all hover:scale-[1.01]"
-          >
-            <Mic className="mr-2 h-5 w-5" />
-            Ny inspelning
-          </Button>
+          </Card>
         </div>
       </div>
     </div>
