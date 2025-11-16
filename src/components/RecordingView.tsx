@@ -777,9 +777,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const stopRecording = async () => {
     if (isFinalizingRef.current) return;
     isFinalizingRef.current = true;
-    
-    // Show analyzing screen immediately
-    setShowAnalyzing(true);
 
     let finalTranscript = (transcript + interimTranscript).trim();
 
@@ -800,7 +797,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
     // Validate transcript length
     if (!finalTranscript) {
-      setShowAnalyzing(false);
       toast({ title: 'Ingen text', description: 'Ingen transkription inspelad.', variant: 'destructive' });
       handleBackClick();
       isFinalizingRef.current = false;
@@ -808,7 +804,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     }
     const wordCount = finalTranscript.split(/\s+/).filter(w => w).length;
     if (wordCount < MIN_WORD_COUNT) {
-      setShowAnalyzing(false);
       setShowShortTranscriptDialog(true);
       isFinalizingRef.current = false;
       return;
@@ -847,7 +842,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       console.warn('Final save failed:', e);
     }
     // Navigate
-    setShowAnalyzing(false);
     if (userPlan?.plan === 'free') {
       navigate(`/generate-protocol?meetingId=${savedId}&title=${encodeURIComponent(aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`)}`);
       isFinalizingRef.current = false;
