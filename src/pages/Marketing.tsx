@@ -82,17 +82,21 @@ export default function Marketing() {
 
   const getStatusColor = () => {
     if (!status) return 'bg-muted';
-    const withinHours = status.withinSendingHours ?? isWithinSendingHours();
+    if (!status.initialized) return 'bg-yellow-500';
+    const withinHours = status.sender.withinSendingHours ?? isWithinSendingHours();
     if (!withinHours) return 'bg-yellow-500';
-    if (Object.keys(status.pausedSenders || {}).length > 0) return 'bg-red-500';
+    if (Object.keys(status.sender.pausedSenders || {}).length > 0) return 'bg-red-500';
+    if (!status.scheduler.isRunning) return 'bg-red-500';
     return 'bg-green-500';
   };
 
   const getStatusText = () => {
     if (!status) return 'Loading...';
-    const withinHours = status.withinSendingHours ?? isWithinSendingHours();
+    if (!status.initialized) return 'System Initializing...';
+    if (!status.scheduler.isRunning) return 'Scheduler Stopped';
+    const withinHours = status.sender.withinSendingHours ?? isWithinSendingHours();
     if (!withinHours) return 'Outside Sending Hours (06:00-22:00)';
-    if (Object.keys(status.pausedSenders || {}).length > 0) return 'Some Senders Paused';
+    if (Object.keys(status.sender.pausedSenders || {}).length > 0) return 'Some Senders Paused';
     return 'System Operational';
   };
 
@@ -171,7 +175,7 @@ export default function Marketing() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{status?.emailsInMaster || 0}</div>
+              <div className="text-3xl font-bold">{status?.statistics.totalMaster || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">Verified emails</p>
             </CardContent>
           </Card>
@@ -184,7 +188,7 @@ export default function Marketing() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{status?.emailsSentToday || 0}</div>
+              <div className="text-3xl font-bold">{status?.statistics.sentToday || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">Out of 300 daily limit</p>
             </CardContent>
           </Card>
@@ -197,7 +201,7 @@ export default function Marketing() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{status?.emailsPending || 0}</div>
+              <div className="text-3xl font-bold">{status?.statistics.totalPending || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">Ready to send</p>
             </CardContent>
           </Card>
@@ -210,10 +214,8 @@ export default function Marketing() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm font-medium truncate">
-                {status?.nextScheduledSend || 'N/A'}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Scheduled time</p>
+              <div className="text-3xl font-bold">{status?.statistics.totalInvalid || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">Bounced/Invalid</p>
             </CardContent>
           </Card>
         </div>
@@ -225,10 +227,10 @@ export default function Marketing() {
             <CardDescription>Daily sending limits per domain (resets at midnight)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {status?.domainSends &&
-              Object.entries(status.domainSends).map(([domain, stats]) => {
+            {status?.sender.domainSends &&
+              Object.entries(status.sender.domainSends).map(([domain, stats]) => {
                 const percentage = (stats.sent / stats.limit) * 100;
-                const isPaused = status.pausedSenders?.[domain];
+                const isPaused = status.sender.pausedSenders?.[domain];
 
                 return (
                   <div key={domain} className="space-y-2">
@@ -262,9 +264,21 @@ export default function Marketing() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Scheduler Status:</span>
+              <span className="font-medium">
+                {status?.scheduler.isRunning ? 'Running' : 'Stopped'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Active Jobs:</span>
+              <span className="font-medium">
+                {status?.scheduler.jobs.filter(j => j.running).length || 0} / {status?.scheduler.jobs.length || 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Active Sender Domains:</span>
               <span className="font-medium">
-                {(status?.activeSenderDomains || []).join(', ') || 'None'}
+                {(status?.sender.activeSenderDomains || []).join(', ') || 'None'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -277,12 +291,18 @@ export default function Marketing() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Batch Delay:</span>
-              <span className="font-medium">45-180 seconds</span>
+              <span className="font-medium">4-12 seconds</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Paused Senders:</span>
               <span className="font-medium">
-                {Object.keys(status?.pausedSenders || {}).length || 'None'}
+                {Object.keys(status?.sender.pausedSenders || {}).length || 'None'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Last Update:</span>
+              <span className="font-medium">
+                {status?.timestamp ? new Date(status.timestamp).toLocaleTimeString() : 'N/A'}
               </span>
             </div>
           </CardContent>
