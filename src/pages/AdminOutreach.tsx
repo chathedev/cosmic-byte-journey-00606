@@ -346,7 +346,7 @@ export default function AdminOutreach() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Active Sender Domains:</span>
               <span className="font-medium">
-                {status?.activeSenderDomains.join(', ') || 'None'}
+                {(status?.activeSenderDomains || []).join(', ') || 'None'}
               </span>
             </div>
             <div className="flex justify-between">
