@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { outreachApi, OutreachStatus } from '@/lib/outreachApi';
-import { Mail, Database, Clock, AlertCircle } from 'lucide-react';
+import { Mail, Database, Clock, AlertCircle, Send } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from '@/hooks/use-toast';
 
 export default function Marketing() {
   const [status, setStatus] = useState<OutreachStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [sendingTest, setSendingTest] = useState(false);
 
   const loadStatus = async () => {
     try {
@@ -50,6 +53,25 @@ export default function Marketing() {
     return 'System Operational';
   };
 
+  const handleSendTest = async () => {
+    setSendingTest(true);
+    try {
+      await outreachApi.sendTest();
+      toast({
+        title: "Test Emails Sent",
+        description: "All three email templates have been sent to the test address.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send test emails",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   if (loading && !status) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -63,11 +85,23 @@ export default function Marketing() {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Marketing Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
-              Real-time email outreach monitoring
-            </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Marketing Dashboard</h1>
+              <p className="text-muted-foreground mt-1">
+                Real-time email outreach monitoring
+              </p>
+            </div>
+            <Button
+              onClick={handleSendTest}
+              disabled={sendingTest}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Send className="h-4 w-4" />
+              {sendingTest ? 'Sending...' : 'Send Test Emails'}
+            </Button>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
