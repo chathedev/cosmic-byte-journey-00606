@@ -251,16 +251,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       <div className="flex-1 flex flex-col items-center justify-center p-4 pt-8 md:p-8">
         <div className="max-w-4xl w-full space-y-8">
           {/* Hero section */}
-          <div className="text-center space-y-4">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-4">
-              <Mic className="w-10 h-10 text-primary" />
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-3">
+              <Mic className="w-8 h-8 text-primary" />
             </div>
             
-            <div className="space-y-3">
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight">
+            <div className="space-y-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
                 Mötestranskribering
               </h1>
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
                 Transkribera dina möten i realtid med svensk taligenkänning eller ladda upp inspelade möten och skapa professionella protokoll.
               </p>
             </div>
@@ -271,70 +271,70 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             <Button
               onClick={handleStartRecording}
               size="lg"
-              className="px-8 py-6 text-lg font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              className="px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
             >
               <Mic className="mr-2 h-5 w-5" />
               Spela in möte
             </Button>
           </div>
           {/* Features grid */}
-          <div className="grid md:grid-cols-2 gap-6 lg:gap-8 xl:gap-10 max-w-3xl lg:max-w-4xl xl:max-w-6xl mx-auto">
-            <div className="bg-card rounded-lg p-6 lg:p-8 xl:p-10 border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start gap-4 lg:gap-6">
-                <div className="flex-shrink-0 w-10 h-10 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-lg lg:rounded-xl bg-primary/10 flex items-center justify-center">
-                  <svg className="w-5 h-5 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+            <div className="bg-card rounded-lg p-5 border border-border shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 </div>
                 <div className="flex-1 text-left">
-                  <h3 className="font-semibold lg:text-xl xl:text-2xl text-foreground mb-1 lg:mb-2">Realtid</h3>
-                  <p className="text-sm lg:text-base xl:text-lg text-muted-foreground leading-relaxed">
+                  <h3 className="font-semibold text-base text-foreground mb-1">Realtid</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     Transkribering på svenska direkt medan du pratar
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-card rounded-lg p-6 lg:p-8 xl:p-10 border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start gap-4 lg:gap-6">
-                <div className="flex-shrink-0 w-10 h-10 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-lg lg:rounded-xl bg-accent/10 flex items-center justify-center">
-                  <svg className="w-5 h-5 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="bg-card rounded-lg p-5 border border-border shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                   </svg>
                 </div>
                 <div className="flex-1 text-left">
-                  <h3 className="font-semibold lg:text-xl xl:text-2xl text-foreground mb-1 lg:mb-2">Visualisering</h3>
-                  <p className="text-sm lg:text-base xl:text-lg text-muted-foreground leading-relaxed">
+                  <h3 className="font-semibold text-base text-foreground mb-1">Visualisering</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     Se din röst med animerad ljudvisualisering
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-card rounded-lg p-6 lg:p-8 xl:p-10 border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start gap-4 lg:gap-6">
-                <div className="flex-shrink-0 w-10 h-10 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-lg lg:rounded-xl bg-primary/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-primary" />
+            <div className="bg-card rounded-lg p-5 border border-border shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 text-left">
-                  <h3 className="font-semibold lg:text-xl xl:text-2xl text-foreground mb-1 lg:mb-2">Protokoll</h3>
-                  <p className="text-sm lg:text-base xl:text-lg text-muted-foreground leading-relaxed">
+                  <h3 className="font-semibold text-base text-foreground mb-1">Protokoll</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     Generera och ladda ner Word-dokument enkelt
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-card rounded-lg p-6 lg:p-8 xl:p-10 border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start gap-4 lg:gap-6">
-                <div className="flex-shrink-0 w-10 h-10 lg:w-14 lg:h-14 xl:w-16 xl:h-16 rounded-lg lg:rounded-xl bg-accent/10 flex items-center justify-center">
-                  <svg className="w-5 h-5 lg:w-7 lg:h-7 xl:w-8 xl:h-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="bg-card rounded-lg p-5 border border-border shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div className="flex-1 text-left">
-                  <h3 className="font-semibold lg:text-xl xl:text-2xl text-foreground mb-1 lg:mb-2">Bibliotek</h3>
-                  <p className="text-sm lg:text-base xl:text-lg text-muted-foreground leading-relaxed">
+                  <h3 className="font-semibold text-base text-foreground mb-1">Bibliotek</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     Organisera möten i mappar och kategorier
                   </p>
                 </div>
