@@ -118,8 +118,9 @@ export default function AdminOutreach() {
 
   const getStatusColor = () => {
     if (!status) return 'bg-muted';
-    if (!status.withinSendingHours) return 'bg-yellow-500';
-    if (Object.keys(status.pausedSenders).length > 0) return 'bg-red-500';
+    const withinHours = status.withinSendingHours ?? isWithinSendingHours();
+    if (!withinHours) return 'bg-yellow-500';
+    if (Object.keys(status.pausedSenders || {}).length > 0) return 'bg-red-500';
     return 'bg-green-500';
   };
 
@@ -127,7 +128,7 @@ export default function AdminOutreach() {
     if (!status) return 'Loading...';
     const withinHours = status.withinSendingHours ?? isWithinSendingHours();
     if (!withinHours) return 'Outside Sending Hours (06:00-22:00)';
-    if (Object.keys(status.pausedSenders).length > 0) return 'Some Senders Paused';
+    if (Object.keys(status.pausedSenders || {}).length > 0) return 'Some Senders Paused';
     return 'System Operational';
   };
 
