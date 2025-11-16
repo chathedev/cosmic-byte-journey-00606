@@ -159,10 +159,24 @@ export default function GenerateProtocol() {
     navigate("/");
   };
 
-  if (!isValidated) {
+  if (!isValidated || !pageState) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse">Validerar...</div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
+        <div className="text-center space-y-6">
+          <div className="relative">
+            <div className="w-24 h-24 mx-auto">
+              <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping"></div>
+              <div className="absolute inset-0 rounded-full bg-primary/30 animate-pulse"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/60 animate-spin border-4 border-transparent border-t-background"></div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-foreground">Förbereder protokollet</h3>
+            <p className="text-muted-foreground">Laddar transkription och verifierar data...</p>
+          </div>
+        </div>
       </div>
     );
   }

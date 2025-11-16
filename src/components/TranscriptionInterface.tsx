@@ -33,10 +33,9 @@ interface AIProtocol {
 
 interface TranscriptionInterfaceProps {
   isFreeTrialMode: boolean;
-  onOpenRecordingDialog?: () => void;
 }
 
-export const TranscriptionInterface = ({ isFreeTrialMode = false, onOpenRecordingDialog }: TranscriptionInterfaceProps) => {
+export const TranscriptionInterface = ({ isFreeTrialMode = false }: TranscriptionInterfaceProps) => {
   const [currentView, setCurrentView] = useState<View>("welcome");
   const [transcript, setTranscript] = useState("");
   const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan } = useSubscription();
@@ -79,18 +78,13 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false, onOpenRecordin
       return;
     }
 
-    // Open enhanced recording dialog if callback provided, otherwise navigate to recording page
-    if (onOpenRecordingDialog) {
-      onOpenRecordingDialog();
-    } else {
-      navigate('/recording', { 
-        state: { 
-          continuedMeeting: null,
-          isFreeTrialMode,
-          selectedLanguage 
-        } 
-      });
-    }
+    navigate('/recording', { 
+      state: { 
+        continuedMeeting: null,
+        isFreeTrialMode,
+        selectedLanguage 
+      } 
+    });
   };
 
 
