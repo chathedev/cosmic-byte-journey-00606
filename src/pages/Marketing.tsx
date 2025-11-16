@@ -134,9 +134,12 @@ export default function Marketing() {
         <div className="flex flex-col gap-6">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground tracking-tight">Marketing Outreach Dashboard</h1>
+              <h1 className="text-2xl font-semibold text-foreground tracking-tight">B2B Utskick · Automatisk</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Automated B2B outreach system · 1000 daily capacity · 5 sender domains
+                24/7 automatisk kontaktdiscovery och mailingkampanj · Max 990/dag · 3 avsändare
+              </p>
+              <p className="text-xs text-muted-foreground/80 mt-1">
+                Systemet kör automatiskt 06:00-22:00 · Daglig återställning kl 05:00
               </p>
             </div>
             <Button
@@ -153,10 +156,11 @@ export default function Marketing() {
           <div className="flex items-center gap-6 text-xs text-muted-foreground border-l-2 border-border pl-4">
             <div className="flex items-center gap-2">
               <Clock className="h-3.5 w-3.5" />
-              <span>Updated {lastUpdate.toLocaleTimeString()}</span>
+              <span>Uppdaterad {lastUpdate.toLocaleTimeString()}</span>
             </div>
-            <span>Live updates</span>
-            <span>Active 06:00-22:00</span>
+            <span>Live-uppdateringar var 10:e sekund</span>
+            <span>Aktiv 06:00-22:00</span>
+            <span className="text-primary">Fullt automatiserad</span>
           </div>
         </div>
 
@@ -194,16 +198,16 @@ export default function Marketing() {
             <CardHeader className="pb-3">
               <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                 <Mail className="h-3.5 w-3.5" />
-                Sent Today
+                Skickade Idag
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold text-foreground">{status?.statistics.sentToday || 0}</div>
               <div className="flex items-center justify-between mt-2">
-                <p className="text-xs text-muted-foreground">of 1000</p>
-                <p className="text-xs font-medium">{Math.round(((status?.statistics.sentToday || 0) / 1000) * 100)}%</p>
+                <p className="text-xs text-muted-foreground">av 990</p>
+                <p className="text-xs font-medium">{Math.round(((status?.statistics.sentToday || 0) / 990) * 100)}%</p>
               </div>
-              <Progress value={((status?.statistics.sentToday || 0) / 1000) * 100} className="h-1 mt-3" />
+              <Progress value={((status?.statistics.sentToday || 0) / 990) * 100} className="h-1 mt-3" />
             </CardContent>
           </Card>
 
@@ -274,36 +278,36 @@ export default function Marketing() {
           {/* Automation Schedule */}
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Automation Schedule</CardTitle>
-              <CardDescription className="text-xs">Daily cycle · Fully automated</CardDescription>
+              <CardTitle className="text-base font-semibold">Automatiserad Schemaläggning</CardTitle>
+              <CardDescription className="text-xs">Daglig cykel · Fullt automatiserad · 24/7 drift</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-start gap-4 p-3 border border-border rounded-md">
                 <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">05:00</div>
                 <div className="text-sm space-y-1">
-                  <div className="font-medium text-sm">Queue Reset</div>
-                  <div className="text-xs text-muted-foreground leading-relaxed">Discovery initiates for 1000 validated contacts</div>
+                  <div className="font-medium text-sm">Kö återställs</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Samlar upp till 400 validerade kontakter (max 3/företag)</div>
                 </div>
               </div>
               <div className="flex items-start gap-4 p-3 border border-border rounded-md">
                 <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">06:00-22:00</div>
                 <div className="text-sm space-y-1">
-                  <div className="font-medium text-sm">Active Sending</div>
-                  <div className="text-xs text-muted-foreground leading-relaxed">Batch delivery every ~2 minutes</div>
+                  <div className="font-medium text-sm">Aktiv Utskick</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Batchleverans var ~2:a minut · 20 mail/batch · 4-12s fördröjning</div>
                 </div>
               </div>
               <div className="flex items-start gap-4 p-3 border border-border rounded-md">
                 <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">23:50</div>
                 <div className="text-sm space-y-1">
-                  <div className="font-medium text-sm">Queue Purge</div>
-                  <div className="text-xs text-muted-foreground leading-relaxed">Cleanup for next cycle</div>
+                  <div className="font-medium text-sm">Kö rensas</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Städning för nästa cykel</div>
                 </div>
               </div>
               <div className="flex items-start gap-4 p-3 border border-border rounded-md bg-muted/30">
-                <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">HOURLY</div>
+                <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">24/7</div>
                 <div className="text-sm space-y-1">
-                  <div className="font-medium text-sm">Discovery</div>
-                  <div className="text-xs text-muted-foreground leading-relaxed">Continuous validation & queuing</div>
+                  <div className="font-medium text-sm">Kontinuerlig Discovery</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Multi-källa (Allabolag, Hitta, Eniro, domän-crawl) · MX + SMTP validering</div>
                 </div>
               </div>
             </CardContent>
@@ -313,31 +317,31 @@ export default function Marketing() {
         {/* System Info */}
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">System Configuration</CardTitle>
-            <CardDescription className="text-xs">Automation status and operational parameters</CardDescription>
+            <CardTitle className="text-base font-semibold">Systemkonfiguration</CardTitle>
+            <CardDescription className="text-xs">Automationsstatus och driftparametrar</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Scheduler</span>
+                <span className="text-xs text-muted-foreground">Schemaläggare</span>
                 <span className={`text-xs font-medium ${status?.scheduler.isRunning ? 'text-foreground' : 'text-muted-foreground'}`}>
-                  {status?.scheduler.isRunning ? 'Running' : 'Stopped'}
+                  {status?.scheduler.isRunning ? 'Aktiv' : 'Stoppad'}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Active Jobs</span>
+                <span className="text-xs text-muted-foreground">Aktiva Jobb</span>
                 <span className="text-xs font-medium font-mono">
                   {status?.scheduler.jobs.filter(j => j.running).length || 0}/{status?.scheduler.jobs.length || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Active Domains</span>
+                <span className="text-xs text-muted-foreground">Aktiva Avsändare</span>
                 <span className="text-xs font-medium font-mono">
-                  {(status?.sender.activeSenderDomains || []).length || 0}
+                  {(status?.sender.activeSenderDomains || []).length || 0}/3
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Paused Senders</span>
+                <span className="text-xs text-muted-foreground">Pausade Avsändare</span>
                 <span className="text-xs font-medium font-mono">
                   {Object.keys(status?.sender.pausedSenders || {}).length || 0}
                 </span>
@@ -345,20 +349,24 @@ export default function Marketing() {
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Daily Capacity</span>
-                <span className="text-xs font-medium font-mono">1000</span>
+                <span className="text-xs text-muted-foreground">Daglig Kapacitet</span>
+                <span className="text-xs font-medium font-mono">990</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Sending Window</span>
+                <span className="text-xs text-muted-foreground">Skickfönster</span>
                 <span className="text-xs font-medium font-mono">06:00-22:00</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Batch Interval</span>
+                <span className="text-xs text-muted-foreground">Batch-intervall</span>
                 <span className="text-xs font-medium font-mono">~2 min</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-xs text-muted-foreground">Message Delay</span>
+                <span className="text-xs text-muted-foreground">Meddelandefördröjning</span>
                 <span className="text-xs font-medium font-mono">4-12s</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Max per Företag</span>
+                <span className="text-xs font-medium font-mono">3 kontakter</span>
               </div>
             </div>
           </CardContent>

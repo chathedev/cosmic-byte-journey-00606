@@ -237,4 +237,69 @@ export const backendApi = {
 
     return response.json();
   },
+
+  // Protocol Management
+  async saveProtocol(meetingId: string, data: { fileName: string; mimeType: string; documentBlob: string }): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      if (response.status === 409) {
+        // Protocol exists, use PUT to replace
+        return this.replaceProtocol(meetingId, data);
+      }
+      const error = await response.json().catch(() => ({ error: 'Failed to save protocol' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async replaceProtocol(meetingId: string, data: { fileName: string; mimeType: string; documentBlob: string }): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to replace protocol' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getProtocol(meetingId: string): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      const error = await response.json().catch(() => ({ error: 'Failed to get protocol' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async deleteProtocol(meetingId: string): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to delete protocol' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
 };
