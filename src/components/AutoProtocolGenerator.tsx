@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, Save, ArrowLeft, FileText, CheckCircle2, Clock, Users, Target, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { Document, Paragraph, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
@@ -9,46 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useToast } from "@/hooks/use-toast";
-
-// TypeWriter component for smooth text reveal
-const TypeWriter = ({ 
-  text, 
-  delay = 0,
-  speed = 15 
-}: { 
-  text: string; 
-  delay?: number;
-  speed?: number;
-}) => {
-  const [displayedText, setDisplayedText] = useState("");
-  const [started, setStarted] = useState(false);
-
-  useEffect(() => {
-    const startTimer = setTimeout(() => {
-      setStarted(true);
-    }, delay);
-
-    return () => clearTimeout(startTimer);
-  }, [delay]);
-
-  useEffect(() => {
-    if (!started) return;
-    
-    let currentIndex = 0;
-    const interval = setInterval(() => {
-      if (currentIndex <= text.length) {
-        setDisplayedText(text.slice(0, currentIndex));
-        currentIndex++;
-      } else {
-        clearInterval(interval);
-      }
-    }, speed);
-
-    return () => clearInterval(interval);
-  }, [text, started, speed]);
-
-  return <span>{displayedText}</span>;
-};
 
 interface AIActionItem {
   title: string;
@@ -94,22 +54,13 @@ export const AutoProtocolGenerator = ({
 }: AutoProtocolGeneratorProps) => {
   const [generatedProtocol, setGeneratedProtocol] = useState<AIProtocol | null>(aiProtocol);
   const [isGenerating, setIsGenerating] = useState(!aiProtocol);
-  const [generationStep, setGenerationStep] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [documentBlob, setDocumentBlob] = useState<Blob | null>(null);
   const [fileName, setFileName] = useState("Mötesprotokoll.docx");
-  const [isExpanded, setIsExpanded] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const hasGeneratedRef = useRef(false);
-
-  const generationSteps = [
-    { icon: Sparkles, text: "Analyserar transkription...", duration: 800 },
-    { icon: Users, text: "Identifierar deltagare och samtalsämnen...", duration: 1000 },
-    { icon: Target, text: "Extraherar viktiga beslut och åtgärdspunkter...", duration: 1200 },
-    { icon: FileText, text: "Strukturerar protokollet...", duration: 800 },
-    { icon: CheckCircle2, text: "Färdigställer dokument...", duration: 600 },
-  ];
 
   useEffect(() => {
     if (aiProtocol || hasGeneratedRef.current) return;
@@ -118,11 +69,13 @@ export const AutoProtocolGenerator = ({
     const generateProtocol = async () => {
       setIsGenerating(true);
       
-      // Animate through steps
-      for (let i = 0; i < generationSteps.length; i++) {
-        setGenerationStep(i);
-        await new Promise(resolve => setTimeout(resolve, generationSteps[i].duration));
-      }
+      // Slower, smoother progress animation
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 3;
+        });
+      }, 200);
 
       try {
         const response = await fetch(
@@ -146,6 +99,13 @@ export const AutoProtocolGenerator = ({
         }
 
         const data = await response.json();
+        
+        // Complete progress
+        clearInterval(progressInterval);
+        setProgress(100);
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         setGeneratedProtocol(data);
 
         // Generate title
@@ -165,6 +125,7 @@ export const AutoProtocolGenerator = ({
         }
       } catch (error) {
         console.error("Error generating protocol:", error);
+        clearInterval(progressInterval);
         toast({
           title: "Fel vid generering",
           description: "Kunde inte generera protokollet. Försök igen.",
@@ -321,11 +282,11 @@ export const AutoProtocolGenerator = ({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'critical': return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20';
-      case 'high': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20';
-      case 'medium': return 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20';
-      case 'low': return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20';
-      default: return 'bg-muted text-muted-foreground';
+      case 'critical': return 'text-red-600 dark:text-red-400';
+      case 'high': return 'text-orange-600 dark:text-orange-400';
+      case 'medium': return 'text-yellow-600 dark:text-yellow-400';
+      case 'low': return 'text-green-600 dark:text-green-400';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -341,88 +302,29 @@ export const AutoProtocolGenerator = ({
 
   if (isGenerating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full">
-          <Card className="p-8 md:p-12 backdrop-blur-sm bg-card/80 border-primary/10 shadow-2xl">
-            <div className="space-y-8">
-              {/* Logo/Icon */}
-              <div className="flex justify-center">
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
-                    <FileText className="w-10 h-10 text-primary-foreground" />
-                  </div>
-                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping"></div>
-                </div>
-              </div>
-
-              {/* Title */}
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                  Genererar protokoll
-                </h2>
-                <p className="text-muted-foreground">AI analyserar ditt möte och skapar ett strukturerat protokoll</p>
-              </div>
-
-              {/* Progress Steps */}
-              <div className="space-y-4 py-8">
-                {generationSteps.map((step, index) => {
-                  const StepIcon = step.icon;
-                  const isActive = index === generationStep;
-                  const isCompleted = index < generationStep;
-                  
-                  return (
-                    <div 
-                      key={index}
-                      className={`flex items-center gap-4 p-4 rounded-lg transition-all duration-500 ${
-                        isActive 
-                          ? 'bg-primary/10 scale-105 shadow-lg shadow-primary/10' 
-                          : isCompleted
-                          ? 'bg-muted/50 opacity-60'
-                          : 'bg-muted/20 opacity-40'
-                      }`}
-                      style={{
-                        animation: isActive ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
-                      }}
-                    >
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                        isActive 
-                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' 
-                          : isCompleted
-                          ? 'bg-primary/60 text-primary-foreground'
-                          : 'bg-muted text-muted-foreground'
-                      } transition-all duration-500`}>
-                        <StepIcon className={`w-6 h-6 ${isActive ? 'animate-bounce' : ''}`} />
-                      </div>
-                      <div className="flex-1">
-                        <p className={`font-medium transition-colors duration-500 ${
-                          isActive ? 'text-foreground' : 'text-muted-foreground'
-                        }`}>
-                          {step.text}
-                        </p>
-                      </div>
-                      {isCompleted && (
-                        <CheckCircle2 className="w-6 h-6 text-primary animate-scale-in" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all duration-500 ease-out"
-                    style={{ width: `${((generationStep + 1) / generationSteps.length) * 100}%` }}
-                  />
-                </div>
-                <p className="text-sm text-center text-muted-foreground">
-                  {Math.round(((generationStep + 1) / generationSteps.length) * 100)}% färdigt
-                </p>
-              </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 space-y-6">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              <Loader2 className="w-12 h-12 text-primary animate-spin" />
             </div>
-          </Card>
-        </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Genererar protokoll</h3>
+              <p className="text-sm text-muted-foreground">AI analyserar ditt möte...</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-center text-muted-foreground">
+              {Math.round(progress)}%
+            </p>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -432,16 +334,15 @@ export const AutoProtocolGenerator = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
+      <div className="sticky top-0 z-50 bg-background border-b">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
             <Button
               variant="ghost"
               size="sm"
               onClick={onBack}
-              className="hover:bg-muted"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Tillbaka
@@ -452,7 +353,6 @@ export const AutoProtocolGenerator = ({
                 size="sm"
                 onClick={handleDownload}
                 disabled={!documentBlob}
-                className="hover:bg-primary/10"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Ladda ner
@@ -460,10 +360,9 @@ export const AutoProtocolGenerator = ({
               <Button
                 size="sm"
                 onClick={handleSave}
-                className="bg-primary hover:bg-primary/90"
               >
                 <Save className="w-4 h-4 mr-2" />
-                Spara i bibliotek
+                Spara
               </Button>
             </div>
           </div>
@@ -471,175 +370,101 @@ export const AutoProtocolGenerator = ({
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <div className="space-y-6">
-          {/* Title Card */}
-          <Card className="p-8 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '100ms' }}>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <Card className="p-8 animate-fadeIn">
+          {/* Title */}
+          <div className="mb-8 pb-6 border-b">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
-                <FileText className="w-7 h-7 text-primary-foreground" />
+              <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-primary" />
               </div>
               <div className="flex-1">
-                <h1 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  <TypeWriter text={fileName.replace('.docx', '')} speed={30} />
+                <h1 className="text-3xl font-bold mb-2">
+                  {fileName.replace('.docx', '')}
                 </h1>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{new Date(meetingCreatedAt || Date.now()).toLocaleDateString('sv-SE')}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
-                    <span className="text-primary font-medium">Färdigt</span>
-                  </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{new Date(meetingCreatedAt || Date.now()).toLocaleDateString('sv-SE')}</span>
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
 
-          {/* Summary Card */}
-          <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '200ms' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-semibold">Sammanfattning</h2>
+          {/* Content sections */}
+          <div className="space-y-8">
+            {/* Summary */}
+            <div>
+              <h2 className="text-xl font-semibold mb-3">Sammanfattning</h2>
+              <p className="text-muted-foreground leading-relaxed">
+                {generatedProtocol.summary}
+              </p>
             </div>
-            <p className="text-muted-foreground leading-relaxed">
-              <TypeWriter text={generatedProtocol.summary} delay={300} speed={8} />
-            </p>
-          </Card>
 
-          {/* Main Points Card */}
-          <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '300ms' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h2 className="text-2xl font-semibold">Huvudpunkter</h2>
-            </div>
-            <ul className="space-y-3">
-              {generatedProtocol.mainPoints.map((point, index) => (
-                <li 
-                  key={index} 
-                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors animate-fadeInUp"
-                  style={{ animationDelay: `${400 + index * 100}ms` }}
-                >
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
-                    <span className="text-xs font-bold text-primary">{index + 1}</span>
-                  </div>
-                  <p className="text-muted-foreground flex-1">
-                    <TypeWriter text={point} delay={400 + index * 100} speed={5} />
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          {/* Decisions Card */}
-          {generatedProtocol.decisions.length > 0 && (
-            <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '500ms' }}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-                <h2 className="text-2xl font-semibold">Beslut</h2>
-              </div>
-              <ul className="space-y-3">
-                {generatedProtocol.decisions.map((decision, index) => (
-                  <li 
-                    key={index} 
-                    className="flex items-start gap-3 p-3 rounded-lg bg-green-500/5 hover:bg-green-500/10 transition-colors border border-green-500/20 animate-fadeInUp"
-                    style={{ animationDelay: `${600 + index * 100}ms` }}
-                  >
-                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-muted-foreground flex-1">
-                      <TypeWriter text={decision} delay={600 + index * 100} speed={5} />
-                    </p>
+            {/* Main Points */}
+            <div>
+              <h2 className="text-xl font-semibold mb-3">Huvudpunkter</h2>
+              <ul className="space-y-2">
+                {generatedProtocol.mainPoints.map((point, index) => (
+                  <li key={index} className="flex gap-3">
+                    <span className="text-primary font-medium">{index + 1}.</span>
+                    <span className="text-muted-foreground">{point}</span>
                   </li>
                 ))}
               </ul>
-            </Card>
-          )}
+            </div>
 
-          {/* Action Items Card */}
-          {generatedProtocol.actionItems.length > 0 && (
-            <Card className="p-6 backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '700ms' }}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <h2 className="text-2xl font-semibold">Åtgärdspunkter</h2>
+            {/* Decisions */}
+            {generatedProtocol.decisions.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-3">Beslut</h2>
+                <ul className="space-y-2">
+                  {generatedProtocol.decisions.map((decision, index) => (
+                    <li key={index} className="flex gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{decision}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="space-y-4">
-                {generatedProtocol.actionItems.map((item, index) => (
-                  <div 
-                    key={index}
-                    className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all border border-border/50 hover:border-primary/30 animate-fadeInUp"
-                    style={{ animationDelay: `${800 + index * 100}ms` }}
-                  >
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <h3 className="font-semibold text-lg flex-1">
-                        <TypeWriter text={item.title} delay={800 + index * 100} speed={10} />
-                      </h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(item.priority)}`}>
-                        {getPriorityLabel(item.priority)}
-                      </span>
-                    </div>
-                    {item.description && (
-                      <p className="text-sm text-muted-foreground mb-3">
-                        <TypeWriter text={item.description} delay={900 + index * 100} speed={5} />
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      {item.owner && (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Users className="w-4 h-4" />
-                          <span>{item.owner}</span>
-                        </div>
-                      )}
-                      {item.deadline && (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Clock className="w-4 h-4" />
-                          <span>{item.deadline}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+            )}
 
-          {/* Transcript Card (Collapsible) */}
-          <Card className="backdrop-blur-sm bg-card/80 border-primary/10 shadow-lg animate-fadeInUp" style={{ animationDelay: '900ms' }}>
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="w-full p-6 flex items-center justify-between hover:bg-muted/20 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <h2 className="text-2xl font-semibold">Transkription</h2>
-              </div>
-              {isExpanded ? (
-                <ChevronUp className="w-5 h-5 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-muted-foreground" />
-              )}
-            </button>
-            {isExpanded && (
-              <div className="px-6 pb-6">
-                <div className="p-4 rounded-lg bg-muted/30 max-h-96 overflow-y-auto">
-                  <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                    {transcript}
-                  </p>
+            {/* Action Items */}
+            {generatedProtocol.actionItems.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-3">Åtgärdspunkter</h2>
+                <div className="space-y-4">
+                  {generatedProtocol.actionItems.map((item, index) => (
+                    <div key={index} className="pl-4 border-l-2 border-primary/20">
+                      <div className="flex items-start justify-between gap-4 mb-1">
+                        <h3 className="font-medium">{item.title}</h3>
+                        <span className={`text-xs font-medium ${getPriorityColor(item.priority)}`}>
+                          {getPriorityLabel(item.priority)}
+                        </span>
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
+                      )}
+                      <div className="flex gap-4 text-xs text-muted-foreground">
+                        {item.owner && <span>Ansvarig: {item.owner}</span>}
+                        {item.deadline && <span>Deadline: {item.deadline}</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
-          </Card>
-        </div>
+
+            {/* Transcript */}
+            <div>
+              <h2 className="text-xl font-semibold mb-3">Transkription</h2>
+              <div className="p-4 bg-muted/50 rounded-lg max-h-80 overflow-y-auto">
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                  {transcript}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

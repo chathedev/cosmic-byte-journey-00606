@@ -847,25 +847,22 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       console.warn('Final save failed:', e);
     }
     // Navigate
+    setShowAnalyzing(false);
     if (userPlan?.plan === 'free') {
-      setShowAnalyzing(false);
       navigate(`/generate-protocol?meetingId=${savedId}&title=${encodeURIComponent(aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`)}`);
       isFinalizingRef.current = false;
       return;
     }
 
-    // Small delay to show analyzing screen before agenda dialog
-    setTimeout(() => {
-      setShowAnalyzing(false);
-      setPendingMeetingData({
-        id: savedId,
-        transcript: finalTranscript,
-        title: aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`,
-        createdAt: createdAtRef.current,
-      });
-      setShowAgendaDialog(true);
-      isFinalizingRef.current = false;
-    }, 1500);
+    // Show agenda dialog immediately
+    setPendingMeetingData({
+      id: savedId,
+      transcript: finalTranscript,
+      title: aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`,
+      createdAt: createdAtRef.current,
+    });
+    setShowAgendaDialog(true);
+    isFinalizingRef.current = false;
   };
 
   const proceedWithShortTranscript = async () => {
