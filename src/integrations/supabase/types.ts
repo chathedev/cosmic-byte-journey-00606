@@ -14,13 +14,183 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      action_items: {
+        Row: {
+          created_at: string
+          deadline: string | null
+          description: string | null
+          id: string
+          meeting_id: string
+          owner: string | null
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          meeting_id: string
+          owner?: string | null
+          priority: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          meeting_id?: string
+          owner?: string | null
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      folders: {
+        Row: {
+          createdAt: string
+          id: string
+          name: string
+          order: number | null
+          userId: string
+        }
+        Insert: {
+          createdAt?: string
+          id?: string
+          name: string
+          order?: number | null
+          userId: string
+        }
+        Update: {
+          createdAt?: string
+          id?: string
+          name?: string
+          order?: number | null
+          userId?: string
+        }
+        Relationships: []
+      }
+      meeting_agendas: {
+        Row: {
+          content: string
+          createdat: string
+          id: string
+          name: string
+          updatedat: string
+          userid: string
+        }
+        Insert: {
+          content: string
+          createdat?: string
+          id?: string
+          name: string
+          updatedat?: string
+          userid: string
+        }
+        Update: {
+          content?: string
+          createdat?: string
+          id?: string
+          name?: string
+          updatedat?: string
+          userid?: string
+        }
+        Relationships: []
+      }
+      meetings: {
+        Row: {
+          agendaid: string | null
+          counted: boolean
+          createdAt: string
+          folder: string
+          id: string
+          isCompleted: boolean | null
+          protocol: string | null
+          protocolCount: number | null
+          title: string
+          transcript: string
+          updatedAt: string
+          userId: string
+        }
+        Insert: {
+          agendaid?: string | null
+          counted?: boolean
+          createdAt?: string
+          folder?: string
+          id?: string
+          isCompleted?: boolean | null
+          protocol?: string | null
+          protocolCount?: number | null
+          title: string
+          transcript: string
+          updatedAt?: string
+          userId: string
+        }
+        Update: {
+          agendaid?: string | null
+          counted?: boolean
+          createdAt?: string
+          folder?: string
+          id?: string
+          isCompleted?: boolean | null
+          protocol?: string | null
+          protocolCount?: number | null
+          title?: string
+          transcript?: string
+          updatedAt?: string
+          userId?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetings_agendaid_fkey"
+            columns: ["agendaid"]
+            isOneToOne: false
+            referencedRelation: "meeting_agendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          role: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          role?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_user_email: { Args: never; Returns: string }
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
