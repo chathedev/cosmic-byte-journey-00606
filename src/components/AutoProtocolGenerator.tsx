@@ -33,12 +33,15 @@ const SmoothRevealText = ({
 
   return (
     <span 
-      className={`inline-block transition-all duration-700 ease-out ${
+      className={`inline-block transition-all duration-1000 ${
         isVisible 
-          ? 'opacity-100 translate-y-0' 
-          : 'opacity-0 translate-y-4'
+          ? 'opacity-100 translate-y-0 blur-0' 
+          : 'opacity-0 translate-y-6 blur-sm'
       }`}
-      style={{ transitionDelay: `${delay}ms` }}
+      style={{ 
+        transitionDelay: `${delay}ms`,
+        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)'
+      }}
     >
       {text}
     </span>
@@ -366,10 +369,10 @@ export const AutoProtocolGenerator = ({
 
               {/* Status text */}
               <div className="space-y-3">
-                <h3 className="text-2xl font-semibold text-foreground">
+                <h3 className="text-2xl font-semibold text-foreground animate-pulse">
                   Skapar ditt protokoll
                 </h3>
-                <p className="text-base text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed transition-all duration-500">
                   {progress < 30 && "Analyserar innehållet och förbereder strukturen..."}
                   {progress >= 30 && progress < 60 && "Identifierar huvudpunkter och beslut..."}
                   {progress >= 60 && progress < 85 && "Formulerar sammanfattning och åtgärder..."}
@@ -379,19 +382,22 @@ export const AutoProtocolGenerator = ({
 
               {/* Modern progress bar */}
               <div className="space-y-2">
-                <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden backdrop-blur">
+                <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden backdrop-blur shadow-inner">
                   <div 
-                    className="h-full bg-gradient-to-r from-primary via-primary/80 to-primary rounded-full transition-all duration-500 ease-out relative"
-                    style={{ width: `${progress}%` }}
+                    className="h-full bg-gradient-to-r from-primary via-primary/80 to-primary rounded-full transition-all duration-700 ease-out relative shadow-lg"
+                    style={{ 
+                      width: `${progress}%`,
+                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground font-medium">{Math.round(progress)}% slutfört</p>
+                <p className="text-sm text-muted-foreground font-medium transition-all duration-300">{Math.round(progress)}% slutfört</p>
               </div>
 
               {/* Subtle hint */}
-              <p className="text-xs text-muted-foreground/70 italic">
+              <p className="text-xs text-muted-foreground/70 italic animate-pulse">
                 Detta tar vanligtvis 10-15 sekunder
               </p>
             </div>
@@ -399,7 +405,7 @@ export const AutoProtocolGenerator = ({
         ) : (
           <div className="space-y-8 animate-fade-in">
             {/* Header */}
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-2 opacity-0 animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
               <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 Protokoll klart!
               </h1>
@@ -407,16 +413,16 @@ export const AutoProtocolGenerator = ({
             </div>
 
             {/* Protocol Card */}
-            <Card className="border-2 shadow-xl overflow-hidden">
+            <Card className="border-2 shadow-xl overflow-hidden opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
               <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b-2 space-y-4 py-8">
-                <div className="space-y-3 animate-fade-in">
-                  <CardTitle className="text-3xl md:text-4xl font-bold text-center">
+                <div className="space-y-3">
+                  <CardTitle className="text-3xl md:text-4xl font-bold text-center opacity-0 animate-fade-in" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
                     MÖTESPROTOKOLL
                   </CardTitle>
-                  <h2 className="text-xl md:text-2xl font-semibold text-center text-muted-foreground">
+                  <h2 className="text-xl md:text-2xl font-semibold text-center text-muted-foreground opacity-0 animate-fade-in" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
                     {protocol?.title || 'Protokoll'}
                   </h2>
-                  <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground opacity-0 animate-fade-in" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
                     <span className="font-medium">📅 {dateStr}</span>
                     <span className="text-border">•</span>
                     <span className="font-medium">🕐 {timeStr}</span>
@@ -429,31 +435,35 @@ export const AutoProtocolGenerator = ({
                   <div className="space-y-8">
                     {/* Summary */}
                     {protocol.summary && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
+                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '500ms', animationFillMode: 'forwards', animationDuration: '800ms' }}>
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
+                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" />
                           Sammanfattning
                         </h3>
                         <p className="text-base leading-relaxed text-foreground/90 pl-4">
-                          <SmoothRevealText text={protocol.summary} delay={200} />
+                          <SmoothRevealText text={protocol.summary} delay={600} />
                         </p>
                       </div>
                     )}
 
                     {/* Main Points */}
                     {protocol.mainPoints && protocol.mainPoints.length > 0 && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
+                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '800ms', animationFillMode: 'forwards', animationDuration: '800ms' }}>
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
+                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" style={{ animationDelay: '900ms' }} />
                           Huvudpunkter
                         </h3>
                         <ul className="space-y-3 pl-4">
                           {protocol.mainPoints.map((point, index) => (
-                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in" 
-                                style={{ animationDelay: `${400 + index * 150}ms`, animationFillMode: 'forwards' }}>
-                              <span className="text-primary mt-1.5 text-lg">•</span>
+                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in transform" 
+                                style={{ 
+                                  animationDelay: `${1000 + index * 120}ms`, 
+                                  animationFillMode: 'forwards',
+                                  animationDuration: '700ms'
+                                }}>
+                              <span className="text-primary mt-1.5 text-lg transition-transform duration-300 hover:scale-125">•</span>
                               <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={point} delay={400 + index * 150} />
+                                <SmoothRevealText text={point} delay={1000 + index * 120} />
                               </span>
                             </li>
                           ))
@@ -464,18 +474,28 @@ export const AutoProtocolGenerator = ({
 
                     {/* Decisions */}
                     {protocol.decisions && protocol.decisions.length > 0 && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: `${500 + protocol.mainPoints.length * 150}ms`, animationFillMode: 'forwards' }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
+                      <div className="space-y-3 opacity-0 animate-fade-in" 
+                           style={{ 
+                             animationDelay: `${1100 + protocol.mainPoints.length * 120}ms`, 
+                             animationFillMode: 'forwards',
+                             animationDuration: '800ms'
+                           }}>
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
+                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" 
+                                style={{ animationDelay: `${1200 + protocol.mainPoints.length * 120}ms` }} />
                           Beslut
                         </h3>
                         <ul className="space-y-3 pl-4">
                           {protocol.decisions.map((decision, index) => (
-                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in" 
-                                style={{ animationDelay: `${600 + protocol.mainPoints.length * 150 + index * 150}ms`, animationFillMode: 'forwards' }}>
-                              <span className="text-primary mt-1.5 text-lg">✓</span>
+                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in transform" 
+                                style={{ 
+                                  animationDelay: `${1300 + protocol.mainPoints.length * 120 + index * 120}ms`, 
+                                  animationFillMode: 'forwards',
+                                  animationDuration: '700ms'
+                                }}>
+                              <span className="text-primary mt-1.5 text-lg transition-transform duration-300 hover:scale-125">✓</span>
                               <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={decision} delay={600 + protocol.mainPoints.length * 150 + index * 150} />
+                                <SmoothRevealText text={decision} delay={1300 + protocol.mainPoints.length * 120 + index * 120} />
                               </span>
                             </li>
                           ))
@@ -488,22 +508,28 @@ export const AutoProtocolGenerator = ({
                     {protocol.actionItems && protocol.actionItems.length > 0 && (
                       <div className="space-y-3 opacity-0 animate-fade-in" 
                            style={{ 
-                             animationDelay: `${700 + protocol.mainPoints.length * 150 + protocol.decisions.length * 150}ms`, 
-                             animationFillMode: 'forwards' 
+                             animationDelay: `${1400 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120}ms`, 
+                             animationFillMode: 'forwards',
+                             animationDuration: '800ms'
                            }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
+                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" 
+                                style={{ animationDelay: `${1500 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120}ms` }} />
                           Åtgärdspunkter
                         </h3>
                         <ul className="space-y-4 pl-4">
                           {protocol.actionItems.map((item, index) => {
                             const isSmartItem = typeof item === 'object' && 'priority' in item;
-                            const baseDelay = 800 + protocol.mainPoints.length * 150 + protocol.decisions.length * 150 + index * 200;
+                            const baseDelay = 1600 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120 + index * 150;
                             
                             return (
-                              <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in" 
-                                  style={{ animationDelay: `${baseDelay}ms`, animationFillMode: 'forwards' }}>
-                                <span className="text-primary mt-1.5 text-lg">→</span>
+                              <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in transform" 
+                                  style={{ 
+                                    animationDelay: `${baseDelay}ms`, 
+                                    animationFillMode: 'forwards',
+                                    animationDuration: '700ms'
+                                  }}>
+                                <span className="text-primary mt-1.5 text-lg transition-transform duration-300 hover:scale-125">→</span>
                                 <div className="flex-1 space-y-1">
                                   {isSmartItem ? (
                                     <>
@@ -569,18 +595,22 @@ export const AutoProtocolGenerator = ({
             {/* Action Buttons */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 opacity-0 animate-fade-in" 
-                   style={{ animationDelay: '1000ms', animationFillMode: 'forwards' }}>
+                   style={{ 
+                     animationDelay: `${2000 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120 + protocol.actionItems.length * 150}ms`, 
+                     animationFillMode: 'forwards',
+                     animationDuration: '600ms'
+                   }}>
                 {!isFreeTrialMode && (
-                  <Button onClick={onBack} variant="outline" size="lg" className="gap-2 w-full">
+                  <Button onClick={onBack} variant="outline" size="lg" className="gap-2 w-full transition-all duration-300 hover:scale-105">
                     <ArrowLeft className="w-4 h-4" />
                     <span className="whitespace-nowrap">Nytt möte</span>
                   </Button>
                 )}
-                <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full">
+                <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full transition-all duration-300 hover:scale-105">
                   <Mail className="w-4 h-4" />
                   <span className="whitespace-nowrap">E-posta</span>
                 </Button>
-                <Button onClick={handleDownload} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                <Button onClick={handleDownload} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105 hover:shadow-lg">
                   <Download className="w-4 h-4" />
                   <span className="whitespace-nowrap">Ladda ner</span>
                 </Button>
