@@ -352,7 +352,7 @@ export default function Marketing() {
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Daily Limit:</span>
+                <span className="text-sm text-muted-foreground">Daily Limit Total:</span>
                 <span className="font-medium text-sm">400 emails</span>
               </div>
               <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
