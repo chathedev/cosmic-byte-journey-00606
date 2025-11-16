@@ -129,7 +129,7 @@ export function AppSidebar() {
       if (path === "/admin/users") setSelected("Användare");
       else if (path === "/admin/analytics") setSelected("Analys");
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
-      else if (path === "/admin/outreach") setSelected("B2B Outreach");
+      else if (path === "/admin/marketing") setSelected("Marketing");
       else if (path === "/admin/admins") setSelected("Admins");
       else if (path === "/admin/backend") setSelected("Backend");
       else if (path === "/admin/enterprise") setSelected("Enterprise");
@@ -173,7 +173,7 @@ export function AppSidebar() {
     { Icon: FiUsers, title: "Användare", path: "/admin/users" },
     { Icon: FiBarChart, title: "Analys", path: "/admin/analytics" },
     { Icon: FiMail, title: "E-postkampanjer", path: "/admin/email-campaigns" },
-    { Icon: FiMail, title: "B2B Outreach", path: "/admin/outreach" },
+    { Icon: FiMail, title: "Marketing", path: "/admin/marketing" },
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
     { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
