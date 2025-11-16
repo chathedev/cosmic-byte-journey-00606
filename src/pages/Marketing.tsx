@@ -26,9 +26,52 @@ export default function Marketing() {
   };
 
   useEffect(() => {
-    loadStatus();
-    const interval = setInterval(loadStatus, 3000); // Refresh every 3 seconds
-    return () => clearInterval(interval);
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: NodeJS.Timeout | null = null;
+    let isSSEActive = false;
+
+    // Try to use Server-Sent Events first
+    try {
+      eventSource = new EventSource('https://api.tivly.se/outreach/stats-stream');
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setStatus(data);
+          setLastUpdate(new Date());
+          setLoading(false);
+          isSSEActive = true;
+        } catch (error) {
+          console.error('Failed to parse SSE data:', error);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+        eventSource?.close();
+        
+        // Fall back to polling if SSE fails
+        if (!isSSEActive && !fallbackInterval) {
+          console.log('Falling back to polling every 10 seconds');
+          fallbackInterval = setInterval(loadStatus, 10000);
+        }
+      };
+
+      // Initial load
+      loadStatus();
+    } catch (error) {
+      console.error('SSE not supported, using polling:', error);
+      // Fall back to polling if SSE is not supported
+      loadStatus();
+      fallbackInterval = setInterval(loadStatus, 10000);
+    }
+
+    return () => {
+      eventSource?.close();
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
+    };
   }, []);
 
   const isWithinSendingHours = () => {
@@ -106,7 +149,7 @@ export default function Marketing() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
             <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
-            <span className="ml-2 text-primary">• Auto-refreshing every 3s</span>
+            <span className="ml-2 text-primary">• Live updates via SSE</span>
           </div>
         </div>
 
