@@ -24,27 +24,28 @@ const SmoothRevealText = ({
   text: string; 
   delay?: number;
 }) => {
-  const [displayText, setDisplayText] = useState("");
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      let currentIndex = 0;
-      const interval = setInterval(() => {
-        if (currentIndex <= text.length) {
-          setDisplayText(text.slice(0, currentIndex));
-          currentIndex++;
-        } else {
-          clearInterval(interval);
-        }
-      }, 5);
-
-      return () => clearInterval(interval);
+      setIsVisible(true);
     }, delay);
 
     return () => clearTimeout(timeout);
-  }, [text, delay]);
+  }, [delay]);
 
-  return <>{displayText}</>;
+  return (
+    <span 
+      className={`inline-block transition-all duration-700 ease-out ${
+        isVisible 
+          ? 'opacity-100 translate-y-0' 
+          : 'opacity-0 translate-y-4'
+      }`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {text}
+    </span>
+  );
 };
 
 interface AIActionItem {
@@ -98,13 +99,10 @@ export const AutoProtocolGenerator = ({
   const [showContent, setShowContent] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [agendaContent, setAgendaContent] = useState<string>("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedProtocol, setEditedProtocol] = useState<AIProtocol | null>(null);
   const { user } = useAuth();
   const { userPlan } = useSubscription();
   useEffect(() => {
     setProtocol(aiProtocol);
-    setEditedProtocol(aiProtocol);
   }, [aiProtocol]);
   const { toast } = useToast();
 
@@ -126,49 +124,6 @@ export const AutoProtocolGenerator = ({
     loadAgenda();
   }, [agendaId]);
 
-  const handleSaveEdits = async () => {
-    if (!editedProtocol) return;
-    
-    try {
-      // Update the protocol state
-      setProtocol(editedProtocol);
-      
-      // Save to backend if we have a meetingId
-      if (meetingId && userId) {
-        const protocolText = JSON.stringify(editedProtocol, null, 2);
-        await meetingStorage.saveMeeting({
-          id: meetingId,
-          title: editedProtocol.title,
-          transcript: transcript,
-          protocol: protocolText,
-          folder: 'Allmänt',
-          createdAt: meetingCreatedAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          userId: userId,
-          isCompleted: true,
-          agendaId: agendaId,
-        });
-      }
-      
-      setIsEditing(false);
-      toast({ 
-        title: "Ändringar sparade!", 
-        description: "Protokollet har uppdaterats och sparats." 
-      });
-    } catch (error) {
-      console.error('Failed to save edits:', error);
-      toast({ 
-        title: "Kunde inte spara", 
-        description: "Ett fel uppstod vid sparande. Försök igen.", 
-        variant: "destructive" 
-      });
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditedProtocol(protocol);
-    setIsEditing(false);
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -848,56 +803,22 @@ export const AutoProtocolGenerator = ({
 
             {/* Action Buttons */}
             <div className="w-full max-w-3xl mx-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 opacity-0 animate-fade-in" 
+                   style={{ animationDelay: '1000ms', animationFillMode: 'forwards' }}>
                 {!isFreeTrialMode && (
                   <Button onClick={onBack} variant="outline" size="lg" className="gap-2 w-full">
                     <ArrowLeft className="w-4 h-4" />
                     <span className="whitespace-nowrap">Nytt möte</span>
                   </Button>
                 )}
-                {!isEditing ? (
-                  <>
-                    <Button 
-                      onClick={() => {
-                        if (userPlan?.plan === 'free') {
-                          toast({
-                            title: "Redigering ej tillgängligt",
-                            description: "Uppgradera till Standard eller Plus för att kunna redigera protokoll.",
-                            variant: "destructive"
-                          });
-                          return;
-                        }
-                        setIsEditing(true);
-                      }} 
-                      variant="outline" 
-                      size="lg" 
-                      className="gap-2 w-full"
-                      disabled={userPlan?.plan === 'free'}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      <span className="whitespace-nowrap">Redigera</span>
-                    </Button>
-                    <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full">
-                      <Mail className="w-4 h-4" />
-                      <span className="whitespace-nowrap">E-posta</span>
-                    </Button>
-                    <Button onClick={handleDownload} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
-                      <Download className="w-4 h-4" />
-                      <span className="whitespace-nowrap">Ladda ner</span>
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 w-full">
-                      <X className="w-4 h-4" />
-                      <span className="whitespace-nowrap">Avbryt</span>
-                    </Button>
-                    <Button onClick={handleSaveEdits} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span className="whitespace-nowrap">Spara ändringar</span>
-                    </Button>
-                  </>
-                )}
+                <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full">
+                  <Mail className="w-4 h-4" />
+                  <span className="whitespace-nowrap">E-posta</span>
+                </Button>
+                <Button onClick={handleDownload} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                  <Download className="w-4 h-4" />
+                  <span className="whitespace-nowrap">Ladda ner</span>
+                </Button>
               </div>
             </div>
             
