@@ -661,37 +661,39 @@ export const AutoProtocolGenerator = ({
             </Card>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap justify-center gap-3 md:gap-4">
-              {!isFreeTrialMode && (
-                <Button onClick={onBack} variant="outline" size="lg" className="gap-2 min-w-[160px]">
-                  <ArrowLeft className="w-4 h-4" />
-                  Nytt möte
-                </Button>
-              )}
-              {!isEditing ? (
-                <>
-                  <Button onClick={() => setIsEditing(true)} variant="outline" size="lg" className="gap-2 min-w-[160px]">
-                    Redigera
+            <div className="w-full max-w-3xl mx-auto">
+              <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4">
+                {!isFreeTrialMode && (
+                  <Button onClick={onBack} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="whitespace-nowrap">Nytt möte</span>
                   </Button>
-                  <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 min-w-[160px]">
-                    <Mail className="w-4 h-4" />
-                    E-posta
-                  </Button>
-                  <Button onClick={handleDownload} size="lg" className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
-                    <Download className="w-4 h-4" />
-                    Ladda ner
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 min-w-[160px]">
-                    Avbryt
-                  </Button>
-                  <Button onClick={handleSaveEdits} size="lg" className="gap-2 min-w-[160px]">
-                    Spara ändringar
-                  </Button>
-                </>
-              )}
+                )}
+                {!isEditing ? (
+                  <>
+                    <Button onClick={() => setIsEditing(true)} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                      <span className="whitespace-nowrap">Redigera</span>
+                    </Button>
+                    <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                      <Mail className="w-4 h-4" />
+                      <span className="whitespace-nowrap">E-posta</span>
+                    </Button>
+                    <Button onClick={handleDownload} size="lg" className="gap-2 flex-shrink-0 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                      <Download className="w-4 h-4" />
+                      <span className="whitespace-nowrap">Ladda ner</span>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                      <span className="whitespace-nowrap">Avbryt</span>
+                    </Button>
+                    <Button onClick={handleSaveEdits} size="lg" className="gap-2 flex-shrink-0">
+                      <span className="whitespace-nowrap">Spara ändringar</span>
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             
             {/* Free trial notice */}
