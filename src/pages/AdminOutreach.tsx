@@ -20,6 +20,7 @@ export default function AdminOutreach() {
     try {
       setLoading(true);
       const data = await outreachApi.getStatus();
+      console.log('Outreach status:', data);
       setStatus(data);
     } catch (error) {
       toast({
@@ -30,6 +31,13 @@ export default function AdminOutreach() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fallback time check on frontend
+  const isWithinSendingHours = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    return hours >= 6 && hours < 22;
   };
 
   useEffect(() => {
@@ -117,7 +125,8 @@ export default function AdminOutreach() {
 
   const getStatusText = () => {
     if (!status) return 'Loading...';
-    if (!status.withinSendingHours) return 'Outside Sending Hours (06:00-22:00)';
+    const withinHours = status.withinSendingHours ?? isWithinSendingHours();
+    if (!withinHours) return 'Outside Sending Hours (06:00-22:00)';
     if (Object.keys(status.pausedSenders).length > 0) return 'Some Senders Paused';
     return 'System Operational';
   };
@@ -276,8 +285,9 @@ export default function AdminOutreach() {
             <CardContent>
               <Button
                 onClick={handleTriggerSend}
-                disabled={actionLoading === 'send' || !status?.withinSendingHours}
+                disabled={actionLoading === 'send' || !(status?.withinSendingHours ?? isWithinSendingHours())}
                 className="w-full"
+                title={!(status?.withinSendingHours ?? isWithinSendingHours()) ? 'Sending only allowed between 06:00-22:00' : ''}
               >
                 {actionLoading === 'send' ? (
                   <>
