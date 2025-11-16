@@ -132,6 +132,7 @@ export const AutoProtocolGenerator = ({
           title: "Fel vid generering",
           description: "Kunde inte generera protokollet. Försök igen.",
           variant: "destructive",
+          duration: 2500,
         });
       } finally {
         setIsGenerating(false);
@@ -270,6 +271,7 @@ export const AutoProtocolGenerator = ({
       toast({
         title: "Nedladdning startad",
         description: "Protokollet laddas ner till din enhet.",
+        duration: 2000,
       });
     }
   };
@@ -278,6 +280,7 @@ export const AutoProtocolGenerator = ({
     toast({
       title: "Protokoll sparat",
       description: "Protokollet finns nu i ditt bibliotek.",
+      duration: 2000,
     });
     navigate("/library");
   };

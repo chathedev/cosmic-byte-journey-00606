@@ -122,6 +122,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         title: "Inte stödd",
         description: "Din webbläsare stöder inte rösttranskribering. Använd Google Chrome.",
         variant: "destructive",
+        duration: 2500,
       });
       return;
     }
@@ -229,6 +230,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           title: "Mikrofonfel",
           description: "Kunde inte komma åt mikrofonen. Kontrollera dina inställningar.",
           variant: "destructive",
+          duration: 2500,
         });
       }
     };
@@ -528,6 +530,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
             title: 'Behörighet nekad',
             description: 'Tivly behöver tillstånd till mikrofon. Kontrollera webbläsarens inställningar och försök igen.',
             variant: 'destructive',
+            duration: 3000,
           });
           onBack();
           return;
@@ -536,6 +539,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           title: 'Ett oväntat fel uppstod',
           description: (error as any)?.message || 'Kunde inte starta inspelningen.',
           variant: 'destructive',
+          duration: 2500,
         });
       }
     };
@@ -559,6 +563,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       toast({
         title: 'Inspelningen avslutad',
         description: 'Bearbetar text...',
+        duration: 2000,
       });
     };
   }, [sessionId, isPaused, isMuted, toast, prefetchedMicStream, selectedLanguage]);
@@ -711,6 +716,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     toast({
       title: "🎭 Testläge aktiverat",
       description: "Simulerar realistiskt Tivly-möte med ~1000 ord",
+      duration: 2000,
     });
 
     // Cleanup previous test if any
@@ -737,6 +743,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       toast({
         title: "Testläge avslutat",
         description: "Simulerat möte klart",
+        duration: 2000,
       });
     }, 15000); // Simulation duration
   };
@@ -832,6 +839,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         title: 'Ingen text',
         description: 'Ingen transkription inspelad än.',
         variant: 'destructive',
+        duration: 2500,
       });
       setIsSaving(false);
       isFinalizingRef.current = false;
@@ -861,6 +869,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       toast({
         title: 'Sparat!',
         description: `"${meetingName}" har sparats i biblioteket under ${selectedFolder}.`,
+        duration: 2000,
       });
       handleBackClick();
     } catch (error) {
@@ -869,6 +878,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         title: 'Fel vid sparning',
         description: 'Kunde inte spara till biblioteket. Försök igen.',
         variant: 'destructive',
+        duration: 2500,
       });
     } finally {
       setIsSaving(false);
@@ -912,7 +922,12 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
     // Validate transcript length
     if (!finalTranscript) {
-      toast({ title: 'Ingen text', description: 'Ingen transkription inspelad.', variant: 'destructive' });
+      toast({ 
+        title: 'Ingen text', 
+        description: 'Ingen transkription inspelad.', 
+        variant: 'destructive',
+        duration: 2500,
+      });
       handleBackClick();
       isFinalizingRef.current = false;
       return;
@@ -1045,7 +1060,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         toast({
           title: "Protokoll redan genererat",
           description: "Du har redan genererat ett protokoll för detta möte.",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 2500,
         });
         return;
       }
