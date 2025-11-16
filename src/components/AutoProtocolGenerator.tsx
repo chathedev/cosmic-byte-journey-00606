@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2 } from "lucide-react";
+import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2 } from "lucide-react";
 import { Document, Paragraph, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useToast } from "@/hooks/use-toast";
+import { EmailDialog } from "@/components/EmailDialog";
 
 interface AIActionItem {
   title: string;
@@ -57,6 +58,7 @@ export const AutoProtocolGenerator = ({
   const [progress, setProgress] = useState(0);
   const [documentBlob, setDocumentBlob] = useState<Blob | null>(null);
   const [fileName, setFileName] = useState("Mötesprotokoll.docx");
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -72,10 +74,10 @@ export const AutoProtocolGenerator = ({
       // Slower, smoother progress animation
       const progressInterval = setInterval(() => {
         setProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + Math.random() * 3;
+          if (prev >= 85) return prev;
+          return prev + Math.random() * 2;
         });
-      }, 200);
+      }, 300);
 
       try {
         const response = await fetch(
@@ -351,6 +353,15 @@ export const AutoProtocolGenerator = ({
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowEmailDialog(true)}
+                disabled={!documentBlob}
+              >
+                <Share2 className="w-4 h-4 mr-2" />
+                Dela
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleDownload}
                 disabled={!documentBlob}
               >
@@ -454,18 +465,16 @@ export const AutoProtocolGenerator = ({
               </div>
             )}
 
-            {/* Transcript */}
-            <div>
-              <h2 className="text-xl font-semibold mb-3">Transkription</h2>
-              <div className="p-4 bg-muted/50 rounded-lg max-h-80 overflow-y-auto">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {transcript}
-                </p>
-              </div>
-            </div>
           </div>
         </Card>
       </div>
+
+      <EmailDialog
+        open={showEmailDialog}
+        onOpenChange={setShowEmailDialog}
+        documentBlob={documentBlob}
+        fileName={fileName}
+      />
     </div>
   );
 };

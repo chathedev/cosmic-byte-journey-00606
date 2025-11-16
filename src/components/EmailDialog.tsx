@@ -77,39 +77,45 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
         const base64 = base64data.split(',')[1];
 
         try {
-          const { sendProtocolEmail } = await import('@/lib/backend');
-          const result = await sendProtocolEmail({
-            recipients: validRecipients,
-            subject: subject.trim(),
-            message: message.trim(),
-            documentBlob: base64,
-            fileName,
-          });
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-protocol-email`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                recipients: validRecipients,
+                subject: subject.trim(),
+                message: message.trim(),
+                fileBase64: base64,
+                fileName,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to send email');
+          }
 
           setSending(false);
           
-          // If we got here without throwing, the email was sent successfully
           toast({
             title: "E-post skickat!",
             description: `Protokollet har skickats till ${validRecipients.length} mottagare.`,
           });
           onOpenChange(false);
+          setRecipients([""]);
+          setSubject("Mötesprotokoll");
+          setMessage("Hej,\n\nBifogat finner du mötesprotokoll från vårt möte.\n\nMed vänliga hälsningar");
         } catch (err: any) {
           console.error('Email error:', err);
           setSending(false);
           
-          let errorMessage = "Ett fel uppstod vid skickandet.";
-          if (err.message?.includes('invalid_recipients')) {
-            errorMessage = "En eller flera e-postadresser är ogiltiga.";
-          } else if (err.message?.includes('attachment_too_large')) {
-            errorMessage = "Bilagan är för stor (max 15 MB).";
-          } else if (err.message) {
-            errorMessage = err.message;
-          }
-          
           toast({
             title: "Kunde inte skicka e-post",
-            description: errorMessage,
+            description: "Ett fel uppstod vid skickandet. Försök igen.",
             variant: "destructive",
           });
         }
@@ -118,8 +124,8 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
       console.error('Send error:', error);
       setSending(false);
       toast({
-        title: "Fel",
-        description: "Kunde inte skicka e-postmeddelandet.",
+        title: "Kunde inte skicka e-post",
+        description: "Ett fel uppstod vid skickandet.",
         variant: "destructive",
       });
     }
