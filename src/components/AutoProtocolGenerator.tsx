@@ -15,6 +15,7 @@ import { ProtocolGenerationWidget } from "./ProtocolGenerationWidget";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { saveActionItems } from "@/lib/backend";
 import { hasPlusAccess } from "@/lib/accessCheck";
+import { meetingStorage } from "@/utils/meetingStorage";
 
 const SmoothRevealText = ({ 
   text, 
@@ -125,11 +126,42 @@ export const AutoProtocolGenerator = ({
     loadAgenda();
   }, [agendaId]);
 
-  const handleSaveEdits = () => {
-    if (editedProtocol) {
+  const handleSaveEdits = async () => {
+    if (!editedProtocol) return;
+    
+    try {
+      // Update the protocol state
       setProtocol(editedProtocol);
+      
+      // Save to backend if we have a meetingId
+      if (meetingId && userId) {
+        const protocolText = JSON.stringify(editedProtocol, null, 2);
+        await meetingStorage.saveMeeting({
+          id: meetingId,
+          title: editedProtocol.title,
+          transcript: transcript,
+          protocol: protocolText,
+          folder: 'Allmänt',
+          createdAt: meetingCreatedAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          userId: userId,
+          isCompleted: true,
+          agendaId: agendaId,
+        });
+      }
+      
       setIsEditing(false);
-      toast({ title: "Ändringar sparade!", description: "Protokollet har uppdaterats." });
+      toast({ 
+        title: "Ändringar sparade!", 
+        description: "Protokollet har uppdaterats och sparats." 
+      });
+    } catch (error) {
+      console.error('Failed to save edits:', error);
+      toast({ 
+        title: "Kunde inte spara", 
+        description: "Ett fel uppstod vid sparande. Försök igen.", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -825,7 +857,24 @@ export const AutoProtocolGenerator = ({
                 )}
                 {!isEditing ? (
                   <>
-                    <Button onClick={() => setIsEditing(true)} variant="outline" size="lg" className="gap-2 w-full">
+                    <Button 
+                      onClick={() => {
+                        if (userPlan?.plan === 'free') {
+                          toast({
+                            title: "Redigering ej tillgängligt",
+                            description: "Uppgradera till Standard eller Plus för att kunna redigera protokoll.",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+                        setIsEditing(true);
+                      }} 
+                      variant="outline" 
+                      size="lg" 
+                      className="gap-2 w-full"
+                      disabled={userPlan?.plan === 'free'}
+                    >
+                      <Edit2 className="w-4 h-4" />
                       <span className="whitespace-nowrap">Redigera</span>
                     </Button>
                     <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full">
@@ -840,9 +889,11 @@ export const AutoProtocolGenerator = ({
                 ) : (
                   <>
                     <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 w-full">
+                      <X className="w-4 h-4" />
                       <span className="whitespace-nowrap">Avbryt</span>
                     </Button>
-                    <Button onClick={handleSaveEdits} size="lg" className="gap-2 w-full">
+                    <Button onClick={handleSaveEdits} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80">
+                      <CheckCircle2 className="w-4 h-4" />
                       <span className="whitespace-nowrap">Spara ändringar</span>
                     </Button>
                   </>
