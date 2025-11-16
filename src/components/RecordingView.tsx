@@ -15,7 +15,7 @@ import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
 import { isUserAdmin } from "@/lib/accessCheck";
-import { AnalyzingScreen } from "./AnalyzingScreen";
+
 
 interface AIActionItem {
   title: string;
@@ -64,7 +64,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [showShortTranscriptDialog, setShowShortTranscriptDialog] = useState(false);
   const [showMaxDurationDialog, setShowMaxDurationDialog] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
-  const [showAnalyzing, setShowAnalyzing] = useState(false);
   const MAX_DURATION_SECONDS = 28800; // 8 hours instead of 2
   const MIN_DURATION_SECONDS = 5;
   const MIN_WORD_COUNT = 50;
@@ -809,50 +808,52 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       return;
     }
 
-    // Generate AI title
-    let aiTitle = meetingName;
-    try {
-      aiTitle = await generateMeetingTitle(finalTranscript);
-    } catch (e) {
-      console.warn('Failed to generate AI title, using manual name:', e);
-      aiTitle = meetingName || `Möte ${new Date().toLocaleDateString('sv-SE')}`;
-    }
-
-    // Save meeting
-    const now = new Date().toISOString();
-    let savedId = sessionId;
-    try {
-      const newId = await meetingStorage.saveMeeting({
-        id: sessionId,
-        title: aiTitle,
-        folder: selectedFolder,
-        transcript: finalTranscript,
-        protocol: '',
-        createdAt: createdAtRef.current,
-        updatedAt: now,
-        userId: user?.uid || '',
-        isCompleted: true,
-        agendaId: selectedAgendaId,
-      } as any);
-      if (newId && newId !== sessionId) {
-        setSessionId(newId);
-        savedId = newId;
-      }
-    } catch (e) {
-      console.warn('Final save failed:', e);
-    }
-    // Navigate
+    // For paid users, show agenda dialog immediately with temp title
+    // Title generation and saving will happen when user clicks "Generera"
+    const tempTitle = meetingName || `Möte ${new Date().toLocaleDateString('sv-SE')}`;
+    
     if (userPlan?.plan === 'free') {
-      navigate(`/generate-protocol?meetingId=${savedId}&title=${encodeURIComponent(aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`)}`);
+      // Generate title and save for free users before navigating
+      let aiTitle = tempTitle;
+      try {
+        aiTitle = await generateMeetingTitle(finalTranscript);
+      } catch (e) {
+        console.warn('Failed to generate AI title:', e);
+      }
+
+      const now = new Date().toISOString();
+      let savedId = sessionId;
+      try {
+        const newId = await meetingStorage.saveMeeting({
+          id: sessionId,
+          title: aiTitle,
+          folder: selectedFolder,
+          transcript: finalTranscript,
+          protocol: '',
+          createdAt: createdAtRef.current,
+          updatedAt: now,
+          userId: user?.uid || '',
+          isCompleted: true,
+          agendaId: selectedAgendaId,
+        } as any);
+        if (newId && newId !== sessionId) {
+          setSessionId(newId);
+          savedId = newId;
+        }
+      } catch (e) {
+        console.warn('Final save failed:', e);
+      }
+      
+      navigate(`/generate-protocol?meetingId=${savedId}&title=${encodeURIComponent(aiTitle)}`);
       isFinalizingRef.current = false;
       return;
     }
 
-    // Show agenda dialog immediately
+    // For paid users, show dialog immediately
     setPendingMeetingData({
-      id: savedId,
+      id: sessionId,
       transcript: finalTranscript,
-      title: aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`,
+      title: tempTitle,
       createdAt: createdAtRef.current,
     });
     setShowAgendaDialog(true);
@@ -1414,8 +1415,6 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         isOpen={showInstructions} 
         onClose={() => setShowInstructions(false)} 
       />
-
-      <AnalyzingScreen isVisible={showAnalyzing} />
     </div>
   );
 };
