@@ -158,15 +158,23 @@ export const AutoProtocolGenerator = ({
         let finalProtocol: AIProtocol | null = protocol;
         if (!finalProtocol && transcript && transcript.trim().length >= 20) {
           try {
-            setProgress(30);
+            setProgress(25);
             const { analyzeMeeting } = await import('@/lib/backend');
-            setProgress(40);
+            setProgress(35);
+            
+            // Simulate more realistic progress during AI call
+            const progressInterval = setInterval(() => {
+              setProgress(prev => Math.min(prev + 2, 65));
+            }, 400);
+            
             const data: any = await analyzeMeeting({ 
               transcript, 
               meetingName: `Mötesprotokoll ${dateStr}`,
               agenda: agendaContent 
             });
-            setProgress(70);
+            
+            clearInterval(progressInterval);
+            setProgress(75);
             if (data) {
               // Generate AI title if not provided
               const aiTitle = data.title || await generateMeetingTitle(transcript);
