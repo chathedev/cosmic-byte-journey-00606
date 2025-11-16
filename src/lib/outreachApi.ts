@@ -1,20 +1,39 @@
 const BACKEND_URL = 'https://api.tivly.se';
 
 export interface OutreachStatus {
-  emailsInMaster: number;
-  emailsSentToday: number;
-  emailsPending: number;
-  activeSenderDomains: string[];
-  domainSends: {
-    [key: string]: {
-      sent: number;
-      limit: number;
-      remaining: number;
-    };
+  initialized: boolean;
+  scheduler: {
+    isRunning: boolean;
+    jobs: Array<{
+      name: string;
+      schedule: string;
+      running: boolean;
+    }>;
   };
-  pausedSenders: Record<string, any>;
-  nextScheduledSend: string;
-  withinSendingHours: boolean;
+  sender: {
+    emailsInMaster: number;
+    emailsSentToday: number;
+    emailsPending: number;
+    activeSenderDomains?: string[];
+    domainSends?: {
+      [key: string]: {
+        sent: number;
+        limit: number;
+        remaining: number;
+      };
+    };
+    pausedSenders?: Record<string, any>;
+    nextScheduledSend?: string;
+    withinSendingHours?: boolean;
+  };
+  statistics: {
+    totalMaster: number;
+    totalSent: number;
+    totalInvalid: number;
+    totalPending: number;
+    sentToday: number;
+  };
+  timestamp: string;
 }
 
 export interface CollectResult {
