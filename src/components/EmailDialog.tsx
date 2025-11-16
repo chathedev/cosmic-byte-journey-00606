@@ -52,6 +52,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
         title: "Inga mottagare",
         description: "Lägg till minst en giltig e-postadress.",
         variant: "destructive",
+        duration: 2500,
       });
       return;
     }
@@ -61,6 +62,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
         title: "Saknar ämne",
         description: "Ange ett ämne för e-postmeddelandet.",
         variant: "destructive",
+        duration: 2500,
       });
       return;
     }
@@ -112,6 +114,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
       toast({
         title: "E-post skickat!",
         description: `Protokollet har skickats till ${validRecipients.length} mottagare.`,
+        duration: 2000,
       });
       
       onOpenChange(false);
@@ -126,6 +129,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
         title: "Kunde inte skicka e-post",
         description: error.message || "Ett fel uppstod vid skickandet. Försök igen.",
         variant: "destructive",
+        duration: 2500,
       });
     }
   };
