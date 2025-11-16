@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Loader2, Mail, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Mail, CheckCircle2, Clock, AlertCircle, Edit2, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -461,9 +462,20 @@ export const AutoProtocolGenerator = ({
                   <CardTitle className="text-3xl md:text-4xl font-bold text-center">
                     MÖTESPROTOKOLL
                   </CardTitle>
-                  <h2 className="text-xl md:text-2xl font-semibold text-center text-primary">
-                    {protocol?.title || `Mötesprotokoll ${dateStr}`}
-                  </h2>
+                  {isEditing ? (
+                    <div className="max-w-2xl mx-auto">
+                      <Input
+                        value={editedProtocol?.title || ''}
+                        onChange={(e) => setEditedProtocol(prev => prev ? {...prev, title: e.target.value} : null)}
+                        className="text-xl md:text-2xl font-semibold text-center bg-background"
+                        placeholder="Mötestitel..."
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="text-xl md:text-2xl font-semibold text-center text-primary">
+                      {protocol?.title || `Mötesprotokoll ${dateStr}`}
+                    </h2>
+                  )}
                   <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
                     <span className="font-medium">📅 {dateStr}</span>
                     <span className="text-border">•</span>
@@ -508,17 +520,40 @@ export const AutoProtocolGenerator = ({
                             {editedProtocol?.mainPoints.map((point, index) => (
                               <div key={index} className="flex gap-2 items-start">
                                 <span className="text-primary mt-3">•</span>
-                                <textarea
+                                <Textarea
                                   value={point}
                                   onChange={(e) => {
                                     const newPoints = [...(editedProtocol?.mainPoints || [])];
                                     newPoints[index] = e.target.value;
                                     setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
                                   }}
-                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed border rounded-md bg-background"
+                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed"
                                 />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newPoints = editedProtocol?.mainPoints.filter((_, i) => i !== index) || [];
+                                    setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
+                                  }}
+                                  className="h-10 mt-1"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
                               </div>
                             ))}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newPoints = [...(editedProtocol?.mainPoints || []), ''];
+                                setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
+                              }}
+                              className="w-full"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Lägg till punkt
+                            </Button>
                           </div>
                         ) : (
                           <ul className="space-y-3 pl-4">
@@ -547,17 +582,40 @@ export const AutoProtocolGenerator = ({
                             {editedProtocol?.decisions.map((decision, index) => (
                               <div key={index} className="flex gap-2 items-start">
                                 <span className="text-primary mt-3">✓</span>
-                                <textarea
+                                <Textarea
                                   value={decision}
                                   onChange={(e) => {
                                     const newDecisions = [...(editedProtocol?.decisions || [])];
                                     newDecisions[index] = e.target.value;
                                     setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
                                   }}
-                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed border rounded-md bg-background"
+                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed"
                                 />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newDecisions = editedProtocol?.decisions.filter((_, i) => i !== index) || [];
+                                    setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
+                                  }}
+                                  className="h-10 mt-1"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
                               </div>
                             ))}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newDecisions = [...(editedProtocol?.decisions || []), ''];
+                                setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
+                              }}
+                              className="w-full"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Lägg till beslut
+                            </Button>
                           </div>
                         ) : (
                           <ul className="space-y-3 pl-4">
@@ -575,69 +633,157 @@ export const AutoProtocolGenerator = ({
                     )}
 
                     {/* Action Items Section with Smart Display */}
-                    {protocol.actionItems && protocol.actionItems.length > 0 && (
+                    {(isEditing ? editedProtocol?.actionItems : protocol.actionItems) && (isEditing ? editedProtocol?.actionItems.length : protocol.actionItems.length) > 0 && (
                       <div className="space-y-3">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
                           <span className="w-1 h-6 bg-primary rounded-full" />
                           Åtgärdspunkter
                         </h3>
-                        <div className="space-y-4 pl-4">
-                          {protocol.actionItems.map((item, index) => {
-                            const isSmartItem = typeof item === 'object' && item.priority;
-                            if (!isSmartItem) {
-                              // Legacy string format
+                        {isEditing ? (
+                          <div className="space-y-4 pl-4">
+                            {editedProtocol?.actionItems.map((item, index) => {
+                              const isSmartItem = typeof item === 'object' && 'priority' in item;
                               return (
-                                <div key={index} className="flex gap-3 items-start group">
-                                  <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">→</span>
-                                  <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                    <SmoothRevealText text={typeof item === 'string' ? item : item.title} delay={index * 100} />
-                                  </span>
+                                <div key={index} className="border rounded-lg p-4 bg-card space-y-3">
+                                  <div className="flex items-start gap-2">
+                                    <Input
+                                      value={typeof item === 'string' ? item : item.title}
+                                      onChange={(e) => {
+                                        const newItems = [...(editedProtocol?.actionItems || [])];
+                                        if (typeof newItems[index] === 'string') {
+                                          newItems[index] = e.target.value as any;
+                                        } else {
+                                          newItems[index] = { ...(newItems[index] as AIActionItem), title: e.target.value };
+                                        }
+                                        setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
+                                      }}
+                                      placeholder="Åtgärdstitel..."
+                                      className="flex-1 font-semibold"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const newItems = editedProtocol?.actionItems.filter((_, i) => i !== index) || [];
+                                        setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
+                                      }}
+                                      className="h-10"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                  {isSmartItem && typeof item !== 'string' && (
+                                    <>
+                                      <Textarea
+                                        value={(item as AIActionItem).description || ''}
+                                        onChange={(e) => {
+                                          const newItems = [...(editedProtocol?.actionItems || [])];
+                                          newItems[index] = { ...(newItems[index] as AIActionItem), description: e.target.value };
+                                          setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
+                                        }}
+                                        placeholder="Beskrivning..."
+                                        className="min-h-[60px] text-sm"
+                                      />
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                          value={(item as AIActionItem).owner || ''}
+                                          onChange={(e) => {
+                                            const newItems = [...(editedProtocol?.actionItems || [])];
+                                            newItems[index] = { ...(newItems[index] as AIActionItem), owner: e.target.value };
+                                            setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
+                                          }}
+                                          placeholder="Ansvarig..."
+                                          className="text-sm"
+                                        />
+                                        <Input
+                                          type="date"
+                                          value={(item as AIActionItem).deadline || ''}
+                                          onChange={(e) => {
+                                            const newItems = [...(editedProtocol?.actionItems || [])];
+                                            newItems[index] = { ...(newItems[index] as AIActionItem), deadline: e.target.value };
+                                            setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
+                                          }}
+                                          className="text-sm"
+                                        />
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               );
-                            }
-                            
-                            // Smart action item display
-                            const priorityColors = {
-                              critical: 'bg-red-500/10 text-red-700 border-red-200 dark:text-red-400',
-                              high: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:text-orange-400',
-                              medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:text-yellow-400',
-                              low: 'bg-green-500/10 text-green-700 border-green-200 dark:text-green-400'
-                            };
-                            
-                            return (
-                              <div key={index} className="border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
-                                <div className="flex items-start justify-between gap-3 mb-2">
-                                  <h4 className="font-semibold text-foreground flex-1">
-                                    <SmoothRevealText text={item.title} delay={index * 100} />
-                                  </h4>
-                                  <Badge variant="outline" className={priorityColors[item.priority]}>
-                                    {item.priority === 'critical' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                    {item.priority.toUpperCase()}
-                                  </Badge>
-                                </div>
-                                {item.description && (
-                                  <p className="text-sm text-muted-foreground mb-2">
-                                    <SmoothRevealText text={item.description} delay={index * 100 + 50} />
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                                  {item.owner && (
-                                    <div className="flex items-center gap-1">
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      <span>{item.owner}</span>
-                                    </div>
+                            })}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newItem: AIActionItem = { title: '', description: '', owner: '', deadline: '', priority: 'medium' };
+                                const newItems = [...(editedProtocol?.actionItems || []), newItem];
+                                setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
+                              }}
+                              className="w-full"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Lägg till åtgärd
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-4 pl-4">
+                            {protocol.actionItems.map((item, index) => {
+                              const isSmartItem = typeof item === 'object' && item.priority;
+                              if (!isSmartItem) {
+                                // Legacy string format
+                                return (
+                                  <div key={index} className="flex gap-3 items-start group">
+                                    <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">→</span>
+                                    <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                      <SmoothRevealText text={typeof item === 'string' ? item : item.title} delay={index * 100} />
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              
+                              // Smart action item display
+                              const priorityColors = {
+                                critical: 'bg-red-500/10 text-red-700 border-red-200 dark:text-red-400',
+                                high: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:text-orange-400',
+                                medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:text-yellow-400',
+                                low: 'bg-green-500/10 text-green-700 border-green-200 dark:text-green-400'
+                              };
+                              
+                              return (
+                                <div key={index} className="border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
+                                  <div className="flex items-start justify-between gap-3 mb-2">
+                                    <h4 className="font-semibold text-foreground flex-1">
+                                      <SmoothRevealText text={item.title} delay={index * 100} />
+                                    </h4>
+                                    <Badge variant="outline" className={priorityColors[item.priority]}>
+                                      {item.priority === 'critical' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                      {item.priority.toUpperCase()}
+                                    </Badge>
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      <SmoothRevealText text={item.description} delay={index * 100 + 50} />
+                                    </p>
                                   )}
-                                  {item.deadline && (
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-3.5 h-3.5" />
-                                      <span>{new Date(item.deadline).toLocaleDateString('sv-SE')}</span>
-                                    </div>
-                                  )}
+                                  <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                                    {item.owner && (
+                                      <div className="flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>{item.owner}</span>
+                                      </div>
+                                    )}
+                                    {item.deadline && (
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        <span>{new Date(item.deadline).toLocaleDateString('sv-SE')}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
 
