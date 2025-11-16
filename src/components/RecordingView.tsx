@@ -1093,27 +1093,103 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       {/* Simplified Bottom Controls */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg mobile-compact mobile-inset-bottom">
         <div className="max-w-5xl mx-auto px-2 md:px-4 py-2 md:py-4">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-3">
-            {/* Back Button - Desktop only */}
-            <Button
-              onClick={handleBackClick}
-              variant="ghost"
-              size="lg"
-              className="hidden md:flex h-12"
-              title="Gå tillbaka till startsidan"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Tillbaka
-            </Button>
+          <div className="flex flex-col gap-2">
+            {/* Desktop: Horizontal Layout */}
+            <div className="hidden md:grid md:grid-cols-[auto_1fr_auto] md:items-center md:gap-3">
+              {/* Back Button - Desktop */}
+              <Button
+                onClick={handleBackClick}
+                variant="ghost"
+                size="lg"
+                className="h-12 whitespace-nowrap"
+                title="Gå tillbaka till startsidan"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Tillbaka
+              </Button>
 
-            {/* Recording Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1.5 md:gap-3 w-full md:w-auto">
-              {/* Back Button - Mobile (compact) */}
+              {/* Center Controls */}
+              <div className="flex items-center justify-center gap-3">
+                {/* Pause/Resume Button */}
+                {!isMuted && (
+                  <Button
+                    onClick={togglePause}
+                    variant="outline"
+                    size="lg"
+                    disabled={isGeneratingProtocol || isSaving}
+                    className="h-12 min-w-[140px] whitespace-nowrap"
+                    title={isPaused ? "ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "PAUSA: Pausar inspelningen tillfälligt"}
+                  >
+                    {isPaused ? (
+                      <>
+                        <Play className="w-5 h-5 mr-2" />
+                        <span>Återuppta</span>
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="w-5 h-5 mr-2" />
+                        <span>Pausa</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {/* Stop & Generate Button */}
+                <Button
+                  onClick={stopRecording}
+                  variant="default"
+                  size="lg"
+                  disabled={isGeneratingProtocol || isSaving}
+                  className="h-12 min-w-[180px] bg-red-500 hover:bg-red-600 font-semibold whitespace-nowrap"
+                  title="AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett AI-protokoll"
+                >
+                  {isGeneratingProtocol ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      <span>Genererar...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Square className="w-5 h-5 mr-2" />
+                      <span>Avsluta & Skapa Protokoll</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Save Button - Desktop */}
+              {userPlan?.plan !== 'free' ? (
+                <Button
+                  onClick={saveToLibrary}
+                  variant="outline"
+                  size="lg"
+                  disabled={isSaving || isGeneratingProtocol}
+                  className="h-12 min-w-[140px] whitespace-nowrap"
+                  title="SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      <span>Sparar...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-5 h-5 mr-2" />
+                      <span>Spara</span>
+                    </>
+                  )}
+                </Button>
+              ) : <div />}
+            </div>
+
+            {/* Mobile: Vertical Layout */}
+            <div className="md:hidden flex flex-col gap-2">
+              {/* Back Button - Mobile */}
               <Button
                 onClick={handleBackClick}
                 variant="ghost"
                 size="sm"
-                className="md:hidden h-10"
+                className="h-10 w-full"
                 title="Gå tillbaka"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1127,17 +1203,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   variant="outline"
                   size="lg"
                   disabled={isGeneratingProtocol || isSaving}
-                  className="h-10 md:h-12 w-full sm:flex-1 md:flex-none md:min-w-[140px] text-sm"
+                  className="h-10 w-full"
                   title={isPaused ? "ÅTERUPPTA: Fortsätt inspelningen där du slutade" : "PAUSA: Pausar inspelningen tillfälligt"}
                 >
                   {isPaused ? (
                     <>
-                      <Play className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                      <Play className="w-4 h-4 mr-2" />
                       <span>Återuppta</span>
                     </>
                   ) : (
                     <>
-                      <Pause className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                      <Pause className="w-4 h-4 mr-2" />
                       <span>Pausa</span>
                     </>
                   )}
@@ -1150,20 +1226,18 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 variant="default"
                 size="lg"
                 disabled={isGeneratingProtocol || isSaving}
-                className="h-10 md:h-12 w-full sm:flex-[2] md:flex-none md:min-w-[180px] bg-red-500 hover:bg-red-600 text-sm font-semibold"
+                className="h-10 w-full bg-red-500 hover:bg-red-600 font-semibold"
                 title="AVSLUTA: Stoppar inspelningen OCH skapar automatiskt ett AI-protokoll"
               >
                 {isGeneratingProtocol ? (
                   <>
-                    <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     <span>Genererar...</span>
                   </>
                 ) : (
                   <>
-                    <Square className="w-4 md:w-5 h-4 md:h-5 mr-2" />
-                    <span className="sm:hidden">Avsluta & Protokoll</span>
-                    <span className="hidden sm:inline md:hidden">Avsluta & Protokoll</span>
-                    <span className="hidden md:inline">Avsluta & Skapa Protokoll</span>
+                    <Square className="w-4 h-4 mr-2" />
+                    <span>Avsluta & Protokoll</span>
                   </>
                 )}
               </Button>
@@ -1175,17 +1249,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   variant="outline"
                   size="lg"
                   disabled={isSaving || isGeneratingProtocol}
-                  className="h-10 md:h-12 w-full sm:flex-1 md:flex-none md:min-w-[140px] text-sm"
+                  className="h-10 w-full"
                   title="SPARA: Sparar ENDAST transkriptionen till biblioteket - INGET protokoll skapas"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-4 md:w-5 h-4 md:h-5 mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       <span>Sparar...</span>
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                      <FileText className="w-4 h-4 mr-2" />
                       <span>Spara</span>
                     </>
                   )}
