@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Loader2, Mail, CheckCircle2, Clock, AlertCircle, Edit2, X, Plus } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -15,7 +13,6 @@ import { ProtocolGenerationWidget } from "./ProtocolGenerationWidget";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { saveActionItems } from "@/lib/backend";
 import { hasPlusAccess } from "@/lib/accessCheck";
-import { meetingStorage } from "@/utils/meetingStorage";
 
 const SmoothRevealText = ({ 
   text, 
@@ -101,9 +98,11 @@ export const AutoProtocolGenerator = ({
   const [agendaContent, setAgendaContent] = useState<string>("");
   const { user } = useAuth();
   const { userPlan } = useSubscription();
+  
   useEffect(() => {
     setProtocol(aiProtocol);
   }, [aiProtocol]);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -124,7 +123,6 @@ export const AutoProtocolGenerator = ({
     loadAgenda();
   }, [agendaId]);
 
-
   useEffect(() => {
     let cancelled = false;
     const generateDocument = async () => {
@@ -132,71 +130,29 @@ export const AutoProtocolGenerator = ({
         setIsGenerating(true);
         setProgress(10);
         // Wait a moment to show loading state with progress message
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setProgress(15);
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setProgress(20);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (cancelled) return;
+        setProgress(25);
 
-        // Use meeting creation date instead of current date
-        const meetingDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
-        const dateStr = meetingDate.toLocaleDateString('sv-SE');
-        const timeStr = meetingDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+        const finalProtocol = protocol;
 
-        // If no AI protocol provided, try to generate it here
-        let finalProtocol: AIProtocol | null = protocol;
-        if (!finalProtocol && transcript && transcript.trim().length >= 20) {
+        // Generate title from protocol or transcript
+        let generatedTitle = finalProtocol?.title;
+        if (!generatedTitle || generatedTitle.toLowerCase().startsWith('möte')) {
           try {
-            setProgress(25);
-            const { analyzeMeeting } = await import('@/lib/backend');
-            setProgress(35);
-            
-            // Simulate more realistic progress during AI call
-            const progressInterval = setInterval(() => {
-              setProgress(prev => Math.min(prev + 2, 65));
-            }, 400);
-            
-            const data: any = await analyzeMeeting({ 
-              transcript, 
-              meetingName: `Mötesprotokoll ${dateStr}`,
-              agenda: agendaContent 
-            });
-            
-            clearInterval(progressInterval);
-            setProgress(75);
-            if (data) {
-              // Generate AI title if not provided
-              const aiTitle = data.title || await generateMeetingTitle(transcript);
-              
-              // Best-effort normalization (trust backend to paraphrase and avoid verbatim copy)
-              finalProtocol = {
-                title: aiTitle || `Mötesprotokoll ${dateStr}`,
-                summary: typeof data.summary === 'string' ? data.summary : (Array.isArray(data.mainPoints) ? data.mainPoints.join('\n') : ''),
-                mainPoints: Array.isArray(data.mainPoints) ? data.mainPoints : [],
-                decisions: Array.isArray(data.decisions) ? data.decisions : [],
-                actionItems: Array.isArray(data.actionItems) ? data.actionItems : [],
-                nextMeetingSuggestions: Array.isArray(data.nextMeetingSuggestions) ? data.nextMeetingSuggestions : [],
-              };
-              if (!cancelled) setProtocol(finalProtocol);
-              
-              // Save action items to backend for Plus/Admin users
-              const hasAccess = hasPlusAccess(user, userPlan);
-              if (hasAccess && meetingId && userId && data.actionItems && Array.isArray(data.actionItems) && data.actionItems.length > 0) {
-                try {
-                  await saveActionItems({
-                    meetingId,
-                    userId,
-                    actionItems: data.actionItems
-                  });
-                  console.log('✅ Saved action items to backend');
-                } catch (e) {
-                  console.warn('Failed to save action items:', e);
-                }
-              }
-            }
+            generatedTitle = await generateMeetingTitle(transcript);
           } catch (e) {
-            console.warn('AI analysis failed in protocol view, falling back to simple doc:', e);
+            console.warn('Title generation failed:', e);
           }
         }
+
+        setProgress(50);
+        if (cancelled) return;
+
+        // Format date/time
+        const meetingDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
+        const dateStr = meetingDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = meetingDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
 
         // Removed heuristic fallback to avoid using transcript text in the protocol
         // If AI fails to generate, we keep sections empty and suggest retrying via UI/toast.
@@ -320,70 +276,78 @@ export const AutoProtocolGenerator = ({
           ],
         });
 
+        setProgress(75);
         if (cancelled) return;
 
-        setProgress(85);
         const blob = await Packer.toBlob(doc);
-        const generatedFileName = `Motesprotokoll_${dateStr}_${timeStr.replace(':', '-')}.docx`;
+        const safeTitle = (generatedTitle || title || 'Mötesprotokoll').replace(/[^a-zA-Z0-9åäöÅÄÖ\s\-_]/g, '');
+        const fileName = `${safeTitle}_${dateStr.replace(/ /g, '_')}.docx`;
         
-        setProgress(95);
         setDocumentBlob(blob);
-        setFileName(generatedFileName);
-        setProgress(100);
+        setFileName(fileName);
         
-        // Small delay before showing content
-        await new Promise(resolve => setTimeout(resolve, 300));
+        setProgress(100);
         setIsGenerating(false);
-        setShowContent(true);
-
-        if (onProtocolReady) {
-          onProtocolReady();
-        } else {
-          toast({ title: "Protokoll klart!", description: "Du kan nu se och ladda ner ditt protokoll." });
+        
+        // Save action items if user has Plus access
+        if (finalProtocol && finalProtocol.actionItems && finalProtocol.actionItems.length > 0 && hasPlusAccess(user, userPlan) && meetingId) {
+          try {
+            await saveActionItems({
+              actionItems: finalProtocol.actionItems,
+              meetingId: meetingId,
+              userId: user.uid
+            });
+            console.log('Action items saved successfully');
+          } catch (error) {
+            console.error('Failed to save action items:', error);
+          }
         }
+
+        setTimeout(() => {
+          setShowContent(true);
+          onProtocolReady?.();
+        }, 300);
       } catch (error) {
-        console.error("Fel vid generering av protokoll:", error);
-        setIsGenerating(false);
-        toast({ title: "Fel", description: "Kunde inte skapa protokollet.", variant: "destructive" });
+        console.error('Document generation error:', error);
+        if (!cancelled) {
+          toast({
+            title: "Ett fel uppstod",
+            description: "Kunde inte generera dokumentet. Försök igen.",
+            variant: "destructive",
+          });
+        }
       }
     };
 
     generateDocument();
-    return () => { cancelled = true; };
-  }, [transcript, protocol, toast]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [protocol, transcript, toast, meetingCreatedAt, isFreeTrialMode, onProtocolReady, userPlan, user, meetingId]);
 
   const handleDownload = () => {
     if (documentBlob && fileName) {
       saveAs(documentBlob, fileName);
       toast({
-        title: "Nedladdning startad!",
-        description: `${fileName} laddas ner nu.`,
+        title: "Protokoll nedladdat!",
+        description: `${fileName} har laddats ner.`,
       });
     }
   };
 
-  // Use meeting creation date instead of current date for display
-  const displayDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
-  const dateStr = displayDate.toLocaleDateString('sv-SE');
-  const timeStr = displayDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
-
-  // If showing widget mode, don't render the full UI
-  if (showWidget) {
-    return (
-      <ProtocolGenerationWidget
-        isGenerating={isGenerating}
-        progress={progress}
-        onComplete={onProtocolReady}
-      />
-    );
-  }
+  // Format date/time for display
+  const meetingDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
+  const dateStr = meetingDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = meetingDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 flex flex-col">
-      {/* Content */}
-      <div className="flex-1 container max-w-5xl mx-auto px-4 py-8 md:py-12">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        {showWidget && <ProtocolGenerationWidget isGenerating={isGenerating} progress={progress} onComplete={onProtocolReady} />}
+        
         {isGenerating ? (
-          <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center justify-center py-20">
             <div className="text-center space-y-8 max-w-md">
               {/* Elegant loading animation */}
               <div className="relative w-32 h-32 mx-auto">
@@ -445,24 +409,13 @@ export const AutoProtocolGenerator = ({
             {/* Protocol Card */}
             <Card className="border-2 shadow-xl overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b-2 space-y-4 py-8">
-                <div className="space-y-3">
+                <div className="space-y-3 animate-fade-in">
                   <CardTitle className="text-3xl md:text-4xl font-bold text-center">
                     MÖTESPROTOKOLL
                   </CardTitle>
-                  {isEditing ? (
-                    <div className="max-w-2xl mx-auto">
-                      <Input
-                        value={editedProtocol?.title || ''}
-                        onChange={(e) => setEditedProtocol(prev => prev ? {...prev, title: e.target.value} : null)}
-                        className="text-xl md:text-2xl font-semibold text-center bg-background"
-                        placeholder="Mötestitel..."
-                      />
-                    </div>
-                  ) : (
-                    <h2 className="text-xl md:text-2xl font-semibold text-center text-primary">
-                      {protocol?.title || `Mötesprotokoll ${dateStr}`}
-                    </h2>
-                  )}
+                  <h2 className="text-xl md:text-2xl font-semibold text-center text-muted-foreground">
+                    {protocol?.title || 'Protokoll'}
+                  </h2>
                   <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
                     <span className="font-medium">📅 {dateStr}</span>
                     <span className="text-border">•</span>
@@ -473,336 +426,148 @@ export const AutoProtocolGenerator = ({
 
               <CardContent className="py-8 px-6 md:px-10">
                 {protocol && showContent ? (
-                  <div className="space-y-8 animate-fade-in">
-                    {/* Summary Section */}
-                    {(isEditing ? editedProtocol?.summary : protocol.summary) && (
-                      <div className="space-y-3">
+                  <div className="space-y-8">
+                    {/* Summary */}
+                    {protocol.summary && (
+                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
                         <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
                           <span className="w-1 h-6 bg-primary rounded-full" />
                           Sammanfattning
                         </h3>
-                        {isEditing ? (
-                          <textarea
-                            value={editedProtocol?.summary || ''}
-                            onChange={(e) => setEditedProtocol(prev => prev ? {...prev, summary: e.target.value} : null)}
-                            className="w-full min-h-[120px] p-4 text-base leading-relaxed border rounded-md bg-background"
-                          />
-                        ) : (
-                          <p className="text-base leading-relaxed text-foreground/90 pl-4">
-                            <SmoothRevealText text={protocol.summary} delay={0} />
-                          </p>
-                        )}
+                        <p className="text-base leading-relaxed text-foreground/90 pl-4">
+                          <SmoothRevealText text={protocol.summary} delay={200} />
+                        </p>
                       </div>
                     )}
 
-                    {/* Main Points Section */}
-                    {(isEditing ? editedProtocol?.mainPoints : protocol.mainPoints) && (isEditing ? editedProtocol?.mainPoints.length : protocol.mainPoints.length) > 0 && (
-                      <div className="space-y-3">
+                    {/* Main Points */}
+                    {protocol.mainPoints && protocol.mainPoints.length > 0 && (
+                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
                         <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
                           <span className="w-1 h-6 bg-primary rounded-full" />
                           Huvudpunkter
                         </h3>
-                        {isEditing ? (
-                          <div className="space-y-3">
-                            {editedProtocol?.mainPoints.map((point, index) => (
-                              <div key={index} className="flex gap-2 items-start">
-                                <span className="text-primary mt-3">•</span>
-                                <Textarea
-                                  value={point}
-                                  onChange={(e) => {
-                                    const newPoints = [...(editedProtocol?.mainPoints || [])];
-                                    newPoints[index] = e.target.value;
-                                    setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
-                                  }}
-                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed"
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    const newPoints = editedProtocol?.mainPoints.filter((_, i) => i !== index) || [];
-                                    setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
-                                  }}
-                                  className="h-10 mt-1"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const newPoints = [...(editedProtocol?.mainPoints || []), ''];
-                                setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
-                              }}
-                              className="w-full"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Lägg till punkt
-                            </Button>
-                          </div>
-                        ) : (
-                          <ul className="space-y-3 pl-4">
-                            {protocol.mainPoints.map((point, index) => (
-                              <li key={index} className="flex gap-3 items-start group">
-                                <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">•</span>
-                                <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                  <SmoothRevealText text={point} delay={index * 100} />
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Decisions Section */}
-                    {(isEditing ? editedProtocol?.decisions : protocol.decisions) && (isEditing ? editedProtocol?.decisions.length : protocol.decisions.length) > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
-                          Beslut
-                        </h3>
-                        {isEditing ? (
-                          <div className="space-y-3">
-                            {editedProtocol?.decisions.map((decision, index) => (
-                              <div key={index} className="flex gap-2 items-start">
-                                <span className="text-primary mt-3">✓</span>
-                                <Textarea
-                                  value={decision}
-                                  onChange={(e) => {
-                                    const newDecisions = [...(editedProtocol?.decisions || [])];
-                                    newDecisions[index] = e.target.value;
-                                    setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
-                                  }}
-                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed"
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    const newDecisions = editedProtocol?.decisions.filter((_, i) => i !== index) || [];
-                                    setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
-                                  }}
-                                  className="h-10 mt-1"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const newDecisions = [...(editedProtocol?.decisions || []), ''];
-                                setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
-                              }}
-                              className="w-full"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Lägg till beslut
-                            </Button>
-                          </div>
-                        ) : (
-                          <ul className="space-y-3 pl-4">
-                            {protocol.decisions.map((decision, index) => (
-                              <li key={index} className="flex gap-3 items-start group">
-                                <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">✓</span>
-                                <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                  <SmoothRevealText text={decision} delay={index * 100} />
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Action Items Section with Smart Display */}
-                    {(isEditing ? editedProtocol?.actionItems : protocol.actionItems) && (isEditing ? editedProtocol?.actionItems.length : protocol.actionItems.length) > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
-                          Åtgärdspunkter
-                        </h3>
-                        {isEditing ? (
-                          <div className="space-y-4 pl-4">
-                            {editedProtocol?.actionItems.map((item, index) => {
-                              const isSmartItem = typeof item === 'object' && 'priority' in item;
-                              return (
-                                <div key={index} className="border rounded-lg p-4 bg-card space-y-3">
-                                  <div className="flex items-start gap-2">
-                                    <Input
-                                      value={typeof item === 'string' ? item : item.title}
-                                      onChange={(e) => {
-                                        const newItems = [...(editedProtocol?.actionItems || [])];
-                                        if (typeof newItems[index] === 'string') {
-                                          newItems[index] = e.target.value as any;
-                                        } else {
-                                          newItems[index] = { ...(newItems[index] as AIActionItem), title: e.target.value };
-                                        }
-                                        setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
-                                      }}
-                                      placeholder="Åtgärdstitel..."
-                                      className="flex-1 font-semibold"
-                                    />
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        const newItems = editedProtocol?.actionItems.filter((_, i) => i !== index) || [];
-                                        setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
-                                      }}
-                                      className="h-10"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                  {isSmartItem && typeof item !== 'string' && (
-                                    <>
-                                      <Textarea
-                                        value={(item as AIActionItem).description || ''}
-                                        onChange={(e) => {
-                                          const newItems = [...(editedProtocol?.actionItems || [])];
-                                          newItems[index] = { ...(newItems[index] as AIActionItem), description: e.target.value };
-                                          setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
-                                        }}
-                                        placeholder="Beskrivning..."
-                                        className="min-h-[60px] text-sm"
-                                      />
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <Input
-                                          value={(item as AIActionItem).owner || ''}
-                                          onChange={(e) => {
-                                            const newItems = [...(editedProtocol?.actionItems || [])];
-                                            newItems[index] = { ...(newItems[index] as AIActionItem), owner: e.target.value };
-                                            setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
-                                          }}
-                                          placeholder="Ansvarig..."
-                                          className="text-sm"
-                                        />
-                                        <Input
-                                          type="date"
-                                          value={(item as AIActionItem).deadline || ''}
-                                          onChange={(e) => {
-                                            const newItems = [...(editedProtocol?.actionItems || [])];
-                                            newItems[index] = { ...(newItems[index] as AIActionItem), deadline: e.target.value };
-                                            setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
-                                          }}
-                                          className="text-sm"
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const newItem: AIActionItem = { title: '', description: '', owner: '', deadline: '', priority: 'medium' };
-                                const newItems = [...(editedProtocol?.actionItems || []), newItem];
-                                setEditedProtocol(prev => prev ? {...prev, actionItems: newItems} : null);
-                              }}
-                              className="w-full"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Lägg till åtgärd
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="space-y-4 pl-4">
-                            {protocol.actionItems.map((item, index) => {
-                              const isSmartItem = typeof item === 'object' && item.priority;
-                              if (!isSmartItem) {
-                                // Legacy string format
-                                return (
-                                  <div key={index} className="flex gap-3 items-start group">
-                                    <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">→</span>
-                                    <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                      <SmoothRevealText text={typeof item === 'string' ? item : item.title} delay={index * 100} />
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              
-                              // Smart action item display
-                              const priorityColors = {
-                                critical: 'bg-red-500/10 text-red-700 border-red-200 dark:text-red-400',
-                                high: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:text-orange-400',
-                                medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:text-yellow-400',
-                                low: 'bg-green-500/10 text-green-700 border-green-200 dark:text-green-400'
-                              };
-                              
-                              return (
-                                <div key={index} className="border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
-                                  <div className="flex items-start justify-between gap-3 mb-2">
-                                    <h4 className="font-semibold text-foreground flex-1">
-                                      <SmoothRevealText text={item.title} delay={index * 100} />
-                                    </h4>
-                                    <Badge variant="outline" className={priorityColors[item.priority]}>
-                                      {item.priority === 'critical' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                      {item.priority.toUpperCase()}
-                                    </Badge>
-                                  </div>
-                                  {item.description && (
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                      <SmoothRevealText text={item.description} delay={index * 100 + 50} />
-                                    </p>
-                                  )}
-                                  <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                                    {item.owner && (
-                                      <div className="flex items-center gap-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        <span>{item.owner}</span>
-                                      </div>
-                                    )}
-                                    {item.deadline && (
-                                      <div className="flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        <span>{new Date(item.deadline).toLocaleDateString('sv-SE')}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Next Meeting Suggestions - Plus users only */}
-                    {hasPlusAccess(user, userPlan) && protocol.nextMeetingSuggestions && protocol.nextMeetingSuggestions.length > 0 && (
-                      <div className="space-y-3 bg-primary/5 rounded-lg p-5 border border-primary/20">
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
-                          <span className="w-1 h-6 bg-primary rounded-full" />
-                          Förslag för nästa möte
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-3">AI-genererade förslag baserade på detta möte</p>
                         <ul className="space-y-3 pl-4">
-                          {protocol.nextMeetingSuggestions.map((suggestion, index) => (
-                            <li key={index} className="flex gap-3 items-start group">
-                              <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">→</span>
+                          {protocol.mainPoints.map((point, index) => (
+                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in" 
+                                style={{ animationDelay: `${400 + index * 150}ms`, animationFillMode: 'forwards' }}>
+                              <span className="text-primary mt-1.5 text-lg">•</span>
                               <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={suggestion} delay={index * 100} />
+                                <SmoothRevealText text={point} delay={400 + index * 150} />
                               </span>
                             </li>
-                          ))}
+                          ))
+                          }
                         </ul>
                       </div>
                     )}
 
-                    {/* Transcript section intentionally removed to prevent exposing raw transcript in protocol view */}
+                    {/* Decisions */}
+                    {protocol.decisions && protocol.decisions.length > 0 && (
+                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: `${500 + protocol.mainPoints.length * 150}ms`, animationFillMode: 'forwards' }}>
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Beslut
+                        </h3>
+                        <ul className="space-y-3 pl-4">
+                          {protocol.decisions.map((decision, index) => (
+                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in" 
+                                style={{ animationDelay: `${600 + protocol.mainPoints.length * 150 + index * 150}ms`, animationFillMode: 'forwards' }}>
+                              <span className="text-primary mt-1.5 text-lg">✓</span>
+                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                <SmoothRevealText text={decision} delay={600 + protocol.mainPoints.length * 150 + index * 150} />
+                              </span>
+                            </li>
+                          ))
+                          }
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Action Items */}
+                    {protocol.actionItems && protocol.actionItems.length > 0 && (
+                      <div className="space-y-3 opacity-0 animate-fade-in" 
+                           style={{ 
+                             animationDelay: `${700 + protocol.mainPoints.length * 150 + protocol.decisions.length * 150}ms`, 
+                             animationFillMode: 'forwards' 
+                           }}>
+                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                          <span className="w-1 h-6 bg-primary rounded-full" />
+                          Åtgärdspunkter
+                        </h3>
+                        <ul className="space-y-4 pl-4">
+                          {protocol.actionItems.map((item, index) => {
+                            const isSmartItem = typeof item === 'object' && 'priority' in item;
+                            const baseDelay = 800 + protocol.mainPoints.length * 150 + protocol.decisions.length * 150 + index * 200;
+                            
+                            return (
+                              <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in" 
+                                  style={{ animationDelay: `${baseDelay}ms`, animationFillMode: 'forwards' }}>
+                                <span className="text-primary mt-1.5 text-lg">→</span>
+                                <div className="flex-1 space-y-1">
+                                  {isSmartItem ? (
+                                    <>
+                                      <div className="flex items-start gap-2 flex-wrap">
+                                        <span className="font-semibold text-foreground">
+                                          <SmoothRevealText text={item.title} delay={baseDelay} />
+                                        </span>
+                                        <Badge 
+                                          variant={
+                                            item.priority === 'critical' ? 'destructive' : 
+                                            item.priority === 'high' ? 'default' : 
+                                            'secondary'
+                                          }
+                                          className="text-xs"
+                                        >
+                                          {item.priority === 'critical' ? 'Kritisk' : 
+                                           item.priority === 'high' ? 'Hög' : 
+                                           item.priority === 'medium' ? 'Medel' : 'Låg'}
+                                        </Badge>
+                                      </div>
+                                      {item.description && (
+                                        <p className="text-sm text-muted-foreground">
+                                          <SmoothRevealText text={item.description} delay={baseDelay + 100} />
+                                        </p>
+                                      )}
+                                      <div className="flex gap-4 text-xs text-muted-foreground mt-1">
+                                        {item.owner && (
+                                          <span className="flex items-center gap-1">
+                                            <span className="font-medium">Ansvarig:</span> 
+                                            <SmoothRevealText text={item.owner} delay={baseDelay + 150} />
+                                          </span>
+                                        )}
+                                        {item.deadline && (
+                                          <span className="flex items-center gap-1">
+                                            <Clock className="w-3 h-3" />
+                                            <SmoothRevealText text={item.deadline} delay={baseDelay + 200} />
+                                          </span>
+                                        )}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <span className="text-base leading-relaxed text-foreground/90">
+                                      <SmoothRevealText text={String(item)} delay={baseDelay} />
+                                    </span>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })
+                          }
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                ) : null}
+                ) : (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Action Buttons */}
-            <div className="w-full max-w-3xl mx-auto">
+            <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 opacity-0 animate-fade-in" 
                    style={{ animationDelay: '1000ms', animationFillMode: 'forwards' }}>
                 {!isFreeTrialMode && (
