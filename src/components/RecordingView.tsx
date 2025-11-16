@@ -91,6 +91,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [isTestMode, setIsTestMode] = useState(false);
   const testCleanupRef = useRef<(() => void) | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isInBackground, setIsInBackground] = useState(false);
 
   // Check if user is admin
   useEffect(() => {
@@ -584,6 +585,121 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     };
   }, [isRecording, isPaused]);
 
+  // Handle visibility changes and page lifecycle to keep recording active
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('📱 App went to background - recording continues');
+        setIsInBackground(true);
+        
+        // Notify user that recording continues
+        if (isRecording && !isPaused) {
+          toast({
+            title: "📱 Inspelning fortsätter",
+            description: "Din inspelning fortsätter i bakgrunden. Återvänd när mötet är klart.",
+            duration: 5000,
+          });
+        }
+        
+        // Try to reacquire wake lock when coming back
+        setTimeout(() => {
+          if (!document.hidden && isRecording && !isPaused) {
+            requestWakeLock();
+          }
+        }, 100);
+      } else {
+        console.log('📱 App came to foreground');
+        const wasInBackground = isInBackground;
+        setIsInBackground(false);
+        
+        // Welcome user back if they were in background
+        if (wasInBackground && isRecording && !isPaused) {
+          toast({
+            title: "👋 Välkommen tillbaka!",
+            description: "Din inspelning har fortsatt i bakgrunden.",
+            duration: 3000,
+          });
+        }
+        
+        // Reacquire wake lock when returning to foreground
+        if (isRecording && !isPaused) {
+          requestWakeLock();
+        }
+        
+        // Restart speech recognition if it stopped
+        if (isRecording && !isPaused && !isMuted && !isRecognitionActiveRef.current && recognitionRef.current) {
+          setTimeout(() => {
+            if (recognitionRef.current && !isRecognitionActiveRef.current && !isMuted && !isPaused) {
+              try {
+                recognitionRef.current.start();
+                isRecognitionActiveRef.current = true;
+                console.log('✅ Speech recognition restarted after foreground');
+              } catch (error: any) {
+                if (error.message?.includes('already started')) {
+                  isRecognitionActiveRef.current = true;
+                }
+              }
+            }
+          }, 300);
+        }
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isRecording && transcript.length > 100) {
+        // Save current state before page unload
+        const currentData = {
+          transcript: transcript + interimTranscript,
+          duration: durationSec,
+        };
+        
+        try {
+          sessionStorage.setItem('recording_backup', JSON.stringify({
+            ...currentData,
+            sessionId,
+            meetingName,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          console.error('Failed to save recording backup:', err);
+        }
+        
+        // Show warning dialog
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    const handlePageHide = () => {
+      // Save state when page is hidden (mobile tab switch, etc.)
+      if (isRecording) {
+        console.log('💾 Page hidden - saving recording state');
+        try {
+          sessionStorage.setItem('recording_active', JSON.stringify({
+            sessionId,
+            transcript: transcript + interimTranscript,
+            duration: durationSec,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          console.error('Failed to save state:', err);
+        }
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [isRecording, isPaused, isMuted, transcript, interimTranscript, durationSec, sessionId, meetingName, isInBackground, toast]);
+
   const startTestMode = () => {
     if (isTestMode) return;
     
@@ -961,9 +1077,16 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         <div className="max-w-5xl mx-auto px-3 md:px-4 py-2 md:py-3">
           <div className="flex items-center justify-between gap-2 md:gap-4">
             <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-              <div className={`w-2 h-2 rounded-full transition-all ${
-                !isPaused && !isMuted ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground/40'
-              }`} />
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full transition-all ${
+                  !isPaused && !isMuted ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground/40'
+                }`} />
+                {isInBackground && isRecording && !isPaused && (
+                  <span className="text-[10px] md:text-xs px-1.5 py-0.5 bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded font-medium">
+                    Bakgrund
+                  </span>
+                )}
+              </div>
               {isEditingName ? (
                 <div className="flex gap-2 items-center flex-1 min-w-0">
                   <Input
@@ -1027,15 +1150,23 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                 {/* Status Text */}
                 <div className="space-y-1 md:space-y-2">
                   <h2 className="text-base md:text-xl font-semibold">
-                    {isMuted ? 'Mikrofon avstängd' : isPaused ? 'Pausad' : 'Inspelning pågår'}
+                    {isMuted ? 'Mikrofon avstängd' : isPaused ? 'Pausad' : isInBackground ? 'Inspelning fortsätter i bakgrunden' : 'Inspelning pågår'}
                   </h2>
                   <p className="text-xs md:text-sm text-muted-foreground max-w-md px-2">
                     {isMuted 
                       ? 'Klicka på "Slå på" nedan för att aktivera mikrofonen och börja spela in ditt möte' 
                       : isPaused 
                         ? 'Inspelningen är pausad. Tryck "Återuppta" för att fortsätta spela in'
-                        : 'Tala tydligt in ditt möte. Texten transkriberas i realtid nedan'}
+                        : isInBackground
+                          ? 'Inspelningen fortsätter även när appen är i bakgrunden. Återvänd när du är klar för att avsluta.'
+                          : 'Tala tydligt in ditt möte. Texten transkriberas i realtid nedan'}
                   </p>
+                  {isInBackground && (
+                    <div className="mt-2 flex items-center justify-center gap-2 text-xs text-orange-600 dark:text-orange-400">
+                      <Radio className="w-3 h-3 animate-pulse" />
+                      <span>Bakgrundsinspelning aktiv</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
