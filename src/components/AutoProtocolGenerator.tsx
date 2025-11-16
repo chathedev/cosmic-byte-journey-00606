@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
+import { backendApi } from "@/lib/backendApi";
 
 interface AIActionItem {
   title: string;
@@ -276,13 +277,59 @@ export const AutoProtocolGenerator = ({
     }
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Protokoll sparat",
-      description: "Protokollet finns nu i ditt bibliotek.",
-      duration: 2000,
-    });
-    navigate("/library");
+  const handleSave = async () => {
+    if (!documentBlob || !meetingId) {
+      toast({
+        title: "Protokoll sparat",
+        description: "Protokollet finns nu i ditt bibliotek.",
+        duration: 2000,
+      });
+      navigate("/library");
+      return;
+    }
+
+    try {
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(documentBlob);
+      
+      await new Promise<void>((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const base64 = reader.result as string;
+            
+            // Save protocol to backend
+            await backendApi.saveProtocol(meetingId, {
+              fileName,
+              mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              documentBlob: base64,
+            });
+            
+            toast({
+              title: "Protokoll sparat",
+              description: "Protokollet har sparats på mötet och finns i ditt bibliotek.",
+              duration: 2000,
+            });
+            
+            navigate("/library");
+            resolve();
+          } catch (error: any) {
+            reject(error);
+          }
+        };
+        reader.onerror = reject;
+      });
+    } catch (error: any) {
+      console.error('Failed to save protocol:', error);
+      toast({
+        title: "Kunde inte spara",
+        description: error.message || "Ett fel uppstod. Protokollet finns fortfarande i ditt bibliotek.",
+        variant: "destructive",
+        duration: 2500,
+      });
+      // Still navigate to library even if save fails
+      navigate("/library");
+    }
   };
 
   const getPriorityColor = (priority: string) => {

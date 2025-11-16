@@ -15,6 +15,9 @@ import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { MeetingChat } from "@/components/MeetingChat";
 import { ChatUpgradeBanner } from "@/components/ChatUpgradeBanner";
 import { isLibraryLocked as checkLibraryLocked, hasPlusAccess } from "@/lib/accessCheck";
+import { backendApi } from "@/lib/backendApi";
+import { Badge } from "@/components/ui/badge";
+import { Download, Eye, RefreshCw } from "lucide-react";
 
 const Library = () => {
   const { user } = useAuth();
@@ -37,6 +40,8 @@ const Library = () => {
   const [chatMeeting, setChatMeeting] = useState<MeetingSession | null>(null);
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
   const [pendingMeetingData, setPendingMeetingData] = useState<any>(null);
+  const [protocolStatus, setProtocolStatus] = useState<Record<string, any>>({});
+  const [loadingProtocol, setLoadingProtocol] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
@@ -70,6 +75,22 @@ const Library = () => {
       
       const allFolders = await meetingStorage.getFolders(user.uid);
       setFolders(allFolders.map(f => f.name));
+      
+      // Load protocol status for all meetings
+      const protocols: Record<string, any> = {};
+      await Promise.allSettled(
+        deduped.map(async (meeting) => {
+          try {
+            const protocol = await backendApi.getProtocol(meeting.id);
+            if (protocol?.protocol) {
+              protocols[meeting.id] = protocol.protocol;
+            }
+          } catch (error) {
+            // Protocol doesn't exist or error - that's fine
+          }
+        })
+      );
+      setProtocolStatus(protocols);
     } catch (error) {
       console.error('Failed to load data:', error);
       toast({
@@ -502,6 +523,97 @@ const Library = () => {
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
                     {meeting.transcript || "Ingen transkription ännu..."}
                   </p>
+                  
+                  {/* Protocol Status Badge */}
+                  {protocolStatus[meeting.id] && (
+                    <div className="mb-3 pb-3 border-b border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="flex items-center gap-1">
+                            <FileText className="w-3 h-3" />
+                            Protokoll sparat
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(protocolStatus[meeting.id].storedAt).toLocaleDateString('sv-SE')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            onClick={async () => {
+                              setLoadingProtocol(meeting.id);
+                              try {
+                                const data = await backendApi.getProtocol(meeting.id);
+                                if (data?.protocol?.blob) {
+                                  const blob = atob(data.protocol.blob.replace(/^data:.*?;base64,/, ''));
+                                  const bytes = new Uint8Array(blob.length);
+                                  for (let i = 0; i < blob.length; i++) {
+                                    bytes[i] = blob.charCodeAt(i);
+                                  }
+                                  const file = new Blob([bytes], { type: data.protocol.mimeType });
+                                  const url = URL.createObjectURL(file);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = data.protocol.fileName;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                  toast({
+                                    title: "Protokoll nedladdat",
+                                    description: data.protocol.fileName,
+                                    duration: 2000,
+                                  });
+                                }
+                              } catch (error: any) {
+                                toast({
+                                  title: "Fel",
+                                  description: error.message || "Kunde inte ladda ner protokoll",
+                                  variant: "destructive",
+                                  duration: 2500,
+                                });
+                              } finally {
+                                setLoadingProtocol(null);
+                              }
+                            }}
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            disabled={loadingProtocol === meeting.id}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              if (confirm('Vill du ersätta det sparade protokollet? Detta går inte att ångra.')) {
+                                try {
+                                  await backendApi.deleteProtocol(meeting.id);
+                                  const updatedStatus = { ...protocolStatus };
+                                  delete updatedStatus[meeting.id];
+                                  setProtocolStatus(updatedStatus);
+                                  toast({
+                                    title: "Protokoll borttaget",
+                                    description: "Du kan nu generera ett nytt protokoll",
+                                    duration: 2000,
+                                  });
+                                } catch (error: any) {
+                                  toast({
+                                    title: "Fel",
+                                    description: error.message || "Kunde inte ta bort protokoll",
+                                    variant: "destructive",
+                                    duration: 2500,
+                                  });
+                                }
+                              }
+                            }}
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="flex gap-2 flex-wrap items-center">
                     <Button
                       onClick={() => handleContinueMeeting(meeting)}
@@ -517,9 +629,11 @@ const Library = () => {
                       onClick={() => handleCreateProtocol(meeting)}
                       size="sm"
                       variant="outline"
+                      disabled={!!protocolStatus[meeting.id]}
+                      title={protocolStatus[meeting.id] ? 'Protokoll redan sparat för detta möte' : undefined}
                     >
                       <FileText className="w-4 h-4 mr-1" />
-                      {userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll'}
+                      {protocolStatus[meeting.id] ? 'Protokoll sparat' : (userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll')}
                     </Button>
                     {userPlan?.plan === 'plus' && (
                       <Button
