@@ -18,6 +18,7 @@ import { isLibraryLocked as checkLibraryLocked, hasPlusAccess } from "@/lib/acce
 import { backendApi } from "@/lib/backendApi";
 import { Badge } from "@/components/ui/badge";
 import { Download, Eye, RefreshCw } from "lucide-react";
+import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 
 const Library = () => {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ const Library = () => {
   const [pendingMeetingData, setPendingMeetingData] = useState<any>(null);
   const [protocolStatus, setProtocolStatus] = useState<Record<string, any>>({});
   const [loadingProtocol, setLoadingProtocol] = useState<string | null>(null);
+  const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
@@ -543,6 +545,39 @@ const Library = () => {
                               setLoadingProtocol(meeting.id);
                               try {
                                 const data = await backendApi.getProtocol(meeting.id);
+                                if (data?.protocol) {
+                                  setViewingProtocol({
+                                    meetingId: meeting.id,
+                                    protocol: data.protocol
+                                  });
+                                }
+                              } catch (error: any) {
+                                toast({
+                                  title: "Fel",
+                                  description: error.message || "Kunde inte öppna protokoll",
+                                  variant: "destructive",
+                                  duration: 2500,
+                                });
+                              } finally {
+                                setLoadingProtocol(null);
+                              }
+                            }}
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            disabled={loadingProtocol === meeting.id}
+                          >
+                            {loadingProtocol === meeting.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Eye className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              setLoadingProtocol(meeting.id);
+                              try {
+                                const data = await backendApi.getProtocol(meeting.id);
                                 if (data?.protocol?.blob) {
                                   const blob = atob(data.protocol.blob.replace(/^data:.*?;base64,/, ''));
                                   const bytes = new Uint8Array(blob.length);
@@ -717,6 +752,15 @@ const Library = () => {
       {/* Upgrade Dialog */}
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
       <SubscribeDialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog} />
+
+      {/* Protocol Viewer Dialog */}
+      <ProtocolViewerDialog
+        open={!!viewingProtocol}
+        onOpenChange={(open) => {
+          if (!open) setViewingProtocol(null);
+        }}
+        protocol={viewingProtocol?.protocol || null}
+      />
     </div>
   );
 };
