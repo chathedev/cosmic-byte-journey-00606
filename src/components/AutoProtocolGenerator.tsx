@@ -662,33 +662,33 @@ export const AutoProtocolGenerator = ({
 
             {/* Action Buttons */}
             <div className="w-full max-w-3xl mx-auto">
-              <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 {!isFreeTrialMode && (
-                  <Button onClick={onBack} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                  <Button onClick={onBack} variant="outline" size="lg" className="gap-2 w-full">
                     <ArrowLeft className="w-4 h-4" />
                     <span className="whitespace-nowrap">Nytt möte</span>
                   </Button>
                 )}
                 {!isEditing ? (
                   <>
-                    <Button onClick={() => setIsEditing(true)} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                    <Button onClick={() => setIsEditing(true)} variant="outline" size="lg" className="gap-2 w-full">
                       <span className="whitespace-nowrap">Redigera</span>
                     </Button>
-                    <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                    <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full">
                       <Mail className="w-4 h-4" />
                       <span className="whitespace-nowrap">E-posta</span>
                     </Button>
-                    <Button onClick={handleDownload} size="lg" className="gap-2 flex-shrink-0 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                    <Button onClick={handleDownload} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
                       <Download className="w-4 h-4" />
                       <span className="whitespace-nowrap">Ladda ner</span>
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 flex-shrink-0">
+                    <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 w-full">
                       <span className="whitespace-nowrap">Avbryt</span>
                     </Button>
-                    <Button onClick={handleSaveEdits} size="lg" className="gap-2 flex-shrink-0">
+                    <Button onClick={handleSaveEdits} size="lg" className="gap-2 w-full">
                       <span className="whitespace-nowrap">Spara ändringar</span>
                     </Button>
                   </>
