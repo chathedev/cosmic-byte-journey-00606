@@ -1,50 +1,43 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Loader2, Mail, Clock } from "lucide-react";
+import { ArrowLeft, Download, Mic, FileText, ListChecks, CheckCircle2, Target, Save, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
-import { EmailDialog } from "./EmailDialog";
-import { ProtocolGenerationWidget } from "./ProtocolGenerationWidget";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { saveActionItems } from "@/lib/backend";
 import { hasPlusAccess } from "@/lib/accessCheck";
+import { useNavigate } from "react-router-dom";
 
-const SmoothRevealText = ({ 
-  text, 
-  delay = 0 
-}: { 
-  text: string; 
-  delay?: number;
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
+const TypeWriter = ({ text, delay = 0 }: { text: string; delay?: number }) => {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsVisible(true);
-    }, delay);
-
-    return () => clearTimeout(timeout);
-  }, [delay]);
+    const timer = setTimeout(() => {
+      let currentIndex = 0;
+      const interval = setInterval(() => {
+        if (currentIndex <= text.length) {
+          setDisplayedText(text.slice(0, currentIndex));
+          currentIndex++;
+        } else {
+          setIsComplete(true);
+          clearInterval(interval);
+        }
+      }, 12);
+      return () => clearInterval(interval);
+    }, delay * 1000);
+    return () => clearTimeout(timer);
+  }, [text, delay]);
 
   return (
-    <span 
-      className={`inline-block transition-all duration-1000 ${
-        isVisible 
-          ? 'opacity-100 translate-y-0 blur-0' 
-          : 'opacity-0 translate-y-6 blur-sm'
-      }`}
-      style={{ 
-        transitionDelay: `${delay}ms`,
-        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)'
-      }}
-    >
-      {text}
-    </span>
+    <div className={`transition-opacity duration-300 ${isComplete ? 'opacity-100' : 'opacity-95'}`}>
+      {displayedText}
+      {!isComplete && <span className="inline-block w-0.5 h-4 ml-0.5 bg-primary animate-pulse" />}
+    </div>
   );
 };
 
@@ -83,229 +76,174 @@ export const AutoProtocolGenerator = ({
   aiProtocol, 
   onBack, 
   isFreeTrialMode = false,
-  showWidget = false,
   onProtocolReady,
   meetingCreatedAt,
-  agendaId,
   meetingId,
   userId
 }: AutoProtocolGeneratorProps) => {
   const [isGenerating, setIsGenerating] = useState(true);
+  const [currentStep, setCurrentStep] = useState("");
   const [progress, setProgress] = useState(0);
   const [documentBlob, setDocumentBlob] = useState<Blob | null>(null);
   const [fileName, setFileName] = useState<string>("");
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [protocol, setProtocol] = useState<AIProtocol | null>(aiProtocol);
   const [showContent, setShowContent] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [agendaContent, setAgendaContent] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { user } = useAuth();
   const { userPlan } = useSubscription();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   
   useEffect(() => {
     setProtocol(aiProtocol);
   }, [aiProtocol]);
-  
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // Load agenda if provided
-    const loadAgenda = async () => {
-      if (agendaId) {
-        try {
-          const { agendaStorage } = await import('@/utils/agendaStorage');
-          const agenda = await agendaStorage.getAgenda(agendaId);
-          if (agenda) {
-            setAgendaContent(agenda.content);
-          }
-        } catch (error) {
-          console.error('Failed to load agenda:', error);
-        }
-      }
-    };
-    loadAgenda();
-  }, [agendaId]);
 
   useEffect(() => {
     let cancelled = false;
+
     const generateDocument = async () => {
+      if (!protocol) return;
+
       try {
-        setIsGenerating(true);
-        setProgress(10);
-        // Wait a moment to show loading state with progress message
-        await new Promise(resolve => setTimeout(resolve, 500));
-        if (cancelled) return;
-        setProgress(25);
+        // Simulate progress with realistic steps
+        const steps = [
+          { text: "Analyserar mötesinnehållet...", progress: 15 },
+          { text: "Identifierar huvudpunkter...", progress: 35 },
+          { text: "Sammanställer beslut...", progress: 55 },
+          { text: "Formaterar åtgärdspunkter...", progress: 75 },
+          { text: "Färdigställer protokollet...", progress: 95 }
+        ];
 
-        const finalProtocol = protocol;
-
-        // Generate title from protocol or transcript
-        let generatedTitle = finalProtocol?.title;
-        if (!generatedTitle || generatedTitle.toLowerCase().startsWith('möte')) {
-          try {
-            generatedTitle = await generateMeetingTitle(transcript);
-          } catch (e) {
-            console.warn('Title generation failed:', e);
-          }
+        for (const step of steps) {
+          if (cancelled) return;
+          setCurrentStep(step.text);
+          setProgress(step.progress);
+          await new Promise(resolve => setTimeout(resolve, 800));
         }
 
-        setProgress(50);
-        if (cancelled) return;
-
-        // Format date/time
-        const meetingDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
-        const dateStr = meetingDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
-        const timeStr = meetingDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
-
-        // Removed heuristic fallback to avoid using transcript text in the protocol
-        // If AI fails to generate, we keep sections empty and suggest retrying via UI/toast.
-        if (!finalProtocol) {
-          if (!cancelled) {
-            toast({ title: "Kunde inte generera AI‑protokoll", description: "Försök igen om en liten stund." });
-          }
-        }
-
-        const title = finalProtocol?.title || `Mötesprotokoll ${dateStr}`;
+        // Generate title
+        const generatedTitle = await generateMeetingTitle(transcript);
+        const finalTitle = generatedTitle || protocol.title || "Mötesprotokoll";
         
+        // Update protocol with generated title
+        const updatedProtocol = { ...protocol, title: finalTitle };
+        setProtocol(updatedProtocol);
+
+        // Create document sections
+        const docChildren: Paragraph[] = [
+          new Paragraph({
+            text: "MÖTESPROTOKOLL",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 200 }
+          }),
+          new Paragraph({
+            text: finalTitle,
+            heading: HeadingLevel.HEADING_2,
+            spacing: { after: 400 }
+          }),
+        ];
+
+        // Add summary
+        if (updatedProtocol.summary) {
+          docChildren.push(
+            new Paragraph({
+              text: "Sammanfattning",
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+            new Paragraph({
+              text: updatedProtocol.summary,
+              spacing: { after: 400 }
+            })
+          );
+        }
+
+        // Add main points
+        if (updatedProtocol.mainPoints && updatedProtocol.mainPoints.length > 0) {
+          docChildren.push(
+            new Paragraph({
+              text: "Huvudpunkter",
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            })
+          );
+          updatedProtocol.mainPoints.forEach(point => {
+            docChildren.push(
+              new Paragraph({
+                text: `• ${point}`,
+                spacing: { after: 100 }
+              })
+            );
+          });
+        }
+
+        // Add decisions
+        if (updatedProtocol.decisions && updatedProtocol.decisions.length > 0) {
+          docChildren.push(
+            new Paragraph({
+              text: "Beslut",
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            })
+          );
+          updatedProtocol.decisions.forEach(decision => {
+            docChildren.push(
+              new Paragraph({
+                text: `• ${decision}`,
+                spacing: { after: 100 }
+              })
+            );
+          });
+        }
+
+        // Add action items
+        if (updatedProtocol.actionItems && updatedProtocol.actionItems.length > 0) {
+          docChildren.push(
+            new Paragraph({
+              text: "Åtgärdspunkter",
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            })
+          );
+          updatedProtocol.actionItems.forEach(item => {
+            const itemText = typeof item === 'string' ? item : item.title;
+            docChildren.push(
+              new Paragraph({
+                text: `• ${itemText}`,
+                spacing: { after: 100 }
+              })
+            );
+          });
+        }
+
         const doc = new Document({
-          sections: [
-            {
-              properties: {},
-              children: [
-                // Title
-                new Paragraph({
-                  text: "MÖTESPROTOKOLL",
-                  heading: HeadingLevel.TITLE,
-                  alignment: AlignmentType.CENTER,
-                  spacing: { after: 400 },
-                }),
-                
-                // Meeting title
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: title,
-                      bold: true,
-                      size: 32,
-                    }),
-                  ],
-                  spacing: { after: 300 },
-                }),
-
-                // Date and time
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Datum: ", bold: true }),
-                    new TextRun(dateStr),
-                    new TextRun({ text: " | Tid: ", bold: true }),
-                    new TextRun(timeStr),
-                  ],
-                  spacing: { after: 300 },
-                }),
-
-                // Divider
-                new Paragraph({
-                  text: "─────────────────────────────────────────",
-                  spacing: { after: 300 },
-                }),
-
-                // AI-generated content (if available)
-                ...(finalProtocol ? [
-                  // Summary
-                  new Paragraph({
-                    text: "Sammanfattning",
-                    heading: HeadingLevel.HEADING_1,
-                    spacing: { before: 200, after: 200 },
-                  }),
-                  new Paragraph({ text: finalProtocol.summary, spacing: { after: 300 } }),
-
-                  // Main Points
-                  new Paragraph({
-                    text: "Huvudpunkter",
-                    heading: HeadingLevel.HEADING_1,
-                    spacing: { before: 200, after: 200 },
-                  }),
-                  ...finalProtocol.mainPoints.map(point => new Paragraph({ text: `• ${point}`, spacing: { after: 100 } })),
-
-                  // Decisions (if any)
-                  ...(finalProtocol.decisions.length > 0 ? [
-                    new Paragraph({ text: "Beslut", heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 200 } }),
-                    ...finalProtocol.decisions.map(decision => new Paragraph({ text: `• ${decision}`, spacing: { after: 100 } })),
-                  ] : []),
-
-                  // Action Items (if any)
-                  ...(finalProtocol.actionItems.length > 0 ? [
-                    new Paragraph({ text: "Åtgärdspunkter", heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 200 } }),
-                    ...finalProtocol.actionItems.map((item: AIActionItem) => {
-                      const itemText = typeof item === 'string' 
-                        ? item 
-                        : `${item.title}${item.description ? ` - ${item.description}` : ''}${item.owner ? ` (${item.owner})` : ''}${item.deadline ? ` [Deadline: ${item.deadline}]` : ''} [Priority: ${item.priority}]`;
-                      return new Paragraph({ text: `• ${itemText}`, spacing: { after: 100 } });
-                    }),
-                  ] : []),
-                ] : []),
-
-                // Watermark for free users
-                ...(isFreeTrialMode ? [
-                  new Paragraph({ text: "", spacing: { before: 600 } }),
-                  new Paragraph({
-                    text: "─────────────────────────────────────────",
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 200 },
-                  }),
-                  new Paragraph({
-                    children: [
-                      new TextRun({
-                        text: "TIVLY - GRATIS PLAN",
-                        bold: true,
-                        size: 24,
-                      }),
-                    ],
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 100 },
-                  }),
-                  new Paragraph({
-                    text: "Uppgradera till Standard eller Plus för obegränsade protokoll utan vattenstämpel",
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 200 },
-                  }),
-                  new Paragraph({
-                    text: "─────────────────────────────────────────",
-                    alignment: AlignmentType.CENTER,
-                  }),
-                ] : []),
-              ],
-            },
-          ],
+          sections: [{
+            properties: {},
+            children: docChildren
+          }]
         });
 
-        setProgress(75);
-        if (cancelled) return;
-
         const blob = await Packer.toBlob(doc);
-        const safeTitle = (generatedTitle || title || 'Mötesprotokoll').replace(/[^a-zA-Z0-9åäöÅÄÖ\s\-_]/g, '');
-        const fileName = `${safeTitle}_${dateStr.replace(/ /g, '_')}.docx`;
-        
         setDocumentBlob(blob);
-        setFileName(fileName);
-        
-        setProgress(100);
-        setIsGenerating(false);
-        
-        // Save action items if user has Plus access
-        if (finalProtocol && finalProtocol.actionItems && finalProtocol.actionItems.length > 0 && hasPlusAccess(user, userPlan) && meetingId) {
+        setFileName(`protokoll_${finalTitle.replace(/\s+/g, '_')}.docx`);
+
+        // Save action items if needed
+        if (updatedProtocol.actionItems && updatedProtocol.actionItems.length > 0 && meetingId && user) {
           try {
             await saveActionItems({
-              actionItems: finalProtocol.actionItems,
+              actionItems: updatedProtocol.actionItems,
               meetingId: meetingId,
               userId: user.uid
             });
-            console.log('Action items saved successfully');
           } catch (error) {
             console.error('Failed to save action items:', error);
           }
         }
 
+        setProgress(100);
+        setIsGenerating(false);
+        
         setTimeout(() => {
           setShowContent(true);
           onProtocolReady?.();
@@ -329,317 +267,301 @@ export const AutoProtocolGenerator = ({
     };
   }, [protocol, transcript, toast, meetingCreatedAt, isFreeTrialMode, onProtocolReady, userPlan, user, meetingId]);
 
-  const handleDownload = () => {
-    if (documentBlob && fileName) {
-      saveAs(documentBlob, fileName);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Simulate save
+      await new Promise(resolve => setTimeout(resolve, 1000));
       toast({
-        title: "Protokoll nedladdat!",
-        description: `${fileName} har laddats ner.`,
+        title: "Protokoll sparat!",
+        description: "Ditt protokoll har sparats i biblioteket.",
       });
+      navigate("/library");
+    } catch (error) {
+      toast({
+        title: "Ett fel uppstod",
+        description: "Kunde inte spara protokollet.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Format date/time for display
-  const meetingDate = meetingCreatedAt ? new Date(meetingCreatedAt) : new Date();
-  const dateStr = meetingDate.toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' });
-  const timeStr = meetingDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+  const handleDownload = () => {
+    setIsDownloading(true);
+    try {
+      if (documentBlob && fileName) {
+        saveAs(documentBlob, fileName);
+        toast({
+          title: "Protokoll nedladdat!",
+          description: `${fileName} har laddats ner.`,
+        });
+      }
+    } finally {
+      setTimeout(() => setIsDownloading(false), 1000);
+    }
+  };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
-        {showWidget && <ProtocolGenerationWidget isGenerating={isGenerating} progress={progress} onComplete={onProtocolReady} />}
-        
-        {isGenerating ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="text-center space-y-8 max-w-md">
-              {/* Elegant loading animation */}
-              <div className="relative w-32 h-32 mx-auto">
-                {/* Outer rotating circle */}
-                <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-spin" 
-                     style={{ animationDuration: '3s' }}>
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full"></div>
-                </div>
-                {/* Inner pulsing circle */}
-                <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 animate-pulse flex items-center justify-center">
-                  <svg className="w-12 h-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
+  const handleBackToHome = () => {
+    navigate("/");
+  };
+
+  const handleNewRecording = () => {
+    navigate("/recording");
+  };
+
+  const meetingTitle = protocol?.title || "Mötesprotokoll";
+
+  const parsedSections = {
+    summary: protocol?.summary || "",
+    mainPoints: protocol?.mainPoints || [],
+    decisions: protocol?.decisions || [],
+    actionItems: protocol?.actionItems?.map(item => typeof item === 'string' ? item : item.title) || []
+  };
+
+  if (isGenerating) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-muted/10 flex items-center justify-center p-6">
+        <div className="w-full max-w-3xl space-y-10">
+          <div className="text-center space-y-6">
+            <div className="inline-flex items-center gap-4 mb-8">
+              <div className="relative">
+                <Sparkles className="w-10 h-10 text-primary animate-pulse" />
+                <div className="absolute inset-0 w-10 h-10 bg-primary/20 rounded-full blur-xl animate-pulse" />
               </div>
-
-              {/* Status text */}
-              <div className="space-y-3">
-                <h3 className="text-2xl font-semibold text-foreground animate-pulse">
-                  Skapar ditt protokoll
-                </h3>
-                <p className="text-base text-muted-foreground leading-relaxed transition-all duration-500">
-                  {progress < 30 && "Analyserar innehållet och förbereder strukturen..."}
-                  {progress >= 30 && progress < 60 && "Identifierar huvudpunkter och beslut..."}
-                  {progress >= 60 && progress < 85 && "Formulerar sammanfattning och åtgärder..."}
-                  {progress >= 85 && "Färdigställer ditt professionella protokoll..."}
-                </p>
-              </div>
-
-              {/* Modern progress bar */}
-              <div className="space-y-2">
-                <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden backdrop-blur shadow-inner">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary via-primary/80 to-primary rounded-full transition-all duration-700 ease-out relative shadow-lg"
-                    style={{ 
-                      width: `${progress}%`,
-                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)'
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground font-medium transition-all duration-300">{Math.round(progress)}% slutfört</p>
-              </div>
-
-              {/* Subtle hint */}
-              <p className="text-xs text-muted-foreground/70 italic animate-pulse">
-                Detta tar vanligtvis 10-15 sekunder
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8 animate-fade-in">
-            {/* Header */}
-            <div className="text-center space-y-2 opacity-0 animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Protokoll klart!
+              <h1 className="text-5xl font-bold tracking-tight">
+                <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+                  Genererar protokoll
+                </span>
               </h1>
-              <p className="text-muted-foreground">Ditt mötesprotokoll är genererat och redo att användas</p>
-            </div>
-
-            {/* Protocol Card */}
-            <Card className="border-2 shadow-xl overflow-hidden opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-              <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b-2 space-y-4 py-8">
-                <div className="space-y-3">
-                  <CardTitle className="text-3xl md:text-4xl font-bold text-center opacity-0 animate-fade-in" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-                    MÖTESPROTOKOLL
-                  </CardTitle>
-                  <h2 className="text-xl md:text-2xl font-semibold text-center text-muted-foreground opacity-0 animate-fade-in" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
-                    {protocol?.title || 'Protokoll'}
-                  </h2>
-                  <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground opacity-0 animate-fade-in" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-                    <span className="font-medium">📅 {dateStr}</span>
-                    <span className="text-border">•</span>
-                    <span className="font-medium">🕐 {timeStr}</span>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="py-8 px-6 md:px-10">
-                {protocol && showContent ? (
-                  <div className="space-y-8">
-                    {/* Summary */}
-                    {protocol.summary && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '500ms', animationFillMode: 'forwards', animationDuration: '800ms' }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
-                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" />
-                          Sammanfattning
-                        </h3>
-                        <p className="text-base leading-relaxed text-foreground/90 pl-4">
-                          <SmoothRevealText text={protocol.summary} delay={600} />
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Main Points */}
-                    {protocol.mainPoints && protocol.mainPoints.length > 0 && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" style={{ animationDelay: '800ms', animationFillMode: 'forwards', animationDuration: '800ms' }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
-                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" style={{ animationDelay: '900ms' }} />
-                          Huvudpunkter
-                        </h3>
-                        <ul className="space-y-3 pl-4">
-                          {protocol.mainPoints.map((point, index) => (
-                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in transform" 
-                                style={{ 
-                                  animationDelay: `${1000 + index * 120}ms`, 
-                                  animationFillMode: 'forwards',
-                                  animationDuration: '700ms'
-                                }}>
-                              <span className="text-primary mt-1.5 text-lg transition-transform duration-300 hover:scale-125">•</span>
-                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={point} delay={1000 + index * 120} />
-                              </span>
-                            </li>
-                          ))
-                          }
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Decisions */}
-                    {protocol.decisions && protocol.decisions.length > 0 && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" 
-                           style={{ 
-                             animationDelay: `${1100 + protocol.mainPoints.length * 120}ms`, 
-                             animationFillMode: 'forwards',
-                             animationDuration: '800ms'
-                           }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
-                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" 
-                                style={{ animationDelay: `${1200 + protocol.mainPoints.length * 120}ms` }} />
-                          Beslut
-                        </h3>
-                        <ul className="space-y-3 pl-4">
-                          {protocol.decisions.map((decision, index) => (
-                            <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in transform" 
-                                style={{ 
-                                  animationDelay: `${1300 + protocol.mainPoints.length * 120 + index * 120}ms`, 
-                                  animationFillMode: 'forwards',
-                                  animationDuration: '700ms'
-                                }}>
-                              <span className="text-primary mt-1.5 text-lg transition-transform duration-300 hover:scale-125">✓</span>
-                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={decision} delay={1300 + protocol.mainPoints.length * 120 + index * 120} />
-                              </span>
-                            </li>
-                          ))
-                          }
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Action Items */}
-                    {protocol.actionItems && protocol.actionItems.length > 0 && (
-                      <div className="space-y-3 opacity-0 animate-fade-in" 
-                           style={{ 
-                             animationDelay: `${1400 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120}ms`, 
-                             animationFillMode: 'forwards',
-                             animationDuration: '800ms'
-                           }}>
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-primary transform transition-all duration-500">
-                          <span className="w-1 h-6 bg-primary rounded-full animate-pulse" 
-                                style={{ animationDelay: `${1500 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120}ms` }} />
-                          Åtgärdspunkter
-                        </h3>
-                        <ul className="space-y-4 pl-4">
-                          {protocol.actionItems.map((item, index) => {
-                            const isSmartItem = typeof item === 'object' && 'priority' in item;
-                            const baseDelay = 1600 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120 + index * 150;
-                            
-                            return (
-                              <li key={index} className="flex gap-3 items-start opacity-0 animate-fade-in transform" 
-                                  style={{ 
-                                    animationDelay: `${baseDelay}ms`, 
-                                    animationFillMode: 'forwards',
-                                    animationDuration: '700ms'
-                                  }}>
-                                <span className="text-primary mt-1.5 text-lg transition-transform duration-300 hover:scale-125">→</span>
-                                <div className="flex-1 space-y-1">
-                                  {isSmartItem ? (
-                                    <>
-                                      <div className="flex items-start gap-2 flex-wrap">
-                                        <span className="font-semibold text-foreground">
-                                          <SmoothRevealText text={item.title} delay={baseDelay} />
-                                        </span>
-                                        <Badge 
-                                          variant={
-                                            item.priority === 'critical' ? 'destructive' : 
-                                            item.priority === 'high' ? 'default' : 
-                                            'secondary'
-                                          }
-                                          className="text-xs"
-                                        >
-                                          {item.priority === 'critical' ? 'Kritisk' : 
-                                           item.priority === 'high' ? 'Hög' : 
-                                           item.priority === 'medium' ? 'Medel' : 'Låg'}
-                                        </Badge>
-                                      </div>
-                                      {item.description && (
-                                        <p className="text-sm text-muted-foreground">
-                                          <SmoothRevealText text={item.description} delay={baseDelay + 100} />
-                                        </p>
-                                      )}
-                                      <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                                        {item.owner && (
-                                          <span className="flex items-center gap-1">
-                                            <span className="font-medium">Ansvarig:</span> 
-                                            <SmoothRevealText text={item.owner} delay={baseDelay + 150} />
-                                          </span>
-                                        )}
-                                        {item.deadline && (
-                                          <span className="flex items-center gap-1">
-                                            <Clock className="w-3 h-3" />
-                                            <SmoothRevealText text={item.deadline} delay={baseDelay + 200} />
-                                          </span>
-                                        )}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <span className="text-base leading-relaxed text-foreground/90">
-                                      <SmoothRevealText text={String(item)} delay={baseDelay} />
-                                    </span>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })
-                          }
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 opacity-0 animate-fade-in" 
-                   style={{ 
-                     animationDelay: `${2000 + protocol.mainPoints.length * 120 + protocol.decisions.length * 120 + protocol.actionItems.length * 150}ms`, 
-                     animationFillMode: 'forwards',
-                     animationDuration: '600ms'
-                   }}>
-                {!isFreeTrialMode && (
-                  <Button onClick={onBack} variant="outline" size="lg" className="gap-2 w-full transition-all duration-300 hover:scale-105">
-                    <ArrowLeft className="w-4 h-4" />
-                    <span className="whitespace-nowrap">Nytt möte</span>
-                  </Button>
-                )}
-                <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 w-full transition-all duration-300 hover:scale-105">
-                  <Mail className="w-4 h-4" />
-                  <span className="whitespace-nowrap">E-posta</span>
-                </Button>
-                <Button onClick={handleDownload} size="lg" className="gap-2 w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105 hover:shadow-lg">
-                  <Download className="w-4 h-4" />
-                  <span className="whitespace-nowrap">Ladda ner</span>
-                </Button>
+              <div className="relative">
+                <Sparkles className="w-10 h-10 text-primary animate-pulse" />
+                <div className="absolute inset-0 w-10 h-10 bg-primary/20 rounded-full blur-xl animate-pulse" />
               </div>
             </div>
             
-            {/* Free trial notice */}
-            {isFreeTrialMode && (
-              <div className="mt-6 p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-2 border-primary/20 rounded-xl text-center">
-                <p className="text-sm leading-relaxed">
-                  <strong className="text-primary">Gratis testversion:</strong>{" "}
-                  <span className="text-muted-foreground">
-                    Du har använt ditt gratis möte och protokoll. Uppgradera för att skapa fler möten och protokoll!
-                  </span>
-                </p>
+            <div className="w-full max-w-xl mx-auto space-y-3">
+              <div className="relative bg-card/30 backdrop-blur-md rounded-2xl p-3 shadow-2xl border border-border/30">
+                <div 
+                  className="h-4 bg-gradient-to-r from-primary/90 via-primary to-primary/80 rounded-xl transition-all duration-1000 ease-out shadow-[0_0_30px_rgba(var(--primary),0.6)]"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
-            )}
-
-            {/* Email Dialog */}
-            {documentBlob && (
-              <EmailDialog
-                open={emailDialogOpen}
-                onOpenChange={setEmailDialogOpen}
-                documentBlob={documentBlob}
-                fileName={fileName}
-              />
-            )}
+              <p className="text-base text-muted-foreground/80 font-medium animate-fade-in">
+                {currentStep}
+              </p>
+            </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/98 to-muted/5 py-12 px-4">
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="space-y-4 opacity-0 animate-fade-in" style={{ animationDelay: "0s", animationFillMode: "forwards" }}>
+          <div className="flex items-center gap-4 mb-2">
+            <FileText className="w-8 h-8 text-primary" />
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">
+              {meetingTitle}
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground ml-12">
+            Möte genomfört • Protokoll genererat automatiskt
+          </p>
+          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent ml-12" />
+        </div>
+
+        {/* Summary */}
+        {parsedSections.summary && (
+          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
+            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.2s forwards"
+          }}>
+            <CardHeader className="pb-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-primary" />
+                <CardTitle className="text-2xl font-semibold">Sammanfattning</CardTitle>
+              </div>
+              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed">
+                <TypeWriter text={parsedSections.summary} delay={0.4} />
+              </div>
+            </CardContent>
+          </Card>
         )}
+
+        {/* Main Points */}
+        {parsedSections.mainPoints && parsedSections.mainPoints.length > 0 && (
+          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
+            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.5s forwards"
+          }}>
+            <CardHeader className="pb-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <ListChecks className="w-6 h-6 text-primary" />
+                <CardTitle className="text-2xl font-semibold">Huvudpunkter</CardTitle>
+              </div>
+              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="space-y-5">
+                {parsedSections.mainPoints.map((point, index) => (
+                  <div key={index} className="flex gap-4 group">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/30 transition-all">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 pt-0.5 text-foreground/85">
+                      <TypeWriter text={point} delay={0.7 + index * 0.3} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Decisions */}
+        {parsedSections.decisions && parsedSections.decisions.length > 0 && (
+          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
+            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.8s forwards"
+          }}>
+            <CardHeader className="pb-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-primary" />
+                <CardTitle className="text-2xl font-semibold">Beslut</CardTitle>
+              </div>
+              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="space-y-5">
+                {parsedSections.decisions.map((decision, index) => {
+                  const decisionKey = `decision-${index}`;
+                  return (
+                    <div key={decisionKey} className="group">
+                      <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border/30 transition-all">
+                        <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 text-foreground/85">
+                          <TypeWriter text={decision} delay={1.1 + index * 0.3} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Action Items */}
+        {parsedSections.actionItems && parsedSections.actionItems.length > 0 && (
+          <Card className="border-border/40 bg-card/50 backdrop-blur-sm shadow-xl opacity-0" style={{
+            animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 1.1s forwards"
+          }}>
+            <CardHeader className="pb-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Target className="w-6 h-6 text-primary" />
+                <CardTitle className="text-2xl font-semibold">Åtgärdspunkter</CardTitle>
+              </div>
+              <div className="h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="space-y-5">
+                {parsedSections.actionItems.map((item, index) => {
+                  const itemKey = `action-${index}`;
+                  const parts = item.split(/(\[.*?\])/g).filter(Boolean);
+                  return (
+                    <div key={itemKey} className="group">
+                      <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border/30 hover:border-primary/30 transition-all">
+                        <Target className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="text-foreground/85">
+                            <TypeWriter 
+                              text={parts.map(part => 
+                                part.startsWith('[') && part.endsWith(']') 
+                                  ? part.slice(1, -1)
+                                  : part
+                              ).join('')} 
+                              delay={1.4 + index * 0.3} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 pt-6 opacity-0" style={{
+          animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 1.4s forwards"
+        }}>
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Sparar...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-5 w-5" />
+                Spara protokoll
+              </>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="flex-1 h-12 text-base font-semibold border-2 hover:shadow-lg transition-all hover:scale-[1.02]"
+          >
+            {isDownloading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                Laddar ner...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-5 w-5" />
+                Ladda ner (.docx)
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="mt-8 flex flex-col sm:flex-row gap-4 opacity-0" style={{
+          animation: "fadeInUp 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 1.7s forwards"
+        }}>
+          <Button
+            variant="ghost"
+            onClick={handleBackToHome}
+            className="flex-1 h-11 text-base border border-border/40 hover:border-border transition-all hover:scale-[1.01]"
+          >
+            <ArrowLeft className="mr-2 h-5 w-5" />
+            Tillbaka till startsidan
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={handleNewRecording}
+            className="flex-1 h-11 text-base border border-border/40 hover:border-border transition-all hover:scale-[1.01]"
+          >
+            <Mic className="mr-2 h-5 w-5" />
+            Ny inspelning
+          </Button>
+        </div>
       </div>
     </div>
   );

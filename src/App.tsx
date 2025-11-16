@@ -217,7 +217,7 @@ const App = () => {
                           <Route path="/admin/marketing" element={<AdminRoute><Marketing /></AdminRoute>} />
                           <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
                           <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
-                          <Route path="*" element={<NotFound />} />
+                          <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                       </Suspense>
                     </AppLayout>
