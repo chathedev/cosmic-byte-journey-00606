@@ -24,7 +24,7 @@ serve(async (req) => {
     const agendaNote = agenda ? 'OBS: Använd mötesagendan ovan för att strukturera protokollet och säkerställ att alla agendapunkter täcks.' : '';
     const shortNote = wordCount < 50 ? 'OBS: Utskriften är mycket kort. Inkludera ett meddelande i sammanfattningen om att mötet innehöll begränsad information.' : '';
 
-    const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett välskrivet protokoll.
+    const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett DETALJERAT och OMFATTANDE protokoll som täcker nästan allt som diskuterades.
 
 🚫 ABSOLUT FÖRBJUDET:
 - Kopiera NÅGON mening direkt från utskriften
@@ -37,6 +37,8 @@ serve(async (req) => {
 - SYNTETISERA information från flera delar av mötet
 - SKRIVA professionella, välformulerade meningar
 - SAMMANFATTA och PARAFRASERA diskussionerna
+- INKLUDERA SÅ MYCKET DETALJ SOM MÖJLIGT från mötet
+- TÄCKA ALLA DISKUSSIONER och ARGUMENT som fördes
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -44,38 +46,46 @@ Längd: ${wordCount} ord${agendaSection}
 Utskrift:
 ${transcript}
 
-Skapa ett professionellt protokoll:
+Skapa ett professionellt och DETALJERAT protokoll:
 
-1. SAMMANFATTNING (3-5 meningar):
+1. SAMMANFATTNING (5-8 meningar):
    - OMSKRIVNING OBLIGATORISK: Varje mening måste vara omformulerad med egna ord
    - Beskriv mötets SYFTE, HUVUDSAKLIGA DISKUSSIONER och RESULTAT
    - Använd professionell sekreterar-ton
-   - Sammanfatta HELHETEN, inte detaljer
+   - Sammanfatta HELHETEN men inkludera viktiga detaljer
+   - Nämn viktiga teman och diskussionsområden
    
    EXEMPEL PÅ FEL: "Vi ska idag diskutera tre viktiga punkter" (direkt citat)
-   EXEMPEL PÅ RÄTT: "Mötet behandlade tre centrala frågeställningar kring projektets utveckling och budget"
+   EXEMPEL PÅ RÄTT: "Mötet behandlade tre centrala frågeställningar kring projektets utveckling och budget, där särskild vikt lades vid resursallokering och tidsplan för kommande kvartal"
 
-2. HUVUDPUNKTER (6-10 punkter):
+2. HUVUDPUNKTER (12-20 punkter):
    - INGEN PUNKT får vara ett direkt citat från transkriptionen
-   - SYNTETISERA diskussioner till koncisa, professionella sammanfattningar
-   - Varje punkt: en fullständig, välformulerad mening
+   - SYNTETISERA diskussioner till omfattande, professionella sammanfattningar
+   - Varje punkt: 1-3 fullständiga, välformulerade meningar
    - Fokusera på SUBSTANS: vad diskuterades, vilka insikter framkom, vad beslutades
+   - Inkludera ARGUMENT och RESONEMANG som fördes
+   - Täck ALLA VIKTIGA DISKUSSIONER från mötet
+   - Inkludera både stora och mindre diskussionspunkter
    
    EXEMPEL PÅ FEL: "För det första behöver vi gå igenom projektets nuvarande status" (direkt citat)
-   EXEMPEL PÅ RÄTT: "Projektets nuläge genomgicks med fokus på leveranser och eventuella flaskhalsar"
+   EXEMPEL PÅ RÄTT: "Projektets nuläge genomgicks med fokus på leveranser och eventuella flaskhalsar. Teamet identifierade tre kritiska områden som kräver omedelbara åtgärder, samt diskuterade alternativa lösningar för att säkerställa tidsplan."
 
 3. BESLUT:
-   - Lista konkreta beslut, omskrivna professionellt
+   - Lista ALLA konkreta beslut, omskrivna professionellt
+   - Inkludera kontext och resonemang bakom varje beslut
+   - Varje beslut: 1-2 meningar med detaljer
    - Om inga beslut: "Inga formella beslut fattades under mötet"
 
 4. ÅTGÄRDSPUNKTER:
    - Skapa specifika uppgifter baserat på diskussionen
    - Inkludera: titel, beskrivning, ansvarig, deadline, prioritet
    - Prioritet: critical, high, medium, low
+   - Var generös med åtgärdspunkter - inkludera alla nämnda uppgifter
 
-5. NÄSTA MÖTE - FÖRSLAG (3-5 punkter):
+5. NÄSTA MÖTE - FÖRSLAG (5-8 punkter):
    - Konkreta uppföljningsämnen
    - Baserat på olösta frågor och beslut
+   - Inkludera både uppföljning av beslut och nya diskussionsområden
 
 ${agendaNote}
 ${shortNote}
@@ -84,6 +94,7 @@ ${shortNote}
 1. Läs igenom din sammanfattning - innehåller den NÅGON mening från transkriptionen? → SKRIV OM
 2. Läs igenom huvudpunkterna - är NÅGON punkt ett direkt citat? → OMFORMULERA
 3. Har du PARAFRASERAT och SYNTETISERAT informationen? → Om nej, gör om
+4. HAR DU INKLUDERAT TILLRÄCKLIGT MED DETALJ? → Mötet ska vara nästan fullständigt täckt
 
 Svara i JSON-format på samma språk som transkriptionen.`;
 

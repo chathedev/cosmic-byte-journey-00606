@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Loader2, Mail, CheckCircle2, Clock, AlertCircle } 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -95,9 +96,14 @@ export const AutoProtocolGenerator = ({
   const [showContent, setShowContent] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [agendaContent, setAgendaContent] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedProtocol, setEditedProtocol] = useState<AIProtocol | null>(null);
   const { user } = useAuth();
   const { userPlan } = useSubscription();
-  useEffect(() => setProtocol(aiProtocol), [aiProtocol]);
+  useEffect(() => {
+    setProtocol(aiProtocol);
+    setEditedProtocol(aiProtocol);
+  }, [aiProtocol]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -117,6 +123,19 @@ export const AutoProtocolGenerator = ({
     };
     loadAgenda();
   }, [agendaId]);
+
+  const handleSaveEdits = () => {
+    if (editedProtocol) {
+      setProtocol(editedProtocol);
+      setIsEditing(false);
+      toast({ title: "Ändringar sparade!", description: "Protokollet har uppdaterats." });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedProtocol(protocol);
+    setIsEditing(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -449,55 +468,101 @@ export const AutoProtocolGenerator = ({
                 {protocol && showContent ? (
                   <div className="space-y-8 animate-fade-in">
                     {/* Summary Section */}
-                    {protocol.summary && (
+                    {(isEditing ? editedProtocol?.summary : protocol.summary) && (
                       <div className="space-y-3">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
                           <span className="w-1 h-6 bg-primary rounded-full" />
                           Sammanfattning
                         </h3>
-                        <p className="text-base leading-relaxed text-foreground/90 pl-4">
-                          <SmoothRevealText text={protocol.summary} delay={0} />
-                        </p>
+                        {isEditing ? (
+                          <textarea
+                            value={editedProtocol?.summary || ''}
+                            onChange={(e) => setEditedProtocol(prev => prev ? {...prev, summary: e.target.value} : null)}
+                            className="w-full min-h-[120px] p-4 text-base leading-relaxed border rounded-md bg-background"
+                          />
+                        ) : (
+                          <p className="text-base leading-relaxed text-foreground/90 pl-4">
+                            <SmoothRevealText text={protocol.summary} delay={0} />
+                          </p>
+                        )}
                       </div>
                     )}
 
                     {/* Main Points Section */}
-                    {protocol.mainPoints && protocol.mainPoints.length > 0 && (
+                    {(isEditing ? editedProtocol?.mainPoints : protocol.mainPoints) && (isEditing ? editedProtocol?.mainPoints.length : protocol.mainPoints.length) > 0 && (
                       <div className="space-y-3">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
                           <span className="w-1 h-6 bg-primary rounded-full" />
                           Huvudpunkter
                         </h3>
-                        <ul className="space-y-3 pl-4">
-                          {protocol.mainPoints.map((point, index) => (
-                            <li key={index} className="flex gap-3 items-start group">
-                              <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">•</span>
-                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={point} delay={index * 100} />
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            {editedProtocol?.mainPoints.map((point, index) => (
+                              <div key={index} className="flex gap-2 items-start">
+                                <span className="text-primary mt-3">•</span>
+                                <textarea
+                                  value={point}
+                                  onChange={(e) => {
+                                    const newPoints = [...(editedProtocol?.mainPoints || [])];
+                                    newPoints[index] = e.target.value;
+                                    setEditedProtocol(prev => prev ? {...prev, mainPoints: newPoints} : null);
+                                  }}
+                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed border rounded-md bg-background"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <ul className="space-y-3 pl-4">
+                            {protocol.mainPoints.map((point, index) => (
+                              <li key={index} className="flex gap-3 items-start group">
+                                <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">•</span>
+                                <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                  <SmoothRevealText text={point} delay={index * 100} />
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
 
                     {/* Decisions Section */}
-                    {protocol.decisions && protocol.decisions.length > 0 && (
+                    {(isEditing ? editedProtocol?.decisions : protocol.decisions) && (isEditing ? editedProtocol?.decisions.length : protocol.decisions.length) > 0 && (
                       <div className="space-y-3">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
                           <span className="w-1 h-6 bg-primary rounded-full" />
                           Beslut
                         </h3>
-                        <ul className="space-y-3 pl-4">
-                          {protocol.decisions.map((decision, index) => (
-                            <li key={index} className="flex gap-3 items-start group">
-                              <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">✓</span>
-                              <span className="flex-1 text-base leading-relaxed text-foreground/90">
-                                <SmoothRevealText text={decision} delay={index * 100} />
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            {editedProtocol?.decisions.map((decision, index) => (
+                              <div key={index} className="flex gap-2 items-start">
+                                <span className="text-primary mt-3">✓</span>
+                                <textarea
+                                  value={decision}
+                                  onChange={(e) => {
+                                    const newDecisions = [...(editedProtocol?.decisions || [])];
+                                    newDecisions[index] = e.target.value;
+                                    setEditedProtocol(prev => prev ? {...prev, decisions: newDecisions} : null);
+                                  }}
+                                  className="flex-1 min-h-[60px] p-2 text-sm leading-relaxed border rounded-md bg-background"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <ul className="space-y-3 pl-4">
+                            {protocol.decisions.map((decision, index) => (
+                              <li key={index} className="flex gap-3 items-start group">
+                                <span className="text-primary mt-1.5 text-lg group-hover:scale-125 transition-transform">✓</span>
+                                <span className="flex-1 text-base leading-relaxed text-foreground/90">
+                                  <SmoothRevealText text={decision} delay={index * 100} />
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
 
@@ -603,14 +668,30 @@ export const AutoProtocolGenerator = ({
                   Nytt möte
                 </Button>
               )}
-              <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 min-w-[160px]">
-                <Mail className="w-4 h-4" />
-                E-posta
-              </Button>
-              <Button onClick={handleDownload} size="lg" className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
-                <Download className="w-4 h-4" />
-                Ladda ner
-              </Button>
+              {!isEditing ? (
+                <>
+                  <Button onClick={() => setIsEditing(true)} variant="outline" size="lg" className="gap-2 min-w-[160px]">
+                    Redigera
+                  </Button>
+                  <Button onClick={() => setEmailDialogOpen(true)} variant="outline" size="lg" className="gap-2 min-w-[160px]">
+                    <Mail className="w-4 h-4" />
+                    E-posta
+                  </Button>
+                  <Button onClick={handleDownload} size="lg" className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                    <Download className="w-4 h-4" />
+                    Ladda ner
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={handleCancelEdit} variant="outline" size="lg" className="gap-2 min-w-[160px]">
+                    Avbryt
+                  </Button>
+                  <Button onClick={handleSaveEdits} size="lg" className="gap-2 min-w-[160px]">
+                    Spara ändringar
+                  </Button>
+                </>
+              )}
             </div>
             
             {/* Free trial notice */}
