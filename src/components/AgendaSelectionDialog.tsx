@@ -31,13 +31,41 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
     setIsGenerating(true);
 
     try {
-      // Free plan users always allowed to generate (with watermark)
-      // Paid users check limits
+      // Generate AI title first
+      let aiTitle = meetingData.title;
+      try {
+        const { generateMeetingTitle } = await import("@/lib/titleGenerator");
+        aiTitle = await generateMeetingTitle(meetingData.transcript);
+      } catch (e) {
+        console.warn('Failed to generate AI title:', e);
+      }
+
+      // Save meeting with agenda and title
+      const now = new Date().toISOString();
+      const { meetingStorage } = await import("@/utils/meetingStorage");
+      
+      try {
+        await meetingStorage.saveMeeting({
+          id: meetingData.id,
+          title: aiTitle,
+          folder: 'Allmänt',
+          transcript: meetingData.transcript,
+          protocol: '',
+          createdAt: meetingData.createdAt,
+          updatedAt: now,
+          userId: '',
+          isCompleted: true,
+          agendaId: selectedAgendaId,
+        } as any);
+      } catch (e) {
+        console.warn('Failed to save meeting:', e);
+      }
+
+      // Check protocol generation limits
       const latest = await meetingStorage.getMeeting(meetingData.id);
       const currentProtocolCount = latest?.protocolCount || 0;
       const { allowed, reason } = await canGenerateProtocol(meetingData.id, currentProtocolCount);
       
-      // For free users, skip the limit check and allow generation
       if (!allowed && reason !== 'Du har nått din gräns för AI-protokoll') {
         toast({
           title: "Protokollgräns nådd",
@@ -64,7 +92,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
       navigate('/generate-protocol', {
         state: {
           transcript: meetingData.transcript,
-          meetingName: meetingData.title,
+          meetingName: aiTitle,
           meetingId: meetingData.id,
           meetingCreatedAt: meetingData.createdAt,
           agendaId: selectedAgendaId,
