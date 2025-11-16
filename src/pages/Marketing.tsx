@@ -128,15 +128,15 @@ export default function Marketing() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-6 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Marketing Dashboard</h1>
-              <p className="text-muted-foreground mt-1">
-                Automated B2B outreach monitoring • 1000 emails/day • 5 sender domains
+              <h1 className="text-2xl font-semibold text-foreground tracking-tight">Marketing Outreach Dashboard</h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                Automated B2B outreach system · 1000 daily capacity · 5 sender domains
               </p>
             </div>
             <Button
@@ -144,107 +144,104 @@ export default function Marketing() {
               disabled={sendingTest}
               variant="outline"
               size="sm"
-              className="gap-2"
+              className="gap-2 h-9"
             >
-              <Send className="h-4 w-4" />
-              {sendingTest ? 'Sending...' : 'Send Test Emails'}
+              <Send className="h-3.5 w-3.5" />
+              {sendingTest ? 'Sending...' : 'Send Test'}
             </Button>
           </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-6 text-xs text-muted-foreground border-l-2 border-border pl-4">
             <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3" />
-              <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+              <Clock className="h-3.5 w-3.5" />
+              <span>Updated {lastUpdate.toLocaleTimeString()}</span>
             </div>
-            <span className="text-primary">• Live updates via SSE</span>
-            <span>• Active: 06:00-22:00</span>
+            <span>Live updates</span>
+            <span>Active 06:00-22:00</span>
           </div>
         </div>
 
         {/* Status Banner */}
-        <Alert className="border-l-4" style={{ borderLeftColor: getStatusColor().replace('bg-', '') }}>
+        <div className="border border-border rounded-lg p-4 bg-card">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor()} animate-pulse`} />
-              <AlertDescription className="font-medium">{getStatusText()}</AlertDescription>
+              <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+              <span className="text-sm font-medium text-foreground">{getStatusText()}</span>
             </div>
             {status?.scheduler.isRunning && (
-              <div className="text-xs text-muted-foreground">
-                Scheduler: {status.scheduler.jobs.filter(j => j.running).length} active jobs
-              </div>
+              <span className="text-xs text-muted-foreground">
+                {status.scheduler.jobs.filter(j => j.running).length} active jobs
+              </span>
             )}
           </div>
-        </Alert>
+        </div>
 
         {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-primary">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Database className="h-4 w-4 text-primary" />
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Database className="h-3.5 w-3.5" />
                 Master Queue
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{status?.statistics.totalMaster || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Validated contacts ready</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Max 3 per domain</p>
+              <div className="text-2xl font-semibold text-foreground">{status?.statistics.totalMaster || 0}</div>
+              <p className="text-xs text-muted-foreground mt-2">Validated contacts</p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-green-500">
+          <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Mail className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Mail className="h-3.5 w-3.5" />
                 Sent Today
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{status?.statistics.sentToday || 0}</div>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-muted-foreground">of 1000 daily cap</p>
-                <p className="text-xs font-medium text-green-600">{Math.round(((status?.statistics.sentToday || 0) / 1000) * 100)}%</p>
+              <div className="text-2xl font-semibold text-foreground">{status?.statistics.sentToday || 0}</div>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-muted-foreground">of 1000</p>
+                <p className="text-xs font-medium">{Math.round(((status?.statistics.sentToday || 0) / 1000) * 100)}%</p>
               </div>
-              <Progress value={((status?.statistics.sentToday || 0) / 1000) * 100} className="h-1 mt-2" />
+              <Progress value={((status?.statistics.sentToday || 0) / 1000) * 100} className="h-1 mt-3" />
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" />
                 Pending Queue
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{status?.statistics.totalPending || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Awaiting delivery</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Purges at 23:50</p>
+              <div className="text-2xl font-semibold text-foreground">{status?.statistics.totalPending || 0}</div>
+              <p className="text-xs text-muted-foreground mt-2">Awaiting delivery</p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-destructive">
+          <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-destructive" />
-                Invalid/Bounced
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Invalid
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{status?.statistics.totalInvalid || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Blocked addresses</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total all-time</p>
+              <div className="text-2xl font-semibold text-foreground">{status?.statistics.totalInvalid || 0}</div>
+              <p className="text-xs text-muted-foreground mt-2">Blocked addresses</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Domain Statistics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="border-border">
             <CardHeader>
-              <CardTitle>Email Sending Statistics</CardTitle>
-              <CardDescription>5 domains • 200 emails each • Daily limits reset at midnight</CardDescription>
+              <CardTitle className="text-base font-semibold">Sender Domains</CardTitle>
+              <CardDescription className="text-xs">Daily quota per domain · Resets at midnight</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               {status?.sender.domainSends &&
                 Object.entries(status.sender.domainSends)
                   .sort(([a], [b]) => a.localeCompare(b))
@@ -253,21 +250,21 @@ export default function Marketing() {
                     const isPaused = status.sender.pausedSenders?.[domain];
 
                     return (
-                      <div key={domain} className="space-y-2">
+                      <div key={domain} className="space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{domain}</span>
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-sm font-medium">{domain}</span>
                             {isPaused && (
-                              <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
+                              <span className="text-[10px] uppercase tracking-wide bg-muted text-muted-foreground px-2 py-0.5 rounded">
                                 Paused
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {stats.sent} / {stats.limit} • {stats.remaining} left
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {stats.sent}/{stats.limit}
                           </span>
                         </div>
-                        <Progress value={percentage} className="h-2" />
+                        <Progress value={percentage} className="h-1.5" />
                       </div>
                     );
                   })}
@@ -275,41 +272,38 @@ export default function Marketing() {
           </Card>
 
           {/* Automation Schedule */}
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <Card className="border-border">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                Automation Schedule
-              </CardTitle>
-              <CardDescription>Daily automation cycle</CardDescription>
+              <CardTitle className="text-base font-semibold">Automation Schedule</CardTitle>
+              <CardDescription className="text-xs">Daily cycle · Fully automated</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
-                <div className="text-xs font-bold text-primary min-w-[60px]">05:00</div>
-                <div className="text-sm">
-                  <div className="font-medium">Queue Reset</div>
-                  <div className="text-xs text-muted-foreground">Master queue cleared, discovery starts for 1000 new contacts</div>
+              <div className="flex items-start gap-4 p-3 border border-border rounded-md">
+                <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">05:00</div>
+                <div className="text-sm space-y-1">
+                  <div className="font-medium text-sm">Queue Reset</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Discovery initiates for 1000 validated contacts</div>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
-                <div className="text-xs font-bold text-green-600 min-w-[60px]">06:00-22:00</div>
-                <div className="text-sm">
-                  <div className="font-medium">Active Sending</div>
-                  <div className="text-xs text-muted-foreground">Automated batches every ~2 min, 20 emails per batch</div>
+              <div className="flex items-start gap-4 p-3 border border-border rounded-md">
+                <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">06:00-22:00</div>
+                <div className="text-sm space-y-1">
+                  <div className="font-medium text-sm">Active Sending</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Batch delivery every ~2 minutes</div>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
-                <div className="text-xs font-bold text-orange-600 min-w-[60px]">23:50</div>
-                <div className="text-sm">
-                  <div className="font-medium">Queue Purge</div>
-                  <div className="text-xs text-muted-foreground">Leftover contacts removed for fresh start</div>
+              <div className="flex items-start gap-4 p-3 border border-border rounded-md">
+                <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">23:50</div>
+                <div className="text-sm space-y-1">
+                  <div className="font-medium text-sm">Queue Purge</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Cleanup for next cycle</div>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg border-l-2 border-primary">
-                <div className="text-xs font-bold text-primary min-w-[60px]">HOURLY</div>
-                <div className="text-sm">
-                  <div className="font-medium">Discovery Cycles</div>
-                  <div className="text-xs text-muted-foreground">Validates & adds contacts (max 3 per domain)</div>
+              <div className="flex items-start gap-4 p-3 border border-border rounded-md bg-muted/30">
+                <div className="text-[11px] font-mono text-muted-foreground min-w-[70px] pt-0.5">HOURLY</div>
+                <div className="text-sm space-y-1">
+                  <div className="font-medium text-sm">Discovery</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed">Continuous validation & queuing</div>
                 </div>
               </div>
             </CardContent>
@@ -317,59 +311,54 @@ export default function Marketing() {
         </div>
 
         {/* System Info */}
-        <Card>
+        <Card className="border-border">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-primary" />
-              System Information
-            </CardTitle>
-            <CardDescription>Backend automation status and configuration</CardDescription>
+            <CardTitle className="text-base font-semibold">System Configuration</CardTitle>
+            <CardDescription className="text-xs">Automation status and operational parameters</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
             <div className="space-y-3">
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Scheduler Status:</span>
-                <span className={`font-medium text-sm ${status?.scheduler.isRunning ? 'text-green-600' : 'text-destructive'}`}>
-                  {status?.scheduler.isRunning ? '✓ Running' : '✗ Stopped'}
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Scheduler</span>
+                <span className={`text-xs font-medium ${status?.scheduler.isRunning ? 'text-foreground' : 'text-muted-foreground'}`}>
+                  {status?.scheduler.isRunning ? 'Running' : 'Stopped'}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Active Jobs:</span>
-                <span className="font-medium text-sm">
-                  {status?.scheduler.jobs.filter(j => j.running).length || 0} / {status?.scheduler.jobs.length || 0}
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Active Jobs</span>
+                <span className="text-xs font-medium font-mono">
+                  {status?.scheduler.jobs.filter(j => j.running).length || 0}/{status?.scheduler.jobs.length || 0}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Sending Domains:</span>
-                <span className="font-medium text-sm">
-                  {(status?.sender.activeSenderDomains || []).length || 0} active
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Active Domains</span>
+                <span className="text-xs font-medium font-mono">
+                  {(status?.sender.activeSenderDomains || []).length || 0}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Paused Senders:</span>
-                <span className={`font-medium text-sm ${Object.keys(status?.sender.pausedSenders || {}).length > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                  {Object.keys(status?.sender.pausedSenders || {}).length || 'None'}
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Paused Senders</span>
+                <span className="text-xs font-medium font-mono">
+                  {Object.keys(status?.sender.pausedSenders || {}).length || 0}
                 </span>
               </div>
             </div>
             <div className="space-y-3">
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Daily Limit Total:</span>
-                <span className="font-medium text-sm">1000 emails (5 domains × 200)</span>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Daily Capacity</span>
+                <span className="text-xs font-medium font-mono">1000</span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Sending Window:</span>
-                <span className="font-medium text-sm">06:00 - 22:00</span>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Sending Window</span>
+                <span className="text-xs font-medium font-mono">06:00-22:00</span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Batch Delay:</span>
-                <span className="font-medium text-sm">4-12 seconds</span>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Batch Interval</span>
+                <span className="text-xs font-medium font-mono">~2 min</span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                <span className="text-sm text-muted-foreground">Last Update:</span>
-                <span className="font-medium text-sm">
-                  {status?.timestamp ? new Date(status.timestamp).toLocaleTimeString() : 'N/A'}
-                </span>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-xs text-muted-foreground">Message Delay</span>
+                <span className="text-xs font-medium font-mono">4-12s</span>
               </div>
             </div>
           </CardContent>
