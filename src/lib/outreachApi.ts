@@ -39,6 +39,11 @@ export interface UnsubscribeResult {
   email: string;
 }
 
+export interface SendTestResult {
+  success: boolean;
+  message: string;
+}
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('authToken');
   return {
@@ -105,6 +110,21 @@ export const outreachApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to trigger send' }));
+      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async sendTest(email?: string): Promise<SendTestResult> {
+    const response = await fetch(`${BACKEND_URL}/outreach/send-test`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(email ? { email } : {}),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to send test emails' }));
       throw new Error(error.error || `HTTP error! status: ${response.status}`);
     }
 
