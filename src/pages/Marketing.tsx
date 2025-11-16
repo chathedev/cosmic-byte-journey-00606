@@ -136,7 +136,7 @@ export default function Marketing() {
             <div>
               <h1 className="text-3xl font-bold text-foreground">Marketing Dashboard</h1>
               <p className="text-muted-foreground mt-1">
-                Automated B2B outreach monitoring • 400 emails/day
+                Automated B2B outreach monitoring • 1000 emails/day • 5 sender domains
               </p>
             </div>
             <Button
@@ -201,10 +201,10 @@ export default function Marketing() {
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{status?.statistics.sentToday || 0}</div>
               <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-muted-foreground">of 400 daily cap</p>
-                <p className="text-xs font-medium text-green-600">{Math.round(((status?.statistics.sentToday || 0) / 400) * 100)}%</p>
+                <p className="text-xs text-muted-foreground">of 1000 daily cap</p>
+                <p className="text-xs font-medium text-green-600">{Math.round(((status?.statistics.sentToday || 0) / 1000) * 100)}%</p>
               </div>
-              <Progress value={((status?.statistics.sentToday || 0) / 400) * 100} className="h-1 mt-2" />
+              <Progress value={((status?.statistics.sentToday || 0) / 1000) * 100} className="h-1 mt-2" />
             </CardContent>
           </Card>
 
@@ -242,33 +242,35 @@ export default function Marketing() {
           <Card>
             <CardHeader>
               <CardTitle>Email Sending Statistics</CardTitle>
-              <CardDescription>Daily limits per domain (resets at midnight)</CardDescription>
+              <CardDescription>5 domains • 200 emails each • Daily limits reset at midnight</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               {status?.sender.domainSends &&
-                Object.entries(status.sender.domainSends).map(([domain, stats]) => {
-                  const percentage = (stats.sent / stats.limit) * 100;
-                  const isPaused = status.sender.pausedSenders?.[domain];
+                Object.entries(status.sender.domainSends)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([domain, stats]) => {
+                    const percentage = (stats.sent / stats.limit) * 100;
+                    const isPaused = status.sender.pausedSenders?.[domain];
 
-                  return (
-                    <div key={domain} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{domain}</span>
-                          {isPaused && (
-                            <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
-                              Paused
-                            </span>
-                          )}
+                    return (
+                      <div key={domain} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{domain}</span>
+                            {isPaused && (
+                              <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
+                                Paused
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {stats.sent} / {stats.limit} • {stats.remaining} left
+                          </span>
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                          {stats.sent} / {stats.limit} ({stats.remaining} remaining)
-                        </span>
+                        <Progress value={percentage} className="h-2" />
                       </div>
-                      <Progress value={percentage} className="h-2" />
-                    </div>
-                  );
-                })}
+                    );
+                  })}
             </CardContent>
           </Card>
 
@@ -286,7 +288,7 @@ export default function Marketing() {
                 <div className="text-xs font-bold text-primary min-w-[60px]">05:00</div>
                 <div className="text-sm">
                   <div className="font-medium">Queue Reset</div>
-                  <div className="text-xs text-muted-foreground">Master queue cleared, discovery starts for 400 new contacts</div>
+                  <div className="text-xs text-muted-foreground">Master queue cleared, discovery starts for 1000 new contacts</div>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
@@ -353,7 +355,7 @@ export default function Marketing() {
             <div className="space-y-3">
               <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                 <span className="text-sm text-muted-foreground">Daily Limit Total:</span>
-                <span className="font-medium text-sm">400 emails</span>
+                <span className="font-medium text-sm">1000 emails (5 domains × 200)</span>
               </div>
               <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                 <span className="text-sm text-muted-foreground">Sending Window:</span>
