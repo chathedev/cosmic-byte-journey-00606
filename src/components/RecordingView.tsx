@@ -15,6 +15,7 @@ import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
 import { isUserAdmin } from "@/lib/accessCheck";
+import { AnalyzingScreen } from "./AnalyzingScreen";
 
 interface AIActionItem {
   title: string;
@@ -63,6 +64,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [showShortTranscriptDialog, setShowShortTranscriptDialog] = useState(false);
   const [showMaxDurationDialog, setShowMaxDurationDialog] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
+  const [showAnalyzing, setShowAnalyzing] = useState(false);
   const MAX_DURATION_SECONDS = 28800; // 8 hours instead of 2
   const MIN_DURATION_SECONDS = 5;
   const MIN_WORD_COUNT = 50;
@@ -775,6 +777,9 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const stopRecording = async () => {
     if (isFinalizingRef.current) return;
     isFinalizingRef.current = true;
+    
+    // Show analyzing screen immediately
+    setShowAnalyzing(true);
 
     let finalTranscript = (transcript + interimTranscript).trim();
 
@@ -795,6 +800,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
     // Validate transcript length
     if (!finalTranscript) {
+      setShowAnalyzing(false);
       toast({ title: 'Ingen text', description: 'Ingen transkription inspelad.', variant: 'destructive' });
       handleBackClick();
       isFinalizingRef.current = false;
@@ -802,6 +808,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     }
     const wordCount = finalTranscript.split(/\s+/).filter(w => w).length;
     if (wordCount < MIN_WORD_COUNT) {
+      setShowAnalyzing(false);
       setShowShortTranscriptDialog(true);
       isFinalizingRef.current = false;
       return;
@@ -841,19 +848,24 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     }
     // Navigate
     if (userPlan?.plan === 'free') {
+      setShowAnalyzing(false);
       navigate(`/generate-protocol?meetingId=${savedId}&title=${encodeURIComponent(aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`)}`);
       isFinalizingRef.current = false;
       return;
     }
 
-    setPendingMeetingData({
-      id: savedId,
-      transcript: finalTranscript,
-      title: aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`,
-      createdAt: createdAtRef.current,
-    });
-    setShowAgendaDialog(true);
-    isFinalizingRef.current = false;
+    // Small delay to show analyzing screen before agenda dialog
+    setTimeout(() => {
+      setShowAnalyzing(false);
+      setPendingMeetingData({
+        id: savedId,
+        transcript: finalTranscript,
+        title: aiTitle || `Möte ${new Date().toLocaleDateString('sv-SE')}`,
+        createdAt: createdAtRef.current,
+      });
+      setShowAgendaDialog(true);
+      isFinalizingRef.current = false;
+    }, 1500);
   };
 
   const proceedWithShortTranscript = async () => {
@@ -1411,6 +1423,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         isOpen={showInstructions} 
         onClose={() => setShowInstructions(false)} 
       />
+
+      <AnalyzingScreen isVisible={showAnalyzing} />
     </div>
   );
 };
