@@ -68,64 +68,48 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
     setSending(true);
 
     try {
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(documentBlob);
-      
-      reader.onloadend = async () => {
-        const base64data = reader.result as string;
-        const base64 = base64data.split(',')[1];
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
 
-        try {
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-protocol-email`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({
-                recipients: validRecipients,
-                subject: subject.trim(),
-                message: message.trim(),
-                fileBase64: base64,
-                fileName,
-              }),
-            }
-          );
+      const response = await fetch('https://api.tivly.se/send-protocol-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          recipients: validRecipients,
+          subject: subject.trim(),
+          message: message.trim(),
+          documentBlob: documentBlob,
+          fileName: fileName,
+        }),
+      });
 
-          if (!response.ok) {
-            throw new Error('Failed to send email');
-          }
+      if (!response.ok) {
+        throw new Error('Failed to send email');
+      }
 
-          setSending(false);
-          
-          toast({
-            title: "E-post skickat!",
-            description: `Protokollet har skickats till ${validRecipients.length} mottagare.`,
-          });
-          onOpenChange(false);
-          setRecipients([""]);
-          setSubject("Mötesprotokoll");
-          setMessage("Hej,\n\nBifogat finner du mötesprotokoll från vårt möte.\n\nMed vänliga hälsningar");
-        } catch (err: any) {
-          console.error('Email error:', err);
-          setSending(false);
-          
-          toast({
-            title: "Kunde inte skicka e-post",
-            description: "Ett fel uppstod vid skickandet. Försök igen.",
-            variant: "destructive",
-          });
-        }
-      };
-    } catch (error: any) {
-      console.error('Send error:', error);
       setSending(false);
+      
+      toast({
+        title: "E-post skickat!",
+        description: `Protokollet har skickats till ${validRecipients.length} mottagare.`,
+      });
+      
+      onOpenChange(false);
+      setRecipients([""]);
+      setSubject("Mötesprotokoll");
+      setMessage("Hej,\n\nBifogat finner du mötesprotokoll från vårt möte.\n\nMed vänliga hälsningar");
+    } catch (error: any) {
+      console.error('Email error:', error);
+      setSending(false);
+      
       toast({
         title: "Kunde inte skicka e-post",
-        description: "Ett fel uppstod vid skickandet.",
+        description: "Ett fel uppstod vid skickandet. Försök igen.",
         variant: "destructive",
       });
     }
