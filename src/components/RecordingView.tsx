@@ -93,7 +93,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const [isAdmin, setIsAdmin] = useState(false);
   const [isInBackground, setIsInBackground] = useState(false);
 
-  // Check if user is admin
+  // Check if user is admin or special test user
   useEffect(() => {
     const checkAdmin = async () => {
       if (user) {
@@ -103,6 +103,9 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     };
     checkAdmin();
   }, [user]);
+  
+  // Check if user has test access (admin or charlie.wretling@tivly.se)
+  const hasTestAccess = isAdmin || user?.email === 'charlie.wretling@tivly.se';
 
   // Check if user has seen instructions before
   useEffect(() => {
@@ -1258,8 +1261,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
                   </p>
                 )}
                 
-                {/* Admin-only test button */}
-                {isAdmin && (
+                {/* Test button for admins and special users */}
+                {hasTestAccess && (
                   <button
                     onClick={startTestMode}
                     className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 disabled:opacity-50 disabled:cursor-not-allowed"
