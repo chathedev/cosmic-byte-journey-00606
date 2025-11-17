@@ -105,8 +105,10 @@ export function AppSidebar() {
   const meetingsLeft = meetingsLimit !== null ? Math.max(0, Number(meetingsLimit) - Number(meetingsUsed)) : null;
 
   useEffect(() => {
-    refreshPlan();
-  }, []);
+    if (user) {
+      refreshPlan();
+    }
+  }, [user, refreshPlan]);
 
   useEffect(() => {
     const checkAdmin = async () => {
