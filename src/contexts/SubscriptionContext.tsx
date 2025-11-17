@@ -164,7 +164,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       try {
         if (user) {
           const latest = await subscriptionService.getUserPlan(user.uid);
-          const latestPlan = isAdmin ? { ...latest, plan: 'unlimited', meetingsLimit: null, protocolsLimit: 999999 } : latest;
+          const latestPlan: UserPlan = isAdmin 
+            ? { ...latest, plan: 'unlimited' as const, meetingsLimit: null, protocolsLimit: 999999 } 
+            : latest;
           setUserPlan(prev => (JSON.stringify(prev) === JSON.stringify(latestPlan) ? prev : latestPlan));
         }
       } catch (e) {
