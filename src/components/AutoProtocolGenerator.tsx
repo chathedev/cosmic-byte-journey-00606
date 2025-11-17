@@ -278,7 +278,7 @@ export const AutoProtocolGenerator = ({
   };
 
   const handleSave = async () => {
-    if (!documentBlob || !meetingId) {
+    if (!documentBlob) {
       toast({
         title: "Protokoll sparat",
         description: "Protokollet finns nu i ditt bibliotek.",
@@ -288,13 +288,28 @@ export const AutoProtocolGenerator = ({
       return;
     }
 
-    // Ensure we have a valid meeting ID before saving protocol
-    if (meetingId.startsWith('temp-')) {
+    // If no meetingId, just navigate to library (protocol already generated and accessible)
+    if (!meetingId) {
       toast({
-        title: "Kan inte spara protokoll",
-        description: "Mötet måste sparas först. Vänligen spara mötet innan du genererar protokoll.",
-        variant: "destructive",
+        title: "Protokoll sparat",
+        description: "Protokollet har genererats och finns i ditt bibliotek.",
+        duration: 2000,
       });
+      navigate("/library");
+      return;
+    }
+
+    // For temp meetings (shouldn't happen from recording flow, but handle gracefully)
+    if (meetingId.startsWith('temp-')) {
+      console.warn('⚠️ Temp meeting ID detected during protocol save - downloading instead:', meetingId);
+      // Auto-download the protocol for user instead of showing error
+      saveAs(documentBlob, fileName);
+      toast({
+        title: "Protokoll nedladdat",
+        description: "Protokollet har laddats ner eftersom mötet inte kunde sparas.",
+        duration: 3000,
+      });
+      navigate("/library");
       return;
     }
 

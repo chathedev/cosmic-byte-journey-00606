@@ -182,10 +182,10 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AuthProvider>
-            <SubscriptionProvider>
-              <PlanGate>
-                <BrowserRouter>
+          <BrowserRouter>
+            <AuthProvider>
+              <SubscriptionProvider>
+                <PlanGate>
                   <ScrollToTop />
                   <WelcomeGate>
                     <AppLayout>
@@ -221,10 +221,10 @@ const App = () => {
                       </Suspense>
                     </AppLayout>
                   </WelcomeGate>
-                </BrowserRouter>
-              </PlanGate>
-            </SubscriptionProvider>
-          </AuthProvider>
+                </PlanGate>
+              </SubscriptionProvider>
+            </AuthProvider>
+          </BrowserRouter>
         </TooltipProvider>
       </ErrorBoundary>
     </QueryClientProvider>
