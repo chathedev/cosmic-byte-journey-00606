@@ -18,4 +18,11 @@ if ('serviceWorker' in navigator) {
   }
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root")!;
+
+// Show content once React is ready to render
+requestAnimationFrame(() => {
+  rootElement.classList.add('loaded');
+});
+
+createRoot(rootElement).render(<App />);
