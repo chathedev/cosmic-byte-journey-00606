@@ -112,8 +112,6 @@ Svara i JSON-format på samma språk som transkriptionen.`;
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
       return new Response(
         JSON.stringify({ error: "Kunde inte analysera mötet" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -126,7 +124,6 @@ Svara i JSON-format på samma språk som transkriptionen.`;
     let aiResponse;
     try {
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      console.log("Raw AI response:", content);
       
       // Clean up markdown code blocks if present
       let cleanedContent = content.trim();
@@ -138,7 +135,6 @@ Svara i JSON-format på samma språk som transkriptionen.`;
       
       aiResponse = JSON.parse(cleanedContent);
     } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
       return new Response(
         JSON.stringify({ error: "Kunde inte tolka AI-svaret" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -159,7 +155,6 @@ Svara i JSON-format på samma språk som transkriptionen.`;
       }
     );
   } catch (error) {
-    console.error("Error in analyze-meeting function:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {

@@ -22,7 +22,6 @@ serve(async (req) => {
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY not configured");
       // Fallback to simple title
       const words = transcript.trim().split(/\s+/).slice(0, 8).join(' ');
       const fallbackTitle = words.length > 50 ? words.substring(0, 47) + '...' : words;
@@ -57,7 +56,6 @@ serve(async (req) => {
     );
 
     if (!response.ok) {
-      console.error("Gemini API error:", response.status, await response.text());
       // Fallback
       const words = transcript.trim().split(/\s+/).slice(0, 8).join(' ');
       const fallbackTitle = words.length > 50 ? words.substring(0, 47) + '...' : words;
@@ -86,14 +84,11 @@ serve(async (req) => {
       title = words.length > 50 ? words.substring(0, 47) + '...' : words;
     }
 
-    console.log('✅ Generated title:', title);
-
     return new Response(
       JSON.stringify({ title }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error generating title:", error);
     // Fallback on error
     return new Response(
       JSON.stringify({ title: `Möte ${new Date().toLocaleDateString('sv-SE')}` }),

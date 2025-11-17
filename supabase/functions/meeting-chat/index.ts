@@ -96,8 +96,6 @@ Håll dina svar korta och koncisa. Svara på samma språk som användaren använ
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
       return new Response(
         JSON.stringify({ error: "AI API error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -152,7 +150,6 @@ Håll dina svar korta och koncisa. Svara på samma språk som användaren använ
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
-    console.error("Chat error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
