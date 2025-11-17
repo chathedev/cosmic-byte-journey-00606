@@ -214,6 +214,7 @@ const App = () => {
                           <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
                           <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
                           <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                          <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                           <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                           <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>

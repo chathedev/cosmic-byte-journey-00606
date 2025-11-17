@@ -177,7 +177,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     loadPlan();
-  }, [user]);
+  }, [loadPlan]);
 
   const refreshPlan = useCallback(async () => {
     if (!user) {
