@@ -164,12 +164,19 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
   const getPlanDisplayName = (plan: string) => {
     switch (plan) {
+      case 'free':
+        return 'Gratis';
+      case 'pro':
       case 'standard':
         return 'Tivly Pro';
       case 'plus':
         return 'Tivly Plus';
+      case 'unlimited':
+        return 'Unlimited';
+      case 'enterprise':
+        return 'Enterprise';
       default:
-        return 'Gratis testplan';
+        return 'Gratis';
     }
   };
 

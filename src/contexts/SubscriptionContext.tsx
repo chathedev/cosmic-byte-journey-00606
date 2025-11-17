@@ -159,6 +159,17 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         }
         return plan;
       });
+
+      // Background verify with backend plan to avoid stale or 'test' flags
+      try {
+        if (user) {
+          const latest = await subscriptionService.getUserPlan(user.uid);
+          const latestPlan = isAdmin ? { ...latest, plan: 'unlimited', meetingsLimit: null, protocolsLimit: 999999 } : latest;
+          setUserPlan(prev => (JSON.stringify(prev) === JSON.stringify(latestPlan) ? prev : latestPlan));
+        }
+      } catch (e) {
+        console.warn('Plan background refresh failed, using user payload plan.', e);
+      }
     } catch (error) {
       console.error('❌ Failed to load subscription plan:', error);
       // Fallback to free plan on error
