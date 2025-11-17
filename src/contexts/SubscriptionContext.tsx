@@ -284,21 +284,26 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Always count for analytics, even for admins/unlimited/test
-    // (Backend will apply any business rules as needed)
-    
-    // Always call backend to count (idempotent on server)
-    const localKey = `sub:meetingCounted:${meetingId}`;
-    // Note: Keeping key for potential UI hints but not gating backend call
-    
     try {
+      // First check if meeting is already counted using backend state
+      const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
+      
+      if (!wasCounted) {
+        console.log('⏭️ Meeting already counted, skipping increment:', meetingId);
+        // Still refresh to ensure UI is in sync with backend
+        await refreshPlan();
+        return;
+      }
+      
+      console.log('📊 Meeting NOT yet counted, proceeding with increment:', meetingId);
+      
       // Mark meeting as completed in backend
       await meetingStorage.markCompleted(meetingId);
       
-      // Increment count in backend
+      // Increment count in backend (only called if wasCounted === true)
       const result = await subscriptionService.incrementMeetingCount(user.uid, meetingId);
       
-      console.log('✅ Meeting count incremented:', result);
+      console.log('✅ Meeting count incremented successfully:', result);
       
       // Update UI optimistically with backend response
       setUserPlan(prev => prev ? {
@@ -306,8 +311,6 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         meetingsUsed: result.meetingCount,
         meetingsLimit: result.meetingLimit,
       } : prev);
-      
-      // Not setting localStorage to ensure future calls still reach backend
       
       // Refresh to ensure we have latest data
       await refreshPlan();

@@ -86,12 +86,6 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
 
       // Increment protocol count
       await meetingStorage.incrementProtocolCount(meetingData.id);
-      
-      // Count meeting ONLY if not already counted
-      const wasCounted = await meetingStorage.markCountedIfNeeded(meetingData.id);
-      if (wasCounted) {
-        await incrementMeetingCount(meetingData.id);
-      }
 
       // Generate token and navigate
       const token = crypto.randomUUID();

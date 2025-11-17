@@ -404,10 +404,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           setSessionId(newId);
         }
 
-        // ALWAYS count meeting exactly once per session
-        console.log('📊 Incrementing meeting count (first speech) - ONCE');
-        await incrementMeetingCount(finalId);
-        await refreshPlan();
+        // Count meeting exactly once - check backend first
+        const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
+        if (wasCounted) {
+          console.log('📊 Incrementing meeting count (first speech detected) - ONCE');
+          await incrementMeetingCount(finalId);
+          await refreshPlan();
+        } else {
+          console.log('⏭️ Meeting already counted, skipping increment');
+        }
       } catch (err) {
         // Allow a retry on failure
         hasIncrementedCountRef.current = false;

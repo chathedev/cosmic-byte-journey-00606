@@ -248,21 +248,25 @@ export const meetingStorage = {
         return false;
       }
       
-      // Check if already counted
+      // Check if already counted in backend
       const { meetings } = await apiClient.getMeetings();
       const current = (meetings || []).find((m: any) => String(m.id) === String(meetingId));
       
       if (current?.counted) {
-        console.log('⏭️ Meeting already counted:', meetingId);
+        console.log('⏭️ Meeting already counted (backend check):', meetingId);
         return false;
       }
       
-      // Mark as counted
+      // Double-check: if backend says it's not counted but it should be, trust backend
+      console.log('📊 Backend confirms meeting NOT counted yet:', meetingId);
+      
+      // Mark as counted atomically in backend (backend should handle race conditions)
       await apiClient.updateMeeting(meetingId, { counted: true });
-      console.log('✅ Marked meeting as counted:', meetingId);
+      console.log('✅ Successfully marked meeting as counted in backend:', meetingId);
       return true;
     } catch (error) {
-      console.warn('markCountedIfNeeded error:', error);
+      console.error('❌ markCountedIfNeeded error:', error);
+      // On error, assume already counted to prevent double counting
       return false;
     }
   },
