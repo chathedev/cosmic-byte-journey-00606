@@ -25,8 +25,6 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not configured');
     }
 
-    console.log('Generating email from prompt:', prompt);
-
     const systemPrompt = `Du är en expert på att skapa moderna, minimalistiska email för Tivly.
 
 KRITISKA INSTRUKTIONER:
@@ -158,8 +156,6 @@ ENDAST JSON - ingen markdown eller förklaringar!`;
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
       return new Response(
         JSON.stringify({ error: 'Kunde inte generera email' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -168,8 +164,6 @@ ENDAST JSON - ingen markdown eller förklaringar!`;
 
     const data = await response.json();
     let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    console.log('Raw AI response:', content);
 
     // Parse the JSON response
     let parsedContent;
@@ -178,8 +172,6 @@ ENDAST JSON - ingen markdown eller förklaringar!`;
       const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parsedContent = JSON.parse(cleanedContent);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      console.error('Content was:', content);
       throw new Error('Failed to parse AI response. Please try again.');
     }
 
@@ -188,15 +180,12 @@ ENDAST JSON - ingen markdown eller förklaringar!`;
       throw new Error('Invalid response format from AI');
     }
 
-    console.log('Successfully generated email');
-
     return new Response(
       JSON.stringify(parsedContent),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in generate-email function:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
