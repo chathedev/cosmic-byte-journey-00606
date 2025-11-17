@@ -25,8 +25,8 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
   const handleSaveToLibrary = async () => {
     if (!isPaidUser) {
       toast({
-        title: "Uppgradera krävs",
-        description: "Spara till bibliotek är endast tillgängligt för betalande användare",
+        title: "Uppgradera till Pro",
+        description: "Spara till bibliotek är endast tillgängligt för Pro och Plus användare",
         variant: "destructive",
       });
       return;

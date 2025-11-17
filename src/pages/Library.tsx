@@ -251,7 +251,7 @@ const Library = () => {
   const handleContinueMeeting = (meeting: MeetingSession) => {
     // Free users cannot continue meetings
     if (userPlan?.plan === 'free') {
-      setUpgradeReason('Funktionen "Fortsätt möte" är endast tillgänglig för betalande användare. Uppgradera för att fortsätta inspelningar!');
+      setUpgradeReason('Funktionen "Fortsätt möte" är endast tillgänglig för Pro och Plus användare. Uppgradera för att fortsätta inspelningar!');
       setShowSubscribeDialog(true);
       return;
     }
@@ -334,7 +334,7 @@ const Library = () => {
               </div>
               <CardTitle className="text-2xl">Biblioteket är låst</CardTitle>
               <CardDescription className="text-base mt-2">
-                Uppgradera till Standard eller Plus för att få tillgång till biblioteket och alla dess funktioner!
+                Uppgradera till Tivly Pro eller Plus för att få tillgång till biblioteket och alla dess funktioner!
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -353,7 +353,7 @@ const Library = () => {
                 onClick={() => setShowSubscribeDialog(true)}
               >
                 <TrendingUp className="mr-2 h-4 w-4" />
-                Uppgradera nu
+                Uppgradera till Pro
               </Button>
               <Button 
                 variant="outline" 

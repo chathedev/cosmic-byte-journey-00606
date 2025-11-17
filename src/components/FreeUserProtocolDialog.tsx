@@ -198,7 +198,7 @@ export const FreeUserProtocolDialog = ({
                 spacing: { after: 100 },
               }),
               new Paragraph({
-                text: "Uppgradera till Standard eller Plus för obegränsade protokoll utan vattenstämpel",
+                text: "Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel",
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 200 },
               }),
@@ -416,7 +416,7 @@ export const FreeUserProtocolDialog = ({
                   <div className="pt-6 border-t text-center space-y-2">
                     <p className="text-sm font-bold text-primary">TIVLY - GRATIS PLAN</p>
                     <p className="text-xs text-muted-foreground">
-                      Uppgradera till Standard eller Plus för obegränsade protokoll utan vattenstämpel
+                      Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel
                     </p>
                   </div>
 

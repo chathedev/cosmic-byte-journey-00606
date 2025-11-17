@@ -324,7 +324,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                         </div>
                       ) : (
                           <>
-                            {(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (userPlan?.cancelAt || userPlan?.planCancelledAt) && (
+                            {(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (userPlan?.cancelAt || userPlan?.planCancelledAt) && new Date(userPlan.planCancelledAt || userPlan.cancelAt!) > new Date() && (
                               <div className="p-4 border-2 border-orange-500/50 rounded-lg bg-gradient-to-br from-orange-500/10 to-orange-500/5 mb-4">
                                 <div className="flex items-start gap-3">
                                   <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
@@ -356,7 +356,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                               <div>
                                 <p className="text-xs text-muted-foreground mb-1">Möten denna månad</p>
                                 <p className="text-lg font-bold">
-                                  {userPlan?.plan !== 'free'
+                                  {userPlan?.meetingsLimit === null
                                     ? 'Obegränsad'
                                     : `${userPlan?.meetingsUsed || 0} / ${userPlan?.meetingsLimit || 1}`}
                                 </p>
@@ -412,8 +412,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                                 <Button 
                                   onClick={() => setShowSubscribeDialog(true)}
                                   className="flex-1"
+                                  variant={userPlan?.plan === 'free' ? 'default' : 'outline'}
                                 >
-                                  {userPlan?.plan === 'free' ? 'Uppgradera plan' : 'Ändra plan'}
+                                  {userPlan?.plan === 'free' ? 'Uppgradera plan' : 'Byt plan'}
                                 </Button>
                               )}
                             </div>
