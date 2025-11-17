@@ -776,9 +776,6 @@ export default function AdminUsers() {
                 <SelectContent>
                   <SelectItem value="free">Free</SelectItem>
                   <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="plus">Plus</SelectItem>
-                  <SelectItem value="unlimited">Unlimited</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
                 </SelectContent>
               </Select>
             </div>
