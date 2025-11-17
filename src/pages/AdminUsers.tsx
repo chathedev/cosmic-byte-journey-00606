@@ -775,7 +775,10 @@ export default function AdminUsers() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                  <SelectItem value="plus">Plus</SelectItem>
+                  <SelectItem value="unlimited">Unlimited</SelectItem>
+                  <SelectItem value="enterprise">Enterprise</SelectItem>
                 </SelectContent>
               </Select>
             </div>
