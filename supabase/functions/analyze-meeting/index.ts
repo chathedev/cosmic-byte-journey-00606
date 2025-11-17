@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { transcript, meetingName, agenda } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
     const wordCount = transcript.trim().split(/\s+/).length;
@@ -91,109 +91,68 @@ ${shortNote}
 
 Svara i JSON-format på samma språk som transkriptionen.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + LOVABLE_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: "Du är en professionell mötessekreterare som skapar välformulerade och strukturerade mötesprotokoll. Du analyserar mötestranskriberingar och syntetiserar informationen till tydliga, koncisa och professionella sammanfattningar. Svara ALLTID på samma språk som transkriptionen är skriven på (svenska eller engelska)."
-          },
-          {
-            role: "user",
-            content: promptContent
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: promptContent }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+            responseMimeType: "application/json"
           }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "create_protocol",
-              description: "Skapa ett mötesprotokoll",
-              parameters: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  summary: { type: "string" },
-                  mainPoints: {
-                    type: "array",
-                    items: { type: "string" }
-                  },
-                  decisions: {
-                    type: "array",
-                    items: { type: "string" }
-                  },
-                  actionItems: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        title: { type: "string" },
-                        description: { type: "string" },
-                        owner: { type: "string" },
-                        deadline: { type: "string" },
-                        priority: { type: "string", enum: ["critical", "high", "medium", "low"] }
-                      },
-                      required: ["title", "priority"],
-                      additionalProperties: false
-                    }
-                  },
-                  nextMeetingSuggestions: {
-                    type: "array",
-                    items: { type: "string" }
-                  }
-                },
-                required: ["title", "summary", "mainPoints", "decisions", "actionItems", "nextMeetingSuggestions"],
-                additionalProperties: false
-              }
-            }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "create_protocol" } }
-      }),
-    });
+        }),
+      }
+    );
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Payment required, please add credits to your workspace." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("AI gateway error: " + response.status);
+      console.error("Gemini API error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({ error: "Kunde inte analysera mötet" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const result = await response.json();
-    console.log("AI response:", JSON.stringify(result));
-
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-    const content = toolCall?.function?.arguments ? JSON.parse(toolCall.function.arguments) : null;
-
-    if (!content) {
-      throw new Error("Failed to parse AI response");
+    const data = await response.json();
+    
+    // Parse the JSON content from the Gemini response
+    let aiResponse;
+    try {
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      console.log("Raw AI response:", content);
+      
+      // Clean up markdown code blocks if present
+      let cleanedContent = content.trim();
+      if (cleanedContent.startsWith('```json')) {
+        cleanedContent = cleanedContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+      } else if (cleanedContent.startsWith('```')) {
+        cleanedContent = cleanedContent.replace(/^```\n/, '').replace(/\n```$/, '');
+      }
+      
+      aiResponse = JSON.parse(cleanedContent);
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Kunde inte tolka AI-svaret" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
       JSON.stringify({
-        title: content.title || meetingName || 'Mötesprotokoll',
-        summary: content.summary || '',
-        mainPoints: content.mainPoints || [],
-        decisions: content.decisions || [],
-        actionItems: content.actionItems || [],
-        nextMeetingSuggestions: content.nextMeetingSuggestions || []
+        title: aiResponse.title || meetingName || 'Mötesprotokoll',
+        summary: aiResponse.summary || '',
+        mainPoints: aiResponse.mainPoints || [],
+        decisions: aiResponse.decisions || [],
+        actionItems: aiResponse.actionItems || [],
+        nextMeetingSuggestions: aiResponse.nextMeetingSuggestions || []
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
