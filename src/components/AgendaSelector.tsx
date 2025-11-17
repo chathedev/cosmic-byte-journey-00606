@@ -8,6 +8,7 @@ import { Plus, FileText, Trash2 } from "lucide-react";
 import { agendaStorage, MeetingAgenda } from "@/utils/agendaStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface AgendaSelectorProps {
   selectedAgendaId?: string;
@@ -21,6 +22,7 @@ export const AgendaSelector = ({ selectedAgendaId, onSelectAgenda }: AgendaSelec
   const [newAgendaName, setNewAgendaName] = useState("");
   const [newAgendaContent, setNewAgendaContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [deleteAgendaId, setDeleteAgendaId] = useState<string | null>(null);
 
   const loadAgendas = async () => {
     if (!user) return;
@@ -65,18 +67,24 @@ export const AgendaSelector = ({ selectedAgendaId, onSelectAgenda }: AgendaSelec
 
   const handleDeleteAgenda = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Vill du verkligen ta bort denna agenda?")) return;
+    setDeleteAgendaId(id);
+  };
+
+  const confirmDeleteAgenda = async () => {
+    if (!deleteAgendaId) return;
     
     try {
-      await agendaStorage.deleteAgenda(id);
+      await agendaStorage.deleteAgenda(deleteAgendaId);
       toast.success("Agenda borttagen");
-      if (selectedAgendaId === id) {
+      if (selectedAgendaId === deleteAgendaId) {
         onSelectAgenda(undefined);
       }
       await loadAgendas();
     } catch (error) {
       console.error('Failed to delete agenda:', error);
       toast.error("Kunde inte ta bort agenda");
+    } finally {
+      setDeleteAgendaId(null);
     }
   };
 
@@ -147,6 +155,19 @@ export const AgendaSelector = ({ selectedAgendaId, onSelectAgenda }: AgendaSelec
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteAgendaId}
+        onOpenChange={(open) => {
+          if (!open) setDeleteAgendaId(null);
+        }}
+        title="Ta bort agenda"
+        description="Vill du verkligen ta bort denna agenda?"
+        confirmText="Ta bort"
+        cancelText="Avbryt"
+        variant="destructive"
+        onConfirm={confirmDeleteAgenda}
+      />
     </div>
   );
 };
