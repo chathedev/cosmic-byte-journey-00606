@@ -46,6 +46,7 @@ const Library = () => {
   const [loadingProtocol, setLoadingProtocol] = useState<string | null>(null);
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
+  const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
@@ -261,24 +262,17 @@ const Library = () => {
   };
 
   const handleCreateProtocol = async (meeting: MeetingSession) => {
-    // Check if meeting already has a protocol attached
+    // If a protocol exists, offer replace flow
     if (protocolStatus[meeting.id]) {
-      toast({
-        title: "Protokoll finns redan",
-        description: "Detta möte har redan ett genererat protokoll. Ta bort det befintliga protokollet först om du vill skapa ett nytt.",
-        variant: "destructive",
-        duration: 4000,
-      });
+      setMeetingToReplaceProtocol(meeting);
       return;
     }
 
-    // Always refresh latest meeting data to avoid stale counts
+    // Proceed with normal generation
     const latest = await meetingStorage.getMeeting(meeting.id);
     const effectiveMeeting = latest || meeting;
 
-    // Validate minimum word count
     const wordCount = effectiveMeeting.transcript ? effectiveMeeting.transcript.trim().split(/\s+/).filter(w => w).length : 0;
-    
     if (!effectiveMeeting.transcript || wordCount < 50) {
       toast({
         title: "För kort transkription",
@@ -288,7 +282,6 @@ const Library = () => {
       return;
     }
 
-    // Show agenda selection dialog
     setPendingMeetingData({
       id: effectiveMeeting.id,
       transcript: effectiveMeeting.transcript,
@@ -770,30 +763,55 @@ const Library = () => {
           if (!meetingToDeleteProtocol) return;
           try {
             await backendApi.deleteProtocol(meetingToDeleteProtocol.id);
-            
-            // Clear the protocol status
             const updatedStatus = { ...protocolStatus };
             delete updatedStatus[meetingToDeleteProtocol.id];
             setProtocolStatus(updatedStatus);
-            
-            // CRITICAL: Clear sessionStorage to allow regeneration
             const protocolKey = `protocol_generated_${meetingToDeleteProtocol.id}`;
             sessionStorage.removeItem(protocolKey);
-            
-            toast({
-              title: "Protokoll borttaget",
-              description: "Du kan nu generera ett nytt protokoll",
-              duration: 2000,
-            });
-            
+            toast({ title: "Protokoll borttaget", description: "Du kan nu generera ett nytt protokoll", duration: 2000 });
             setMeetingToDeleteProtocol(null);
           } catch (error: any) {
-            toast({
-              title: "Fel",
-              description: error.message || "Kunde inte ta bort protokoll",
-              variant: "destructive",
-              duration: 2500,
+            toast({ title: "Fel", description: error.message || "Kunde inte ta bort protokoll", variant: "destructive", duration: 2500 });
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!meetingToReplaceProtocol}
+        onOpenChange={(open) => {
+          if (!open) setMeetingToReplaceProtocol(null);
+        }}
+        title="Ersätt protokoll"
+        description="Det finns redan ett protokoll för detta möte. Vill du ersätta det genom att skapa ett nytt?"
+        confirmText="Ersätt"
+        cancelText="Avbryt"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!meetingToReplaceProtocol) return;
+          try {
+            // Remove old
+            await backendApi.deleteProtocol(meetingToReplaceProtocol.id);
+            const updatedStatus = { ...protocolStatus };
+            delete updatedStatus[meetingToReplaceProtocol.id];
+            setProtocolStatus(updatedStatus);
+            sessionStorage.removeItem(`protocol_generated_${meetingToReplaceProtocol.id}`);
+            
+            // Proceed to generation flow
+            const latest = await meetingStorage.getMeeting(meetingToReplaceProtocol.id);
+            const effectiveMeeting = latest || meetingToReplaceProtocol;
+            setPendingMeetingData({
+              id: effectiveMeeting.id,
+              transcript: effectiveMeeting.transcript,
+              title: effectiveMeeting.title,
+              createdAt: effectiveMeeting.createdAt,
             });
+            setShowAgendaDialog(true);
+            
+            toast({ title: "Protokoll ersätts", description: "Nytt protokoll kommer att genereras", duration: 2000 });
+          } catch (error: any) {
+            toast({ title: "Fel", description: error.message || "Kunde inte ersätta protokoll", variant: "destructive", duration: 2500 });
+          } finally {
+            setMeetingToReplaceProtocol(null);
           }
         }}
       />
