@@ -104,7 +104,7 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
           {used} / obegränsat
         </span>
       )}
-      {!isUnlimited && !userPlan.planCancelledAt && userPlan.plan === 'free' && used >= limit && (
+      {userPlan.plan === 'free' && !isUnlimited && !userPlan.planCancelledAt && used >= limit && (
         <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant="default">
           <TrendingUp className="mr-1 h-3 w-3" /> Uppgradera
         </Button>
