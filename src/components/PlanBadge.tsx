@@ -52,10 +52,9 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
 
   const used = userPlan.meetingsUsed;
   const limit = userPlan.meetingsLimit;
-  // Enterprise, Standard, and Unlimited plans have unlimited access
+  // Enterprise and Unlimited plans have unlimited access, but Pro (standard) has 10 meetings limit
   const isUnlimited = isAdmin || 
     limit === null || 
-    userPlan.plan === 'standard' || 
     userPlan.plan === 'unlimited' || 
     userPlan.plan === 'enterprise';
   const progress = isUnlimited ? 0 : Math.min((used / limit) * 100, 100);
@@ -105,7 +104,7 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
           {used} / obegränsat
         </span>
       )}
-      {!isUnlimited && !userPlan.planCancelledAt && (userPlan.plan === 'free' || used >= limit) && (
+      {!isUnlimited && !userPlan.planCancelledAt && (userPlan.plan === 'free' || userPlan.plan === 'standard' || used >= limit) && (
         <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant={userPlan.plan === 'free' ? 'default' : 'outline'}>
           <TrendingUp className="mr-1 h-3 w-3" /> Uppgradera
         </Button>

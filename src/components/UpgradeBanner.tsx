@@ -10,9 +10,8 @@ export const UpgradeBanner = () => {
 
   if (!userPlan) return null;
 
-  // Enterprise, Standard, and Unlimited plans have unlimited access
+  // Enterprise and Unlimited plans have unlimited access, but Pro (standard) has 10 meetings limit
   const isUnlimited = userPlan.meetingsLimit === null || 
-    userPlan.plan === 'standard' || 
     userPlan.plan === 'unlimited' || 
     userPlan.plan === 'enterprise';
   const displayLimit = userPlan.meetingsLimit ?? 0;
@@ -36,9 +35,12 @@ export const UpgradeBanner = () => {
 
   const getPlanMessage = () => {
     if (userPlan.plan === 'free') {
-      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera för obegränsade möten och AI-protokoll!`;
+      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera för fler möten och AI-protokoll!`;
     }
-    // For paid plans: just show unlimited access
+    if (userPlan.plan === 'standard') {
+      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} möten denna månad.`;
+    }
+    // For unlimited plans: show unlimited access
     return `Du har obegränsad tillgång till möten och funktioner.`;
   };
 
@@ -50,7 +52,7 @@ export const UpgradeBanner = () => {
             <Sparkles className="h-4 w-4 text-primary shrink-0" />
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sm text-foreground truncate">{getPlanTitle()}</h3>
-              {userPlan.plan === 'free' && !isUnlimited && (
+              {!isUnlimited && (
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {userPlan.meetingsUsed} / {displayLimit} möten
@@ -63,27 +65,17 @@ export const UpgradeBanner = () => {
                   </div>
                 </div>
               )}
-              {(userPlan.plan === 'standard' || userPlan.plan === 'plus' || userPlan.plan === 'enterprise' || isUnlimited) && (
+              {isUnlimited && (
                 <span className="text-xs text-primary font-semibold">∞ Obegränsade möten</span>
               )}
             </div>
           </div>
-          {userPlan.plan === 'free' && (
+          {(userPlan.plan === 'free' || userPlan.plan === 'standard') && (
             <Button 
               onClick={() => setDialogOpen(true)}
               size="sm"
               className="shrink-0 h-8 text-xs"
-            >
-              <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
-              Uppgradera
-            </Button>
-          )}
-          {userPlan.plan !== 'free' && userPlan.meetingsUsed >= displayLimit && (
-            <Button 
-              onClick={() => setDialogOpen(true)}
-              size="sm"
-              variant="outline"
-              className="shrink-0 h-8 text-xs"
+              variant={userPlan.plan === 'free' ? 'default' : 'outline'}
             >
               <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
               Uppgradera
