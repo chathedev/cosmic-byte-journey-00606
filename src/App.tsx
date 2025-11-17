@@ -30,7 +30,6 @@ import AdminBackend from "./pages/AdminBackend";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminEmailCampaigns from "./pages/AdminEmailCampaigns";
 import AdminEnterprise from "./pages/AdminEnterprise";
-import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -214,7 +213,6 @@ const App = () => {
                           <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
                           <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
                           <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
-                          <Route path="/admin/marketing" element={<AdminRoute><Marketing /></AdminRoute>} />
                           <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
                           <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                           <Route path="*" element={<Navigate to="/" replace />} />

@@ -89,7 +89,7 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
       {!isUnlimited && (
         <div className="flex items-center gap-1">
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-            {used}/{limit}
+            {limit - used} kvar
           </span>
           <div className="w-16 h-1.5 bg-secondary/30 rounded-sm overflow-hidden">
             <div
@@ -104,8 +104,8 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
           {used} / obegränsat
         </span>
       )}
-      {!isUnlimited && !userPlan.planCancelledAt && (userPlan.plan === 'free' || userPlan.plan === 'pro' || used >= limit) && (
-        <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant={userPlan.plan === 'free' ? 'default' : 'outline'}>
+      {!isUnlimited && !userPlan.planCancelledAt && userPlan.plan === 'free' && used >= limit && (
+        <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant="default">
           <TrendingUp className="mr-1 h-3 w-3" /> Uppgradera
         </Button>
       )}

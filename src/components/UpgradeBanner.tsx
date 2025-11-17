@@ -38,7 +38,8 @@ export const UpgradeBanner = () => {
       return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera för fler möten och AI-protokoll!`;
     }
     if (userPlan.plan === 'pro') {
-      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} möten denna månad.`;
+      const remaining = displayLimit - userPlan.meetingsUsed;
+      return `Du har ${remaining} möten kvar av ${displayLimit} möten denna månad.`;
     }
     // For unlimited plans: show unlimited access
     return `Du har obegränsad tillgång till möten och funktioner.`;
@@ -55,7 +56,7 @@ export const UpgradeBanner = () => {
               {!isUnlimited && (
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {userPlan.meetingsUsed} / {displayLimit} möten
+                    {displayLimit - userPlan.meetingsUsed} kvar
                   </span>
                   <div className="flex-1 bg-secondary/20 rounded-full h-1.5 min-w-[60px] max-w-[120px]">
                     <div 
@@ -70,12 +71,12 @@ export const UpgradeBanner = () => {
               )}
             </div>
           </div>
-          {(userPlan.plan === 'free' || userPlan.plan === 'pro') && (
+          {(userPlan.plan === 'free') && (
             <Button 
               onClick={() => setDialogOpen(true)}
               size="sm"
               className="shrink-0 h-8 text-xs"
-              variant={userPlan.plan === 'free' ? 'default' : 'outline'}
+              variant="default"
             >
               <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
               Uppgradera
