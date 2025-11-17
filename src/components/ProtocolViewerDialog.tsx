@@ -4,7 +4,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, X, FileText, Loader2 } from "lucide-react";
+import { Download, Share2, X, FileText, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
 import mammoth from "mammoth";
@@ -21,15 +21,95 @@ interface ProtocolViewerDialogProps {
   } | null;
 }
 
+interface ParsedProtocol {
+  summary: string;
+  mainPoints: string[];
+  decisions: string[];
+  actionItems: Array<{
+    title: string;
+    description?: string;
+    owner?: string;
+    deadline?: string;
+    priority?: string;
+  }>;
+  nextMeetingSuggestions?: string[];
+}
+
 export const ProtocolViewerDialog = ({
   open,
   onOpenChange,
   protocol,
 }: ProtocolViewerDialogProps) => {
-  const [htmlContent, setHtmlContent] = useState<string>("");
+  const [parsedProtocol, setParsedProtocol] = useState<ParsedProtocol | null>(null);
   const [loading, setLoading] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const { toast } = useToast();
+
+  // Parse HTML content into structured sections
+  const parseProtocolContent = (html: string): ParsedProtocol => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const text = doc.body.textContent || '';
+    
+    const parsed: ParsedProtocol = {
+      summary: '',
+      mainPoints: [],
+      decisions: [],
+      actionItems: [],
+      nextMeetingSuggestions: []
+    };
+
+    // Split by common headings
+    const sections = text.split(/(?=Sammanfattning|Huvudpunkter|Beslut|Åtgärdspunkter|Action Items|Nästa möte)/i);
+    
+    sections.forEach(section => {
+      const lowerSection = section.toLowerCase();
+      
+      if (lowerSection.startsWith('sammanfattning')) {
+        parsed.summary = section.replace(/sammanfattning:?/i, '').trim();
+      } else if (lowerSection.startsWith('huvudpunkter')) {
+        const content = section.replace(/huvudpunkter:?/i, '').trim();
+        parsed.mainPoints = content
+          .split(/\n+/)
+          .map(p => p.replace(/^\d+\.\s*|^[-•]\s*/, '').trim())
+          .filter(p => p.length > 0);
+      } else if (lowerSection.startsWith('beslut')) {
+        const content = section.replace(/beslut:?/i, '').trim();
+        parsed.decisions = content
+          .split(/\n+/)
+          .map(d => d.replace(/^\d+\.\s*|^[-•]\s*/, '').trim())
+          .filter(d => d.length > 0);
+      } else if (lowerSection.startsWith('åtgärdspunkter') || lowerSection.startsWith('action items')) {
+        const content = section.replace(/åtgärdspunkter:?|action items:?/i, '').trim();
+        const items = content.split(/\n\n+/);
+        
+        items.forEach(item => {
+          if (!item.trim()) return;
+          
+          const lines = item.split('\n').map(l => l.trim()).filter(l => l);
+          if (lines.length === 0) return;
+          
+          const actionItem: any = { title: lines[0].replace(/^\d+\.\s*|^[-•]\s*/, '') };
+          
+          lines.slice(1).forEach(line => {
+            if (line.match(/ansvarig:/i)) {
+              actionItem.owner = line.replace(/ansvarig:/i, '').trim();
+            } else if (line.match(/deadline:/i)) {
+              actionItem.deadline = line.replace(/deadline:/i, '').trim();
+            } else if (line.match(/prioritet:|priority:/i)) {
+              actionItem.priority = line.replace(/prioritet:|priority:/i, '').trim().toLowerCase();
+            } else if (!actionItem.description) {
+              actionItem.description = line;
+            }
+          });
+          
+          parsed.actionItems.push(actionItem);
+        });
+      }
+    });
+
+    return parsed;
+  };
 
   // Load preview when dialog opens
   useEffect(() => {
@@ -49,7 +129,10 @@ export const ProtocolViewerDialog = ({
 
         // Convert DOCX to HTML using mammoth
         const result = await mammoth.convertToHtml({ arrayBuffer });
-        setHtmlContent(result.value);
+        
+        // Parse the HTML into structured sections
+        const parsed = parseProtocolContent(result.value);
+        setParsedProtocol(parsed);
       } catch (error) {
         console.error("Failed to load protocol preview:", error);
         toast({
@@ -66,7 +149,7 @@ export const ProtocolViewerDialog = ({
     if (open && protocol) {
       loadProtocolPreview();
     } else {
-      setHtmlContent("");
+      setParsedProtocol(null);
       setLoading(false);
     }
   }, [open, protocol, toast]);
@@ -131,6 +214,27 @@ export const ProtocolViewerDialog = ({
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const getPriorityColor = (priority?: string) => {
+    switch (priority) {
+      case 'critical': case 'kritisk': return 'text-red-600 dark:text-red-400';
+      case 'high': case 'hög': return 'text-orange-600 dark:text-orange-400';
+      case 'medium': return 'text-yellow-600 dark:text-yellow-400';
+      case 'low': case 'låg': return 'text-green-600 dark:text-green-400';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const getPriorityLabel = (priority?: string) => {
+    if (!priority) return '';
+    switch (priority.toLowerCase()) {
+      case 'critical': case 'kritisk': return 'Kritisk';
+      case 'high': case 'hög': return 'Hög';
+      case 'medium': return 'Medium';
+      case 'low': case 'låg': return 'Låg';
+      default: return priority;
+    }
   };
 
   return (
@@ -204,18 +308,75 @@ export const ProtocolViewerDialog = ({
                   <p className="text-xs text-muted-foreground">Förbereder förhandsvisning...</p>
                 </div>
               </div>
-            ) : htmlContent ? (
-              <div className="max-w-4xl mx-auto">
-                <div 
-                  className="prose prose-sm dark:prose-invert max-w-none p-8 bg-card rounded-xl border shadow-sm
-                             prose-headings:text-foreground prose-p:text-muted-foreground 
-                             prose-strong:text-foreground prose-ul:text-muted-foreground
-                             prose-h1:text-2xl prose-h1:font-bold prose-h1:mb-4
-                             prose-h2:text-xl prose-h2:font-semibold prose-h2:mb-3 prose-h2:mt-6
-                             prose-h3:text-lg prose-h3:font-medium prose-h3:mb-2
-                             prose-p:leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: htmlContent }}
-                />
+            ) : parsedProtocol ? (
+              <div className="max-w-4xl mx-auto space-y-8">
+                {/* Summary */}
+                {parsedProtocol.summary && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-3 text-foreground">Sammanfattning</h2>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {parsedProtocol.summary}
+                    </p>
+                  </div>
+                )}
+
+                {/* Main Points */}
+                {parsedProtocol.mainPoints.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-3 text-foreground">Huvudpunkter</h2>
+                    <ul className="space-y-2">
+                      {parsedProtocol.mainPoints.map((point, index) => (
+                        <li key={index} className="flex gap-3">
+                          <span className="text-primary font-medium">{index + 1}.</span>
+                          <span className="text-muted-foreground">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Decisions */}
+                {parsedProtocol.decisions.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-3 text-foreground">Beslut</h2>
+                    <ul className="space-y-2">
+                      {parsedProtocol.decisions.map((decision, index) => (
+                        <li key={index} className="flex gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">{decision}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Action Items */}
+                {parsedProtocol.actionItems.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-3 text-foreground">Åtgärdspunkter</h2>
+                    <div className="space-y-4">
+                      {parsedProtocol.actionItems.map((item, index) => (
+                        <div key={index} className="pl-4 border-l-2 border-primary/20">
+                          <div className="flex items-start justify-between gap-4 mb-1">
+                            <h3 className="font-medium text-foreground">{item.title}</h3>
+                            {item.priority && (
+                              <span className={`text-xs font-medium ${getPriorityColor(item.priority)}`}>
+                                {getPriorityLabel(item.priority)}
+                              </span>
+                            )}
+                          </div>
+                          {item.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
+                          )}
+                          <div className="flex gap-4 text-xs text-muted-foreground">
+                            {item.owner && <span>Ansvarig: {item.owner}</span>}
+                            {item.deadline && <span>Deadline: {item.deadline}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
