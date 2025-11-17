@@ -866,6 +866,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       if (newId && newId !== sessionId) {
         setSessionId(newId);
       }
+      
+      // Increment meeting count if not already counted
+      if (finalId) {
+        const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
+        if (wasCounted) {
+          await incrementMeetingCount(finalId);
+        }
+      }
       toast({
         title: 'Sparat!',
         description: `"${meetingName}" har sparats i biblioteket under ${selectedFolder}.`,
@@ -971,6 +979,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           setSessionId(newId);
           savedId = newId;
         }
+        
+        // Increment meeting count if not already counted
+        const finalId = newId || sessionId;
+        if (finalId) {
+          const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
+          if (wasCounted) {
+            await incrementMeetingCount(finalId);
+          }
+        }
       } catch (e) {
         console.warn('Final save failed:', e);
       }
@@ -1045,6 +1062,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         savedId = createdId;
       } else {
         savedId = sessionId;
+      }
+      
+      // Increment meeting count if not already counted
+      if (savedId) {
+        const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
+        if (wasCounted) {
+          await incrementMeetingCount(savedId);
+        }
       }
     } catch (e) {
       console.warn('Failed to save meeting:', e);
