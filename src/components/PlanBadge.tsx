@@ -67,7 +67,7 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
       case 'free':
         return 'Gratis';
       case 'standard':
-        return 'Standard';
+        return 'Pro';
       case 'plus':
         return 'Plus';
       case 'unlimited':

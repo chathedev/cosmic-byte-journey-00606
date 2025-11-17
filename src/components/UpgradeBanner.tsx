@@ -24,7 +24,7 @@ export const UpgradeBanner = () => {
       case 'free':
         return 'Free';
       case 'standard':
-        return 'Standard';
+        return 'Pro';
       case 'plus':
         return 'Plus';
       case 'unlimited':

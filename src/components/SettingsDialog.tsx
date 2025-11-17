@@ -165,7 +165,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const getPlanDisplayName = (plan: string) => {
     switch (plan) {
       case 'standard':
-        return 'Tivly Standard';
+        return 'Tivly Pro';
       case 'plus':
         return 'Tivly Plus';
       default:

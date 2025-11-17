@@ -291,7 +291,7 @@ export function AppSidebar() {
                       {userPlan?.plan === 'enterprise' ? 'Enterprise' : 
                        userPlan?.plan === 'unlimited' ? 'Unlimited' : 
                        userPlan?.plan === 'plus' ? 'Plus' : 
-                       userPlan?.plan === 'standard' ? 'Standard' : 'Free'}
+                       userPlan?.plan === 'standard' ? 'Pro' : 'Free'}
                     </div>
                   </>
                 )}
