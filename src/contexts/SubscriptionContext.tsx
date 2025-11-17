@@ -167,7 +167,14 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           const latestPlan: UserPlan = isAdmin 
             ? { ...latest, plan: 'unlimited' as const, meetingsLimit: null, protocolsLimit: 999999 } 
             : latest;
-          setUserPlan(prev => (JSON.stringify(prev) === JSON.stringify(latestPlan) ? prev : latestPlan));
+          const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
+          setUserPlan(prev => {
+            if (!prev) return latestPlan;
+            if (JSON.stringify(prev) === JSON.stringify(latestPlan)) return prev;
+            return rank[latestPlan.plan] >= rank[prev.plan]
+              ? latestPlan
+              : { ...prev, ...latestPlan, plan: prev.plan };
+          });
         }
       } catch (e) {
         console.warn('Plan background refresh failed, using user payload plan.', e);
@@ -211,10 +218,17 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       
       // Override to unlimited for admins
       if (admin) {
-        plan = { ...plan, plan: 'unlimited', meetingsLimit: null, protocolsLimit: 999999 };
+        plan = { ...plan, plan: 'unlimited' as const, meetingsLimit: null, protocolsLimit: 999999 };
       }
       
-      setUserPlan(prev => (JSON.stringify(prev) === JSON.stringify(plan) ? prev : plan));
+      setUserPlan(prev => {
+        if (!prev) return plan;
+        if (JSON.stringify(prev) === JSON.stringify(plan)) return prev;
+        const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
+        return rank[plan.plan] >= rank[prev.plan]
+          ? plan
+          : { ...prev, ...plan, plan: prev.plan };
+      });
     } catch (error) {
       console.error('❌ Failed to refresh plan from backend:', error);
     }
