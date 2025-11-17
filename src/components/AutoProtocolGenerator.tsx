@@ -6,7 +6,6 @@ import { Document, Paragraph, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
@@ -145,13 +144,25 @@ export const AutoProtocolGenerator = ({
 
   const fetchAgendaContent = async (id: string): Promise<string> => {
     try {
-      const { data, error } = await supabase
-        .from('meeting_agendas')
-        .select('content')
-        .eq('id', id)
-        .single();
-      
-      if (error) throw error;
+      // Fetch from backend API instead of Supabase
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('⚠️ No auth token - skipping agenda fetch');
+        return '';
+      }
+
+      const response = await fetch(`https://api.tivly.se/agendas/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agenda: ${response.status}`);
+      }
+
+      const data = await response.json();
       return data?.content || '';
     } catch (error) {
       console.error('Error fetching agenda:', error);
@@ -161,24 +172,31 @@ export const AutoProtocolGenerator = ({
 
   const saveActionItems = async (items: AIActionItem[], meetingId: string, userId: string) => {
     try {
-      const actionItems = items.map(item => ({
-        meeting_id: meetingId,
-        user_id: userId,
-        title: item.title,
-        description: item.description || null,
-        owner: item.owner || null,
-        deadline: item.deadline || null,
-        priority: item.priority,
-        status: 'pending',
-      }));
+      // Save to backend API instead of Supabase
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('⚠️ No auth token - skipping action items save');
+        return;
+      }
 
-      const { error } = await supabase
-        .from('action_items')
-        .insert(actionItems);
+      const response = await fetch(`https://api.tivly.se/meetings/${meetingId}/action-items`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ actionItems: items }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save action items: ${errorText}`);
+      }
+
+      console.log('✅ Action items saved to backend successfully');
     } catch (error) {
       console.error('Error saving action items:', error);
+      // Non-blocking - protocol generation continues even if action items fail
     }
   };
 
