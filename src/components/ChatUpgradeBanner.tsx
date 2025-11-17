@@ -2,6 +2,9 @@ import { MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasPlusAccess } from "@/lib/accessCheck";
 
 interface ChatUpgradeBannerProps {
   onUpgrade?: () => void;
@@ -9,6 +12,11 @@ interface ChatUpgradeBannerProps {
 
 export const ChatUpgradeBanner = ({ onUpgrade }: ChatUpgradeBannerProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { userPlan } = useSubscription();
+
+  // Hide banner for Pro/Unlimited/Enterprise users
+  if (hasPlusAccess(user, userPlan)) return null;
 
   const handleUpgrade = () => {
     if (onUpgrade) {
