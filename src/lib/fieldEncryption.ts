@@ -165,39 +165,45 @@ export async function encryptField(
 }
 
 /**
- * Encrypt multiple fields in a payload
+ * Encrypt multiple fields in a payload - gracefully degrades if encryption fails
  */
 export async function encryptPayload(
   authToken: string,
   payload: Record<string, any>,
   fieldsToEncrypt: Array<{ path: string; encoding?: 'utf8' | 'json' }>
-): Promise<EncryptedPayload> {
-  const bundle = await getEncryptionKeyBundle(authToken);
-  
-  const encryptedFields: Record<string, EncryptedField> = {};
-  const resultPayload = { ...payload };
-  
-  // Encrypt each specified field
-  for (const { path, encoding = 'utf8' } of fieldsToEncrypt) {
-    const value = getNestedValue(payload, path);
+): Promise<EncryptedPayload | Record<string, any>> {
+  try {
+    const bundle = await getEncryptionKeyBundle(authToken);
     
-    if (value !== undefined && value !== null) {
-      encryptedFields[path] = await encryptField(bundle, path, value, encoding);
+    const encryptedFields: Record<string, EncryptedField> = {};
+    const resultPayload = { ...payload };
+    
+    // Encrypt each specified field
+    for (const { path, encoding = 'utf8' } of fieldsToEncrypt) {
+      const value = getNestedValue(payload, path);
       
-      // Remove plaintext from payload
-      deleteNestedValue(resultPayload, path);
+      if (value !== undefined && value !== null) {
+        encryptedFields[path] = await encryptField(bundle, path, value, encoding);
+        
+        // Remove plaintext from payload
+        deleteNestedValue(resultPayload, path);
+      }
     }
+    
+    // Add encrypted wrapper
+    return {
+      $encrypted: {
+        version: 1,
+        keyId: bundle.keyId,
+        fields: encryptedFields,
+      },
+      ...resultPayload,
+    };
+  } catch (error) {
+    console.warn('⚠️ Encryption failed, sending unencrypted:', error);
+    // Return original payload if encryption fails
+    return payload;
   }
-  
-  // Add encrypted wrapper
-  return {
-    $encrypted: {
-      version: 1,
-      keyId: bundle.keyId,
-      fields: encryptedFields,
-    },
-    ...resultPayload,
-  };
 }
 
 /**

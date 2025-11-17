@@ -138,24 +138,12 @@ export const meetingStorage = {
   // Increment protocol count - count meeting ONLY if not already counted
   async incrementProtocolCount(meetingId: string): Promise<void> {
     try {
-      // Check if meeting already counted, only increment if not
-      if (isValidUUID(meetingId)) {
-        const wasCounted = await this.markCountedIfNeeded(meetingId);
-        if (wasCounted) {
-          console.log('📊 Counting meeting on protocol generation:', meetingId);
-          await apiClient.incrementMeetings(1);
-        } else {
-          console.log('⏭️ Meeting already counted, skipping increment:', meetingId);
-        }
-      } else {
-        // For temp meetings, still count once
-        console.log('📊 Counting temp meeting on protocol generation:', meetingId);
-        await apiClient.incrementMeetings(1);
-      }
+      // NEVER increment meeting count here - that's handled by incrementMeetingCount flow
+      // This function ONLY increments the protocolCount field
       
-      // Skip backend protocolCount update if temp ID (not yet saved to backend)
+      // Skip for temp meetings - they don't exist in backend yet
       if (!isValidUUID(meetingId)) {
-        console.log('⏭️ Skipping protocolCount update for temp meeting:', meetingId);
+        console.log('⏭️ Temp meeting - protocol count will be set on save:', meetingId);
         return;
       }
       
@@ -164,6 +152,7 @@ export const meetingStorage = {
       const current = (meetings || []).find((m: any) => String(m.id) === String(meetingId));
       const next = Number(current?.protocolCount ?? 0) + 1;
       await apiClient.updateMeeting(meetingId, { protocolCount: next });
+      console.log(`✅ Protocol count updated to ${next} for meeting:`, meetingId);
     } catch (error) {
       console.error('Error incrementing protocol count (API):', error);
     }
@@ -241,31 +230,49 @@ export const meetingStorage = {
   },
 
   // Mark meeting as counted exactly once - returns true if successfully marked (wasn't counted before)
+  // ATOMIC operation with locking to prevent race conditions
   async markCountedIfNeeded(meetingId: string): Promise<boolean> {
+    const lockKey = `counting_lock_${meetingId}`;
+    
     try {
       if (!isValidUUID(meetingId)) {
-        console.log('⏭️ Skipping markCountedIfNeeded for temp meeting:', meetingId);
+        console.log('⏭️ Temp meeting cannot be counted:', meetingId);
         return false;
       }
       
-      // Check if already counted in backend
+      // Check for in-flight counting operation
+      const inProgress = sessionStorage.getItem(lockKey);
+      if (inProgress === 'true') {
+        console.log('⏭️ Already counting this meeting in parallel call, skipping:', meetingId);
+        return false;
+      }
+      
+      // Acquire lock
+      sessionStorage.setItem(lockKey, 'true');
+      
+      // Backend handles atomicity - the counted flag can only be set from false->true once
       const { meetings } = await apiClient.getMeetings();
       const current = (meetings || []).find((m: any) => String(m.id) === String(meetingId));
       
       if (current?.counted) {
-        console.log('⏭️ Meeting already counted (backend check):', meetingId);
+        console.log('⏭️ Meeting already marked as counted (backend verified):', meetingId);
+        sessionStorage.removeItem(lockKey);
         return false;
       }
       
-      // Double-check: if backend says it's not counted but it should be, trust backend
       console.log('📊 Backend confirms meeting NOT counted yet:', meetingId);
       
-      // Mark as counted atomically in backend (backend should handle race conditions)
+      // Atomically mark as counted in backend
       await apiClient.updateMeeting(meetingId, { counted: true });
       console.log('✅ Successfully marked meeting as counted in backend:', meetingId);
+      
+      // Release lock
+      sessionStorage.removeItem(lockKey);
       return true;
     } catch (error) {
       console.error('❌ markCountedIfNeeded error:', error);
+      // Release lock on error
+      sessionStorage.removeItem(lockKey);
       // On error, assume already counted to prevent double counting
       return false;
     }

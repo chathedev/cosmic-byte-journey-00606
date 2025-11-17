@@ -288,6 +288,16 @@ export const AutoProtocolGenerator = ({
       return;
     }
 
+    // Ensure we have a valid meeting ID before saving protocol
+    if (meetingId.startsWith('temp-')) {
+      toast({
+        title: "Kan inte spara protokoll",
+        description: "Mötet måste sparas först. Vänligen spara mötet innan du genererar protokoll.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Convert blob to base64
       const reader = new FileReader();
