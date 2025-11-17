@@ -15,11 +15,11 @@ export const BottomNav = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const { userPlan, refreshPlan } = useSubscription();
+  const { userPlan, isLoading: planLoading, refreshPlan } = useSubscription();
   const [showSettings, setShowSettings] = useState(false);
   
-  const isLibraryLocked = checkLibraryLocked(user, userPlan);
-
+  const isLibraryLocked = planLoading ? false : checkLibraryLocked(user, userPlan);
+ 
   useEffect(() => {
     // Ensure plan is fresh on nav mount (helps unlock library after upgrade)
     refreshPlan();
