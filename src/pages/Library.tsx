@@ -19,6 +19,7 @@ import { backendApi } from "@/lib/backendApi";
 import { Badge } from "@/components/ui/badge";
 import { Download, Eye, RefreshCw } from "lucide-react";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 const Library = () => {
   const { user } = useAuth();
@@ -44,6 +45,7 @@ const Library = () => {
   const [protocolStatus, setProtocolStatus] = useState<Record<string, any>>({});
   const [loadingProtocol, setLoadingProtocol] = useState<string | null>(null);
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
+  const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
@@ -616,27 +618,8 @@ const Library = () => {
                             <Download className="w-3.5 h-3.5" />
                           </Button>
                           <Button
-                            onClick={async () => {
-                              if (confirm('Vill du ersätta det sparade protokollet? Detta går inte att ångra.')) {
-                                try {
-                                  await backendApi.deleteProtocol(meeting.id);
-                                  const updatedStatus = { ...protocolStatus };
-                                  delete updatedStatus[meeting.id];
-                                  setProtocolStatus(updatedStatus);
-                                  toast({
-                                    title: "Protokoll borttaget",
-                                    description: "Du kan nu generera ett nytt protokoll",
-                                    duration: 2000,
-                                  });
-                                } catch (error: any) {
-                                  toast({
-                                    title: "Fel",
-                                    description: error.message || "Kunde inte ta bort protokoll",
-                                    variant: "destructive",
-                                    duration: 2500,
-                                  });
-                                }
-                              }
+                            onClick={() => {
+                              setMeetingToDeleteProtocol(meeting);
                             }}
                             size="sm"
                             variant="ghost"
@@ -760,6 +743,48 @@ const Library = () => {
           if (!open) setViewingProtocol(null);
         }}
         protocol={viewingProtocol?.protocol || null}
+      />
+
+      <ConfirmDialog
+        open={!!meetingToDeleteProtocol}
+        onOpenChange={(open) => {
+          if (!open) setMeetingToDeleteProtocol(null);
+        }}
+        title="Ersätta protokoll"
+        description="Vill du ersätta det sparade protokollet? Detta går inte att ångra."
+        confirmText="Ta bort"
+        cancelText="Avbryt"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!meetingToDeleteProtocol) return;
+          try {
+            await backendApi.deleteProtocol(meetingToDeleteProtocol.id);
+            
+            // Clear the protocol status
+            const updatedStatus = { ...protocolStatus };
+            delete updatedStatus[meetingToDeleteProtocol.id];
+            setProtocolStatus(updatedStatus);
+            
+            // CRITICAL: Clear sessionStorage to allow regeneration
+            const protocolKey = `protocol_generated_${meetingToDeleteProtocol.id}`;
+            sessionStorage.removeItem(protocolKey);
+            
+            toast({
+              title: "Protokoll borttaget",
+              description: "Du kan nu generera ett nytt protokoll",
+              duration: 2000,
+            });
+            
+            setMeetingToDeleteProtocol(null);
+          } catch (error: any) {
+            toast({
+              title: "Fel",
+              description: error.message || "Kunde inte ta bort protokoll",
+              variant: "destructive",
+              duration: 2500,
+            });
+          }
+        }}
       />
     </div>
   );

@@ -13,6 +13,7 @@ import { Trash2, Upload, FileText, Loader2, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface Agenda {
   id: string;
@@ -31,6 +32,7 @@ export default function Agendas() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
+  const [deleteAgenda, setDeleteAgenda] = useState<{ id: string; name: string } | null>(null);
 
   // Only free users are locked, Standard+ get full access
   const isLocked = userPlan?.plan === 'free';
@@ -114,12 +116,14 @@ export default function Agendas() {
   };
 
   const handleDelete = async (agendaId: string, agendaName: string) => {
-    if (!confirm(`Är du säker på att du vill ta bort "${agendaName}"?`)) {
-      return;
-    }
+    setDeleteAgenda({ id: agendaId, name: agendaName });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteAgenda) return;
 
     try {
-      await agendaApi.deleteAgenda(agendaId);
+      await agendaApi.deleteAgenda(deleteAgenda.id);
       toast({
         title: "Agenda borttagen",
         description: "Agendan har tagits bort",
@@ -131,6 +135,8 @@ export default function Agendas() {
         description: error.message || "Kunde inte ta bort agenda",
         variant: "destructive",
       });
+    } finally {
+      setDeleteAgenda(null);
     }
   };
 
@@ -292,6 +298,19 @@ export default function Agendas() {
       </Dialog>
 
       <SubscribeDialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog} />
+      
+      <ConfirmDialog
+        open={!!deleteAgenda}
+        onOpenChange={(open) => {
+          if (!open) setDeleteAgenda(null);
+        }}
+        title="Ta bort agenda"
+        description={`Är du säker på att du vill ta bort "${deleteAgenda?.name}"?`}
+        confirmText="Ta bort"
+        cancelText="Avbryt"
+        variant="destructive"
+        onConfirm={confirmDelete}
+      />
     </>
   );
 }
