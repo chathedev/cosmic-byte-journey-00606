@@ -22,7 +22,7 @@ export const UpgradeBanner = () => {
     switch (userPlan.plan) {
       case 'free':
         return 'Free';
-      case 'standard':
+      case 'pro':
         return 'Pro';
       case 'plus':
         return 'Plus';
@@ -37,7 +37,7 @@ export const UpgradeBanner = () => {
     if (userPlan.plan === 'free') {
       return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera för fler möten och AI-protokoll!`;
     }
-    if (userPlan.plan === 'standard') {
+    if (userPlan.plan === 'pro') {
       return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} möten denna månad.`;
     }
     // For unlimited plans: show unlimited access
@@ -70,7 +70,7 @@ export const UpgradeBanner = () => {
               )}
             </div>
           </div>
-          {(userPlan.plan === 'free' || userPlan.plan === 'standard') && (
+          {(userPlan.plan === 'free' || userPlan.plan === 'pro') && (
             <Button 
               onClick={() => setDialogOpen(true)}
               size="sm"
