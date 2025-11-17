@@ -264,6 +264,39 @@ export const AutoProtocolGenerator = ({
 
     const blob = await Packer.toBlob(doc);
     setDocumentBlob(blob);
+    
+    // CRITICAL: Automatically save protocol to backend immediately after generation
+    if (meetingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(meetingId)) {
+      try {
+        console.log('💾 Auto-saving protocol to meeting:', meetingId);
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        
+        await new Promise<void>((resolve, reject) => {
+          reader.onload = async () => {
+            try {
+              const base64 = reader.result as string;
+              await backendApi.saveProtocol(meetingId, {
+                fileName: `${title}.docx`,
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                documentBlob: base64,
+              });
+              console.log('✅ Protocol auto-saved to meeting successfully');
+              resolve();
+            } catch (error) {
+              console.error('❌ Failed to auto-save protocol:', error);
+              reject(error);
+            }
+          };
+          reader.onerror = reject;
+        });
+      } catch (error) {
+        console.error('❌ Protocol auto-save failed (non-blocking):', error);
+        // Don't throw - let user still see and download the protocol
+      }
+    } else {
+      console.log('⚠️ Skipping auto-save - no valid meeting ID:', meetingId);
+    }
   };
 
   const handleDownload = () => {
@@ -278,83 +311,34 @@ export const AutoProtocolGenerator = ({
   };
 
   const handleSave = async () => {
-    if (!documentBlob) {
+    // Helper to check if a string is a valid UUID
+    const isValidUUID = (id: string) => {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+    };
+
+    // CRITICAL: The protocol is already auto-saved to the meeting during generation
+    // This button is just for user confirmation and navigation
+    
+    if (!meetingId || !isValidUUID(meetingId)) {
+      console.warn('⚠️ No valid meeting ID - protocol already generated, navigating to library');
       toast({
-        title: "Protokoll sparat",
-        description: "Protokollet finns nu i ditt bibliotek.",
+        title: "Protokoll klart",
+        description: "Protokollet har genererats och är tillgängligt i biblioteket.",
         duration: 2000,
       });
       navigate("/library");
       return;
     }
 
-    // If no meetingId, just navigate to library (protocol already generated and accessible)
-    if (!meetingId) {
-      toast({
-        title: "Protokoll sparat",
-        description: "Protokollet har genererats och finns i ditt bibliotek.",
-        duration: 2000,
-      });
-      navigate("/library");
-      return;
-    }
-
-    // For temp meetings (shouldn't happen from recording flow, but handle gracefully)
-    if (meetingId.startsWith('temp-')) {
-      console.warn('⚠️ Temp meeting ID detected during protocol save - downloading instead:', meetingId);
-      // Auto-download the protocol for user instead of showing error
-      saveAs(documentBlob, fileName);
-      toast({
-        title: "Protokoll nedladdat",
-        description: "Protokollet har laddats ner eftersom mötet inte kunde sparas.",
-        duration: 3000,
-      });
-      navigate("/library");
-      return;
-    }
-
-    try {
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(documentBlob);
-      
-      await new Promise<void>((resolve, reject) => {
-        reader.onload = async () => {
-          try {
-            const base64 = reader.result as string;
-            
-            // Save protocol to backend
-            await backendApi.saveProtocol(meetingId, {
-              fileName,
-              mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              documentBlob: base64,
-            });
-            
-            toast({
-              title: "Protokoll sparat",
-              description: "Protokollet har sparats på mötet och finns i ditt bibliotek.",
-              duration: 2000,
-            });
-            
-            navigate("/library");
-            resolve();
-          } catch (error: any) {
-            reject(error);
-          }
-        };
-        reader.onerror = reject;
-      });
-    } catch (error: any) {
-      console.error('Failed to save protocol:', error);
-      toast({
-        title: "Kunde inte spara",
-        description: error.message || "Ett fel uppstod. Protokollet finns fortfarande i ditt bibliotek.",
-        variant: "destructive",
-        duration: 2500,
-      });
-      // Still navigate to library even if save fails
-      navigate("/library");
-    }
+    // Protocol is already saved via backend during generation
+    // Just provide user feedback and navigate
+    toast({
+      title: "Protokoll sparat",
+      description: "Protokollet har sparats på mötet och finns i ditt bibliotek.",
+      duration: 2000,
+    });
+    
+    navigate("/library");
   };
 
   const getPriorityColor = (priority: string) => {

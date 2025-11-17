@@ -112,22 +112,33 @@ export const meetingStorage = {
         console.warn('⚠️ Could not resolve folderId from name, proceeding with name only', e);
       }
 
-      // Only save to backend if meeting has a valid UUID (already created) OR is completed
+      // CRITICAL: Always save to backend if meeting is completed OR has a valid UUID
       const hasValidId = meeting.id && isValidUUID(meeting.id);
       const shouldSaveToBackend = hasValidId || meeting.isCompleted;
 
       if (!shouldSaveToBackend) {
         // Draft meeting - return temp ID without backend save
+        console.log('💾 Draft meeting - returning temp ID:', meeting.id);
         return meeting.id || 'temp-' + Date.now();
       }
 
       if (hasValidId) {
+        console.log('💾 Updating existing meeting:', meeting.id);
         const result = await apiClient.updateMeeting(meeting.id, payload);
         return String(result.meeting?.id || meeting.id);
       } else {
         // isCompleted but no valid ID - create new meeting on backend
+        console.log('💾 Creating new meeting (completed, no valid ID yet)');
         const result = await apiClient.createMeeting(payload);
-        return String(result.meeting?.id || '');
+        const newId = String(result.meeting?.id || '');
+        
+        if (!newId || !isValidUUID(newId)) {
+          console.error('❌ Backend returned invalid meeting ID:', newId);
+          throw new Error('Failed to create meeting: invalid ID returned from backend');
+        }
+        
+        console.log('✅ Created meeting with real UUID:', newId);
+        return newId;
       }
     } catch (error) {
       console.error('Error saving meeting (API):', error);
