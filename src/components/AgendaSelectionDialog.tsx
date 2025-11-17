@@ -44,6 +44,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
       const now = new Date().toISOString();
       const { meetingStorage } = await import("@/utils/meetingStorage");
       
+      let finalId = meetingData.id;
       try {
         const savedId = await meetingStorage.saveMeeting({
           id: meetingData.id,
@@ -57,26 +58,25 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           isCompleted: true,
           agendaId: selectedAgendaId,
         } as any);
+        if (savedId) finalId = savedId;
         
         // CRITICAL: Only count if this is a NEW meeting being created with agenda
         // If meeting already exists (e.g., continued from library), it was already counted
-        if (savedId) {
-          const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
-          if (wasCounted && incrementMeetingCount) {
-            console.log('📊 New meeting with agenda - counting:', savedId);
-            await incrementMeetingCount(savedId);
-          } else {
-            console.log('⏭️ Meeting already counted, skipping:', savedId);
-          }
+        const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
+        if (wasCounted && incrementMeetingCount) {
+          console.log('📊 New meeting with agenda - counting:', finalId);
+          await incrementMeetingCount(finalId);
+        } else {
+          console.log('⏭️ Meeting already counted, skipping:', finalId);
         }
       } catch (e) {
         console.warn('Failed to save meeting:', e);
       }
 
-      // Check protocol generation limits
-      const latest = await meetingStorage.getMeeting(meetingData.id);
+      // Check protocol generation limits using the FINAL id
+      const latest = await meetingStorage.getMeeting(finalId);
       const currentProtocolCount = latest?.protocolCount || 0;
-      const { allowed, reason } = await canGenerateProtocol(meetingData.id, currentProtocolCount);
+      const { allowed, reason } = await canGenerateProtocol(finalId, currentProtocolCount);
       
       if (!allowed && reason !== 'Du har nått din gräns för AI-protokoll') {
         toast({
@@ -88,8 +88,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
         return;
       }
 
-      // Increment protocol count
-      await meetingStorage.incrementProtocolCount(meetingData.id);
+      // NOTE: Do NOT increment protocol count here; GenerateProtocol page will do it once
 
       // Generate token and navigate
       const token = crypto.randomUUID();
@@ -99,7 +98,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
         state: {
           transcript: meetingData.transcript,
           meetingName: aiTitle,
-          meetingId: meetingData.id,
+          meetingId: finalId,
           meetingCreatedAt: meetingData.createdAt,
           agendaId: selectedAgendaId,
           token
