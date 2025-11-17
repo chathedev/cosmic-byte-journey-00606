@@ -135,12 +135,23 @@ export const meetingStorage = {
     }
   },
 
-  // Increment protocol count - ALWAYS count meeting to backend
+  // Increment protocol count - count meeting ONLY if not already counted
   async incrementProtocolCount(meetingId: string): Promise<void> {
     try {
-      // ALWAYS count meeting when generating protocol (even for temp/test meetings)
-      console.log('📊 Counting meeting on protocol generation - ALWAYS:', meetingId);
-      await apiClient.incrementMeetings(1);
+      // Check if meeting already counted, only increment if not
+      if (isValidUUID(meetingId)) {
+        const wasCounted = await this.markCountedIfNeeded(meetingId);
+        if (wasCounted) {
+          console.log('📊 Counting meeting on protocol generation:', meetingId);
+          await apiClient.incrementMeetings(1);
+        } else {
+          console.log('⏭️ Meeting already counted, skipping increment:', meetingId);
+        }
+      } else {
+        // For temp meetings, still count once
+        console.log('📊 Counting temp meeting on protocol generation:', meetingId);
+        await apiClient.incrementMeetings(1);
+      }
       
       // Skip backend protocolCount update if temp ID (not yet saved to backend)
       if (!isValidUUID(meetingId)) {

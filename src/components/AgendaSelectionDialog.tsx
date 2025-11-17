@@ -45,7 +45,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
       const { meetingStorage } = await import("@/utils/meetingStorage");
       
       try {
-        await meetingStorage.saveMeeting({
+        const savedId = await meetingStorage.saveMeeting({
           id: meetingData.id,
           title: aiTitle,
           folder: 'Allmänt',
@@ -57,6 +57,14 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           isCompleted: true,
           agendaId: selectedAgendaId,
         } as any);
+        
+        // Increment meeting count if not already counted
+        if (savedId) {
+          const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
+          if (wasCounted && incrementMeetingCount) {
+            await incrementMeetingCount(savedId);
+          }
+        }
       } catch (e) {
         console.warn('Failed to save meeting:', e);
       }
