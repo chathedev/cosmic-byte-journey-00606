@@ -59,10 +59,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       const backendMeetingCount = user.meetingCount || 0;
       
       // Validate and normalize plan type (support common aliases)
-      const validPlans = ['free', 'standard', 'plus', 'unlimited', 'enterprise'] as const;
+      const validPlans = ['free', 'pro', 'plus', 'unlimited', 'enterprise'] as const;
       const aliasMap: Record<string, UserPlan['plan']> = {
         'gratis': 'free',
         'free plan': 'free',
+        'standard': 'pro',
         'obegränsad': 'unlimited',
         'obegränsat': 'unlimited',
       };
@@ -92,8 +93,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       const isUnlimited = normalizedPlan === 'unlimited' || normalizedPlan === 'enterprise';
 
       // Default limits per plan
-      const defaultMeetingLimits: Record<UserPlan['plan'], number> = { free: 1, standard: 10, plus: 30, unlimited: 0, enterprise: 0 };
-      const defaultProtocolsLimits: Record<UserPlan['plan'], number> = { free: 1, standard: 1, plus: 5, unlimited: 999999, enterprise: 999999 };
+      const defaultMeetingLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 10, plus: 30, unlimited: 0, enterprise: 0 };
+      const defaultProtocolsLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 1, plus: 5, unlimited: 999999, enterprise: 999999 };
 
       // Determine limits: trust backend plan; gifts can raise numeric limits but don't change plan
       const used = backendMeetingCount;

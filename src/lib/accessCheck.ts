@@ -22,8 +22,8 @@ export const isUserAdmin = async (user: User | null): Promise<boolean> => {
 export const hasUnlimitedAccess = (user: User | null, userPlan: UserPlan | null): boolean => {
   if (!user || !userPlan) return false;
   
-  // Standard, unlimited, and enterprise get unlimited access
-  if (userPlan.plan === 'standard' || userPlan.plan === 'unlimited' || userPlan.plan === 'enterprise') return true;
+  // Pro, unlimited, and enterprise get unlimited access
+  if (userPlan.plan === 'pro' || userPlan.plan === 'unlimited' || userPlan.plan === 'enterprise') return true;
   
   return false;
 };
@@ -35,8 +35,8 @@ export const hasUnlimitedAccess = (user: User | null, userPlan: UserPlan | null)
 export const hasPlusAccess = (user: User | null, userPlan: UserPlan | null): boolean => {
   if (!user) return false;
   
-  // Standard, unlimited and enterprise plans all get full access
-  if (userPlan?.plan === 'standard' || userPlan?.plan === 'unlimited' || userPlan?.plan === 'enterprise') return true;
+  // Pro, unlimited and enterprise plans all get full access
+  if (userPlan?.plan === 'pro' || userPlan?.plan === 'unlimited' || userPlan?.plan === 'enterprise') return true;
   
   return hasUnlimitedAccess(user, userPlan);
 };

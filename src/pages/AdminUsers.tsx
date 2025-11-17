@@ -472,9 +472,9 @@ export default function AdminUsers() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                    {users.filter(u => u.plan === 'standard').length}
+                    {users.filter(u => u.plan === 'pro').length}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Standard plan</p>
+                  <p className="text-xs text-muted-foreground mt-1">Pro plan</p>
                 </CardContent>
               </Card>
 

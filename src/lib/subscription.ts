@@ -3,7 +3,7 @@ import { apiClient } from './api';
 const BACKEND_URL = 'https://api.tivly.se';
 
 export interface UserPlan {
-  plan: 'free' | 'standard' | 'plus' | 'unlimited' | 'enterprise';
+  plan: 'free' | 'pro' | 'plus' | 'unlimited' | 'enterprise';
   meetingsUsed: number;
   meetingsLimit: number | null; // null = unlimited
   protocolsUsed: number;
@@ -18,7 +18,7 @@ export interface UserPlan {
 
 export interface SubscriptionCheckoutParams {
   userId: string;
-  planName: 'standard' | 'plus';
+  planName: 'pro' | 'plus';
   customerEmail?: string;
   successUrl?: string;
   cancelUrl?: string;
@@ -30,7 +30,7 @@ const normalizePlan = (raw: any, meetingCount: number = 0): UserPlan => {
 
   const defaults: Record<string, { meetingsLimit: number | null; protocolsLimit: number }> = {
     free: { meetingsLimit: 1, protocolsLimit: 1 },
-    standard: { meetingsLimit: null, protocolsLimit: 1 }, // Unlimited meetings
+    pro: { meetingsLimit: 10, protocolsLimit: 1 }, // 10 meetings per month
     plus: { meetingsLimit: null, protocolsLimit: 1 }, // Truly unlimited
     enterprise: { meetingsLimit: null, protocolsLimit: 999999 }, // Enterprise unlimited
   };
@@ -66,8 +66,8 @@ export const subscriptionService = {
       }
 
       // Always read the canonical plan from /me and use /meetings only for usage counts
-      const defaultMeetingLimits: Record<string, number | null> = { free: 1, standard: 100, plus: null }; // Standard: 100/month, Plus: unlimited
-      const defaultProtocolsLimits: Record<string, number> = { free: 1, standard: 1, plus: 1 };
+      const defaultMeetingLimits: Record<string, number | null> = { free: 1, pro: 10, plus: null }; // Pro: 10/month, Plus: unlimited
+      const defaultProtocolsLimits: Record<string, number> = { free: 1, pro: 1, plus: 1 };
 
       let user: any = null;
       let snapshot: any = null;
@@ -138,8 +138,8 @@ export const subscriptionService = {
       let meetingsLimit: number | null;
       if (normalizedPlan === 'unlimited' || normalizedPlan === 'plus' || normalizedPlan === 'enterprise') {
         meetingsLimit = null; // Truly unlimited
-      } else if (normalizedPlan === 'standard') {
-        // Standard has a hidden limit of 100 meetings per month
+      } else if (normalizedPlan === 'pro') {
+        // Pro has a limit of 10 meetings per month
         const fromSnapshot = Number((snapshot as any)?.meetingLimit);
         const fromUser = Number((planRaw as any)?.meetingsLimit);
         meetingsLimit = Number.isFinite(fromSnapshot) && fromSnapshot > 0
@@ -214,7 +214,7 @@ export const subscriptionService = {
 
   // Create subscription intent for custom Elements checkout
   async createSubscriptionIntent(params: {
-    plan: 'standard' | 'plus';
+    plan: 'pro' | 'plus';
   }): Promise<{
     publishableKey: string;
     clientSecret: string;
