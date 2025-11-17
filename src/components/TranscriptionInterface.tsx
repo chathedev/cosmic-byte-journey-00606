@@ -173,19 +173,15 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           
           const savedId = await meetingStorage.saveMeeting(meeting as any);
           
-          // Count the uploaded meeting
+          // Count the uploaded meeting if it's new
           const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
           if (wasCounted) {
-          // Only count if not already counted
-          const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
-          if (wasCounted) {
-            console.log('📊 Incrementing meeting count for uploaded file (first time)');
+            console.log('📊 Uploaded file - counting new meeting:', savedId);
             await incrementMeetingCount(savedId);
             await refreshPlan();
           } else {
-            console.log('⏭️ File meeting already counted, skipping');
+            console.log('⏭️ Uploaded file - meeting already counted:', savedId);
             await refreshPlan();
-          }
           }
         } catch (error) {
           console.error('Error saving uploaded meeting:', error);

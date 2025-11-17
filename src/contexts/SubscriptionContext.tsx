@@ -285,7 +285,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // First check if meeting is already counted using backend state
+      console.log('🔍 incrementMeetingCount called for:', meetingId);
+      
+      // First check if meeting is already counted using backend state + local cache
       const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
       
       if (!wasCounted) {

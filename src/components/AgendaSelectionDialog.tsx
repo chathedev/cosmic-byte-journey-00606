@@ -58,11 +58,15 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           agendaId: selectedAgendaId,
         } as any);
         
-        // Increment meeting count if not already counted
+        // CRITICAL: Only count if this is a NEW meeting being created with agenda
+        // If meeting already exists (e.g., continued from library), it was already counted
         if (savedId) {
           const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
           if (wasCounted && incrementMeetingCount) {
+            console.log('📊 New meeting with agenda - counting:', savedId);
             await incrementMeetingCount(savedId);
+          } else {
+            console.log('⏭️ Meeting already counted, skipping:', savedId);
           }
         }
       } catch (e) {

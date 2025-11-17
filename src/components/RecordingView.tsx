@@ -407,15 +407,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           setSessionId(newId);
         }
 
-        // Count meeting exactly once - check backend first
-        // For continued meetings, this should always return false
+        // Count meeting exactly once - check backend + local cache
+        // For continued meetings, this should always return false (cached)
         const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
         if (wasCounted) {
-          console.log('📊 NEW meeting - incrementing count (first speech detected)');
+          console.log('📊 NEW meeting - incrementing count (first speech detected):', finalId);
           await incrementMeetingCount(finalId);
           await refreshPlan();
         } else {
-          console.log('⏭️ Meeting already counted (continued meeting or duplicate), skipping increment');
+          console.log('⏭️ Meeting already counted (continued/cached), skipping:', finalId);
         }
       } catch (err) {
         // Allow a retry on failure
@@ -879,11 +879,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         setSessionId(newId);
       }
       
-      // Increment meeting count if not already counted
+      // Count meeting if not already counted (test button save)
       if (finalId) {
         const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
         if (wasCounted) {
+          console.log('📊 Test button - counting new meeting:', finalId);
           await incrementMeetingCount(finalId);
+        } else {
+          console.log('⏭️ Test button - meeting already counted:', finalId);
         }
       }
       toast({
@@ -992,12 +995,15 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           savedId = newId;
         }
         
-        // Increment meeting count if not already counted
+        // Count meeting if not already counted (exit save)
         const finalId = newId || sessionId;
         if (finalId) {
           const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
           if (wasCounted) {
+            console.log('📊 Exit save - counting new meeting:', finalId);
             await incrementMeetingCount(finalId);
+          } else {
+            console.log('⏭️ Exit save - meeting already counted:', finalId);
           }
         }
       } catch (e) {
@@ -1076,11 +1082,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         savedId = sessionId;
       }
       
-      // Increment meeting count if not already counted
+      // Count meeting if not already counted (folder change save)
       if (savedId) {
         const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
         if (wasCounted) {
+          console.log('📊 Folder change - counting new meeting:', savedId);
           await incrementMeetingCount(savedId);
+        } else {
+          console.log('⏭️ Folder change - meeting already counted:', savedId);
         }
       }
     } catch (e) {

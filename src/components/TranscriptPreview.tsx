@@ -52,13 +52,9 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
         protocolCount: 0,
       });
 
-      // Count meeting ONLY if not already counted
-      if (meetingId) {
-        const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
-        if (wasCounted) {
-          await incrementMeetingCount(meetingId);
-        }
-      }
+      // CRITICAL: Do NOT count meeting here if it already exists in backend
+      // Meeting counting happens on first save during recording, not during protocol generation
+      console.log('📄 Saving transcript - meeting counting handled by recording flow');
 
       toast({
         title: "Sparat!",
@@ -161,13 +157,9 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
                   protocolCount: 0,
                 });
 
-                // Count meeting ONLY if not already counted
-                if (meetingId) {
-                  const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
-                  if (wasCounted) {
-                    await incrementMeetingCount(meetingId);
-                  }
-                }
+                // CRITICAL: Do NOT count meeting during protocol generation
+                // Meeting was already counted during initial recording/save
+                console.log('📄 Protocol generation - meeting already counted during recording');
 
                 // All users navigate to generate-protocol page
                 const token = `protocol-${Date.now()}`;

@@ -230,9 +230,10 @@ export const meetingStorage = {
   },
 
   // Mark meeting as counted exactly once - returns true if successfully marked (wasn't counted before)
-  // ATOMIC operation with locking to prevent race conditions
+  // ATOMIC operation with LOCAL CACHE + locking to prevent race conditions
   async markCountedIfNeeded(meetingId: string): Promise<boolean> {
     const lockKey = `counting_lock_${meetingId}`;
+    const cacheKey = `meeting_counted_${meetingId}`;
     
     try {
       if (!isValidUUID(meetingId)) {
@@ -240,15 +241,29 @@ export const meetingStorage = {
         return false;
       }
       
-      // Check for in-flight counting operation
-      const inProgress = sessionStorage.getItem(lockKey);
-      if (inProgress === 'true') {
-        console.log('⏭️ Already counting this meeting in parallel call, skipping:', meetingId);
+      // CHECK LOCAL CACHE FIRST - if we've already counted this meeting in this session, don't even try
+      const alreadyCounted = localStorage.getItem(cacheKey);
+      if (alreadyCounted === 'true') {
+        console.log('⏭️ Meeting already counted (local cache):', meetingId);
         return false;
       }
       
-      // Acquire lock
-      sessionStorage.setItem(lockKey, 'true');
+      // Check for in-flight counting operation
+      const lockData = sessionStorage.getItem(lockKey);
+      if (lockData) {
+        const lockTime = parseInt(lockData, 10);
+        const now = Date.now();
+        // If lock is less than 10 seconds old, respect it
+        if (now - lockTime < 10000) {
+          console.log('⏭️ Already counting this meeting in parallel call, skipping:', meetingId);
+          return false;
+        }
+        // Lock is stale, clear it
+        sessionStorage.removeItem(lockKey);
+      }
+      
+      // Acquire lock with timestamp
+      sessionStorage.setItem(lockKey, String(Date.now()));
       
       // Backend handles atomicity - the counted flag can only be set from false->true once
       const { meetings } = await apiClient.getMeetings();
@@ -256,6 +271,7 @@ export const meetingStorage = {
       
       if (current?.counted) {
         console.log('⏭️ Meeting already marked as counted (backend verified):', meetingId);
+        localStorage.setItem(cacheKey, 'true'); // Cache the result
         sessionStorage.removeItem(lockKey);
         return false;
       }
@@ -265,6 +281,9 @@ export const meetingStorage = {
       // Atomically mark as counted in backend
       await apiClient.updateMeeting(meetingId, { counted: true });
       console.log('✅ Successfully marked meeting as counted in backend:', meetingId);
+      
+      // CACHE THE RESULT - this meeting is now counted forever
+      localStorage.setItem(cacheKey, 'true');
       
       // Release lock
       sessionStorage.removeItem(lockKey);

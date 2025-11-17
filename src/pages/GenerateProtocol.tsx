@@ -126,7 +126,7 @@ export default function GenerateProtocol() {
     })();
   }, [location, navigate, toast]);
 
-  // Only increment protocol count - meeting count already handled
+  // Only increment protocol count - NEVER increment meeting count here
   useEffect(() => {
     if (!isValidated || hasCountedRef.current) return;
     hasCountedRef.current = true;
@@ -135,9 +135,10 @@ export default function GenerateProtocol() {
       if (!pageState?.meetingId) return;
       
       try {
-        console.log('📊 Incrementing protocol count for:', pageState.meetingId);
+        console.log('📊 Incrementing protocol count ONLY for:', pageState.meetingId);
         
-        // Only increment protocol count - meeting was already counted when created
+        // CRITICAL: Only increment protocol count - meeting was already counted when created/saved
+        // NEVER call incrementMeetingCount here - that would double-count existing meetings
         await meetingStorage.incrementProtocolCount(pageState.meetingId);
         
         console.log('✅ Protocol count incremented successfully');
