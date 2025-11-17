@@ -289,7 +289,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
       
       if (!wasCounted) {
-        console.log('⏭️ Meeting already counted, skipping increment:', meetingId);
+        console.log('⏭️ Meeting already counted (continued or duplicate call), skipping increment:', meetingId);
         // Still refresh to ensure UI is in sync with backend
         await refreshPlan();
         return;
