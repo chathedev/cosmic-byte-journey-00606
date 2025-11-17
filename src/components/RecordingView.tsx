@@ -80,7 +80,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const recordingStartTimeRef = useRef<number>(Date.now());
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState('');
-  const hasIncrementedCountRef = useRef(false);
+  const hasIncrementedCountRef = useRef(!!continuedMeeting); // If continuing, already counted
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
   const [pendingMeetingData, setPendingMeetingData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -405,13 +405,14 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         }
 
         // Count meeting exactly once - check backend first
+        // For continued meetings, this should always return false
         const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
         if (wasCounted) {
-          console.log('📊 Incrementing meeting count (first speech detected) - ONCE');
+          console.log('📊 NEW meeting - incrementing count (first speech detected)');
           await incrementMeetingCount(finalId);
           await refreshPlan();
         } else {
-          console.log('⏭️ Meeting already counted, skipping increment');
+          console.log('⏭️ Meeting already counted (continued meeting or duplicate), skipping increment');
         }
       } catch (err) {
         // Allow a retry on failure
@@ -429,6 +430,9 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       if (continuedMeeting) {
         setSessionId(continuedMeeting.id);
         setSelectedFolder(continuedMeeting.folder);
+        // Mark as already counted to prevent double counting when continuing
+        hasIncrementedCountRef.current = true;
+        console.log('🔄 Continuing existing meeting - already counted:', continuedMeeting.id);
         return;
       }
 
