@@ -108,6 +108,7 @@ export const subscriptionService = {
       const aliasMap: Record<string, UserPlan['plan']> = {
         'gratis': 'free',
         'free plan': 'free',
+        'standard': 'pro',
         'obegränsad': 'unlimited',
         'obegränsat': 'unlimited',
         'unlimited': 'unlimited',
@@ -126,10 +127,10 @@ export const subscriptionService = {
         (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'enterprise' && (c?.status ?? 'active') === 'active'))
       );
 
-      const validPlans = ['free','standard','plus','unlimited','enterprise'] as const;
+      const validPlans = ['free','pro','plus','unlimited','enterprise'] as const;
       const normalizedPlan: UserPlan['plan'] = enterpriseDetected
         ? 'enterprise'
-        : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')));
+        : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')) as UserPlan['plan']);
 
       // Use cumulative count from /me only
       const meetingsUsed = Math.max(0, Number((user as any)?.meetingCount ?? 0) || 0);
@@ -144,7 +145,7 @@ export const subscriptionService = {
         const fromUser = Number((planRaw as any)?.meetingsLimit);
         meetingsLimit = Number.isFinite(fromSnapshot) && fromSnapshot > 0
           ? fromSnapshot
-          : (Number.isFinite(fromUser) && fromUser > 0 ? fromUser : 100);
+          : (Number.isFinite(fromUser) && fromUser > 0 ? fromUser : 10);
       } else {
         const fromSnapshot = Number((snapshot as any)?.meetingLimit);
         const fromUser = Number((planRaw as any)?.meetingsLimit);
