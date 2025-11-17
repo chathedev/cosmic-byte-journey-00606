@@ -248,7 +248,7 @@ export const Chat = () => {
               <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
                 <Lock className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">Uppgradera till Plus</CardTitle>
+              <CardTitle className="text-2xl">Uppgradera till Tivly Plus</CardTitle>
               <CardDescription className="text-base mt-2">
                 AI Möteschatt är en exklusiv funktion för Plus-användare. Chatta med AI om alla dina möten!
               </CardDescription>
@@ -265,7 +265,7 @@ export const Chat = () => {
               </div>
               <Button className="w-full" size="lg" onClick={() => setShowSubscribeDialog(true)}>
                 <TrendingUp className="mr-2 h-4 w-4" />
-                Uppgradera till Plus
+                Uppgradera till Tivly Plus
               </Button>
               <Button variant="outline" className="w-full" onClick={() => navigate('/')}>Tillbaka till start</Button>
             </CardContent>

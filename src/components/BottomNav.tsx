@@ -64,7 +64,7 @@ export const BottomNav = () => {
             onClick={() => {
               toast({
                 title: "Uppgradera för att se biblioteket",
-                description: "Uppgradera till Standard eller Plus för att få tillgång till biblioteket och alla dess funktioner!",
+                description: "Uppgradera till Tivly Pro eller Plus för att få tillgång till biblioteket och alla dess funktioner!",
                 variant: "destructive",
               });
             }}

@@ -35,7 +35,7 @@ export const UpgradeBanner = () => {
 
   const getPlanMessage = () => {
     if (userPlan.plan === 'free') {
-      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera för fler möten och AI-protokoll!`;
+      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera till Pro för fler möten och AI-protokoll!`;
     }
     if (userPlan.plan === 'pro') {
       const remaining = displayLimit - userPlan.meetingsUsed;
@@ -79,7 +79,7 @@ export const UpgradeBanner = () => {
               variant="default"
             >
               <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
-              Uppgradera
+              Uppgradera till Pro
             </Button>
           )}
         </div>
