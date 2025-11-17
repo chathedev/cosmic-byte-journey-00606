@@ -261,6 +261,17 @@ const Library = () => {
   };
 
   const handleCreateProtocol = async (meeting: MeetingSession) => {
+    // Check if meeting already has a protocol attached
+    if (protocolStatus[meeting.id]) {
+      toast({
+        title: "Protokoll finns redan",
+        description: "Detta möte har redan ett genererat protokoll. Ta bort det befintliga protokollet först om du vill skapa ett nytt.",
+        variant: "destructive",
+        duration: 4000,
+      });
+      return;
+    }
+
     // Always refresh latest meeting data to avoid stale counts
     const latest = await meetingStorage.getMeeting(meeting.id);
     const effectiveMeeting = latest || meeting;
