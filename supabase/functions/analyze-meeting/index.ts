@@ -55,28 +55,30 @@ Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struk
   "protokoll": {
     "titel": "...",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "5-8 meningar med detaljerad översikt av mötet, omformulerat och professionellt skrivet",
+    "sammanfattning": "6-10 meningar med mycket detaljerad översikt av mötet. Inkludera kontext, viktiga diskussioner, beslut och resultat. Skriv omfattande och professionellt.",
     "huvudpunkter": [
-      "Punkt 1: En eller två fullständiga meningar med viktiga detaljer och kontext",
-      "Punkt 2: Fortsätt med substans, specifika diskussioner och insikter från mötet",
-      "Punkt 3 osv: Inkludera alla viktiga ämnen som behandlades"
+      "Punkt 1: Två till tre fullständiga meningar med omfattande detaljer, kontext, specifika siffror och diskussionspunkter som togs upp",
+      "Punkt 2: Fortsätt med substans och djup. Inkludera vad som diskuterades, varför det var viktigt, och vilka insikter som framkom",
+      "Punkt 3 osv: Gå in på detaljer för varje ämne. Täck alla aspekter som behandlades under mötet",
+      "Fortsätt med 10-15 huvudpunkter totalt för att täcka allt som diskuterades"
     ],
     "beslut": [
-      "Beslut 1 ...",
-      "Beslut 2 ..."
+      "Beslut 1: Skriv ut hela beslutet med bakgrund och motivering",
+      "Beslut 2: Inkludera detaljer om vad som beslutades och varför"
     ],
     "åtgärdspunkter": [
       {
-        "titel": "...",
-        "beskrivning": "Detaljerad beskrivning av vad som ska göras",
+        "titel": "Kort och koncis titel",
+        "beskrivning": "Mycket detaljerad beskrivning av uppgiften, vad som ska göras, hur det ska utföras, och varför det är viktigt. Inkludera all relevant kontext från mötet.",
         "ansvarig": "Namn eller roll (lämna tom om ej nämnt)",
         "deadline": "YYYY-MM-DD om datum nämns, annars lämna helt tom",
         "prioritet": "critical" | "high" | "medium" | "low"
       }
     ],
     "nästaMöteFörslag": [
-      "Ämne/område att diskutera nästa gång",
-      "Annat relevant ämne för uppföljning"
+      "Detaljerat diskussionsämne 1 med kontext om varför det bör tas upp",
+      "Uppföljningsområde 2 med förklaring",
+      "Fortsätt med 4-6 förslag totalt"
     ]
   }
 }
