@@ -45,6 +45,8 @@ Längd: ${wordCount} ord${agendaSection}
 Utskrift:
 ${transcript}
 
+VIKTIGT för "nästaMöteFörslag": Lista ENDAST diskussionsämnen och uppföljningspunkter. Inkludera ALDRIG datum, tider eller när mötet ska äga rum - bara VAD som bör tas upp.
+
 Skapa ett professionellt och DETALJERAT protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
 
 {
@@ -71,8 +73,8 @@ Skapa ett professionellt och DETALJERAT protokoll som ren JSON-struktur på sven
       }
     ],
     "nästaMöteFörslag": [
-      "Förslag till nästa möte 1",
-      "Förslag 2"
+      "Ämne/område att diskutera nästa gång",
+      "Annat relevant ämne för uppföljning"
     ]
   }
 }
