@@ -108,9 +108,27 @@ export const AutoProtocolGenerator = ({
           hasSummary: !!data.summary,
           summaryLength: data.summary?.length || 0,
           mainPointsCount: data.mainPoints?.length || 0,
+          mainPointsIsArray: Array.isArray(data.mainPoints),
           decisionsCount: data.decisions?.length || 0,
+          decisionsIsArray: Array.isArray(data.decisions),
           actionItemsCount: data.actionItems?.length || 0
         });
+        
+        // Extra validation to ensure arrays are actually arrays
+        if (!Array.isArray(data.mainPoints)) {
+          console.error("❌ mainPoints is not an array:", typeof data.mainPoints);
+          throw new Error("Ogiltigt format från AI - huvudpunkter saknas");
+        }
+        
+        if (!Array.isArray(data.decisions)) {
+          console.warn("⚠️ decisions is not an array, converting:", typeof data.decisions);
+          data.decisions = [];
+        }
+        
+        if (!Array.isArray(data.actionItems)) {
+          console.warn("⚠️ actionItems is not an array, converting:", typeof data.actionItems);
+          data.actionItems = [];
+        }
         
         // Validate that we have actual content
         if (!data.summary || data.summary.trim() === '') {
@@ -118,7 +136,7 @@ export const AutoProtocolGenerator = ({
           throw new Error("AI genererade inget innehåll. Försök igen.");
         }
         
-        if (!data.mainPoints || data.mainPoints.length === 0) {
+        if (data.mainPoints.length === 0) {
           console.error("❌ No main points received from AI");
           throw new Error("AI kunde inte generera huvudpunkter. Försök igen.");
         }
@@ -517,24 +535,24 @@ export const AutoProtocolGenerator = ({
             <div>
               <h2 className="text-xl font-semibold mb-3">Huvudpunkter</h2>
               <ul className="space-y-2">
-                {generatedProtocol.mainPoints.map((point, index) => (
+                {Array.isArray(generatedProtocol.mainPoints) && generatedProtocol.mainPoints.map((point, index) => (
                   <li key={index} className="flex gap-3">
                     <span className="text-primary font-medium">{index + 1}.</span>
-                    <span className="text-muted-foreground">{point}</span>
+                    <span className="text-muted-foreground">{String(point)}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Decisions */}
-            {generatedProtocol.decisions.length > 0 && (
+            {Array.isArray(generatedProtocol.decisions) && generatedProtocol.decisions.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-3">Beslut</h2>
                 <ul className="space-y-2">
                   {generatedProtocol.decisions.map((decision, index) => (
                     <li key={index} className="flex gap-3">
                       <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{decision}</span>
+                      <span className="text-muted-foreground">{String(decision)}</span>
                     </li>
                   ))}
                 </ul>
@@ -542,7 +560,7 @@ export const AutoProtocolGenerator = ({
             )}
 
             {/* Action Items */}
-            {generatedProtocol.actionItems.length > 0 && (
+            {Array.isArray(generatedProtocol.actionItems) && generatedProtocol.actionItems.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold mb-3">Åtgärdspunkter</h2>
                 <div className="space-y-4">
@@ -564,6 +582,21 @@ export const AutoProtocolGenerator = ({
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Next Meeting Suggestions */}
+            {Array.isArray(generatedProtocol.nextMeetingSuggestions) && generatedProtocol.nextMeetingSuggestions.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-3">Nästa möte - Förslag</h2>
+                <ul className="space-y-2">
+                  {generatedProtocol.nextMeetingSuggestions.map((suggestion, index) => (
+                    <li key={index} className="flex gap-3">
+                      <span className="text-primary font-medium">•</span>
+                      <span className="text-muted-foreground">{String(suggestion)}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
