@@ -47,6 +47,9 @@ const Library = () => {
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
+  const [draggedMeeting, setDraggedMeeting] = useState<MeetingSession | null>(null);
+  const [draggedFolderIndex, setDraggedFolderIndex] = useState<number | null>(null);
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
@@ -251,6 +254,93 @@ const Library = () => {
     });
   };
 
+  // Drag and drop handlers
+  const handleMeetingDragStart = (e: React.DragEvent, meeting: MeetingSession) => {
+    setDraggedMeeting(meeting);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add a slight visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleMeetingDragEnd = (e: React.DragEvent) => {
+    setDraggedMeeting(null);
+    setDragOverFolder(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleFolderDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedFolderIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent, folderName: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolder(folderName);
+  };
+
+  const handleFolderDrop = async (e: React.DragEvent, targetFolder: string, targetIndex: number) => {
+    e.preventDefault();
+    setDragOverFolder(null);
+
+    // If dragging a meeting onto a folder
+    if (draggedMeeting) {
+      if (draggedMeeting.folder !== targetFolder) {
+        await handleMoveToFolder(draggedMeeting, targetFolder);
+      }
+      setDraggedMeeting(null);
+      return;
+    }
+
+    // If dragging a folder to reorder
+    if (draggedFolderIndex !== null && draggedFolderIndex !== targetIndex) {
+      const newFolders = [...folders];
+      const [movedFolder] = newFolders.splice(draggedFolderIndex, 1);
+      newFolders.splice(targetIndex, 0, movedFolder);
+      setFolders(newFolders);
+      setDraggedFolderIndex(null);
+      
+      // Update folder order in backend
+      await updateFolderOrder(newFolders);
+      
+      toast({
+        title: "Mappar omordnade",
+        description: "Mappordningen har uppdaterats",
+      });
+    }
+  };
+
+  const handleFolderDragEnd = () => {
+    setDraggedFolderIndex(null);
+    setDragOverFolder(null);
+  };
+
+  const updateFolderOrder = async (orderedFolders: string[]) => {
+    if (!user) return;
+    
+    try {
+      // Get folder objects with IDs
+      const folderData = await meetingStorage.getFolders(user.uid);
+      
+      // Update each folder's order
+      const { apiClient } = await import("@/lib/api");
+      
+      for (let i = 0; i < orderedFolders.length; i++) {
+        const folderName = orderedFolders[i];
+        const folderObj = folderData.find(f => f.name === folderName);
+        if (folderObj) {
+          await apiClient.updateFolder(folderObj.id, { order: i });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update folder order:', error);
+    }
+  };
+
   const handleContinueMeeting = (meeting: MeetingSession) => {
     // Free users cannot continue meetings
     if (userPlan?.plan === 'free') {
@@ -406,23 +496,40 @@ const Library = () => {
               Alla möten ({meetings.length})
             </Button>
             {/* Always show Allmänt folder first */}
-            <div className="flex items-center gap-1">
+            <div 
+              className="flex items-center gap-1"
+              draggable
+              onDragStart={(e) => handleFolderDragStart(e, 0)}
+              onDragOver={(e) => handleFolderDragOver(e, "Allmänt")}
+              onDrop={(e) => handleFolderDrop(e, "Allmänt", 0)}
+              onDragEnd={handleFolderDragEnd}
+            >
               <Button
                 variant={selectedFolder === "Allmänt" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedFolder("Allmänt")}
+                className={dragOverFolder === "Allmänt" ? "ring-2 ring-primary" : ""}
               >
                 <Folder className="w-3 h-3 mr-1" />
                 Allmänt ({meetings.filter(m => !m.folder || m.folder === "Allmänt").length})
               </Button>
             </div>
             {/* Show other folders */}
-            {folders.filter(f => f !== "Allmänt").map(folder => (
-              <div key={folder} className="flex items-center gap-1">
+            {folders.filter(f => f !== "Allmänt").map((folder, index) => (
+              <div 
+                key={folder} 
+                className="flex items-center gap-1"
+                draggable
+                onDragStart={(e) => handleFolderDragStart(e, index + 1)}
+                onDragOver={(e) => handleFolderDragOver(e, folder)}
+                onDrop={(e) => handleFolderDrop(e, folder, index + 1)}
+                onDragEnd={handleFolderDragEnd}
+              >
                 <Button
                   variant={selectedFolder === folder ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedFolder(folder)}
+                  className={dragOverFolder === folder ? "ring-2 ring-primary" : ""}
                 >
                   <Folder className="w-3 h-3 mr-1" />
                   {folder} ({meetings.filter(m => m.folder === folder).length})
@@ -480,8 +587,11 @@ const Library = () => {
             {filteredMeetings.map((meeting, index) => (
               <Card 
                 key={meeting.id} 
-                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 cursor-move"
                 style={{ animationDelay: `${index * 50}ms` }}
+                draggable
+                onDragStart={(e) => handleMeetingDragStart(e, meeting)}
+                onDragEnd={handleMeetingDragEnd}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
