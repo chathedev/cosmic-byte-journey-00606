@@ -127,7 +127,7 @@ Svara i JSON-format på samma språk som transkriptionen.`;
     console.log("Gemini API response received:", JSON.stringify(data).substring(0, 200));
     
     // Parse the JSON content from the Gemini response
-    let aiResponse;
+    let result;
     try {
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       console.log("Raw AI content:", content.substring(0, 200));
@@ -140,19 +140,41 @@ Svara i JSON-format på samma språk som transkriptionen.`;
         cleanedContent = cleanedContent.replace(/^```\n/, '').replace(/\n```$/, '');
       }
       
-      aiResponse = JSON.parse(cleanedContent);
-      console.log("Parsed AI response:", {
-        hasTitle: !!aiResponse.title,
-        hasSummary: !!aiResponse.summary,
-        summaryLength: aiResponse.summary?.length || 0,
-        mainPointsCount: aiResponse.mainPoints?.length || 0,
-        decisionsCount: aiResponse.decisions?.length || 0,
-        actionItemsCount: aiResponse.actionItems?.length || 0
+      const parsed = JSON.parse(cleanedContent);
+      
+      // Support both English and Swedish JSON structures
+      const protocol = parsed.protokoll || parsed.protocol || parsed;
+
+      const title = protocol.title || protocol.titel || meetingName || 'Mötesprotokoll';
+      const summary = protocol.summary || protocol.sammanfattning || protocol.sammandrag || '';
+      const mainPoints = protocol.mainPoints || protocol.huvudpunkter || protocol.punkter || [];
+      const decisions = protocol.decisions || protocol.beslut || [];
+      const actionItemsRaw = protocol.actionItems || protocol.åtgärdspunkter || protocol.atgardsPunkter || [];
+      const nextMeetingSuggestions = protocol.nextMeetingSuggestions || protocol.nästaMöteFörslag || protocol.nextMeetingTopics || [];
+
+      // Normalize action items to our expected structure
+      const actionItems = Array.isArray(actionItemsRaw)
+        ? actionItemsRaw.map((item: any) => ({
+            title: item.title || item.titel || '',
+            description: item.description || item.beskrivning || '',
+            owner: item.owner || item.ansvarig || '',
+            deadline: item.deadline || item.sistaDatum || item.deadlineDatum || '',
+            priority: (item.priority || item.prioritet || 'medium') as 'critical' | 'high' | 'medium' | 'low',
+          }))
+        : [];
+
+      console.log("Parsed & normalized AI response:", {
+        hasTitle: !!title,
+        hasSummary: !!summary,
+        summaryLength: summary.length,
+        mainPointsCount: Array.isArray(mainPoints) ? mainPoints.length : 0,
+        decisionsCount: Array.isArray(decisions) ? decisions.length : 0,
+        actionItemsCount: actionItems.length,
       });
       
       // Validate that we have actual content
-      if (!aiResponse.summary || aiResponse.summary.trim() === '') {
-        console.error("AI returned empty summary");
+      if (!summary || summary.trim() === '') {
+        console.error("AI returned empty summary after normalization");
         return new Response(
           JSON.stringify({ 
             error: "AI genererade inget innehåll. Försök igen eller använd en längre transkription." 
@@ -161,8 +183,8 @@ Svara i JSON-format på samma språk som transkriptionen.`;
         );
       }
       
-      if (!aiResponse.mainPoints || aiResponse.mainPoints.length === 0) {
-        console.error("AI returned no main points");
+      if (!Array.isArray(mainPoints) || mainPoints.length === 0) {
+        console.error("AI returned no main points after normalization");
         return new Response(
           JSON.stringify({ 
             error: "AI kunde inte generera huvudpunkter. Försök igen." 
@@ -170,24 +192,23 @@ Svara i JSON-format på samma språk som transkriptionen.`;
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
+
+      result = {
+        title,
+        summary,
+        mainPoints,
+        decisions,
+        actionItems,
+        nextMeetingSuggestions,
+      };
     } catch (parseError) {
-      console.error("Parse error:", parseError);
+      console.error("Parse/normalization error:", parseError);
       return new Response(
         JSON.stringify({ error: "Kunde inte tolka AI-svaret. Försök igen." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const result = {
-      title: aiResponse.title || meetingName || 'Mötesprotokoll',
-      summary: aiResponse.summary || '',
-      mainPoints: aiResponse.mainPoints || [],
-      decisions: aiResponse.decisions || [],
-      actionItems: aiResponse.actionItems || [],
-      nextMeetingSuggestions: aiResponse.nextMeetingSuggestions || []
-    };
-    
     console.log("Returning result with summary length:", result.summary.length);
     
     return new Response(
