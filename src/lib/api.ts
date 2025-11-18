@@ -742,7 +742,7 @@ class ApiClient {
     return response.json();
   }
 
-  async updateFolder(id: string, data: { name?: string; color?: string; icon?: string }): Promise<any> {
+  async updateFolder(id: string, data: { name?: string; color?: string; icon?: string; order?: number }): Promise<any> {
     const response = await this.fetchWithAuth(`/folders/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
