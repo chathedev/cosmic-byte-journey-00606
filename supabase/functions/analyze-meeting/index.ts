@@ -20,6 +20,51 @@ serve(async (req) => {
 
     const wordCount = transcript.trim().split(/\s+/).length;
     
+    // Determine protocol length based on transcript length
+    let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsDetail, nextMeetingCount;
+    
+    if (wordCount < 200) {
+      // Very short meeting
+      summaryLength = "2-3 meningar med kortfattad översikt";
+      mainPointsCount = "3-5 huvudpunkter";
+      mainPointsDetail = "En mening per punkt";
+      decisionsDetail = "Kort formulering";
+      actionItemsDetail = "Kortfattad beskrivning";
+      nextMeetingCount = "2-3 förslag";
+    } else if (wordCount < 500) {
+      // Short meeting
+      summaryLength = "3-5 meningar med översikt";
+      mainPointsCount = "5-8 huvudpunkter";
+      mainPointsDetail = "En till två meningar per punkt";
+      decisionsDetail = "Tydlig formulering med lite kontext";
+      actionItemsDetail = "Beskrivning med viktigaste detaljerna";
+      nextMeetingCount = "3-4 förslag";
+    } else if (wordCount < 1500) {
+      // Medium meeting
+      summaryLength = "5-7 meningar med detaljerad översikt";
+      mainPointsCount = "8-12 huvudpunkter";
+      mainPointsDetail = "Två meningar per punkt med detaljer och kontext";
+      decisionsDetail = "Utförlig formulering med bakgrund";
+      actionItemsDetail = "Detaljerad beskrivning med kontext och betydelse";
+      nextMeetingCount = "4-5 förslag";
+    } else if (wordCount < 3000) {
+      // Long meeting
+      summaryLength = "7-10 meningar med mycket detaljerad översikt";
+      mainPointsCount = "12-18 huvudpunkter";
+      mainPointsDetail = "Två till tre meningar per punkt med omfattande detaljer, kontext och specifika diskussionspunkter";
+      decisionsDetail = "Mycket utförlig formulering med bakgrund, motivering och konsekvenser";
+      actionItemsDetail = "Omfattande beskrivning med full kontext, vad som ska göras, hur och varför";
+      nextMeetingCount = "5-6 förslag";
+    } else {
+      // Very long meeting
+      summaryLength = "10-15 meningar med extremt detaljerad översikt av allt som diskuterades";
+      mainPointsCount = "20-30 huvudpunkter";
+      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer, alla aspekter av diskussionen, specifika siffror och insikter";
+      decisionsDetail = "Extremt detaljerad formulering med fullständig bakgrund, alla diskussionsaspekter, motivering och långsiktiga konsekvenser";
+      actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext, detaljerad plan för genomförande, varför det är viktigt och hur det relaterar till mötets diskussioner";
+      nextMeetingCount = "6-8 förslag";
+    }
+    
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
     const agendaNote = agenda ? 'OBS: Använd mötesagendan ovan för att strukturera protokollet och säkerställ att alla agendapunkter täcks.' : '';
     const shortNote = wordCount < 50 ? 'OBS: Utskriften är mycket kort. Inkludera ett meddelande i sammanfattningen om att mötet innehöll begränsad information.' : '';
@@ -55,30 +100,24 @@ Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struk
   "protokoll": {
     "titel": "...",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "6-10 meningar med mycket detaljerad översikt av mötet. Inkludera kontext, viktiga diskussioner, beslut och resultat. Skriv omfattande och professionellt.",
+    "sammanfattning": "${summaryLength}. Inkludera kontext, viktiga diskussioner, beslut och resultat. Skriv professionellt.",
     "huvudpunkter": [
-      "Punkt 1: Två till tre fullständiga meningar med omfattande detaljer, kontext, specifika siffror och diskussionspunkter som togs upp",
-      "Punkt 2: Fortsätt med substans och djup. Inkludera vad som diskuterades, varför det var viktigt, och vilka insikter som framkom",
-      "Punkt 3 osv: Gå in på detaljer för varje ämne. Täck alla aspekter som behandlades under mötet",
-      "Fortsätt med 10-15 huvudpunkter totalt för att täcka allt som diskuterades"
+      "${mainPointsCount} totalt. ${mainPointsDetail}. Täck alla viktiga ämnen som diskuterades under mötet."
     ],
     "beslut": [
-      "Beslut 1: Skriv ut hela beslutet med bakgrund och motivering",
-      "Beslut 2: Inkludera detaljer om vad som beslutades och varför"
+      "${decisionsDetail}. Lista alla beslut som togs."
     ],
     "åtgärdspunkter": [
       {
         "titel": "Kort och koncis titel",
-        "beskrivning": "Mycket detaljerad beskrivning av uppgiften, vad som ska göras, hur det ska utföras, och varför det är viktigt. Inkludera all relevant kontext från mötet.",
+        "beskrivning": "${actionItemsDetail}",
         "ansvarig": "Namn eller roll (lämna tom om ej nämnt)",
         "deadline": "YYYY-MM-DD om datum nämns, annars lämna helt tom",
         "prioritet": "critical" | "high" | "medium" | "low"
       }
     ],
     "nästaMöteFörslag": [
-      "Detaljerat diskussionsämne 1 med kontext om varför det bör tas upp",
-      "Uppföljningsområde 2 med förklaring",
-      "Fortsätt med 4-6 förslag totalt"
+      "${nextMeetingCount}. Beskriv varje diskussionsämne med tillräcklig kontext."
     ]
   }
 }
