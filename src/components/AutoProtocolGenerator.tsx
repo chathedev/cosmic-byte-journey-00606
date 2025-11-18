@@ -97,10 +97,31 @@ export const AutoProtocolGenerator = ({
         );
 
         if (!response.ok) {
-          throw new Error("Failed to generate protocol");
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          console.error("Edge function error:", errorData);
+          throw new Error(errorData.error || "Failed to generate protocol");
         }
 
         const data = await response.json();
+        console.log("✅ Received protocol data:", {
+          hasTitle: !!data.title,
+          hasSummary: !!data.summary,
+          summaryLength: data.summary?.length || 0,
+          mainPointsCount: data.mainPoints?.length || 0,
+          decisionsCount: data.decisions?.length || 0,
+          actionItemsCount: data.actionItems?.length || 0
+        });
+        
+        // Validate that we have actual content
+        if (!data.summary || data.summary.trim() === '') {
+          console.error("❌ Empty summary received from AI");
+          throw new Error("AI genererade inget innehåll. Försök igen.");
+        }
+        
+        if (!data.mainPoints || data.mainPoints.length === 0) {
+          console.error("❌ No main points received from AI");
+          throw new Error("AI kunde inte generera huvudpunkter. Försök igen.");
+        }
         
         // Complete progress
         clearInterval(progressInterval);
@@ -108,6 +129,7 @@ export const AutoProtocolGenerator = ({
         
         await new Promise(resolve => setTimeout(resolve, 300));
         
+        console.log("📝 Setting generated protocol with summary:", data.summary.substring(0, 100));
         setGeneratedProtocol(data);
 
         // Generate title
@@ -126,14 +148,17 @@ export const AutoProtocolGenerator = ({
           onProtocolReady();
         }
       } catch (error) {
-        console.error("Error generating protocol:", error);
+        console.error("❌ Error generating protocol:", error);
         clearInterval(progressInterval);
+        const errorMessage = error instanceof Error ? error.message : "Kunde inte generera protokollet. Försök igen.";
         toast({
           title: "Fel vid generering",
-          description: "Kunde inte generera protokollet. Försök igen.",
+          description: errorMessage,
           variant: "destructive",
-          duration: 2500,
+          duration: 4000,
         });
+        // Navigate back on error
+        setTimeout(() => onBack(), 1000);
       } finally {
         setIsGenerating(false);
       }
