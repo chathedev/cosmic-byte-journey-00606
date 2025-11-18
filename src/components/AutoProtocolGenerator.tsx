@@ -312,7 +312,7 @@ export const AutoProtocolGenerator = ({
               bullet: { level: 1 },
               spacing: { after: 50 },
             })] : []),
-            ...(item.deadline ? [new Paragraph({
+            ...(item.deadline && item.deadline.trim() !== '' ? [new Paragraph({
               text: `Deadline: ${item.deadline}`,
               bullet: { level: 1 },
               spacing: { after: 100 },
@@ -576,7 +576,7 @@ export const AutoProtocolGenerator = ({
                       )}
                       <div className="flex gap-4 text-xs text-muted-foreground">
                         {item.owner && <span>Ansvarig: {item.owner}</span>}
-                        {item.deadline && <span>Deadline: {item.deadline}</span>}
+                        {item.deadline && item.deadline.trim() !== '' && <span>Deadline: {item.deadline}</span>}
                       </div>
                     </div>
                   ))}
