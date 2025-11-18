@@ -31,6 +31,12 @@ interface User {
   };
 }
 
+interface TranscribeResponse {
+  text: string;
+  processedAt?: string;
+  fileSizeMB?: string;
+}
+
 interface AuthResponse {
   token: string;
   user: User;
@@ -1138,6 +1144,36 @@ class ApiClient {
     const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/meetings${params}`);
     if (!response.ok) throw new Error('Failed to fetch company meetings');
     return response.json();
+  }
+
+  // Transcription API
+  async transcribeAudio(audioFile: File, language: string = 'sv', modelSize: string = 'base'): Promise<string> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const formData = new FormData();
+    formData.append('audioFile', audioFile);
+    formData.append('language', language);
+    formData.append('modelSize', modelSize);
+
+    const response = await fetch(`${API_BASE_URL}/transcribe`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to transcribe audio' }));
+      throw new Error(error.error || error.message || 'Failed to transcribe audio');
+    }
+
+    const data: TranscribeResponse = await response.json();
+    return data.text;
   }
 }
 
