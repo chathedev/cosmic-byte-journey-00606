@@ -47,17 +47,19 @@ ${transcript}
 
 VIKTIGT för "nästaMöteFörslag": Lista ENDAST diskussionsämnen och uppföljningspunkter. Inkludera ALDRIG datum, tider eller när mötet ska äga rum - bara VAD som bör tas upp.
 
-Skapa ett professionellt och DETALJERAT protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
+VIKTIGT för åtgärdspunkter: Om inget specifikt datum nämndes för en deadline, lämna "deadline"-fältet HELT TOMT (tom sträng ""). Gissa INTE eller lägg INTE till dagens år automatiskt.
+
+Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
 
 {
   "protokoll": {
     "titel": "...",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "4-6 meningar, tydligt omformulerad sammanfattning",
+    "sammanfattning": "5-8 meningar med detaljerad översikt av mötet, omformulerat och professionellt skrivet",
     "huvudpunkter": [
-      "Punkt 1 i hela meningar",
-      "Punkt 2 ...",
-      "..."
+      "Punkt 1: En eller två fullständiga meningar med viktiga detaljer och kontext",
+      "Punkt 2: Fortsätt med substans, specifika diskussioner och insikter från mötet",
+      "Punkt 3 osv: Inkludera alla viktiga ämnen som behandlades"
     ],
     "beslut": [
       "Beslut 1 ...",
@@ -66,9 +68,9 @@ Skapa ett professionellt och DETALJERAT protokoll som ren JSON-struktur på sven
     "åtgärdspunkter": [
       {
         "titel": "...",
-        "beskrivning": "...",
-        "ansvarig": "Namn eller roll",
-        "deadline": "YYYY-MM-DD",
+        "beskrivning": "Detaljerad beskrivning av vad som ska göras",
+        "ansvarig": "Namn eller roll (lämna tom om ej nämnt)",
+        "deadline": "YYYY-MM-DD om datum nämns, annars lämna helt tom",
         "prioritet": "critical" | "high" | "medium" | "low"
       }
     ],
