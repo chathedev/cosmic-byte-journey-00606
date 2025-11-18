@@ -147,29 +147,60 @@ Svara i JSON-format på samma språk som transkriptionen.`;
 
       const title = protocol.title || protocol.titel || meetingName || 'Mötesprotokoll';
       const summary = protocol.summary || protocol.sammanfattning || protocol.sammandrag || '';
-      const mainPoints = protocol.mainPoints || protocol.huvudpunkter || protocol.punkter || [];
-      const decisions = protocol.decisions || protocol.beslut || [];
+      
+      // Normalize main points - ensure it's always an array of strings
+      let mainPoints = protocol.mainPoints || protocol.huvudpunkter || protocol.punkter || [];
+      if (!Array.isArray(mainPoints)) {
+        mainPoints = [];
+      }
+      mainPoints = mainPoints.filter((p: any) => typeof p === 'string' && p.trim() !== '');
+      
+      // Normalize decisions - ensure it's always an array of strings
+      let decisions = protocol.decisions || protocol.beslut || [];
+      if (!Array.isArray(decisions)) {
+        decisions = [];
+      }
+      decisions = decisions.filter((d: any) => typeof d === 'string' && d.trim() !== '');
+      
+      // Normalize action items
       const actionItemsRaw = protocol.actionItems || protocol.åtgärdspunkter || protocol.atgardsPunkter || [];
-      const nextMeetingSuggestions = protocol.nextMeetingSuggestions || protocol.nästaMöteFörslag || protocol.nextMeetingTopics || [];
-
-      // Normalize action items to our expected structure
       const actionItems = Array.isArray(actionItemsRaw)
-        ? actionItemsRaw.map((item: any) => ({
-            title: item.title || item.titel || '',
-            description: item.description || item.beskrivning || '',
-            owner: item.owner || item.ansvarig || '',
-            deadline: item.deadline || item.sistaDatum || item.deadlineDatum || '',
-            priority: (item.priority || item.prioritet || 'medium') as 'critical' | 'high' | 'medium' | 'low',
-          }))
+        ? actionItemsRaw.map((item: any) => {
+            // Handle both object and string formats
+            if (typeof item === 'string') {
+              return {
+                title: item,
+                description: '',
+                owner: '',
+                deadline: '',
+                priority: 'medium' as const,
+              };
+            }
+            return {
+              title: item.title || item.titel || '',
+              description: item.description || item.beskrivning || '',
+              owner: item.owner || item.ansvarig || '',
+              deadline: item.deadline || item.sistaDatum || item.deadlineDatum || '',
+              priority: (item.priority || item.prioritet || 'medium') as 'critical' | 'high' | 'medium' | 'low',
+            };
+          }).filter((item: any) => item.title.trim() !== '')
         : [];
+
+      // Normalize next meeting suggestions
+      let nextMeetingSuggestions = protocol.nextMeetingSuggestions || protocol.nästaMöteFörslag || protocol.nextMeetingTopics || [];
+      if (!Array.isArray(nextMeetingSuggestions)) {
+        nextMeetingSuggestions = [];
+      }
+      nextMeetingSuggestions = nextMeetingSuggestions.filter((s: any) => typeof s === 'string' && s.trim() !== '');
 
       console.log("Parsed & normalized AI response:", {
         hasTitle: !!title,
         hasSummary: !!summary,
         summaryLength: summary.length,
-        mainPointsCount: Array.isArray(mainPoints) ? mainPoints.length : 0,
-        decisionsCount: Array.isArray(decisions) ? decisions.length : 0,
+        mainPointsCount: mainPoints.length,
+        decisionsCount: decisions.length,
         actionItemsCount: actionItems.length,
+        nextMeetingSuggestionsCount: nextMeetingSuggestions.length,
       });
       
       // Validate that we have actual content
@@ -183,7 +214,7 @@ Svara i JSON-format på samma språk som transkriptionen.`;
         );
       }
       
-      if (!Array.isArray(mainPoints) || mainPoints.length === 0) {
+      if (mainPoints.length === 0) {
         console.error("AI returned no main points after normalization");
         return new Response(
           JSON.stringify({ 
