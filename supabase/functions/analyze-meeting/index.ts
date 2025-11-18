@@ -92,7 +92,7 @@ ${shortNote}
 Svara i JSON-format på samma språk som transkriptionen.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -113,6 +113,7 @@ Svara i JSON-format på samma språk som transkriptionen.`;
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("Gemini API error:", response.status, errorText);
       return new Response(
         JSON.stringify({
           error: "Kunde inte analysera mötet",
@@ -123,11 +124,13 @@ Svara i JSON-format på samma språk som transkriptionen.`;
     }
 
     const data = await response.json();
+    console.log("Gemini API response received:", JSON.stringify(data).substring(0, 200));
     
     // Parse the JSON content from the Gemini response
     let aiResponse;
     try {
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      console.log("Raw AI content:", content.substring(0, 200));
       
       // Clean up markdown code blocks if present
       let cleanedContent = content.trim();
@@ -138,22 +141,57 @@ Svara i JSON-format på samma språk som transkriptionen.`;
       }
       
       aiResponse = JSON.parse(cleanedContent);
+      console.log("Parsed AI response:", {
+        hasTitle: !!aiResponse.title,
+        hasSummary: !!aiResponse.summary,
+        summaryLength: aiResponse.summary?.length || 0,
+        mainPointsCount: aiResponse.mainPoints?.length || 0,
+        decisionsCount: aiResponse.decisions?.length || 0,
+        actionItemsCount: aiResponse.actionItems?.length || 0
+      });
+      
+      // Validate that we have actual content
+      if (!aiResponse.summary || aiResponse.summary.trim() === '') {
+        console.error("AI returned empty summary");
+        return new Response(
+          JSON.stringify({ 
+            error: "AI genererade inget innehåll. Försök igen eller använd en längre transkription." 
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      if (!aiResponse.mainPoints || aiResponse.mainPoints.length === 0) {
+        console.error("AI returned no main points");
+        return new Response(
+          JSON.stringify({ 
+            error: "AI kunde inte generera huvudpunkter. Försök igen." 
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
     } catch (parseError) {
+      console.error("Parse error:", parseError);
       return new Response(
-        JSON.stringify({ error: "Kunde inte tolka AI-svaret" }),
+        JSON.stringify({ error: "Kunde inte tolka AI-svaret. Försök igen." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const result = {
+      title: aiResponse.title || meetingName || 'Mötesprotokoll',
+      summary: aiResponse.summary || '',
+      mainPoints: aiResponse.mainPoints || [],
+      decisions: aiResponse.decisions || [],
+      actionItems: aiResponse.actionItems || [],
+      nextMeetingSuggestions: aiResponse.nextMeetingSuggestions || []
+    };
+    
+    console.log("Returning result with summary length:", result.summary.length);
+    
     return new Response(
-      JSON.stringify({
-        title: aiResponse.title || meetingName || 'Mötesprotokoll',
-        summary: aiResponse.summary || '',
-        mainPoints: aiResponse.mainPoints || [],
-        decisions: aiResponse.decisions || [],
-        actionItems: aiResponse.actionItems || [],
-        nextMeetingSuggestions: aiResponse.nextMeetingSuggestions || []
-      }),
+      JSON.stringify(result),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
