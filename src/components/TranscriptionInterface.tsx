@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Mic, AlertCircle, FileText, Loader2 } from "lucide-react";
+import { Mic, AlertCircle, FileText, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
 import { TrustpilotDialog } from "./TrustpilotDialog";
+import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -47,6 +48,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const { toast } = useToast();
   const [selectedLanguage, setSelectedLanguage] = useState<'sv-SE' | 'en-US'>('sv-SE');
   const navigate = useNavigate();
+  const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
 
   useEffect(() => {
     const id = searchParams.get('continue');
@@ -92,6 +94,53 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setCurrentView("welcome");
     setTranscript("");
   };
+
+  const handleDigitalMeetingUpload = async (transcript: string) => {
+    if (!user?.id) return;
+
+    try {
+      // Create a meeting with the transcript
+      const meetingId = crypto.randomUUID();
+      const meeting = {
+        id: meetingId,
+        userId: user.id,
+        title: "Digital Meeting",
+        transcript,
+        folder: "Unsorted",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isCompleted: true
+      };
+
+      await meetingStorage.saveMeeting(meeting);
+      await incrementMeetingCount(meetingId);
+
+      // Show transcript preview
+      setTranscript(transcript);
+      setCurrentView("transcript-preview");
+    } catch (error) {
+      console.error('Error saving digital meeting:', error);
+      toast({
+        title: "Ett fel uppstod",
+        description: "Kunde inte spara mötet. Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenDigitalMeeting = async () => {
+    const { allowed, reason } = await canCreateMeeting();
+    if (!allowed) {
+      setUpgradeReason(reason || 'Du har nått din gräns för möten');
+      setShowUpgradeDialog(true);
+      return;
+    }
+
+    setShowDigitalMeetingDialog(true);
+  };
+
+  // Check if user has Pro or Enterprise plan
+  const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'unlimited' || userPlan.plan === 'enterprise');
 
 
   const handleFileUpload = async (file: File) => {
@@ -268,16 +317,28 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </div>
           </div>
 
-          {/* CTA Button */}
-          <div className="flex justify-center">
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Button
               onClick={handleStartRecording}
               size="lg"
               className="px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
             >
               <Mic className="mr-2 h-5 w-5" />
-              Spela in möte
+              Spela in live-möte
             </Button>
+            
+            {hasProAccess && (
+              <Button
+                onClick={handleOpenDigitalMeeting}
+                variant="outline"
+                size="lg"
+                className="px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              >
+                <Upload className="mr-2 h-5 w-5" />
+                Ladda upp inspelning
+              </Button>
+            )}
           </div>
           {/* Features grid */}
           <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
@@ -350,6 +411,13 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       <SubscribeDialog
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
+      />
+      
+      <DigitalMeetingDialog
+        open={showDigitalMeetingDialog}
+        onOpenChange={setShowDigitalMeetingDialog}
+        onTranscriptReady={handleDigitalMeetingUpload}
+        selectedLanguage={selectedLanguage}
       />
     </div>
   );
