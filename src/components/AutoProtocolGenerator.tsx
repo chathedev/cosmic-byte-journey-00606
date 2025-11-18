@@ -175,8 +175,7 @@ export const AutoProtocolGenerator = ({
           variant: "destructive",
           duration: 4000,
         });
-        // Navigate back on error
-        setTimeout(() => onBack(), 1000);
+        // Stanna kvar på sidan så användaren kan försöka igen
       } finally {
         setIsGenerating(false);
       }
