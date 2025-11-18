@@ -112,8 +112,12 @@ Svara i JSON-format på samma språk som transkriptionen.`;
     );
 
     if (!response.ok) {
+      const errorText = await response.text();
       return new Response(
-        JSON.stringify({ error: "Kunde inte analysera mötet" }),
+        JSON.stringify({
+          error: "Kunde inte analysera mötet",
+          details: errorText,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
