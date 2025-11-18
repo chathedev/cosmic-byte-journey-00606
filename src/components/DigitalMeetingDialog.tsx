@@ -51,13 +51,13 @@ export const DigitalMeetingDialog = ({
       return;
     }
 
-    // Check file size (max 10GB as per backend)
-    const maxSizeGB = 10;
-    const maxSizeBytes = maxSizeGB * 1024 * 1024 * 1024;
+    // Check file size (max 500MB)
+    const maxSizeMB = 500;
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       toast({
         title: "Filen är för stor",
-        description: `Filen får max vara ${maxSizeGB}GB. Din fil är ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB`,
+        description: `Filen får max vara ${maxSizeMB}MB. Din fil är ${(file.size / 1024 / 1024).toFixed(1)}MB`,
         variant: "destructive",
       });
       return;
@@ -93,7 +93,7 @@ export const DigitalMeetingDialog = ({
       if (error.message?.includes('no_speech_detected')) {
         errorMessage = "Inget tal kunde detekteras i ljudfilen. Försök med en annan fil eller kontrollera språkinställningen.";
       } else if (error.message?.includes('file_too_large')) {
-        errorMessage = "Filen är för stor. Maximal filstorlek är 10GB.";
+        errorMessage = "Filen är för stor. Maximal filstorlek är 500MB.";
       } else if (error.message?.includes('transcription_backend_missing')) {
         errorMessage = "Transkriptionstjänsten är inte tillgänglig just nu. Kontakta support.";
       }
@@ -138,7 +138,7 @@ export const DigitalMeetingDialog = ({
                   <li>Ladda upp filen här för automatisk transkribering</li>
                 </ol>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Max filstorlek: 10GB. Endast ljudfiler accepteras (inga videofiler).
+                  Max filstorlek: 500MB. Endast ljudfiler accepteras (inga videofiler).
                 </p>
               </div>
             </AlertDescription>
@@ -155,7 +155,7 @@ export const DigitalMeetingDialog = ({
                 Klicka för att välja ljudfil
               </p>
               <p className="text-xs text-muted-foreground">
-                MP3, WAV, M4A, OGG, WebM (max 10GB)
+                MP3, WAV, M4A, OGG, WebM (max 500MB)
               </p>
               <input
                 ref={fileInputRef}
