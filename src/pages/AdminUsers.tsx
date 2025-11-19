@@ -83,6 +83,9 @@ export default function AdminUsers() {
   const getEffectiveMeetingLimit = (user: UserData): number | null => {
     if (isSuperAdmin(user.email) || isAdmin(user.email)) return null;
     
+    // Check if plan is enterprise or unlimited
+    if (user.plan === 'enterprise' || user.plan === 'unlimited') return null;
+    
     // Check override first (gifted meetings)
     const override = user.overrides?.meeting || user.meetingUsage?.override;
     if (override?.isActive) {
