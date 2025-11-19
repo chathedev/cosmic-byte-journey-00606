@@ -36,7 +36,7 @@ export const FeedbackWidget = ({ showOnlyOnHome = false }: FeedbackWidgetProps) 
     setIsSending(true);
     try {
       const userEmail = user?.email || 'Ej inloggad';
-      const feedbackText = `Betyg: ${rating}/5 stjärnor\n\nAnvändarens e-post: ${userEmail}\n\nFeedback:\n${feedback}`;
+      const feedbackText = `Betyg: ${rating}/5 stjärnor\n\nFeedback:\n${feedback}\n\nfrån användaren: ${userEmail}`;
       const blob = new Blob([feedbackText], { type: "text/plain" });
       const reader = new FileReader();
       
