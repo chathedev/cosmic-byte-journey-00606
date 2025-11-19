@@ -46,7 +46,7 @@ export const FeedbackWidget = ({ showOnlyOnHome = false }: FeedbackWidgetProps) 
         
         await sendProtocolEmail({
           recipients: ["feedback@tivly.se"],
-          subject: `Feedback från användare - Betyg: ${rating}/5`,
+          subject: `Feedback från ${userEmail} - Betyg: ${rating}/5`,
           message: feedbackText,
           documentBlob: base64Content,
           fileName: "feedback.txt",
