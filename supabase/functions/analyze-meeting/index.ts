@@ -84,6 +84,22 @@ serve(async (req) => {
 - SAMMANFATTA och PARAFRASERA diskussionerna
 - INKLUDERA VIKTIGA DETALJER från mötet
 
+🎯 KRITISKA NOGGRANNHETSKRAV:
+- Inkludera ENDAST information som FAKTISKT diskuterades i mötet
+- Dra INGA slutsatser som inte EXPLICIT nämndes i utskriften
+- Om något är oklart, använd formuleringen "enligt diskussionen" eller "som nämndes"
+- GÖR INGA ANTAGANDEN om saker som inte sades i mötet
+- Vid osäkerhet, var KONSERVATIV - utelämna hellre information än att gissa
+- VERIFIERA att varje punkt du skriver faktiskt har stöd i utskriften
+- Om en person nämns, använd EXAKT det namn som används i utskriften
+- Om siffror eller data nämns, använd EXAKT de värden som nämndes
+- Lägg ALDRIG till extra kontext eller bakgrundsinformation som inte diskuterades
+- Om ingen ansvarig nämndes för en åtgärd, lämna fältet TOMT - gissa inte
+- Om inget beslut togs om något, inkludera det INTE i beslutslistan
+
+⚠️ VARNING: Felaktiga protokoll med uppfinnad information är OACCEPTABELT.
+Korrekthet och faktabaserad dokumentation är VIKTIGARE än omfattande protokoll.
+
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
 
@@ -128,7 +144,7 @@ ${shortNote}
 Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markdown och utan förklaringar.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -139,7 +155,7 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
             parts: [{ text: promptContent }]
           }],
           generationConfig: {
-            temperature: 0.7,
+            temperature: 0.2,
             maxOutputTokens: 8192,
             responseMimeType: "application/json"
           }
