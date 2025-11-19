@@ -608,12 +608,12 @@ export default function AdminUsers() {
                                 const effectiveLimit = getEffectiveMeetingLimit(user);
                                 const usedMeetings = getUsedMeetings(user);
                                 
-                                // Show X/unlimited for unlimited plans
+                                // Show X/∞ for unlimited plans
                                 if (effectiveLimit === null) {
                                   return (
                                     <>
                                       {usedMeetings}
-                                      <span className="text-muted-foreground font-normal">/unlimited</span>
+                                      <span className="text-muted-foreground font-normal">/∞</span>
                                     </>
                                   );
                                 }
@@ -714,12 +714,12 @@ export default function AdminUsers() {
                               const effectiveLimit = getEffectiveMeetingLimit(user);
                               const usedMeetings = getUsedMeetings(user);
                               
-                              // Show X/unlimited for unlimited plans
+                              // Show X/∞ for unlimited plans
                               if (effectiveLimit === null) {
                                 return (
                                   <>
                                     {usedMeetings}
-                                    <span className="text-muted-foreground font-normal">/unlimited</span>
+                                    <span className="text-muted-foreground font-normal">/∞</span>
                                   </>
                                 );
                               }
