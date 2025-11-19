@@ -38,6 +38,9 @@ const Auth = () => {
   // Poll for login status when link is sent
   useEffect(() => {
     if (!linkSent || !sessionId || !email) return;
+    
+    // Don't poll if we have a fallback/dummy sessionId (from CORS errors)
+    if (sessionId.startsWith('session_')) return;
 
     let pollInterval: NodeJS.Timeout;
     let timeoutTimer: NodeJS.Timeout;
@@ -60,8 +63,7 @@ const Auth = () => {
           clearTimeout(timeoutTimer);
         }
       } catch (error) {
-        // Silently fail, keep polling
-        console.error('Polling error:', error);
+        // Silently ignore errors during polling
       }
     };
 
