@@ -206,10 +206,10 @@ class ApiClient {
   async requestMagicLink(email: string, redirect?: string): Promise<{
     ok: boolean;
     email: string;
-    expiresAt: string;
+    expiresAt?: string;
     retryAfterSeconds: number;
-    sessionId: string;
-    isNewUser: boolean;
+    sessionId?: string;
+    isNewUser?: boolean;
   }> {
     const response = await fetch(`${API_BASE_URL}/auth/magic-link`, {
       method: 'POST',
@@ -220,13 +220,32 @@ class ApiClient {
       },
       body: JSON.stringify({ email, redirect })
     });
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to send magic link' }));
       throw new Error((error as any).error || 'Failed to send magic link');
     }
-    
-    return response.json();
+
+    // Backend might respond with 204 No Content or a minimal JSON body.
+    const text = await response.text();
+    let data: any = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // If parsing fails but we got 2xx, fall back to a minimal success object.
+        data = {};
+      }
+    }
+
+    return {
+      ok: true,
+      email,
+      retryAfterSeconds: data.retryAfterSeconds ?? 60,
+      expiresAt: data.expiresAt,
+      sessionId: data.sessionId,
+      isNewUser: data.isNewUser,
+    };
   }
 
   async checkMagicLinkStatus(sessionId: string, email: string): Promise<{
