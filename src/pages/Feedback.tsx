@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { sendProtocolEmail } from "@/lib/backend";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 const RATE_LIMIT_KEY = "feedback_last_submission";
 const RATE_LIMIT_HOURS = 1;
@@ -14,6 +15,7 @@ const Feedback = () => {
   const [feedback, setFeedback] = useState("");
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const checkRateLimit = (): boolean => {
     const lastSubmission = localStorage.getItem(RATE_LIMIT_KEY);
@@ -61,7 +63,8 @@ const Feedback = () => {
 
     setIsSending(true);
     try {
-      const feedbackText = `Betyg: ${rating}/5 stjärnor\n\nFeedback:\n${feedback}`;
+      const userEmail = user?.email || 'Ej inloggad';
+      const feedbackText = `Betyg: ${rating}/5 stjärnor\n\nFeedback:\n${feedback}\n\nfrån användaren: ${userEmail}`;
       const blob = new Blob([feedbackText], { type: "text/plain" });
       const reader = new FileReader();
       
@@ -71,7 +74,7 @@ const Feedback = () => {
         
         await sendProtocolEmail({
           recipients: ["feedback@tivly.se"],
-          subject: `Feedback från användare - Betyg: ${rating}/5`,
+          subject: `Feedback från ${userEmail} - Betyg: ${rating}/5`,
           message: feedbackText,
           documentBlob: base64Content,
           fileName: "feedback.txt",
