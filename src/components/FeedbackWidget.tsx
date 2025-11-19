@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { sendProtocolEmail } from "@/lib/backend";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FeedbackWidgetProps {
   showOnlyOnHome?: boolean;
@@ -15,6 +16,7 @@ export const FeedbackWidget = ({ showOnlyOnHome = false }: FeedbackWidgetProps) 
   const [feedback, setFeedback] = useState("");
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Don't render if showOnlyOnHome is true and we're not on home
   if (showOnlyOnHome && window.location.pathname !== '/') {
@@ -33,7 +35,8 @@ export const FeedbackWidget = ({ showOnlyOnHome = false }: FeedbackWidgetProps) 
 
     setIsSending(true);
     try {
-      const feedbackText = `Betyg: ${rating}/5 stjärnor\n\nFeedback:\n${feedback}`;
+      const userEmail = user?.email || 'Ej inloggad';
+      const feedbackText = `Betyg: ${rating}/5 stjärnor\n\nAnvändarens e-post: ${userEmail}\n\nFeedback:\n${feedback}`;
       const blob = new Blob([feedbackText], { type: "text/plain" });
       const reader = new FileReader();
       
