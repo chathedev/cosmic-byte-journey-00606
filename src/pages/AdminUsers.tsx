@@ -604,25 +604,24 @@ export default function AdminUsers() {
                               {(() => {
                                 const effectiveLimit = getEffectiveMeetingLimit(user);
                                 const usedMeetings = getUsedMeetings(user);
-                                const displayPlan = getDisplayPlan(user);
                                 
-                                // Show infinity for unlimited
+                                // Show X/unlimited for unlimited plans
                                 if (effectiveLimit === null) {
-                                  return <span>∞</span>;
-                                }
-                                
-                                // For free users, show X/Y
-                                if (displayPlan === 'free') {
                                   return (
                                     <>
                                       {usedMeetings}
-                                      <span className="text-muted-foreground font-normal">/{effectiveLimit}</span>
+                                      <span className="text-muted-foreground font-normal">/unlimited</span>
                                     </>
                                   );
                                 }
                                 
-                                // For paid plans (standard, plus), just show count
-                                return <span>{usedMeetings}</span>;
+                                // For all limited plans, show X/Y format
+                                return (
+                                  <>
+                                    {usedMeetings}
+                                    <span className="text-muted-foreground font-normal">/{effectiveLimit}</span>
+                                  </>
+                                );
                               })()}
                             </div>
                           </TableCell>
@@ -711,25 +710,24 @@ export default function AdminUsers() {
                             {(() => {
                               const effectiveLimit = getEffectiveMeetingLimit(user);
                               const usedMeetings = getUsedMeetings(user);
-                              const displayPlan = getDisplayPlan(user);
                               
-                              // Show infinity for unlimited
+                              // Show X/unlimited for unlimited plans
                               if (effectiveLimit === null) {
-                                return <span>∞</span>;
-                              }
-                              
-                              // For free users, show X/Y
-                              if (displayPlan === 'free') {
                                 return (
                                   <>
                                     {usedMeetings}
-                                    <span className="text-muted-foreground font-normal">/{effectiveLimit}</span>
+                                    <span className="text-muted-foreground font-normal">/unlimited</span>
                                   </>
                                 );
                               }
                               
-                              // For paid plans (standard, plus), just show count
-                              return <span>{usedMeetings}</span>;
+                              // For all limited plans, show X/Y format
+                              return (
+                                <>
+                                  {usedMeetings}
+                                  <span className="text-muted-foreground font-normal">/{effectiveLimit}</span>
+                                </>
+                              );
                             })()}
                           </p>
                         </div>
