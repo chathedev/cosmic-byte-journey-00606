@@ -66,6 +66,9 @@ export default function AdminUsers() {
   const [admins, setAdmins] = useState<Array<{ email: string; role: string }>>([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+  const [resetUsageUser, setResetUsageUser] = useState<UserData | null>(null);
+  const [resetNote, setResetNote] = useState('');
+  const [isResettingUsage, setIsResettingUsage] = useState(false);
   const { toast } = useToast();
 
   // Filter users based on search
@@ -322,6 +325,42 @@ export default function AdminUsers() {
         description: 'Kunde inte öppna Stripe dashboard',
         variant: "destructive",
       });
+    }
+  };
+
+  const handleResetUsage = async () => {
+    if (!resetUsageUser) return;
+    
+    setIsResettingUsage(true);
+    try {
+      const result = await apiClient.resetUserMonthlyUsage(
+        resetUsageUser.email,
+        resetNote || undefined
+      );
+      
+      toast({
+        title: "✅ Användningen återställd",
+        description: `${resetUsageUser.email} har nu 0 använda möten denna månad.`,
+      });
+      
+      // Update the user in the list with new data
+      setUsers(users.map(u => 
+        u.email === resetUsageUser.email 
+          ? { ...u, meetingUsage: result.meetingUsage }
+          : u
+      ));
+      
+      setResetUsageUser(null);
+      setResetNote('');
+      fetchUsers(); // Refresh to get latest data
+    } catch (error) {
+      toast({
+        title: "Fel",
+        description: error instanceof Error ? error.message : 'Kunde inte återställa användningen',
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingUsage(false);
     }
   };
 
@@ -611,6 +650,15 @@ export default function AdminUsers() {
                               )}
                               <Button
                                 variant="ghost"
+                                size="sm"
+                                onClick={() => setResetUsageUser(user)}
+                                className="h-9 px-2 hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 transition-all"
+                                title="Reset monthly usage"
+                              >
+                                <span className="text-xs font-medium">Reset</span>
+                              </Button>
+                              <Button
+                                variant="ghost"
                                 size="icon"
                                 onClick={() => setDeleteUser(user)}
                                 className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
@@ -725,6 +773,15 @@ export default function AdminUsers() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => setResetUsageUser(user)}
+                          className="h-9 px-2 hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 transition-all"
+                          title="Reset monthly usage"
+                        >
+                          <span className="text-xs">Reset</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setDeleteUser(user)}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                         >
@@ -817,24 +874,81 @@ export default function AdminUsers() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <span className="font-semibold text-foreground">{deleteUser?.email}</span>?
-              <br />
-              <span className="text-destructive font-medium mt-2 block">This action cannot be undone.</span>
+              This will permanently remove all their data, meetings, and folders.
+              <span className="block mt-2 font-medium text-destructive">This action cannot be undone.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteUser}
               disabled={isDeleting}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...
                 </>
               ) : (
-                'Delete User'
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete User
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Usage Dialog */}
+      <AlertDialog open={!!resetUsageUser} onOpenChange={(open) => { if (!open) { setResetUsageUser(null); setResetNote(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Monthly Usage</AlertDialogTitle>
+            <AlertDialogDescription>
+              Reset meeting usage for <span className="font-semibold text-foreground">{resetUsageUser?.email}</span> back to zero. 
+              This sets a new baseline without deleting meeting history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-note">Note (optional)</Label>
+              <Textarea
+                id="reset-note"
+                placeholder="e.g., Manual reset for March invoice"
+                value={resetNote}
+                onChange={(e) => setResetNote(e.target.value.slice(0, 500))}
+                className="resize-none"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                {resetNote.length}/500 characters
+              </p>
+            </div>
+            {resetUsageUser && (
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                <p className="text-xs text-muted-foreground">Current Usage</p>
+                <p className="text-sm font-medium">
+                  {getUsedMeetings(resetUsageUser)} / {getEffectiveMeetingLimit(resetUsageUser) ?? '∞'} meetings
+                </p>
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResettingUsage}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetUsage}
+              disabled={isResettingUsage}
+              className="bg-orange-600 text-white hover:bg-orange-700"
+            >
+              {isResettingUsage ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                'Reset Usage'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
