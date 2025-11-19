@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, CheckCircle2 } from 'lucide-react';
+import { Loader2, Mail, CheckCircle2, ArrowLeft } from 'lucide-react';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const Auth = () => {
@@ -15,10 +16,12 @@ const Auth = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [linkSent, setLinkSent] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [cooldown, setCooldown] = useState(0);
-  const [isPolling, setIsPolling] = useState(false);
+  const [code, setCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
 
   // Redirect if already logged in
   useEffect(() => {
@@ -35,99 +38,53 @@ const Auth = () => {
     }
   }, [cooldown]);
 
-  // Poll for login status when link is sent
+  // Auto-submit when code is complete
   useEffect(() => {
-    if (!linkSent || !sessionId || !email) return;
+    if (code.length === 6 && codeSent && !isVerifying) {
+      handleVerifyCode();
+    }
+  }, [code, codeSent]);
 
-    let pollInterval: NodeJS.Timeout;
-    let timeoutTimer: NodeJS.Timeout;
-    let pollCount = 0;
-
-    const pollStatus = async () => {
-      try {
-        pollCount++;
-        const status = await apiClient.checkMagicLinkStatus(sessionId, email);
+  const handleVerifyCode = async () => {
+    if (code.length !== 6) return;
+    
+    setIsVerifying(true);
+    setVerifyError('');
+    
+    try {
+      const result = await apiClient.verifyMagicLink(email, sessionId, code);
+      
+      if (result.token) {
+        apiClient.applyAuthToken(result.token);
+        await refreshUser();
         
-        // Terminal states
-        if (status.status === 'ready' && status.token) {
-          setIsPolling(false);
-          clearInterval(pollInterval);
-          clearTimeout(timeoutTimer);
-          await refreshUser();
-          
-          toast({
-            title: "Inloggad!",
-            description: "Du loggades in framgångsrikt.",
-          });
-          
-          navigate('/');
-        } else if (status.status === 'expired') {
-          setIsPolling(false);
-          clearInterval(pollInterval);
-          clearTimeout(timeoutTimer);
-          toast({
-            title: "Länken har gått ut",
-            description: "Begär en ny inloggningslänk för att fortsätta.",
-            variant: "destructive",
-          });
-          setLinkSent(false);
-        } else if (status.status === 'device_mismatch') {
-          setIsPolling(false);
-          clearInterval(pollInterval);
-          clearTimeout(timeoutTimer);
-          toast({
-            title: "Enhetsfel",
-            description: "Öppna länken på samma enhet som du begärde den från.",
-            variant: "destructive",
-          });
-        } else if (status.status === 'not_found') {
-          setIsPolling(false);
-          clearInterval(pollInterval);
-          clearTimeout(timeoutTimer);
-          toast({
-            title: "Session hittades inte",
-            description: "Begär en ny inloggningslänk.",
-            variant: "destructive",
-          });
-          setLinkSent(false);
-        }
-        // Keep polling for 'pending' and 'none' states
-      } catch (error) {
-        // Silently ignore transient errors, keep polling
+        toast({
+          title: "Inloggad!",
+          description: "Du loggades in framgångsrikt.",
+        });
+        
+        navigate('/');
       }
-    };
-
-    // Start polling: 2s for first minute, then 4s
-    setIsPolling(true);
-    pollInterval = setInterval(() => {
-      pollStatus();
-      if (pollCount > 30) {
-        clearInterval(pollInterval);
-        pollInterval = setInterval(pollStatus, 4000);
-      }
-    }, 2000);
-    
-    // Initial poll
-    pollStatus();
-    
-    // Stop polling after 15 minutes (link expiry)
-    timeoutTimer = setTimeout(() => {
-      clearInterval(pollInterval);
-      setIsPolling(false);
+    } catch (error: any) {
+      const message = error.message || 'Ogiltig kod';
+      setVerifyError(message);
+      setCode('');
+      
       toast({
-        title: "Tidsgräns överskreds",
-        description: "Begär en ny inloggningslänk.",
+        title: "Verifiering misslyckades",
+        description: message.includes('invalid_code') 
+          ? 'Ogiltig kod. Försök igen.'
+          : message.includes('token_expired')
+          ? 'Koden har gått ut. Begär en ny kod.'
+          : message.includes('session_not_found')
+          ? 'Sessionen hittades inte. Begär en ny kod.'
+          : message,
         variant: "destructive",
       });
-      setLinkSent(false);
-    }, 15 * 60 * 1000);
-
-    return () => {
-      clearInterval(pollInterval);
-      clearTimeout(timeoutTimer);
-      setIsPolling(false);
-    };
-  }, [linkSent, sessionId, email, refreshUser, navigate, toast]);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,31 +158,34 @@ const Auth = () => {
         return;
       }
       
-      // Normal flow: email sent, start polling
+      // Normal flow: email sent with code
       if (result.sessionId) {
-        setLinkSent(true);
+        setCodeSent(true);
         setSessionId(result.sessionId);
         setCooldown(result.retryAfterSeconds || 60);
+        setCode('');
+        setVerifyError('');
         
         toast({
-          title: "E-post skickad!",
-          description: `Kontrollera din inkorg på ${email}`,
+          title: "Kod skickad!",
+          description: `En 6-siffrig kod skickades till ${email}`,
         });
       } else {
         throw new Error('No session ID received');
       }
     } catch (error: any) {
       // CORS error workaround: Backend returns 200 OK (email sent) but browser blocks response
-      // due to duplicate CORS headers. Since email is sent, proceed to polling state.
       if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
-        console.log('CORS error detected, but email was likely sent (200 OK). Proceeding to polling...');
-        setLinkSent(true);
+        console.log('CORS error detected, but email was likely sent (200 OK). Proceeding...');
+        setCodeSent(true);
         setSessionId(`session_${Date.now()}_${email.replace(/[^a-z0-9]/gi, '')}`);
         setCooldown(60);
+        setCode('');
+        setVerifyError('');
         
         toast({
-          title: "E-post skickad!",
-          description: `Kontrollera din inkorg på ${email}`,
+          title: "Kod skickad!",
+          description: `En 6-siffrig kod skickades till ${email}`,
         });
         return;
       }
@@ -291,82 +251,108 @@ const Auth = () => {
               
               <div className="text-center space-y-2">
                 <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent tracking-tight">
-                  {linkSent ? 'Länk skickad!' : 'Välkommen'}
+                  {codeSent ? 'Ange kod' : 'Välkommen'}
                 </h1>
                 
                 <p className="text-sm sm:text-base text-muted-foreground text-center max-w-sm leading-relaxed">
-                  {linkSent 
-                    ? 'Kolla din inkorg för att logga in säkert' 
-                    : 'Ange din e-post för en säker inloggningslänk – ingen lösenord behövs'}
+                  {codeSent 
+                    ? 'Ange den 6-siffriga koden från ditt email' 
+                    : 'Ange din e-post för att få en säker inloggningskod'}
                 </p>
               </div>
             </div>
 
             {/* Content */}
-            {linkSent ? (
+            {codeSent ? (
               <div className="text-center space-y-8 animate-slide-in-from-bottom">
                 <div className="relative mx-auto w-24 h-24 group">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-3xl blur-xl opacity-40 animate-pulse" />
                   <div className="relative rounded-3xl bg-gradient-to-br from-primary/20 to-secondary/20 border-2 border-primary/40 flex items-center justify-center shadow-2xl">
-                    <CheckCircle2 className="w-12 h-12 text-primary animate-scale-in" />
+                    <Mail className="w-12 h-12 text-primary" />
                   </div>
                 </div>
                 
-                <div className="space-y-5">
-                  <div className="p-6 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-transparent backdrop-blur-sm shadow-lg">
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                      En säker inloggningslänk skickades till
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Kod skickad till
                     </p>
-                    <p className="text-lg font-semibold text-foreground break-all bg-gradient-to-br from-primary/10 to-transparent px-4 py-2 rounded-lg">
+                    <p className="text-base font-semibold text-foreground break-all">
                       {email}
                     </p>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground bg-muted/30 rounded-xl p-3">
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                      <span>Länken är giltig i 15 minuter</span>
-                    </div>
-                    
-                    {isPolling && (
-                      <div className="flex items-center justify-center gap-2.5 py-2 px-4 rounded-xl bg-primary/5 border border-primary/20">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                        <span className="text-xs font-medium text-primary">Väntar på inloggning...</span>
+
+                  <div className="flex flex-col items-center gap-4">
+                    <InputOTP
+                      maxLength={6}
+                      value={code}
+                      onChange={setCode}
+                      disabled={isVerifying}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+
+                    {verifyError && (
+                      <p className="text-sm text-destructive">
+                        {verifyError}
+                      </p>
+                    )}
+
+                    {isVerifying && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Verifierar...</span>
                       </div>
                     )}
                   </div>
-                </div>
-                
-                <div className="flex gap-3 pt-2">
-                    <Button
-                      onClick={handleSendMagicLink}
-                      variant="outline"
-                      className="flex-1 h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all hover:border-primary/50"
-                      disabled={cooldown > 0 || isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Mail className="w-4 h-4 mr-2" />
-                      )}
-                      <span className="text-sm font-medium">
-                        {cooldown > 0 ? `Vänta ${cooldown}s` : 'Skicka igen'}
-                      </span>
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setLinkSent(false);
-                        setSessionId('');
-                        setEmail('');
-                        setCooldown(0);
-                      }}
-                      variant="ghost"
-                      className="flex-1 h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                      <span className="text-sm font-medium">Annan e-post</span>
-                    </Button>
+
+                  <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                    <span>Koden är giltig i 15 minuter</span>
                   </div>
                 </div>
+                
+                <div className="flex flex-col gap-3 pt-2">
+                  <Button
+                    onClick={handleSendMagicLink}
+                    variant="outline"
+                    className="w-full h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all hover:border-primary/50"
+                    disabled={cooldown > 0 || isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Mail className="w-4 h-4 mr-2" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {cooldown > 0 ? `Skicka igen om ${cooldown}s` : 'Skicka ny kod'}
+                    </span>
+                  </Button>
+                  
+                  <Button
+                    onClick={() => {
+                      setCodeSent(false);
+                      setSessionId('');
+                      setEmail('');
+                      setCode('');
+                      setVerifyError('');
+                      setCooldown(0);
+                    }}
+                    variant="ghost"
+                    className="w-full h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    <span className="text-sm font-medium">Tillbaka</span>
+                  </Button>
+                </div>
+              </div>
               ) : (
                 <form 
                   onSubmit={handleSendMagicLink} 
@@ -397,12 +383,12 @@ const Auth = () => {
                       {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Skickar länk...
+                          Skickar kod...
                         </>
                       ) : (
                         <>
                           <Mail className="mr-2 h-5 w-5" />
-                          Skicka inloggningslänk
+                          Skicka inloggningskod
                         </>
                       )}
                     </Button>
@@ -417,7 +403,7 @@ const Auth = () => {
                       <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
                     </div>
                     <p className="text-xs text-center text-muted-foreground leading-relaxed px-4">
-                      Vi skickar en engångslänk till din e-post som är giltig i 15 minuter
+                      Vi skickar en 6-siffrig engångskod till din e-post som är giltig i 15 minuter
                     </p>
                   </div>
                 </form>
