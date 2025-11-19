@@ -210,9 +210,13 @@ class ApiClient {
     retryAfterSeconds: number;
     sessionId?: string;
     isNewUser?: boolean;
+    trustedLogin?: boolean;
+    token?: string;
+    user?: User;
   }> {
     const response = await fetch(`${API_BASE_URL}/auth/magic-link`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-Browser-Id': this.browserId,
@@ -223,19 +227,14 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to send magic link' }));
-      throw new Error((error as any).error || 'Failed to send magic link');
+      throw new Error((error as any).error || (error as any).message || 'Failed to send magic link');
     }
 
-    // Backend might respond with 204 No Content or a minimal JSON body.
-    const text = await response.text();
-    let data: any = {};
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // If parsing fails but we got 2xx, fall back to a minimal success object.
-        data = {};
-      }
+    const data = await response.json();
+
+    // Handle trusted login bypass
+    if (data.trustedLogin && data.token) {
+      this.setToken(data.token);
     }
 
     return {
@@ -245,11 +244,14 @@ class ApiClient {
       expiresAt: data.expiresAt,
       sessionId: data.sessionId,
       isNewUser: data.isNewUser,
+      trustedLogin: data.trustedLogin,
+      token: data.token,
+      user: data.user,
     };
   }
 
   async checkMagicLinkStatus(sessionId: string, email: string): Promise<{
-    status: 'pending' | 'ready';
+    status: 'pending' | 'ready' | 'expired' | 'none' | 'device_mismatch' | 'not_found';
     token?: string;
     user?: User;
     issuedAt?: string;
@@ -258,6 +260,7 @@ class ApiClient {
   }> {
     const response = await fetch(`${API_BASE_URL}/auth/magic-link/status`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-Device-Id': this.browserId,
@@ -267,7 +270,7 @@ class ApiClient {
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to check status' }));
-      throw new Error((error as any).error || 'Failed to check status');
+      throw new Error((error as any).error || (error as any).message || 'Failed to check status');
     }
     
     const data = await response.json();
@@ -283,6 +286,7 @@ class ApiClient {
   async verifyMagicLink(token: string, options?: { storeToken?: boolean }): Promise<AuthResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/magic-link/verify`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-Browser-Id': this.browserId,
@@ -293,7 +297,7 @@ class ApiClient {
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Invalid or expired magic link' }));
-      throw new Error((error as any).error || 'Invalid or expired magic link');
+      throw new Error((error as any).error || (error as any).message || 'Invalid or expired magic link');
     }
     
     const data = await response.json();
