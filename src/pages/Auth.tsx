@@ -98,14 +98,10 @@ const Auth = () => {
     if (email.toLowerCase() === 'review@tivly.se') {
       setIsLoading(true);
       try {
-        // Create a test token and mock unlimited user
         const testToken = 'test_unlimited_user_' + Date.now();
         apiClient.applyAuthToken(testToken);
         
-        // Grace period while user state initializes
         try { sessionStorage.setItem('pendingTestLogin', '1'); } catch {}
-        
-        // Store test user email
         localStorage.setItem('userEmail', email);
         
         await refreshUser();
@@ -135,15 +131,19 @@ const Auth = () => {
     }
     
     setIsLoading(true);
+    console.log('🔐 Sending magic link to:', email);
     
     try {
       const result = await apiClient.requestMagicLink(
         email,
         `${window.location.origin}/magic-login`
       );
+      
+      console.log('✅ Magic link response:', result);
 
       // Handle trusted device auto-login (no email sent by backend)
       if ((result as any).trustedLogin && (result as any).token) {
+        console.log('🔓 Trusted device login');
         apiClient.applyAuthToken((result as any).token);
         await refreshUser();
         toast({
@@ -154,6 +154,8 @@ const Auth = () => {
         return;
       }
       
+      // Email sent successfully
+      console.log('📧 Setting link sent state with sessionId:', result.sessionId);
       setLinkSent(true);
       setSessionId(result.sessionId);
       setCooldown(result.retryAfterSeconds || 60);
@@ -163,7 +165,8 @@ const Auth = () => {
         description: `Kontrollera din inkorg på ${email}`,
       });
     } catch (error: any) {
-      let description = "Kunde inte skicka länk.";
+      console.error('❌ Magic link error:', error);
+      let description = "Kunde inte skicka länk. Försök igen.";
       let title = "Fel";
       
       if (error.message.includes('rate_limited') || error.message.includes('retry_after')) {
@@ -173,7 +176,6 @@ const Auth = () => {
         title = "För många försök";
         description = `Vänta ${seconds} sekunder innan du försöker igen.`;
       } else if (error.message.includes('browser_blocked')) {
-        // For enterprise users or any blocked users, show a more helpful message
         description = "Denna enhet kan inte användas för att skapa ett nytt konto. Om du har ett Enterprise-konto, kontakta din administratör.";
       }
       
