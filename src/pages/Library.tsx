@@ -86,9 +86,12 @@ const Library = () => {
       await Promise.allSettled(
         deduped.map(async (meeting) => {
           try {
-            const protocol = await backendApi.getProtocol(meeting.id);
-            if (protocol?.protocol) {
-              protocols[meeting.id] = protocol.protocol;
+            // Only count protocol if it's both in backend AND attached to meeting
+            if (meeting.protocol) {
+              const protocol = await backendApi.getProtocol(meeting.id);
+              if (protocol?.protocol) {
+                protocols[meeting.id] = protocol.protocol;
+              }
             }
           } catch (error) {
             // Protocol doesn't exist or error - that's fine
