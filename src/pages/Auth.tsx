@@ -38,43 +38,88 @@ const Auth = () => {
   // Poll for login status when link is sent
   useEffect(() => {
     if (!linkSent || !sessionId || !email) return;
-    
-    // Don't poll if we have a fallback/dummy sessionId (from CORS errors)
-    if (sessionId.startsWith('session_')) return;
 
     let pollInterval: NodeJS.Timeout;
     let timeoutTimer: NodeJS.Timeout;
+    let pollCount = 0;
 
     const pollStatus = async () => {
       try {
+        pollCount++;
         const status = await apiClient.checkMagicLinkStatus(sessionId, email);
         
+        // Terminal states
         if (status.status === 'ready' && status.token) {
           setIsPolling(false);
+          clearInterval(pollInterval);
+          clearTimeout(timeoutTimer);
           await refreshUser();
           
           toast({
             title: "Inloggad!",
-            description: "Du loggades in från en annan enhet.",
+            description: "Du loggades in framgångsrikt.",
           });
           
           navigate('/');
+        } else if (status.status === 'expired') {
+          setIsPolling(false);
           clearInterval(pollInterval);
           clearTimeout(timeoutTimer);
+          toast({
+            title: "Länken har gått ut",
+            description: "Begär en ny inloggningslänk för att fortsätta.",
+            variant: "destructive",
+          });
+          setLinkSent(false);
+        } else if (status.status === 'device_mismatch') {
+          setIsPolling(false);
+          clearInterval(pollInterval);
+          clearTimeout(timeoutTimer);
+          toast({
+            title: "Enhetsfel",
+            description: "Öppna länken på samma enhet som du begärde den från.",
+            variant: "destructive",
+          });
+        } else if (status.status === 'not_found') {
+          setIsPolling(false);
+          clearInterval(pollInterval);
+          clearTimeout(timeoutTimer);
+          toast({
+            title: "Session hittades inte",
+            description: "Begär en ny inloggningslänk.",
+            variant: "destructive",
+          });
+          setLinkSent(false);
         }
+        // Keep polling for 'pending' and 'none' states
       } catch (error) {
-        // Silently ignore errors during polling
+        // Silently ignore transient errors, keep polling
       }
     };
 
-    // Start polling every 2 seconds
+    // Start polling: 2s for first minute, then 4s
     setIsPolling(true);
-    pollInterval = setInterval(pollStatus, 2000);
+    pollInterval = setInterval(() => {
+      pollStatus();
+      if (pollCount > 30) {
+        clearInterval(pollInterval);
+        pollInterval = setInterval(pollStatus, 4000);
+      }
+    }, 2000);
+    
+    // Initial poll
+    pollStatus();
     
     // Stop polling after 15 minutes (link expiry)
     timeoutTimer = setTimeout(() => {
       clearInterval(pollInterval);
       setIsPolling(false);
+      toast({
+        title: "Tidsgräns överskreds",
+        description: "Begär en ny inloggningslänk.",
+        variant: "destructive",
+      });
+      setLinkSent(false);
     }, 15 * 60 * 1000);
 
     return () => {
@@ -145,8 +190,8 @@ const Auth = () => {
       );
 
       // Handle trusted device auto-login (no email sent by backend)
-      if ((result as any).trustedLogin && (result as any).token) {
-        apiClient.applyAuthToken((result as any).token);
+      if (result.trustedLogin && result.token) {
+        apiClient.applyAuthToken(result.token);
         await refreshUser();
         toast({
           title: "Inloggad!",
@@ -156,52 +201,42 @@ const Auth = () => {
         return;
       }
       
-      setLinkSent(true);
-      setSessionId(result.sessionId);
-      setCooldown(result.retryAfterSeconds || 60);
-      
-      toast({
-        title: "E-post skickad!",
-        description: `Kontrollera din inkorg på ${email}`,
-      });
-    } catch (error: any) {
-      // Check if it's a CORS or network error - backend likely sent the email anyway (200 OK)
-      const isCorsOrNetworkError = 
-        error.message.includes('CORS') || 
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('ERR_FAILED') ||
-        error.message.includes('NetworkError');
-      
-      if (isCorsOrNetworkError) {
-        // Backend sent the email successfully, proceed to email sent view
+      // Normal flow: email sent, start polling
+      if (result.sessionId) {
         setLinkSent(true);
-        setSessionId(`session_${Date.now()}`);
-        setCooldown(60);
+        setSessionId(result.sessionId);
+        setCooldown(result.retryAfterSeconds || 60);
         
         toast({
           title: "E-post skickad!",
           description: `Kontrollera din inkorg på ${email}`,
         });
       } else {
-        let description = "Kunde inte skicka länk.";
-        let title = "Fel";
-        
-        if (error.message.includes('rate_limited') || error.message.includes('retry_after')) {
-          const retryMatch = error.message.match(/retry_after_(\d+)/);
-          const seconds = retryMatch ? parseInt(retryMatch[1]) : 60;
-          setCooldown(seconds);
-          title = "För många försök";
-          description = `Vänta ${seconds} sekunder innan du försöker igen.`;
-        } else if (error.message.includes('browser_blocked')) {
-          description = "Denna enhet kan inte användas för att skapa ett nytt konto. Om du har ett Enterprise-konto, kontakta din administratör.";
-        }
-        
-        toast({
-          title,
-          description,
-          variant: "destructive",
-        });
+        throw new Error('No session ID received');
       }
+    } catch (error: any) {
+      let description = error.message || "Kunde inte skicka länk.";
+      let title = "Fel";
+      
+      if (error.message.includes('rate_limited') || error.message.includes('retry_after')) {
+        const retryMatch = error.message.match(/retry_after_(\d+)/);
+        const seconds = retryMatch ? parseInt(retryMatch[1]) : 60;
+        setCooldown(seconds);
+        title = "För många försök";
+        description = `Vänta ${seconds} sekunder innan du försöker igen.`;
+      } else if (error.message.includes('browser_blocked')) {
+        title = "Enhet blockerad";
+        description = "Denna enhet kan inte användas för att skapa ett nytt konto. Om du har ett Enterprise-konto, kontakta din administratör.";
+      } else if (error.message.includes('mail_not_configured') || error.message.includes('mail_send_failed')) {
+        title = "E-post kunde inte skickas";
+        description = "Det gick inte att skicka e-post. Försök igen om en stund.";
+      }
+      
+      toast({
+        title,
+        description,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
