@@ -975,6 +975,25 @@ class ApiClient {
     throw lastError || new Error('Failed to update plan after retries');
   }
 
+  async resetUserMonthlyUsage(email: string, note?: string): Promise<any> {
+    const body: any = {};
+    if (note && note.trim()) {
+      body.note = note.trim().slice(0, 500);
+    }
+    const response = await this.fetchWithAuth(
+      `/admin/users/${encodeURIComponent(email)}/reset-usage`,
+      {
+        method: 'POST',
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to reset usage' }));
+      throw new Error(error.error || 'Failed to reset monthly usage');
+    }
+    return response.json();
+  }
+
   async deleteAdminUser(email: string): Promise<any> {
     const response = await this.fetchWithAuth(`/admin/users/${encodeURIComponent(email)}`, {
       method: 'DELETE',
