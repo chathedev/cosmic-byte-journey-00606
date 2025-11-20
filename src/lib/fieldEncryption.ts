@@ -43,8 +43,25 @@ const ENCRYPTION_KEY_STORAGE = 'tivly_encryption_key';
 const CRYPTO_KEY_CACHE = 'tivly_crypto_key_cache';
 
 // Helper functions for base64 encoding/decoding
-const decodeBase64 = (value: string): Uint8Array =>
-  Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+const decodeBase64 = (value: string): Uint8Array => {
+  try {
+    // Validate base64 string before decoding
+    if (!value || typeof value !== 'string') {
+      throw new Error('Invalid base64 input: empty or not a string');
+    }
+    
+    // Remove any whitespace and validate base64 format
+    const cleaned = value.replace(/\s/g, '');
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
+      throw new Error('Invalid base64 format');
+    }
+    
+    return Uint8Array.from(atob(cleaned), (char) => char.charCodeAt(0));
+  } catch (error) {
+    console.error('Base64 decode error:', error);
+    throw new Error(`Failed to decode base64: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
 
 const encodeBase64 = (bytes: Uint8Array): string =>
   btoa(String.fromCharCode(...Array.from(bytes)));
@@ -63,10 +80,18 @@ export async function fetchEncryptionKey(authToken: string): Promise<EncryptionK
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch encryption key');
+    const errorText = await response.text();
+    console.error('Encryption key fetch failed:', response.status, errorText);
+    throw new Error(`Failed to fetch encryption key: ${response.status}`);
   }
 
   const bundle = await response.json();
+  
+  // Validate the bundle has required fields
+  if (!bundle.key || !bundle.keyId || !bundle.algorithm) {
+    console.error('Invalid encryption key bundle:', bundle);
+    throw new Error('Invalid encryption key bundle received from backend');
+  }
   
   // Cache in sessionStorage (cleared on logout)
   sessionStorage.setItem(ENCRYPTION_KEY_STORAGE, JSON.stringify(bundle));

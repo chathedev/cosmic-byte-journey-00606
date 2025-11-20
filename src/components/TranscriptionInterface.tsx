@@ -99,21 +99,27 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     if (!user?.id) return;
 
     try {
-      // Create a meeting with the transcript
-      const meetingId = crypto.randomUUID();
+      // Create a meeting with the transcript - use temp ID so backend creates it
       const meeting = {
-        id: meetingId,
+        id: 'temp-' + Date.now(),
         userId: user.id,
         title: "Digital Meeting",
         transcript,
-        folder: "Unsorted",
+        folder: "Allmänt",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         isCompleted: true
       };
 
-      await meetingStorage.saveMeeting(meeting);
-      await incrementMeetingCount(meetingId);
+      const savedId = await meetingStorage.saveMeeting(meeting);
+      
+      // Count the meeting
+      const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
+      if (wasCounted) {
+        console.log('📊 Digital meeting - counting new meeting:', savedId);
+        await incrementMeetingCount(savedId);
+        await refreshPlan();
+      }
 
       // Show transcript preview
       setTranscript(transcript);
