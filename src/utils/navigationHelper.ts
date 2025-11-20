@@ -1,3 +1,23 @@
+import { Capacitor } from '@capacitor/core';
+
+// Check if running in native app (without URL param influence)
+export const isRunningInNativeApp = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // Check Capacitor first
+  try {
+    if (Capacitor.isNativePlatform()) return true;
+  } catch {
+    // Ignore and fall back to heuristics
+  }
+
+  const ua = navigator.userAgent || navigator.vendor || '';
+  const isStandalonePWA = window.matchMedia?.('(display-mode: standalone)').matches;
+
+  // Heuristics for installed app shells / PWAs
+  return /Capacitor|TivlyApp/i.test(ua) || isStandalonePWA;
+};
+
 // Preserve usingapp parameter across navigation
 export const preserveAppParam = (to: string): string => {
   if (typeof window === 'undefined') return to;
@@ -21,9 +41,7 @@ export const preserveAppParam = (to: string): string => {
   }
 };
 
-// Check if we should preserve the app param
-export const shouldPreserveAppParam = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  const url = new URL(window.location.href);
-  return url.searchParams.get('usingapp') === 'true';
+// Check if we should have the app param
+export const shouldHaveAppParam = (): boolean => {
+  return isRunningInNativeApp();
 };

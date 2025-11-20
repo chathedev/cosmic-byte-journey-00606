@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { shouldPreserveAppParam } from "@/utils/navigationHelper";
+import { shouldHaveAppParam } from "@/utils/navigationHelper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -131,17 +131,19 @@ const ScrollToTop = () => {
   return null;
 };
 
-// Preserve usingapp parameter across navigation
+// Automatically add and preserve usingapp parameter in native apps
 const PreserveAppParam = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (!shouldPreserveAppParam()) return;
+    // Check if we should have the param (running in native app)
+    if (!shouldHaveAppParam()) return;
     
     const currentUrl = new URL(window.location.href);
-    const hasParam = currentUrl.searchParams.has('usingapp');
+    const hasParam = currentUrl.searchParams.get('usingapp') === 'true';
     
+    // Add the param if it's missing
     if (!hasParam) {
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.set('usingapp', 'true');
