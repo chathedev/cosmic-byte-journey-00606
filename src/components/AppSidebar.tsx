@@ -181,7 +181,7 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* Mobile Trigger Button - Only visible when closed */}
+      {/* Mobile Trigger Button - Only visible when closed on mobile */}
       {isMobile && !open && (
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
@@ -189,7 +189,7 @@ export function AppSidebar() {
           exit={{ scale: 0.8, opacity: 0 }}
           transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
           onClick={() => setOpen(true)}
-          className="fixed z-50 w-12 h-12 bg-primary backdrop-blur-md border-2 border-primary/20 rounded-full flex items-center justify-center text-primary-foreground shadow-xl transition-transform hover:scale-110 active:scale-95"
+          className="md:hidden fixed z-50 w-12 h-12 bg-primary backdrop-blur-md border-2 border-primary/20 rounded-full flex items-center justify-center text-primary-foreground shadow-xl transition-transform hover:scale-110 active:scale-95"
           style={{
             bottom: 'calc(max(env(safe-area-inset-bottom, 16px), 16px) + 16px)',
             left: 'calc(max(env(safe-area-inset-left, 16px), 16px) + 16px)',
