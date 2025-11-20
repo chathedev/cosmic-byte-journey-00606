@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUserAdmin, hasPlusAccess, hasUnlimitedAccess, isLibraryLocked } from "@/lib/accessCheck";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
+import { isNativeApp } from "@/utils/capacitorDetection";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { isMobileDevice } from "@/utils/mobileDetection";
@@ -42,6 +43,7 @@ export function AppSidebar() {
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
+  const isNative = isNativeApp();
   
   const scrollYRef = useRef(0);
   const { user, logout } = useAuth();
@@ -234,8 +236,8 @@ export function AppSidebar() {
         className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-card border-r border-border`}
         style={{
           height: isMobile ? '100dvh' : '100vh',
-          paddingTop: isMobile ? 'max(env(safe-area-inset-top, 0px), 0px)' : 0,
-          paddingBottom: isMobile ? 'max(env(safe-area-inset-bottom, 0px), 0px)' : 0,
+          paddingTop: (isMobile && isNative) ? 'max(env(safe-area-inset-top, 0px), 0px)' : 0,
+          paddingBottom: (isMobile && isNative) ? 'max(env(safe-area-inset-bottom, 0px), 0px)' : 0,
           willChange: 'transform',
           transform: 'translate3d(0, 0, 0)',
           backfaceVisibility: 'hidden',
