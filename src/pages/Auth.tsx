@@ -1,34 +1,31 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, CheckCircle2, ArrowLeft, Link2 } from 'lucide-react';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { refreshUser, user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
+  const [linkSent, setLinkSent] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [cooldown, setCooldown] = useState(0);
-  const [code, setCode] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState('');
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingIntervalRef = useRef<number | null>(null);
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && !searchParams.get('token')) {
+    if (user) {
       navigate('/');
     }
-  }, [user, navigate, searchParams]);
+  }, [user, navigate]);
 
   // Cooldown timer
   useEffect(() => {
@@ -38,53 +35,89 @@ const Auth = () => {
     }
   }, [cooldown]);
 
-  // Auto-submit when code is complete
+  // Cross-device polling
   useEffect(() => {
-    if (code.length === 6 && codeSent && !isVerifying) {
-      handleVerifyCode();
-    }
-  }, [code, codeSent]);
+    if (!isPolling || !sessionId || !email) return;
 
-  const handleVerifyCode = async () => {
-    if (code.length !== 6) return;
-    
-    setIsVerifying(true);
-    setVerifyError('');
-    
-    try {
-      const result = await apiClient.verifyMagicLink(email, sessionId, code);
-      
-      if (result.token) {
-        apiClient.applyAuthToken(result.token);
-        await refreshUser();
+    const pollStatus = async () => {
+      try {
+        const result = await apiClient.checkMagicLinkStatus(sessionId, email);
         
-        toast({
-          title: "Inloggad!",
-          description: "Du loggades in framgångsrikt.",
-        });
-        
-        navigate('/');
+        if (result.status === 'ready' && result.token) {
+          // Success - stop polling and log in
+          setIsPolling(false);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          apiClient.applyAuthToken(result.token);
+          await refreshUser();
+          
+          toast({
+            title: "Inloggad!",
+            description: "Du loggades in framgångsrikt.",
+          });
+          
+          navigate('/');
+        } else if (result.status === 'device_mismatch') {
+          setIsPolling(false);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          toast({
+            title: "Enhetsmatchning misslyckades",
+            description: "Öppna länken på denna enhet eller starta om inloggningen på din andra enhet.",
+            variant: "destructive",
+          });
+        } else if (result.status === 'expired') {
+          setIsPolling(false);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          toast({
+            title: "Länken har gått ut",
+            description: "Begär en ny inloggningslänk.",
+            variant: "destructive",
+          });
+          
+          setLinkSent(false);
+        } else if (result.status === 'not_found') {
+          setIsPolling(false);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          toast({
+            title: "Session hittades inte",
+            description: "Begär en ny inloggningslänk.",
+            variant: "destructive",
+          });
+          
+          setLinkSent(false);
+        }
+        // If pending, keep polling
+      } catch (error: any) {
+        console.error('Polling error:', error);
       }
-    } catch (error: any) {
-      const message = error.message || 'Ogiltig kod';
-      setVerifyError(message);
-      setCode('');
-      
-      toast({
-        title: "Verifiering misslyckades",
-        description: message.includes('invalid_code') 
-          ? 'Ogiltig kod. Försök igen.'
-          : message.includes('token_expired')
-          ? 'Koden har gått ut. Begär en ny kod.'
-          : message.includes('session_not_found')
-          ? 'Sessionen hittades inte. Begär en ny kod.'
-          : message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+    };
+
+    // Start polling immediately
+    pollStatus();
+    pollingIntervalRef.current = window.setInterval(pollStatus, 2000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [isPolling, sessionId, email, refreshUser, navigate, toast]);
 
   const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,14 +135,10 @@ const Auth = () => {
     if (email.toLowerCase() === 'review@tivly.se') {
       setIsLoading(true);
       try {
-        // Create a test token and mock unlimited user
         const testToken = 'test_unlimited_user_' + Date.now();
         apiClient.applyAuthToken(testToken);
         
-        // Grace period while user state initializes
         try { sessionStorage.setItem('pendingTestLogin', '1'); } catch {}
-        
-        // Store test user email
         localStorage.setItem('userEmail', email);
         
         await refreshUser();
@@ -146,7 +175,7 @@ const Auth = () => {
         `${window.location.origin}/magic-login`
       );
 
-      // Handle trusted device auto-login (no email sent by backend)
+      // Handle trusted device auto-login
       if (result.trustedLogin && result.token) {
         apiClient.applyAuthToken(result.token);
         await refreshUser();
@@ -158,34 +187,42 @@ const Auth = () => {
         return;
       }
       
-      // Normal flow: email sent with code
+      // Normal flow: email sent with magic link
       if (result.sessionId) {
-        setCodeSent(true);
+        setLinkSent(true);
         setSessionId(result.sessionId);
+        
+        // Store in localStorage for cross-tab recovery
+        localStorage.setItem('magic_session_id', result.sessionId);
+        localStorage.setItem('magic_session_email', email);
+        
         setCooldown(result.retryAfterSeconds || 60);
-        setCode('');
-        setVerifyError('');
+        
+        // Start polling for cross-device login
+        setIsPolling(true);
         
         toast({
-          title: "Kod skickad!",
-          description: `En 6-siffrig kod skickades till ${email}`,
+          title: "Länk skickad!",
+          description: `En inloggningslänk skickades till ${email}`,
         });
       } else {
         throw new Error('No session ID received');
       }
     } catch (error: any) {
-      // CORS error workaround: Backend returns 200 OK (email sent) but browser blocks response
+      // CORS error workaround
       if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
-        console.log('CORS error detected, but email was likely sent (200 OK). Proceeding...');
-        setCodeSent(true);
-        setSessionId(`session_${Date.now()}_${email.replace(/[^a-z0-9]/gi, '')}`);
+        console.log('CORS error detected, but email was likely sent. Proceeding...');
+        const tempSessionId = `session_${Date.now()}_${email.replace(/[^a-z0-9]/gi, '')}`;
+        setLinkSent(true);
+        setSessionId(tempSessionId);
+        localStorage.setItem('magic_session_id', tempSessionId);
+        localStorage.setItem('magic_session_email', email);
         setCooldown(60);
-        setCode('');
-        setVerifyError('');
+        setIsPolling(true);
         
         toast({
-          title: "Kod skickad!",
-          description: `En 6-siffrig kod skickades till ${email}`,
+          title: "Länk skickad!",
+          description: `En inloggningslänk skickades till ${email}`,
         });
         return;
       }
@@ -201,7 +238,7 @@ const Auth = () => {
         description = `Vänta ${seconds} sekunder innan du försöker igen.`;
       } else if (error.message.includes('browser_blocked')) {
         title = "Enhet blockerad";
-        description = "Denna enhet kan inte användas för att skapa ett nytt konto. Om du har ett Enterprise-konto, kontakta din administratör.";
+        description = "Denna enhet kan inte användas. Om du har ett Enterprise-konto, kontakta din administratör.";
       } else if (error.message.includes('mail_not_configured') || error.message.includes('mail_send_failed')) {
         title = "E-post kunde inte skickas";
         description = "Det gick inte att skicka e-post. Försök igen om en stund.";
@@ -215,6 +252,20 @@ const Auth = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBack = () => {
+    setLinkSent(false);
+    setSessionId('');
+    setEmail('');
+    setCooldown(0);
+    setIsPolling(false);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    localStorage.removeItem('magic_session_id');
+    localStorage.removeItem('magic_session_email');
   };
 
   return (
@@ -236,7 +287,7 @@ const Auth = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 rounded-3xl opacity-50" />
           
           <div className="relative p-6 sm:p-10 space-y-8">
-            {/* Logo Section with animation */}
+            {/* Logo Section */}
             <div className="flex flex-col items-center gap-5 animate-slide-in-from-top">
               <div className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-500" />
@@ -251,71 +302,61 @@ const Auth = () => {
               
               <div className="text-center space-y-2">
                 <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent tracking-tight">
-                  {codeSent ? 'Ange kod' : 'Välkommen'}
+                  {linkSent ? 'Kolla din inkorg' : 'Välkommen'}
                 </h1>
                 
                 <p className="text-sm sm:text-base text-muted-foreground text-center max-w-sm leading-relaxed">
-                  {codeSent 
-                    ? 'Ange den 6-siffriga koden från ditt email' 
-                    : 'Ange din e-post för att få en säker inloggningskod'}
+                  {linkSent 
+                    ? 'Vi skickade en inloggningslänk till din e-post' 
+                    : 'Ange din e-post för att få en säker inloggningslänk'}
                 </p>
               </div>
             </div>
 
             {/* Content */}
-            {codeSent ? (
+            {linkSent ? (
               <div className="text-center space-y-8 animate-slide-in-from-bottom">
                 <div className="relative mx-auto w-24 h-24 group">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-3xl blur-xl opacity-40 animate-pulse" />
                   <div className="relative rounded-3xl bg-gradient-to-br from-primary/20 to-secondary/20 border-2 border-primary/40 flex items-center justify-center shadow-2xl">
-                    <Mail className="w-12 h-12 text-primary" />
+                    {isPolling ? (
+                      <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                    ) : (
+                      <Mail className="w-12 h-12 text-primary" />
+                    )}
                   </div>
                 </div>
                 
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      Kod skickad till
+                      Länk skickad till
                     </p>
                     <p className="text-base font-semibold text-foreground break-all">
                       {email}
                     </p>
                   </div>
 
-                  <div className="flex flex-col items-center gap-4">
-                    <InputOTP
-                      maxLength={6}
-                      value={code}
-                      onChange={setCode}
-                      disabled={isVerifying}
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
-
-                    {verifyError && (
-                      <p className="text-sm text-destructive">
-                        {verifyError}
-                      </p>
-                    )}
-
-                    {isVerifying && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="space-y-3 p-4 bg-muted/30 rounded-xl">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                      <span>Klicka på länken i ditt email</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                      <span>Du kan öppna länken på valfri enhet</span>
+                    </div>
+                    {isPolling && (
+                      <div className="flex items-center gap-2 text-sm text-primary">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Verifierar...</span>
+                        <span>Väntar på inloggning...</span>
                       </div>
                     )}
                   </div>
 
                   <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                    <span>Koden är giltig i 15 minuter</span>
+                    <span>Länken är giltig i 15 minuter</span>
                   </div>
                 </div>
                 
@@ -332,19 +373,12 @@ const Auth = () => {
                       <Mail className="w-4 h-4 mr-2" />
                     )}
                     <span className="text-sm font-medium">
-                      {cooldown > 0 ? `Skicka igen om ${cooldown}s` : 'Skicka ny kod'}
+                      {cooldown > 0 ? `Skicka igen om ${cooldown}s` : 'Skicka ny länk'}
                     </span>
                   </Button>
                   
                   <Button
-                    onClick={() => {
-                      setCodeSent(false);
-                      setSessionId('');
-                      setEmail('');
-                      setCode('');
-                      setVerifyError('');
-                      setCooldown(0);
-                    }}
+                    onClick={handleBack}
                     variant="ghost"
                     className="w-full h-12 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
@@ -353,61 +387,61 @@ const Auth = () => {
                   </Button>
                 </div>
               </div>
-              ) : (
-                <form 
-                  onSubmit={handleSendMagicLink} 
-                  className="space-y-5"
-                >
-                  <div>
-                    <div className="relative group">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-all duration-200 group-focus-within:text-primary group-focus-within:scale-110 z-10" />
-                      <Input
-                        type="email"
-                        placeholder="din@email.se"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                        className="pl-12 h-14 rounded-xl border-border/60 focus:border-primary/50 transition-all duration-200 text-base"
-                        required
-                      />
-                    </div>
+            ) : (
+              <form 
+                onSubmit={handleSendMagicLink} 
+                className="space-y-5"
+              >
+                <div>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-all duration-200 group-focus-within:text-primary group-focus-within:scale-110 z-10" />
+                    <Input
+                      type="email"
+                      placeholder="din@email.se"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                      className="pl-12 h-14 rounded-xl border-border/60 focus:border-primary/50 transition-all duration-200 text-base"
+                      required
+                    />
                   </div>
-                  
-                  <div>
-                    <Button
-                      type="submit"
-                      disabled={isLoading || !email}
-                      className="w-full h-14 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-base font-semibold shadow-lg disabled:opacity-50"
-                      size="lg"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Skickar kod...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="mr-2 h-5 w-5" />
-                          Skicka inloggningskod
-                        </>
-                      )}
-                    </Button>
+                </div>
+                
+                <div>
+                  <Button
+                    type="submit"
+                    disabled={isLoading || !email}
+                    className="w-full h-14 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-base font-semibold shadow-lg disabled:opacity-50"
+                    size="lg"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Skickar länk...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="mr-2 h-5 w-5" />
+                        Skicka inloggningslänk
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                    <span>Inget lösenord krävs</span>
+                    <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
+                    <span>Säker inloggning</span>
+                    <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
                   </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
-                      <span>Inget lösenord krävs</span>
-                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
-                      <span>Säker inloggning</span>
-                      <div className="w-1 h-1 bg-muted-foreground/40 rounded-full" />
-                    </div>
-                    <p className="text-xs text-center text-muted-foreground leading-relaxed px-4">
-                      Vi skickar en 6-siffrig engångskod till din e-post som är giltig i 15 minuter
-                    </p>
-                  </div>
-                </form>
-              )}
+                  <p className="text-xs text-center text-muted-foreground leading-relaxed px-4">
+                    Vi skickar en klickbar länk till din e-post som är giltig i 15 minuter
+                  </p>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>

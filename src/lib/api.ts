@@ -282,7 +282,7 @@ class ApiClient {
     return data;
   }
 
-  async verifyMagicLink(email: string, sessionId: string, code: string): Promise<AuthResponse> {
+  async verifyMagicLink(token: string, sessionId?: string): Promise<AuthResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/magic-link/verify`, {
       method: 'POST',
       credentials: 'include',
@@ -291,12 +291,12 @@ class ApiClient {
         'X-Browser-Id': this.browserId,
         'X-Device-Id': this.browserId,
       },
-      body: JSON.stringify({ email, sessionId, code })
+      body: JSON.stringify({ token, sessionId })
     });
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Invalid or expired code' }));
-      throw new Error((error as any).error || (error as any).message || 'Invalid or expired code');
+      const error = await response.json().catch(() => ({ error: 'Invalid or expired link' }));
+      throw new Error((error as any).error || (error as any).message || 'Invalid or expired link');
     }
     
     const data = await response.json();
