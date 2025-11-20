@@ -39,9 +39,9 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
       // Generate AI-powered title
       const title = await generateMeetingTitle(transcript);
 
-      // Create new meeting and increment meeting count
+      // Create new meeting with unique temp ID to force backend to create new
       const meetingId = await meetingStorage.saveMeeting({
-        id: '', // Empty ID means CREATE new meeting
+        id: `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`, // Unique temp ID forces creation
         title,
         transcript,
         folder: 'Allmänt',
@@ -52,9 +52,12 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
         protocolCount: 0,
       });
 
-      // CRITICAL: Do NOT count meeting here if it already exists in backend
-      // Meeting counting happens on first save during recording, not during protocol generation
-      console.log('📄 Saving transcript - meeting counting handled by recording flow');
+      // Count this as a new meeting
+      const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
+      if (wasCounted) {
+        console.log('📊 Uploaded meeting saved - counting:', meetingId);
+        await incrementMeetingCount(meetingId);
+      }
 
       toast({
         title: "Sparat!",
@@ -145,8 +148,9 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
                 const now = new Date().toISOString();
                 const title = await generateMeetingTitle(transcript);
                 
+                // Create new meeting with unique temp ID to force backend to create new
                 const meetingId = await meetingStorage.saveMeeting({
-                  id: '',
+                  id: `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`, // Unique temp ID forces creation
                   title,
                   transcript,
                   folder: 'Allmänt',
@@ -157,11 +161,14 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
                   protocolCount: 0,
                 });
 
-                // CRITICAL: Do NOT count meeting during protocol generation
-                // Meeting was already counted during initial recording/save
-                console.log('📄 Protocol generation - meeting already counted during recording');
+                // Count this as a new meeting
+                const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
+                if (wasCounted) {
+                  console.log('📊 Uploaded meeting - generating protocol - counting:', meetingId);
+                  await incrementMeetingCount(meetingId);
+                }
 
-                // All users navigate to generate-protocol page
+                // Navigate to generate-protocol page
                 const token = `protocol-${Date.now()}`;
                 const payload = {
                   transcript,
