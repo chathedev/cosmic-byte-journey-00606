@@ -12,13 +12,35 @@ serve(async (req) => {
 
   try {
     const { transcript, meetingName, agenda } = await req.json();
+    
+    console.log('📥 analyze-meeting request:', {
+      hasTranscript: !!transcript,
+      transcriptLength: transcript?.length || 0,
+      transcriptWords: transcript?.trim().split(/\s+/).length || 0,
+      meetingName,
+      hasAgenda: !!agenda
+    });
+    
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     
     if (!GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY not configured');
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
+    if (!transcript || transcript.trim().length < 10) {
+      console.error('❌ Transcript too short or missing:', transcript?.length || 0);
+      return new Response(
+        JSON.stringify({
+          error: "Transkriptionen är för kort eller saknas",
+          details: "Minst 10 tecken krävs för att generera ett protokoll"
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const wordCount = transcript.trim().split(/\s+/).length;
+    console.log('📊 Processing transcript:', { wordCount, chars: transcript.length });
     
     // Determine protocol length based on transcript length
     let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsDetail, nextMeetingCount;
@@ -165,24 +187,28 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
+      console.error("❌ Gemini API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText.substring(0, 500)
+      });
       return new Response(
         JSON.stringify({
           error: "Kunde inte analysera mötet",
-          details: errorText,
+          details: `Gemini API error: ${response.status}`,
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await response.json();
-    console.log("Gemini API response received:", JSON.stringify(data).substring(0, 400));
+    console.log("✅ Gemini API response received, processing...");
     
     // Parse the JSON content from the Gemini response
     let result;
     try {
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      console.log("Raw AI content:", content.substring(0, 400));
+      console.log("📝 Raw AI content length:", content.length);
       
       // Clean up markdown code blocks if present
       let cleanedContent = content.trim();
@@ -203,8 +229,8 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
       try {
         parsed = JSON.parse(cleanedContent);
       } catch (innerErr) {
-        console.error('Primary JSON.parse failed, content snippet:', cleanedContent.substring(0, 400));
-        throw innerErr;
+        console.error('❌ JSON parse failed, content preview:', cleanedContent.substring(0, 200));
+        throw new Error('AI returnerade ogiltigt format');
       }
       
       // Support both English and Swedish JSON structures
@@ -264,10 +290,11 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
         .map((s: any) => (typeof s === 'string' ? s : ''))
         .filter((s: string) => s.trim() !== '');
 
-      console.log("Parsed & normalized AI response:", {
-        hasTitle: !!title,
+      console.log("✅ Parsed & normalized AI response:", {
+        title,
         hasSummary: !!summary,
         summaryLength: summary.length,
+        summaryPreview: summary.substring(0, 100),
         mainPointsCount: mainPoints.length,
         decisionsCount: decisions.length,
         actionItemsCount: actionItems.length,
@@ -294,8 +321,17 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
         actionItems,
         nextMeetingSuggestions,
       };
+      
+      console.log('✅ Returning protocol:', {
+        title: result.title,
+        summaryLength: result.summary.length,
+        mainPointsCount: result.mainPoints.length,
+        decisionsCount: result.decisions.length,
+        actionItemsCount: result.actionItems.length
+      });
     } catch (parseError) {
-      console.error("Parse/normalization error, using fallback:", parseError);
+      console.error("❌ Parse/normalization error:", parseError);
+      console.error('Stack:', parseError instanceof Error ? parseError.stack : 'No stack');
 
       // Absolute fallback: always return a generic but användbart protokoll
       const fallbackWordCount = transcript.trim().split(/\s+/).length;
@@ -315,9 +351,30 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
         actionItems: [],
         nextMeetingSuggestions: [],
       };
+      
+      console.log('⚠️ Using fallback protocol due to parse error');
     }
 
-    console.log("Returning result with summary length:", result.summary.length);
+    // Final validation - ensure we never return garbage data
+    if (!result.summary || result.summary.trim().length < 10) {
+      console.error('❌ Invalid summary detected:', result.summary);
+      result.summary = `Mötet genomfördes och diskussioner fördes. Protokollet genererades automatiskt från transkriptionen.`;
+    }
+    
+    if (!Array.isArray(result.mainPoints) || result.mainPoints.length === 0) {
+      console.error('❌ Invalid mainPoints detected');
+      result.mainPoints = [
+        'Genomgång av aktuellt läge och prioriterade frågor.',
+        'Diskussion kring nästa steg och ansvariga.',
+      ];
+    }
+
+    console.log("✅ Returning protocol:", {
+      title: result.title,
+      summaryLength: result.summary.length,
+      summaryPreview: result.summary.substring(0, 100),
+      mainPointsCount: result.mainPoints.length,
+    });
     
     return new Response(
       JSON.stringify(result),
@@ -326,9 +383,15 @@ Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markd
       }
     );
   } catch (error) {
-    console.error('Unexpected error in analyze-meeting:', error);
+    console.error('❌ Unexpected error in analyze-meeting:', error);
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+    
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : "Ett oväntat fel uppstod",
+        details: error instanceof Error ? error.stack?.substring(0, 500) : 'No details'
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -121,15 +121,17 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
+      console.error('❌ Speech Recognition not supported in this browser');
       toast({
         title: "Inte stödd",
         description: "Din webbläsare stöder inte rösttranskribering. Använd Google Chrome.",
         variant: "destructive",
-        duration: 2500,
+        duration: 5000,
       });
       return;
     }
 
+    console.log('🎤 Initializing Speech Recognition with language:', selectedLanguage);
     const recognition = new SpeechRecognition();
     // Use selected language with enhanced settings
     recognition.lang = selectedLanguage;
@@ -141,6 +143,35 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     if ('webkitSpeechRecognition' in window) {
       (recognition as any).serviceURI = undefined; // Use default service
     }
+
+    recognition.onstart = () => {
+      console.log('✅ Speech recognition started successfully');
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('❌ Speech recognition error:', event.error, event);
+      
+      // Handle specific errors
+      if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+        toast({
+          title: "Mikrofon nekad",
+          description: "Tillåt mikrofonåtkomst för att spela in möten.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      } else if (event.error === 'no-speech') {
+        console.warn('⚠️ No speech detected - will retry');
+      } else if (event.error === 'network') {
+        toast({
+          title: "Nätverksfel",
+          description: "Kontrollera din internetanslutning och försök igen.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      } else {
+        console.error('Unhandled speech recognition error:', event.error);
+      }
+    };
 
     recognition.onresult = (event: any) => {
       let interim = '';
@@ -170,9 +201,11 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
       // Immediate state updates for faster display
       if (final) {
-        console.log('✅ Final transcript:', final, 'confidence:', event.results[event.resultIndex]?.[0]?.confidence);
+        const confidence = event.results[event.resultIndex]?.[0]?.confidence;
+        console.log('✅ Final transcript:', final.substring(0, 100), 'confidence:', confidence);
         setTranscript(prev => {
           const newText = prev + final;
+          console.log('📝 Total transcript length:', newText.length, 'words:', newText.split(/\s+/).length);
           return newText;
         });
         setInterimTranscript('');
@@ -180,7 +213,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
       }
       
       if (interim && !final) {
-        console.log('⏳ Interim:', interim);
+        console.log('⏳ Interim:', interim.substring(0, 50));
         setInterimTranscript(interim);
       }
     };
@@ -928,35 +961,57 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
     let finalTranscript = (transcript + interimTranscript).trim();
 
+    console.log('🛑 Stopping recording...');
+    console.log('📊 Final stats:', {
+      transcriptLength: finalTranscript.length,
+      wordCount: finalTranscript.split(/\s+/).filter(w => w).length,
+      duration: durationSec,
+      hasSpoken
+    });
+
     // Stop recognition
     setIsRecording(false);
     // Release wake lock when stopping
     await releaseWakeLock();
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
+      try { 
+        recognitionRef.current.stop(); 
+        console.log('✅ Speech recognition stopped');
+      } catch (e) {
+        console.error('❌ Error stopping recognition:', e);
+      }
       isRecognitionActiveRef.current = false;
     }
 
     // Stop stream
     if (streamRef.current) {
-      try { streamRef.current.getTracks().forEach((t) => t.stop()); } catch {}
+      try { 
+        streamRef.current.getTracks().forEach((t) => t.stop()); 
+        console.log('✅ Media stream stopped');
+      } catch (e) {
+        console.error('❌ Error stopping stream:', e);
+      }
       streamRef.current = null;
     }
 
     // Validate transcript length
     if (!finalTranscript) {
+      console.error('❌ No transcript captured!');
       toast({ 
         title: 'Ingen text', 
-        description: 'Ingen transkription inspelad.', 
+        description: 'Ingen transkription inspelad. Kontrollera att mikrofonen fungerar och att du pratade under inspelningen.', 
         variant: 'destructive',
-        duration: 2500,
+        duration: 5000,
       });
       handleBackClick();
       isFinalizingRef.current = false;
       return;
     }
     const wordCount = finalTranscript.split(/\s+/).filter(w => w).length;
+    console.log(`📝 Transcript has ${wordCount} words (minimum: ${MIN_WORD_COUNT})`);
+    
     if (wordCount < MIN_WORD_COUNT) {
+      console.warn(`⚠️ Transcript too short: ${wordCount} words < ${MIN_WORD_COUNT} minimum`);
       setShowShortTranscriptDialog(true);
       isFinalizingRef.current = false;
       return;

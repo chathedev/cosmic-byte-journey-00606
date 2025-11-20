@@ -71,6 +71,27 @@ export const AutoProtocolGenerator = ({
     const generateProtocol = async () => {
       setIsGenerating(true);
       
+      // Validate transcript before sending
+      const wordCount = transcript.trim().split(/\s+/).filter(w => w).length;
+      console.log('📊 Protocol generation starting:', {
+        transcriptLength: transcript.length,
+        wordCount,
+        hasAgenda: !!agendaId,
+        meetingName: fileName.replace('.docx', '')
+      });
+
+      if (wordCount < 10) {
+        console.error('❌ Transcript too short for AI analysis:', wordCount, 'words');
+        toast({
+          title: "För kort transkription",
+          description: "Transkriptionen är för kort för att generera ett meningsfullt protokoll. Försök spela in ett längre möte.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        setIsGenerating(false);
+        return;
+      }
+      
       // Slower, smoother progress animation
       const progressInterval = setInterval(() => {
         setProgress(prev => {
@@ -80,6 +101,18 @@ export const AutoProtocolGenerator = ({
       }, 300);
 
       try {
+        const requestBody = {
+          transcript,
+          meetingName: fileName.replace('.docx', ''),
+          agenda: agendaId ? await fetchAgendaContent(agendaId) : undefined,
+        };
+        
+        console.log('🚀 Sending to analyze-meeting:', {
+          transcriptPreview: transcript.substring(0, 200),
+          wordCount,
+          hasAgenda: !!requestBody.agenda
+        });
+
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-meeting`,
           {
@@ -88,18 +121,24 @@ export const AutoProtocolGenerator = ({
               "Content-Type": "application/json",
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({
-              transcript,
-              meetingName: fileName.replace('.docx', ''),
-              agenda: agendaId ? await fetchAgendaContent(agendaId) : undefined,
-            }),
+            body: JSON.stringify(requestBody),
           }
         );
 
+        console.log('📡 analyze-meeting response status:', response.status, response.statusText);
+
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-          console.error("Edge function error:", errorData);
-          throw new Error(errorData.error || "Failed to generate protocol");
+          const errorText = await response.text();
+          console.error("❌ Edge function error:", response.status, errorText);
+          
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || "Unknown error" };
+          }
+          
+          throw new Error(errorData.error || `Server error: ${response.status}`);
         }
 
         const data = await response.json();
