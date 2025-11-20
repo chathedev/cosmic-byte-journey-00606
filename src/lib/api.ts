@@ -92,7 +92,6 @@ class ApiClient {
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
       ...(fetchOptions.headers as any),
     };
 
@@ -102,6 +101,7 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...fetchOptions,
+      credentials: 'include',
       headers,
     });
 
@@ -137,7 +137,6 @@ class ApiClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
           'X-Browser-ID': this.browserId,
           ...(deviceId ? { 'X-Device-ID': deviceId } : {}),
           ...(userIP ? { 'X-Client-IP': userIP } : {}),
