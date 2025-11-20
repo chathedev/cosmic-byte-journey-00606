@@ -1,8 +1,15 @@
 import { Capacitor } from '@capacitor/core';
 
-// Detect if running inside a native shell (Capacitor or installed app)
+// Detect if running inside the Tivly native app / shell
 export const isNativeApp = (): boolean => {
   if (typeof window === 'undefined') return false;
+
+  const url = new URL(window.location.href);
+  const usingAppParam = url.searchParams.get('usingapp');
+
+  // Explicit override from URL: ?usingapp=true / ?usingapp=false
+  if (usingAppParam === 'true') return true;
+  if (usingAppParam === 'false') return false;
 
   try {
     if (Capacitor.isNativePlatform()) return true;
@@ -11,13 +18,9 @@ export const isNativeApp = (): boolean => {
   }
 
   const ua = navigator.userAgent || navigator.vendor || '';
-
-  // Heuristics:
-  // - Custom app identifiers (update if you add your own)
-  // - "Capacitor" token added by many Capacitor shells
-  // - Installed PWA display mode
   const isStandalonePWA = window.matchMedia?.('(display-mode: standalone)').matches;
 
+  // Heuristics for installed app shells / PWAs
   return /Capacitor|TivlyApp/i.test(ua) || isStandalonePWA;
 };
 
