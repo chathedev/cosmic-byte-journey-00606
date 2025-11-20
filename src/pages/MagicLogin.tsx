@@ -46,7 +46,6 @@ const MagicLogin = () => {
           window.history.replaceState({}, document.title, '/magic-login');
           
           setState('success');
-          setErrorMessage('Inloggningen lyckades! Omdirigerar...');
           
           await refreshUser();
           
@@ -112,32 +111,36 @@ const MagicLogin = () => {
           
           <div className="space-y-2">
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Omdirigerar...
+              {state === 'success' ? 'Inloggning lyckades!' : state === 'verifying' ? 'Verifierar...' : 'Något gick fel'}
             </CardTitle>
             <CardDescription className="text-base">
-              {errorMessage}
+              {state === 'success' ? 'Du omdirigeras till startsidan...' : errorMessage}
             </CardDescription>
           </div>
         </CardHeader>
         
         <CardContent className="space-y-6 pb-8">
           <div className="flex flex-col items-center justify-center space-y-6">
-            <div className="mx-auto w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+            <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center ${
+              state === 'success' ? 'bg-primary/10' : state === 'verifying' ? 'bg-primary/10' : 'bg-destructive/10'
+            }`}>
               {getStatusIcon()}
             </div>
             
-            <div className="space-y-4 w-full">
-              <p className="text-sm text-muted-foreground text-center">
-                Du omdirigeras till inloggningssidan om 3 sekunder...
-              </p>
-              <Button 
-                onClick={() => navigate('/auth')}
-                className="w-full"
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                Gå till inloggning nu
-              </Button>
-            </div>
+            {(state === 'error' || state === 'invalid') && (
+              <div className="space-y-4 w-full">
+                <p className="text-sm text-muted-foreground text-center">
+                  Du omdirigeras till inloggningssidan om några sekunder...
+                </p>
+                <Button 
+                  onClick={() => navigate('/auth')}
+                  className="w-full"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Gå till inloggning nu
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
