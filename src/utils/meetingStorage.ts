@@ -119,7 +119,7 @@ export const meetingStorage = {
       if (!shouldSaveToBackend) {
         // Draft meeting - return temp ID without backend save
         console.log('💾 Draft meeting - returning temp ID:', meeting.id);
-        return meeting.id || 'temp-' + Date.now();
+        return meeting.id || `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       }
 
       if (hasValidId) {

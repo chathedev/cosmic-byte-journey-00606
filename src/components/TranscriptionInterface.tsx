@@ -99,9 +99,9 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     if (!user?.id) return;
 
     try {
-      // Create a meeting with the transcript - use temp ID so backend creates it
+      // Create a meeting with the transcript - use unique temp ID so backend creates it
       const meeting = {
-        id: 'temp-' + Date.now(),
+        id: `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
         userId: user.id,
         title: "Digital Meeting",
         transcript,
@@ -217,7 +217,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         try {
           const now = new Date().toISOString();
           const meeting = {
-            id: 'temp-' + Date.now(),
+            id: `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
             title: file.name.replace(/\.[^/.]+$/, ""),
             folder: 'Allmänt',
             transcript: transcriptText,

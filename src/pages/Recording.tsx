@@ -43,8 +43,12 @@ const Recording = () => {
     navigate('/', { replace: true });
   };
 
+  // Use continuedMeeting.id as key to force remount when starting new meeting
+  const recordingKey = state.continuedMeeting?.id || 'new';
+
   return (
     <RecordingView
+      key={recordingKey}
       onFinish={handleFinishRecording}
       onBack={handleBack}
       continuedMeeting={state.continuedMeeting}
