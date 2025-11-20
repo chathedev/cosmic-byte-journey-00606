@@ -13,6 +13,7 @@ export interface MeetingSession {
   isCompleted?: boolean;
   protocolCount?: number;
   agendaId?: string;
+  source?: 'live' | 'upload'; // Indikerar om mötet är från live-inspelning eller uppladdad fil
 }
 
 export interface MeetingFolder {

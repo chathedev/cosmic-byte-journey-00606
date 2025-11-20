@@ -50,6 +50,7 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
         userId: '',
         isCompleted: true,
         protocolCount: 0,
+        source: 'upload', // Mark as uploaded meeting
       });
 
       // Count this as a new meeting
@@ -159,6 +160,7 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
                   userId: '',
                   isCompleted: true,
                   protocolCount: 0,
+                  source: 'upload', // Mark as uploaded meeting
                 });
 
                 // Count this as a new meeting
