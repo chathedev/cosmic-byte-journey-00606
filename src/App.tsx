@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
+import { shouldPreserveAppParam } from "@/utils/navigationHelper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -130,6 +131,27 @@ const ScrollToTop = () => {
   return null;
 };
 
+// Preserve usingapp parameter across navigation
+const PreserveAppParam = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!shouldPreserveAppParam()) return;
+    
+    const currentUrl = new URL(window.location.href);
+    const hasParam = currentUrl.searchParams.has('usingapp');
+    
+    if (!hasParam) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('usingapp', 'true');
+      navigate(location.pathname + newUrl.search + location.hash, { replace: true });
+    }
+  }, [location.pathname, location.search, location.hash, navigate]);
+  
+  return null;
+};
+
 // Layout wrapper for pages with sidebar
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -189,6 +211,7 @@ const App = () => {
               <SubscriptionProvider>
                 <PlanGate>
                   <ScrollToTop />
+                  <PreserveAppParam />
                   <WelcomeGate>
                     <AppLayout>
                       <Suspense
