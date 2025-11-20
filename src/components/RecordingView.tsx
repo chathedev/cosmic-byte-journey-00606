@@ -481,7 +481,8 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         return;
       }
 
-      const tempId = 'temp-' + Date.now();
+      // Generate truly unique temp ID using crypto
+      const tempId = `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       
       createdOnceRef.current = true;
       const now = new Date().toISOString();
