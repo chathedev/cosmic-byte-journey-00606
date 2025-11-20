@@ -79,6 +79,14 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                   <p className="text-xs text-muted-foreground">
                     Förstå knapparna så du inte förlorar din inspelning
                   </p>
+                  
+                  {/* Important notice about recording type */}
+                  <div className="mt-3 p-3 rounded-xl bg-primary/10 border border-primary/20">
+                    <p className="text-xs font-bold text-primary mb-1">📍 Inspelning för fysiska möten</p>
+                    <p className="text-[11px] text-foreground/80 leading-relaxed">
+                      Inspelaren fungerar <span className="font-semibold">bäst vid fysiska möten</span>. För digitala möten (Teams, Zoom etc.) rekommenderar vi att spela in ljudet separat och ladda upp filen istället för att använda inspelaren.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Scrollable Instructions */}

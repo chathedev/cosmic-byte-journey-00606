@@ -325,27 +325,47 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           </div>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button
-              onClick={handleStartRecording}
-              size="lg"
-              className="px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-            >
-              <Mic className="mr-2 h-5 w-5" />
-              Spela in live-möte
-            </Button>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <div className="flex-1 max-w-xs">
+                <Button
+                  onClick={handleStartRecording}
+                  size="lg"
+                  className="w-full px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                >
+                  <Mic className="mr-2 h-5 w-5" />
+                  Spela in live-möte
+                </Button>
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  <span className="font-semibold text-primary">Bäst för fysiska möten</span> – realtidsinspelning på plats
+                </p>
+              </div>
+              
+              {hasProAccess && (
+                <div className="flex-1 max-w-xs">
+                  <Button
+                    onClick={handleOpenDigitalMeeting}
+                    variant="outline"
+                    size="lg"
+                    className="w-full px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                  >
+                    <Upload className="mr-2 h-5 w-5" />
+                    Ladda upp inspelning
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    <span className="font-semibold text-accent">För alla möten</span> – fysiska & digitala (Teams, Zoom, etc.)
+                  </p>
+                </div>
+              )}
+            </div>
             
-            {hasProAccess && (
-              <Button
-                onClick={handleOpenDigitalMeeting}
-                variant="outline"
-                size="lg"
-                className="px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-              >
-                <Upload className="mr-2 h-5 w-5" />
-                Ladda upp inspelning
-              </Button>
-            )}
+            {/* Clear explanation banner */}
+            <Alert className="max-w-2xl mx-auto border-primary/20 bg-primary/5">
+              <AlertCircle className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-sm">
+                <span className="font-semibold">Tips:</span> Inspelaren är optimerad för fysiska möten. Vid digitala möten (Teams, Zoom, etc.) fungerar det bättre att spela in ljudet separat och ladda upp filen istället.
+              </AlertDescription>
+            </Alert>
           </div>
           {/* Features grid */}
           <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
