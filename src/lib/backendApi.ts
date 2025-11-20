@@ -139,6 +139,7 @@ const getAuthHeaders = () => {
 export const backendApi = {
   async getDashboard(): Promise<DashboardData> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/dashboard`, {
+      credentials: 'include',
       headers: getAuthHeaders(),
     });
 
@@ -151,6 +152,7 @@ export const backendApi = {
 
   async getHealth(): Promise<HealthCheck> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/health`, {
+      credentials: 'include',
       headers: getAuthHeaders(),
     });
 
@@ -163,6 +165,7 @@ export const backendApi = {
 
   async getStorage(): Promise<StorageData> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/storage`, {
+      credentials: 'include',
       headers: getAuthHeaders(),
     });
 
@@ -175,6 +178,7 @@ export const backendApi = {
 
   async getServices(): Promise<ServiceInfo> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/services`, {
+      credentials: 'include',
       headers: getAuthHeaders(),
     });
 
@@ -187,6 +191,7 @@ export const backendApi = {
 
   async getLogs(lines: number = 100): Promise<{ ok: boolean; lines: string[]; total: number; showing: number }> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/logs?lines=${lines}`, {
+      credentials: 'include',
       headers: getAuthHeaders(),
     });
 
@@ -200,6 +205,7 @@ export const backendApi = {
   async cleanup(target: 'transcriptions' | 'conversions' | 'all' = 'all'): Promise<CleanupResponse> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/cleanup`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders(),
       body: JSON.stringify({ target }),
     });
@@ -214,6 +220,7 @@ export const backendApi = {
   async backup(collections: string[] = ['all']): Promise<BackupResponse> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/backup`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders(),
       body: JSON.stringify({ collections }),
     });
@@ -228,6 +235,7 @@ export const backendApi = {
   async restart(): Promise<{ ok: boolean; message: string }> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/restart`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders(),
     });
 
@@ -242,6 +250,7 @@ export const backendApi = {
   async saveProtocol(meetingId: string, data: { fileName: string; mimeType: string; documentBlob: string }): Promise<any> {
     const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });

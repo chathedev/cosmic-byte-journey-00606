@@ -55,6 +55,7 @@ const encodeBase64 = (bytes: Uint8Array): string =>
 export async function fetchEncryptionKey(authToken: string): Promise<EncryptionKeyBundle> {
   const response = await fetch('https://api.tivly.se/security/encryption-key', {
     method: 'GET',
+    credentials: 'include',
     headers: {
       'Authorization': `Bearer ${authToken}`,
       'Content-Type': 'application/json',

@@ -70,6 +70,7 @@ export const agendaApi = {
 
       const response = await fetch(`${BACKEND_URL}/agenda/save`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -88,6 +89,7 @@ export const agendaApi = {
       // Fallback to unencrypted for backward compatibility
       const response = await fetch(`${BACKEND_URL}/agenda/save`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -109,6 +111,7 @@ export const agendaApi = {
     
     const response = await fetch(`${BACKEND_URL}/agenda/list/${encodeURIComponent(userId)}`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -127,6 +130,7 @@ export const agendaApi = {
     
     const response = await fetch(`${BACKEND_URL}/agenda/${agendaId}`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -145,6 +149,7 @@ export const agendaApi = {
     
     const response = await fetch(`${BACKEND_URL}/agenda/${agendaId}`, {
       method: 'DELETE',
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`,
       },

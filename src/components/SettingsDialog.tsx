@@ -117,6 +117,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       const token = localStorage.getItem('authToken');
       const response = await fetch('https://api.tivly.se/account/terminate', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${token}`,
         },

@@ -459,6 +459,7 @@ class ApiClient {
     
     const response = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -502,6 +503,7 @@ class ApiClient {
 
       const response = await fetch(`${API_BASE_URL}/meetings`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -520,6 +522,7 @@ class ApiClient {
       // Fallback to unencrypted for backward compatibility
       const response = await fetch(`${API_BASE_URL}/meetings`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -556,6 +559,7 @@ class ApiClient {
 
       const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -574,6 +578,7 @@ class ApiClient {
       // Fallback to unencrypted for backward compatibility
       const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -594,6 +599,7 @@ class ApiClient {
     const token = this.getToken();
     const response = await fetch(`${API_BASE_URL}/meetings/${id}`, {
       method: 'DELETE',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -636,9 +642,9 @@ class ApiClient {
   async resetPassword(email: string): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/reset-password`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
       },
       body: JSON.stringify({ email }),
     });
@@ -733,6 +739,7 @@ class ApiClient {
   async validateUnlimitedInvite(token: string): Promise<{ valid: boolean; error?: string }> {
     const response = await fetch(`${API_BASE_URL}/invites/unlimited/${token}`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -1201,9 +1208,9 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE_URL}/transcribe`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
       },
       body: formData,
     });

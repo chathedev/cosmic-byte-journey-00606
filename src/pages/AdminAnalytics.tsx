@@ -68,10 +68,10 @@ const AdminAnalytics = () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`https://api.tivly.se/admin/analytics?windowDays=${days}`, {
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
         },
       });
       

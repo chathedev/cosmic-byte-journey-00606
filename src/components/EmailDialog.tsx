@@ -91,6 +91,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
 
       const response = await fetch('https://api.tivly.se/send-protocol-email', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
