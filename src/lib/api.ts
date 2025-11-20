@@ -1201,27 +1201,59 @@ class ApiClient {
       throw new Error('Authentication required');
     }
 
+    console.log('🎤 Transcribing audio:', {
+      fileName: audioFile.name,
+      fileSize: `${(audioFile.size / 1024 / 1024).toFixed(2)}MB`,
+      fileType: audioFile.type,
+      language,
+      modelSize
+    });
+
     const formData = new FormData();
     formData.append('audioFile', audioFile);
     formData.append('language', language);
     formData.append('modelSize', modelSize);
 
-    const response = await fetch(`${API_BASE_URL}/transcribe`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/transcribe`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to transcribe audio' }));
-      throw new Error(error.error || error.message || 'Failed to transcribe audio');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Transcription failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText
+        });
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to transcribe audio' };
+        }
+
+        // Throw specific error messages
+        const errorMessage = errorData.error || errorData.message || 'transcription_failed';
+        throw new Error(errorMessage);
+      }
+
+      const data: TranscribeResponse = await response.json();
+      console.log('✅ Transcription successful:', {
+        textLength: data.text.length,
+        processedAt: data.processedAt
+      });
+      return data.text;
+    } catch (error: any) {
+      console.error('❌ Transcription error:', error);
+      throw error;
     }
-
-    const data: TranscribeResponse = await response.json();
-    return data.text;
   }
 }
 
