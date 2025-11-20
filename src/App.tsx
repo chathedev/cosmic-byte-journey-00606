@@ -148,7 +148,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        <main className={`flex-1 overflow-auto ${isNative ? '' : 'pt-6 md:pt-8 lg:pt-10'}`}>
+        <main className={`flex-1 overflow-auto ${isNative ? 'pt-6 md:pt-8 lg:pt-10' : ''}`}>
           {children}
         </main>
       </div>
