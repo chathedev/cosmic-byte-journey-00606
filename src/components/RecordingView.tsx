@@ -1045,6 +1045,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           userId: user?.uid || '',
           isCompleted: true,
           agendaId: selectedAgendaId,
+          source: 'live', // Mark as live recording
         } as any);
         if (newId && newId !== sessionId) {
           setSessionId(newId);
@@ -1129,6 +1130,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         updatedAt: now,
         userId: user?.uid || '',
         isCompleted: true,
+        source: 'live', // Mark as live recording
       } as any);
 
       if (createdId && createdId !== sessionId) {

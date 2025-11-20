@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle } from "lucide-react";
+import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
@@ -530,6 +530,24 @@ const Library = () => {
                         <span className="text-muted-foreground">
                           Uppdaterad: {formatDate(meeting.updatedAt)}
                         </span>
+                        {meeting.source && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <Badge variant={meeting.source === 'live' ? 'default' : 'secondary'} className="flex items-center gap-1 text-xs">
+                              {meeting.source === 'live' ? (
+                                <>
+                                  <Mic className="w-3 h-3" />
+                                  Live-inspelning
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-3 h-3" />
+                                  Uppladdad fil
+                                </>
+                              )}
+                            </Badge>
+                          </>
+                        )}
                       </CardDescription>
                     </div>
                   </div>
