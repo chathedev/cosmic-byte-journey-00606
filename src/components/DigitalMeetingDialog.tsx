@@ -88,20 +88,33 @@ export const DigitalMeetingDialog = ({
     } catch (error: any) {
       console.error('Upload error:', error);
       
-      let errorMessage = "Ett fel uppstod vid uppladdning av filen.";
+      let errorMessage = "Ett fel uppstod vid transkribering av filen.";
+      let errorDetails = "";
       
       if (error.message?.includes('no_speech_detected')) {
-        errorMessage = "Inget tal kunde detekteras i ljudfilen. Försök med en annan fil eller kontrollera språkinställningen.";
+        errorMessage = "Inget tal kunde detekteras i ljudfilen.";
+        errorDetails = "Kontrollera att filen innehåller tal och att rätt språk är valt.";
       } else if (error.message?.includes('file_too_large')) {
-        errorMessage = "Filen är för stor. Maximal filstorlek är 500MB.";
+        errorMessage = "Filen är för stor.";
+        errorDetails = "Maximal filstorlek är 500MB.";
       } else if (error.message?.includes('transcription_backend_missing')) {
-        errorMessage = "Transkriptionstjänsten är inte tillgänglig just nu. Kontakta support.";
+        errorMessage = "Transkriptionstjänsten är inte tillgänglig just nu.";
+        errorDetails = "Försök igen om en stund eller kontakta support.";
+      } else if (error.message?.includes('transcription_failed')) {
+        errorMessage = "Transkriberingen misslyckades.";
+        errorDetails = "Kontrollera att filen är ett giltigt ljudformat och innehåller tydligt tal. Om problemet kvarstår, kontakta support.";
+      } else if (error.message?.includes('Authentication required')) {
+        errorMessage = "Du måste vara inloggad.";
+        errorDetails = "Ladda om sidan och logga in igen.";
+      } else {
+        errorDetails = error.message || "Ett okänt fel uppstod.";
       }
 
       toast({
-        title: "Uppladdning misslyckades",
-        description: errorMessage,
+        title: errorMessage,
+        description: errorDetails,
         variant: "destructive",
+        duration: 6000,
       });
     } finally {
       setIsUploading(false);
