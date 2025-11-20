@@ -96,42 +96,10 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   const handleDigitalMeetingUpload = async (transcript: string) => {
-    if (!user?.id) return;
-
-    try {
-      // Create a meeting with the transcript - use unique temp ID so backend creates it
-      const meeting = {
-        id: `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
-        userId: user.id,
-        title: "Digital Meeting",
-        transcript,
-        folder: "Allmänt",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isCompleted: true
-      };
-
-      const savedId = await meetingStorage.saveMeeting(meeting);
-      
-      // Count the meeting
-      const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
-      if (wasCounted) {
-        console.log('📊 Digital meeting - counting new meeting:', savedId);
-        await incrementMeetingCount(savedId);
-        await refreshPlan();
-      }
-
-      // Show transcript preview
-      setTranscript(transcript);
-      setCurrentView("transcript-preview");
-    } catch (error) {
-      console.error('Error saving digital meeting:', error);
-      toast({
-        title: "Ett fel uppstod",
-        description: "Kunde inte spara mötet. Försök igen.",
-        variant: "destructive",
-      });
-    }
+    // Just show the transcript preview - don't save yet
+    // User will save when they click "Spara till bibliotek" or "Generera protokoll"
+    setTranscript(transcript);
+    setCurrentView("transcript-preview");
   };
 
   const handleOpenDigitalMeeting = async () => {
