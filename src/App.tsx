@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { isNativeApp } from "@/utils/capacitorDetection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -137,6 +138,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/generate-protocol';
   const isRecordingPage = location.pathname === '/recording';
   const isProtocolPage = location.pathname === '/protocol';
+  const isNative = isNativeApp();
 
   if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage || isProtocolPage) {
     return <>{children}</>;
@@ -146,7 +148,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        <main className="flex-1 overflow-auto pt-6 md:pt-8 lg:pt-10">
+        <main className={`flex-1 overflow-auto ${isNative ? '' : 'pt-6 md:pt-8 lg:pt-10'}`}>
           {children}
         </main>
       </div>
