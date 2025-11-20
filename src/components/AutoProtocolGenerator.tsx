@@ -194,6 +194,7 @@ export const AutoProtocolGenerator = ({
       }
 
       const response = await fetch(`https://api.tivly.se/agendas/${id}`, {
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -223,6 +224,7 @@ export const AutoProtocolGenerator = ({
 
       const response = await fetch(`https://api.tivly.se/meetings/${meetingId}/action-items`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

@@ -134,6 +134,7 @@ export const sendProtocolEmail = async (data: SendEmailRequest): Promise<SendEma
 
     const response = await fetch(`${BACKEND_URL}/send-protocol-email`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
@@ -152,6 +153,7 @@ export const sendProtocolEmail = async (data: SendEmailRequest): Promise<SendEma
     // Fallback to unencrypted (for backward compatibility)
     const response = await fetch(`${BACKEND_URL}/send-protocol-email`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
@@ -195,6 +197,7 @@ export const saveActionItems = async (data: SaveActionItemsRequest): Promise<voi
 
     const response = await fetch(`${BACKEND_URL}/action-items`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
@@ -211,6 +214,7 @@ export const saveActionItems = async (data: SaveActionItemsRequest): Promise<voi
     // Fallback to unencrypted
     const response = await fetch(`${BACKEND_URL}/action-items`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,

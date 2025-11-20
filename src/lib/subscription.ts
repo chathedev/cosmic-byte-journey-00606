@@ -197,10 +197,10 @@ export const subscriptionService = {
   }> {
     const response = await fetch(`${BACKEND_URL}/create-checkout-session`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
       },
       body: JSON.stringify(params),
     });
@@ -227,10 +227,10 @@ export const subscriptionService = {
   }> {
     const response = await fetch(`${BACKEND_URL}/create-subscription`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-        'X-JWT-Secret': import.meta.env.VITE_JWT_SECRET || '',
       },
       body: JSON.stringify({
         plan: params.plan,

@@ -185,6 +185,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       // Call transcription API
       const response = await fetch('https://api.tivly.se/transcribe', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
