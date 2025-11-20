@@ -180,39 +180,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         throw new Error("Ingen transkription mottogs");
       }
 
-      // Save the uploaded meeting and count it
-      if (user) {
-        try {
-          const now = new Date().toISOString();
-          const meeting = {
-            id: `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
-            title: file.name.replace(/\.[^/.]+$/, ""),
-            folder: 'Allmänt',
-            transcript: transcriptText,
-            protocol: '',
-            createdAt: now,
-            updatedAt: now,
-            userId: user.uid,
-          };
-          
-          const savedId = await meetingStorage.saveMeeting(meeting as any);
-          
-          // Count the uploaded meeting if it's new
-          const wasCounted = await meetingStorage.markCountedIfNeeded(savedId);
-          if (wasCounted) {
-            console.log('📊 Uploaded file - counting new meeting:', savedId);
-            await incrementMeetingCount(savedId);
-            await refreshPlan();
-          } else {
-            console.log('⏭️ Uploaded file - meeting already counted:', savedId);
-            await refreshPlan();
-          }
-        } catch (error) {
-          console.error('Error saving uploaded meeting:', error);
-        }
-      }
-
-      // Go to transcript preview instead of protocol
+      // Gå direkt till transkriptions-vyn utan att spara mötet ännu
+      // Mötet sparas först när användaren väljer "Spara till bibliotek" eller "Generera protokoll"
       setTranscript(transcriptText);
       setCurrentView("transcript-preview");
 
