@@ -112,9 +112,20 @@ export const meetingStorage = {
         console.warn('⚠️ Could not resolve folderId from name, proceeding with name only', e);
       }
 
-      // CRITICAL: Always save to backend if meeting is completed OR has a valid UUID
+      // CRITICAL: Determine if this is an update or create operation
       const hasValidId = meeting.id && isValidUUID(meeting.id);
+      const isTempId = meeting.id && meeting.id.startsWith('temp-');
       const shouldSaveToBackend = hasValidId || meeting.isCompleted;
+
+      console.log('💾 saveMeeting decision:', {
+        meetingId: meeting.id,
+        hasValidId,
+        isTempId,
+        isCompleted: meeting.isCompleted,
+        shouldSaveToBackend,
+        willCreate: !hasValidId && meeting.isCompleted,
+        willUpdate: hasValidId && meeting.isCompleted
+      });
 
       if (!shouldSaveToBackend) {
         // Draft meeting - return temp ID without backend save
@@ -123,12 +134,21 @@ export const meetingStorage = {
       }
 
       if (hasValidId) {
+        // Existing meeting with valid UUID - update it
         console.log('💾 Updating existing meeting:', meeting.id);
         const result = await apiClient.updateMeeting(meeting.id, payload);
         return String(result.meeting?.id || meeting.id);
       } else {
-        // isCompleted but no valid ID - create new meeting on backend
-        console.log('💾 Creating new meeting (completed, no valid ID yet)');
+        // New meeting (temp ID or no ID) - CREATE new meeting on backend
+        console.log('💾 Creating NEW meeting (temp ID or isCompleted):', {
+          tempId: meeting.id,
+          title: meeting.title,
+          isCompleted: meeting.isCompleted
+        });
+        
+        // CRITICAL: Remove the temp ID before creating so backend generates a new UUID
+        delete payload.id;
+        
         const result = await apiClient.createMeeting(payload);
         const newId = String(result.meeting?.id || '');
         
@@ -137,7 +157,7 @@ export const meetingStorage = {
           throw new Error('Failed to create meeting: invalid ID returned from backend');
         }
         
-        console.log('✅ Created meeting with real UUID:', newId);
+        console.log('✅ Created NEW meeting with UUID:', newId, 'replacing temp ID:', meeting.id);
         return newId;
       }
     } catch (error) {
