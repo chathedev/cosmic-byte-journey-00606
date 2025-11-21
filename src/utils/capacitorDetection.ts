@@ -1,14 +1,30 @@
 import { Capacitor } from '@capacitor/core';
 
-// Detect if running inside the Tivly native app / shell
+/**
+ * Detects if running inside the Tivly native app / shell
+ * Logs detection result and method to console for debugging
+ */
 export const isNativeApp = (): boolean => {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {
+    console.log('📱 Native App Detection: Not in browser (SSR)');
+    return false;
+  }
+
+  let detectionMethod = '';
+  let result = false;
 
   try {
     // Primary: Capacitor native runtime (covers real device + TestFlight + production)
-    if (Capacitor.isNativePlatform()) return true;
-  } catch {
-    // Ignore and fall back to heuristics
+    if (Capacitor.isNativePlatform()) {
+      detectionMethod = 'Capacitor.isNativePlatform()';
+      result = true;
+      console.log('📱 Native App Detection: TRUE via', detectionMethod, {
+        platform: Capacitor.getPlatform(),
+      });
+      return true;
+    }
+  } catch (error) {
+    console.warn('📱 Native App Detection: Capacitor check failed, using heuristics', error);
   }
 
   const ua = navigator.userAgent || navigator.vendor || '';
@@ -35,9 +51,40 @@ export const isNativeApp = (): boolean => {
     return null;
   })();
 
-  if (forced !== null) return forced;
+  if (forced !== null) {
+    detectionMethod = 'localStorage override';
+    result = forced;
+    console.log('📱 Native App Detection:', result, 'via', detectionMethod);
+    return forced;
+  }
 
-  return matchesAppUA || isStandalonePWA || isIOSStandalone || looksLikeWebView;
+  // Check heuristics
+  if (matchesAppUA) {
+    detectionMethod = 'User-Agent (Capacitor/TivlyApp)';
+    result = true;
+  } else if (isStandalonePWA) {
+    detectionMethod = 'display-mode: standalone';
+    result = true;
+  } else if (isIOSStandalone) {
+    detectionMethod = 'iOS standalone mode';
+    result = true;
+  } else if (looksLikeWebView) {
+    detectionMethod = 'WebView indicators';
+    result = true;
+  } else {
+    detectionMethod = 'none (web browser)';
+    result = false;
+  }
+
+  console.log('📱 Native App Detection:', result, 'via', detectionMethod, {
+    userAgent: ua.substring(0, 100),
+    isStandalonePWA,
+    isIOSStandalone,
+    looksLikeWebView,
+    matchesAppUA,
+  });
+
+  return result;
 };
 
 export const isWebApp = (): boolean => {

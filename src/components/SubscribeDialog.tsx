@@ -56,19 +56,20 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     }
   }, [open]);
 
-  const handleIosPurchase = async (planName: 'pro' | 'plus') => {
+  const handleIosPurchase = async () => {
     setIsLoading(true);
     try {
-      const productId = planName === 'plus' ? PRODUCT_IDS.PLUS_MONTHLY : PRODUCT_IDS.PRO_MONTHLY;
-      const success = await buyIosSubscription(productId);
+      console.log('🍎 Starting iOS purchase flow for PRO monthly');
+      const success = await buyIosSubscription(PRODUCT_IDS.PRO_MONTHLY);
       
       if (success) {
+        console.log('🍎 Purchase successful, refreshing plan...');
         await refreshPlan();
         onOpenChange(false);
         window.location.reload();
       }
     } catch (error) {
-      console.error('iOS purchase error:', error);
+      console.error('🍎 iOS purchase error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -90,10 +91,13 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     }
   };
 
-  const handleSubscribe = async (planName: 'pro' | 'plus') => {
+  const handleSubscribe = async (planName: 'pro') => {
     if (isIos) {
-      return handleIosPurchase(planName);
+      console.log('🍎 User is on iOS app, using Apple IAP');
+      return handleIosPurchase();
     }
+    
+    console.log('🌐 User is on web browser, using Stripe');
     if (!user) return;
 
     setIsLoading(true);
@@ -223,7 +227,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Ingen möteshistorik', included: false },
         { text: 'Inga avancerade AI-funktioner', included: false },
       ],
-      cta: 'Kom igång',
+      cta: 'Nuvarande plan',
       variant: 'outline' as const,
     },
     {
@@ -241,7 +245,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Inga teamfunktioner', included: false },
         { text: 'Ingen prioriterad support', included: false },
       ],
-      cta: 'Välj Pro',
+      cta: isIos ? 'Köp med Apple' : 'Välj Pro',
       variant: 'default' as const,
       planId: 'pro' as const,
       highlight: true,
@@ -275,8 +279,8 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           <DialogHeader>
             <DialogTitle>Betalningsuppgifter</DialogTitle>
             <DialogDescription>
-              Slutför din {selectedPlan === 'pro' ? 'Tivly Pro' : 'Tivly Plus'} prenumeration
-              {isIos && ' (via Apple)'}
+              Slutför din Tivly Pro prenumeration
+              {isIos ? ' via Apple In-App Purchase' : ' via Stripe'}
             </DialogDescription>
           </DialogHeader>
 
@@ -286,7 +290,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Totalt att betala</span>
                 <span className="text-2xl font-bold text-foreground">
-                  {selectedPlan === 'pro' ? '99' : '199'} kr
+                  99 kr
                   <span className="text-sm font-normal text-muted-foreground"> / månad</span>
                 </span>
               </div>
@@ -335,11 +339,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Välj din plan {isIos && '(Apple)'}</DialogTitle>
+          <DialogTitle>Välj din plan</DialogTitle>
           {userPlan && (
             <DialogDescription className="text-xs">
-              Aktiv: <span className="font-medium capitalize">{userPlan.plan === 'free' ? 'Gratis' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
-              {isIos && ' • Betalning via Apple In-App Purchase'}
+              Aktiv plan: <span className="font-medium capitalize">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
+              {isIos ? ' • Betalning via Apple' : ' • Betalning via Stripe'}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -395,7 +399,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                     size="lg"
                   >
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isIos ? `Köp med Apple` : plan.cta}
+                    {plan.cta}
                   </Button>
                 ) : plan.name === 'Enterprise' ? (
                   <Button 
