@@ -3,13 +3,13 @@
   "appName": "Tivly",
   "webDir": "dist",
   "server": {
-    "url": "https://ios.tivly.se",
+    "url": "https://io.tivly.se",
     "cleartext": true
   },
   "ios": {
     "contentInset": "always",
     "allowNavigation": [
-      "ios.tivly.se",
+      "io.tivly.se",
       "api.tivly.se",
       "accounts.google.com",
       "oauth2.googleapis.com"

@@ -2,10 +2,10 @@ import { Capacitor } from '@capacitor/core';
 
 /**
  * Domain-based detection for iOS app vs web browser.
- * iOS app uses ios.tivly.se, web browser uses app.tivly.se
+ * iOS app uses io.tivly.se, web browser uses app.tivly.se
  * 
  * This is the single source of truth for environment detection.
- * @returns {boolean} True if running on ios.tivly.se domain (iOS app)
+ * @returns {boolean} True if running on io.tivly.se domain (iOS app)
  */
 export function isNativeApp(): boolean {
   if (typeof window === 'undefined') {
@@ -15,10 +15,10 @@ export function isNativeApp(): boolean {
 
   try {
     const hostname = window.location.hostname;
-    const isIosDomain = hostname === 'ios.tivly.se';
+    const isIosDomain = hostname === 'io.tivly.se';
     
     if (isIosDomain) {
-      console.log('✅ Environment Detected: iOS Native App (ios.tivly.se) - Apple IAP enabled');
+      console.log('✅ Environment Detected: iOS Native App (io.tivly.se) - Apple IAP enabled');
     } else {
       console.log('🌍 Environment Detected: Web Browser (app.tivly.se) - Stripe enabled');
     }
@@ -52,7 +52,7 @@ export function getPlatform(): string {
 
 /**
  * Detects if running specifically on iOS native app
- * @returns {boolean} True if running on ios.tivly.se
+ * @returns {boolean} True if running on io.tivly.se
  */
 export function isIosApp(): boolean {
   return isNativeApp();
