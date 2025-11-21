@@ -5,21 +5,29 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Smartphone, ArrowLeft, Clock, AlertCircle } from 'lucide-react';
-import { apiClient } from '@/lib/api';
+import { Fingerprint, ArrowLeft, Shield, KeyRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 /**
- * Auth - SMS verification login page
+ * Auth - WebAuthn (Passkey) + TOTP login page
  * 
- * Implements the Tivly SMS verification playbook:
- * - Collects email + phone number (E.164 format)
- * - Initiates SMS verification via Sinch
- * - Collects and verifies PIN code
- * - No resend functionality - user must wait for expiry
+ * Implements the Tivly WebAuthn + TOTP authentication playbook:
+ * - Collects email and checks available auth methods
+ * - Primary: WebAuthn (Passkeys) for passwordless auth
+ * - Fallback: TOTP (Authenticator apps) with 6-digit codes
+ * - No passwords, SMS, or magic links
  */
+
+type AuthMethod = 'passkey' | 'totp' | null;
+
+interface AuthCheckResponse {
+  authMethods: {
+    passkey: boolean;
+    totp: boolean;
+  };
+}
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -27,15 +35,10 @@ export default function Auth() {
 
   // State management
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
-  const [maskedPhone, setMaskedPhone] = useState('');
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(0);
-  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
+  const [showAuthInput, setShowAuthInput] = useState(false);
 
   // Redirect if logged in
   useEffect(() => {
@@ -44,78 +47,7 @@ export default function Auth() {
     }
   }, [user, isLoading, navigate]);
 
-  // Load cooldown from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('tivly_sms_cooldown');
-    if (stored) {
-      const cooldownTime = parseInt(stored, 10);
-      if (cooldownTime > Date.now()) {
-        setCooldownUntil(cooldownTime);
-      } else {
-        localStorage.removeItem('tivly_sms_cooldown');
-      }
-    }
-  }, []);
-
-  // Cooldown countdown timer
-  useEffect(() => {
-    if (!cooldownUntil) {
-      setCooldownSeconds(0);
-      return;
-    }
-
-    const updateCooldown = () => {
-      const now = Date.now();
-      const remaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
-      setCooldownSeconds(remaining);
-
-      if (remaining === 0) {
-        setCooldownUntil(null);
-        localStorage.removeItem('tivly_sms_cooldown');
-      }
-    };
-
-    updateCooldown();
-    const timer = setInterval(updateCooldown, 1000);
-    return () => clearInterval(timer);
-  }, [cooldownUntil]);
-
-  // Countdown timer (Playbook Step 3)
-  useEffect(() => {
-    if (!expiresAt) return;
-
-    const updateCountdown = () => {
-      const now = new Date().getTime();
-      const expires = new Date(expiresAt).getTime();
-      const remaining = Math.max(0, Math.floor((expires - now) / 1000));
-      setCountdown(remaining);
-
-      if (remaining === 0) {
-        toast({
-          variant: 'destructive',
-          title: 'Koden har gått ut',
-          description: 'Vänligen begär en ny kod.',
-        });
-      }
-    };
-
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 1000);
-    return () => clearInterval(timer);
-  }, [expiresAt, toast]);
-
-  const handleStartSmsVerification = async () => {
-    // Check cooldown first - 5 minute rate limit
-    if (cooldownUntil && Date.now() < cooldownUntil) {
-      toast({
-        variant: 'destructive',
-        title: 'Vänta med att begära en ny kod',
-        description: `Du kan begära en ny kod om ${formatCountdown(cooldownSeconds)}.`,
-      });
-      return;
-    }
-
-    // Playbook Step 1: Validate input locally
+  const handleCheckAuthMethods = async () => {
     if (!email.trim()) {
       toast({
         variant: 'destructive',
@@ -125,140 +57,189 @@ export default function Auth() {
       return;
     }
 
-    if (!phone.trim()) {
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       toast({
         variant: 'destructive',
-        title: 'Telefonnummer krävs',
-        description: 'Vänligen ange ditt telefonnummer.',
+        title: 'Ogiltig e-postadress',
+        description: 'Vänligen ange en giltig e-postadress.',
       });
       return;
     }
-
-    // Basic E.164 validation
-    if (!phone.startsWith('+') || phone.replace(/\D/g, '').length < 8) {
-      toast({
-        variant: 'destructive',
-        title: 'Ogiltigt telefonnummer',
-        description: 'Ange nummer i internationellt format (t.ex. +46701234567)',
-      });
-      return;
-    }
-
-    console.log('🚀 [Playbook Step 2] Starting SMS verification');
-    console.log('📧 Email:', email);
-    console.log('📱 Phone:', phone);
 
     setLoading(true);
     try {
-      // Playbook Step 2: Call POST /auth/sms/start
-      const result = await apiClient.startSmsVerification(email, phone);
-
-      console.log('✅ SMS verification started');
-      console.log('📱 Masked phone:', result.phone);
-      console.log('⏰ Expires at:', result.expiresAt);
-
-      setMaskedPhone(result.phone);
-      setExpiresAt(result.expiresAt);
-      setCodeSent(true);
-      setCode(''); // Clear any previous code
-
-      // Set 5-minute cooldown to prevent SMS spam
-      const cooldownTime = Date.now() + 300000; // 5 minutes
-      setCooldownUntil(cooldownTime);
-      localStorage.setItem('tivly_sms_cooldown', cooldownTime.toString());
-
-      toast({
-        title: 'SMS skickad!',
-        description: `Din kod skickas till ${result.phone}`,
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
       });
+
+      if (response.ok) {
+        const data: AuthCheckResponse = await response.json();
+        const { authMethods } = data;
+
+        if (authMethods.passkey) {
+          setAuthMethod('passkey');
+          await handlePasskeyLogin();
+        } else if (authMethods.totp) {
+          setAuthMethod('totp');
+          setShowAuthInput(true);
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Ingen autentiseringsmetod',
+            description: 'Inget konto har konfigurerats för denna e-post. Kontakta support.',
+          });
+        }
+      } else if (response.status === 404) {
+        toast({
+          variant: 'destructive',
+          title: 'Användare hittades inte',
+          description: 'Inget konto finns med denna e-postadress.',
+        });
+      } else {
+        throw new Error('Failed to check authentication methods');
+      }
     } catch (error: any) {
-      console.error('❌ Failed to start SMS verification:', error);
-      
+      console.error('❌ Failed to check auth methods:', error);
       toast({
         variant: 'destructive',
-        title: 'Misslyckades att skicka SMS',
-        description: error.message || 'Försök igen senare.',
+        title: 'Något gick fel',
+        description: 'Kunde inte kontrollera autentiseringsmetoder.',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyCode = async () => {
-    if (code.length < 4) {
+  const handlePasskeyLogin = async () => {
+    try {
+      // Start WebAuthn authentication
+      const startResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/passkey-login-start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
+      });
+
+      if (!startResponse.ok) {
+        throw new Error('Failed to start passkey authentication');
+      }
+
+      const { options, challengeKey } = await startResponse.json();
+
+      toast({
+        title: 'Använd din passkey',
+        description: 'Följ anvisningarna på din enhet...',
+      });
+
+      // Start WebAuthn ceremony
+      const credential = await navigator.credentials.get({
+        publicKey: options,
+      });
+
+      // Finish authentication
+      const finishResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/passkey-login-finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          credential,
+          challengeKey,
+        }),
+      });
+
+      if (finishResponse.ok) {
+        const { token, user: userData } = await finishResponse.json();
+        
+        // Store token
+        localStorage.setItem('tivly_auth_token', token);
+        sessionStorage.setItem('tivly_user', JSON.stringify(userData));
+
+        await refreshUser();
+        navigate('/');
+      } else {
+        throw new Error('Passkey verification failed');
+      }
+    } catch (error: any) {
+      console.error('❌ Passkey authentication failed:', error);
+
+      if (error.name === 'NotAllowedError') {
+        toast({
+          variant: 'destructive',
+          title: 'Autentisering avbruten',
+          description: 'Passkey-autentisering avbröts eller misslyckades.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Autentisering misslyckades',
+          description: 'Kunde inte autentisera med passkey. Försök igen.',
+        });
+      }
+
+      // Show TOTP fallback if available
+      setShowAuthInput(true);
+      setAuthMethod('totp');
+    }
+  };
+
+  const handleVerifyTotp = async () => {
+    if (totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
       toast({
         variant: 'destructive',
         title: 'Ogiltig kod',
-        description: 'Ange en giltig verifieringskod.',
+        description: 'Ange en giltig 6-siffrig kod.',
       });
       return;
     }
 
-    console.log('🚀 [Playbook Step 4] Verifying SMS code');
-    console.log('📧 Email:', email);
-    console.log('🔢 Code length:', code.length);
-
     setLoading(true);
     try {
-      // Playbook Step 4: Call POST /auth/sms/verify
-      const result = await apiClient.verifySmsCode(email, code);
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/totp-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, token: totpCode }),
+      });
 
-      console.log('✅ SMS code verified successfully');
-      console.log('🔑 JWT received');
+      if (response.ok) {
+        const { token, user: userData } = await response.json();
+        
+        // Store token
+        localStorage.setItem('tivly_auth_token', token);
+        sessionStorage.setItem('tivly_user', JSON.stringify(userData));
 
-      // Playbook Step 5: Token is already stored by API client
-      await refreshUser();
-      navigate('/');
-    } catch (error: any) {
-      console.error('❌ SMS verification failed:', error);
-
-      // Playbook Step 4: Handle error cases
-      if (error.message === 'invalid_code') {
-        toast({
-          variant: 'destructive',
-          title: 'Fel kod',
-          description: 'Fel kod – försök igen.',
-        });
-        setCode('');
-      } else if (error.message === 'verification_expired') {
-        toast({
-          variant: 'destructive',
-          title: 'Koden har gått ut',
-          description: 'Begär en ny kod.',
-        });
-        handleStartOver();
-      } else if (error.message === 'verification_not_found') {
-        toast({
-          variant: 'destructive',
-          title: 'Session förlorad',
-          description: 'Vänligen starta om verifieringsprocessen.',
-        });
-        handleStartOver();
+        await refreshUser();
+        navigate('/');
       } else {
+        const error = await response.json();
         toast({
           variant: 'destructive',
-          title: 'Verifiering misslyckades',
-          description: error.message || 'Försök igen.',
+          title: 'Ogiltig kod',
+          description: error.message || 'Autentiseringen misslyckades. Försök igen.',
         });
+        setTotpCode('');
       }
+    } catch (error: any) {
+      console.error('❌ TOTP verification failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Autentisering misslyckades',
+        description: 'Försök igen.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleStartOver = () => {
-    setCodeSent(false);
-    setCode('');
-    setMaskedPhone('');
-    setExpiresAt(null);
-    setCountdown(0);
-    // Keep cooldown active to prevent spam
-  };
-
-  const formatCountdown = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    setShowAuthInput(false);
+    setTotpCode('');
+    setAuthMethod(null);
   };
 
   return (
@@ -273,68 +254,61 @@ export default function Auth() {
           
           <div className="space-y-2">
             <CardTitle className="text-3xl font-bold">
-              {codeSent ? 'Ange verifieringskod' : 'Välkommen till Tivly'}
+              {showAuthInput ? 'Ange verifieringskod' : 'Välkommen till Tivly'}
             </CardTitle>
             <CardDescription className="text-base">
-              {codeSent
-                ? `Din SMS-kod skickas till ${maskedPhone}`
-                : 'Ange din e-post och telefonnummer för att få en verifieringskod'}
+              {showAuthInput
+                ? 'Ange koden från din autentiseringsapp'
+                : 'Ange din e-post för att logga in med passkey eller autentiseringsapp'}
             </CardDescription>
           </div>
         </CardHeader>
 
         <CardContent className="pb-8">
-          {codeSent ? (
-            // Code entry view (Playbook Step 3)
+          {showAuthInput ? (
+            // TOTP code entry view
             <div className="space-y-6">
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <div className="flex items-start gap-3">
-                  <Smartphone className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <KeyRound className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                   <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">Telefonnummer:</p>
-                    <p className="text-sm text-muted-foreground">{maskedPhone}</p>
+                    <p className="text-sm font-medium">E-postadress:</p>
+                    <p className="text-sm text-muted-foreground">{email}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <p className="text-muted-foreground">
-                    Koden gäller i <strong>{formatCountdown(countdown)}</strong>
-                  </p>
-                </div>
-              </div>
-
               <div className="space-y-2">
-                <Label htmlFor="code" className="text-center block">Verifieringskod</Label>
+                <Label htmlFor="totp" className="text-center block">
+                  Ange kod från din autentiseringsapp
+                </Label>
                 <div className="flex justify-center">
                   <InputOTP
-                    maxLength={4}
-                    value={code}
-                    onChange={setCode}
-                    disabled={loading || countdown === 0}
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={(value) => {
+                      setTotpCode(value);
+                      // Auto-submit when 6 digits entered
+                      if (value.length === 6 && /^\d{6}$/.test(value)) {
+                        handleVerifyTotp();
+                      }
+                    }}
+                    disabled={loading}
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
                       <InputOTPSlot index={1} />
                       <InputOTPSlot index={2} />
                       <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Använd Google Authenticator, Authy eller liknande app
+                </p>
               </div>
-
-              {countdown === 0 && (
-                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-destructive">
-                      Koden har gått ut. Begär en ny kod.
-                    </p>
-                  </div>
-                </div>
-              )}
 
               <div className="flex gap-2 pt-2">
                 <Button
@@ -344,11 +318,11 @@ export default function Auth() {
                   className="flex-1"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Börja om
+                  Tillbaka
                 </Button>
                 <Button
-                  onClick={handleVerifyCode}
-                  disabled={loading || code.length < 4 || countdown === 0}
+                  onClick={handleVerifyTotp}
+                  disabled={loading || totpCode.length !== 6}
                   className="flex-1"
                 >
                   {loading ? 'Verifierar...' : 'Verifiera'}
@@ -356,13 +330,13 @@ export default function Auth() {
               </div>
             </div>
           ) : (
-            // Login form view (Playbook Step 1-2)
+            // Email input view
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleStartSmsVerification();
+                handleCheckAuthMethods();
               }}
-              className="space-y-4"
+              className="space-y-6"
             >
               <div className="space-y-2">
                 <Label htmlFor="email">E-postadress</Label>
@@ -379,56 +353,32 @@ export default function Auth() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Telefonnummer</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+46701234567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={loading}
-                  required
-                  className="h-11"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Ange i internationellt format (t.ex. +46701234567)
-                </p>
-              </div>
-
-              {cooldownSeconds > 0 && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Vänta innan du begär en ny kod</p>
-                      <p className="text-sm text-muted-foreground">
-                        Du kan skicka en ny kod om <strong>{formatCountdown(cooldownSeconds)}</strong>
-                      </p>
-                    </div>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Säker inloggning</p>
+                    <p className="text-xs text-muted-foreground">
+                      Vi använder passkeys eller autentiseringsappar för säker, lösenordsfri inloggning
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
 
               <Button 
                 type="submit" 
                 className="w-full h-11" 
-                disabled={loading || cooldownSeconds > 0}
+                disabled={loading}
               >
                 {loading ? (
                   <>
-                    <Clock className="w-4 h-4 mr-2 animate-spin" />
-                    Skickar kod...
-                  </>
-                ) : cooldownSeconds > 0 ? (
-                  <>
-                    <Clock className="w-4 h-4 mr-2" />
-                    Vänta {formatCountdown(cooldownSeconds)}
+                    <Shield className="w-4 h-4 mr-2 animate-spin" />
+                    Kontrollerar...
                   </>
                 ) : (
                   <>
-                    <Smartphone className="w-4 h-4 mr-2" />
-                    Skicka SMS-kod
+                    <Fingerprint className="w-4 h-4 mr-2" />
+                    Fortsätt
                   </>
                 )}
               </Button>
