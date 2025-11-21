@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Mail, ArrowLeft, Sparkles } from 'lucide-react';
 import tivlyLogo from '@/assets/tivly-logo.png';
 import { toast } from 'sonner';
+import { isNativeApp } from '@/utils/environment';
 
 /**
  * Auth - Login page for app.tivly.se and io.tivly.se
@@ -66,7 +67,7 @@ const Auth = () => {
     
     try {
       const redirectUrl = window.location.origin;
-      console.log('🔐 Requesting magic link:', { email, redirectUrl });
+      console.log('🔐 Requesting magic link:', { email, redirectUrl, isNative: isNativeApp() });
       
       await apiClient.requestMagicLink(email, redirectUrl);
       
@@ -79,10 +80,19 @@ const Auth = () => {
       console.error('Error details:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        isNative: isNativeApp()
       });
       
-      const errorMessage = error.message || 'Kunde inte skicka länk. Kontrollera att backend-servern fungerar.';
+      let errorMessage = 'Kunde inte skicka länk. Försök igen.';
+      
+      // Better error messages for common issues
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        errorMessage = 'Nätverksfel. Kontrollera din internetanslutning.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
