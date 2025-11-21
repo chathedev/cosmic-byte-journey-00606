@@ -13,9 +13,10 @@ type VerificationState = 'verifying' | 'success' | 'error' | 'invalid';
 /**
  * MagicLogin - Handles cross-domain magic link verification
  * 
- * Users can request a magic link from either app.tivly.se or io.tivly.se,
- * and click the link from any device/domain. The verification will work
- * seamlessly across both domains, allowing flexible authentication flows.
+ * Per playbook:
+ * - Email links point to https://auth.tivly.se/magic-login
+ * - This page verifies the token and redirects back to originating domain
+ * - Redirect includes ?token=... so the app can complete login
  */
 const MagicLogin = () => {
   const navigate = useNavigate();
@@ -37,56 +38,37 @@ const MagicLogin = () => {
 
       setState('verifying');
       
-      // Retry logic with exponential backoff
-      const maxRetries = 3;
-      let attempt = 0;
-      
-      while (attempt < maxRetries) {
-        try {
-          // Verify the magic link token with the API
-          const response = await apiClient.verifyMagicLink(token);
-          
-          setState('success');
-          
-          // Apply token and refresh user - no redirect
-          apiClient.applyAuthToken(response.token);
-          await refreshUser();
-          
-          console.log('✅ Successfully logged in - staying on success page');
-          return;
-        } catch (error: any) {
-          attempt++;
-          console.error(`Magic link verification attempt ${attempt} failed:`, error);
-          
-          // If this was the last attempt, show error
-          if (attempt >= maxRetries) {
-            const message = error.message || 'Verifiering misslyckades';
-            
-            // For generic network errors, just redirect anyway with the token
-            if (message.includes('Failed to fetch') || message.includes('network')) {
-              console.log('Network error, redirecting with token anyway');
-              const redirectDomain = returnUrl || window.location.origin;
-              const separator = redirectDomain.includes('?') ? '&' : '?';
-              window.location.href = `${redirectDomain}${separator}token=${token}`;
-              return;
-            }
-            
-            setState('error');
-            
-            if (message.includes('invalid_token') || message.includes('token_not_found')) {
-              setErrorMessage('Länken är ogiltig eller har redan använts.');
-            } else if (message.includes('token_expired')) {
-              setErrorMessage('Länken har gått ut. Begär en ny länk.');
-            } else {
-              setErrorMessage(message);
-            }
-            
-            // Stay on error screen, no automatic redirect
-            console.warn('Magic link verification failed, staying on error screen');
-          } else {
-            // Wait before retrying (exponential backoff: 1s, 2s, 4s)
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
-          }
+      try {
+        console.log('🔐 Verifying magic link token...');
+        const response = await apiClient.verifyMagicLink(token);
+        
+        setState('success');
+        console.log('✅ Token verified successfully');
+        
+        // Playbook step 6: Redirect back to originating domain with token
+        const redirectDomain = returnUrl || window.location.origin.replace('auth.', 'app.');
+        const separator = redirectDomain.includes('?') ? '&' : '?';
+        const finalUrl = `${redirectDomain}${separator}token=${response.token}`;
+        
+        console.log('🔄 Redirecting to:', finalUrl);
+        
+        // Show success briefly before redirect
+        setTimeout(() => {
+          window.location.href = finalUrl;
+        }, 1500);
+        
+      } catch (error: any) {
+        console.error('❌ Magic link verification failed:', error);
+        setState('error');
+        
+        const message = error.message || 'Verifiering misslyckades';
+        
+        if (message.includes('invalid_token') || message.includes('token_not_found')) {
+          setErrorMessage('Länken är ogiltig eller har redan använts.');
+        } else if (message.includes('token_expired')) {
+          setErrorMessage('Länken har gått ut. Begär en ny länk.');
+        } else {
+          setErrorMessage(message);
         }
       }
     };
@@ -130,7 +112,11 @@ const MagicLogin = () => {
               {state === 'success' ? 'Inloggning lyckades!' : state === 'verifying' ? 'Verifierar...' : 'Något gick fel'}
             </CardTitle>
             <CardDescription className="text-base">
-              {state === 'success' ? 'Du är nu inloggad!' : state === 'verifying' ? 'Verifierar din magiska länk...' : errorMessage}
+              {state === 'success' 
+                ? 'Verifierad! Omdirigerar till appen...' 
+                : state === 'verifying' 
+                ? 'Verifierar din magiska länk...' 
+                : errorMessage}
             </CardDescription>
           </div>
         </CardHeader>
@@ -146,18 +132,11 @@ const MagicLogin = () => {
             {state === 'success' && (
               <div className="space-y-4 w-full animate-in fade-in duration-500">
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 justify-center">
                     <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-                    <p className="text-sm font-medium">Din inloggning är bekräftad</p>
+                    <p className="text-sm font-medium">Länken verifierad!</p>
                   </div>
                 </div>
-                <Button 
-                  onClick={() => window.location.href = window.location.origin}
-                  className="w-full"
-                  size="lg"
-                >
-                  Gå till appen
-                </Button>
               </div>
             )}
 

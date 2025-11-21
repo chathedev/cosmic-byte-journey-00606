@@ -13,8 +13,10 @@ import { isNativeApp } from '@/utils/environment';
 /**
  * Auth - Login page for app.tivly.se and io.tivly.se
  * 
- * Users login here and receive magic links via email.
- * Magic links point to auth.tivly.se for verification, then redirect back here.
+ * Implements the Tivly magic link playbook:
+ * - Requests magic link with current location as redirect
+ * - Polls for cross-device completion
+ * - Handles same-device completion via ?token parameter
  */
 const Auth = () => {
   const navigate = useNavigate();
@@ -24,14 +26,23 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [linkSent, setLinkSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [pollingStatus, setPollingStatus] = useState<string>('');
 
-  // Handle token from magic link redirect
+  // Handle same-device completion: ?token=... parameter
   useEffect(() => {
     const token = searchParams.get('token');
     if (token) {
+      console.log('🔐 Same-device magic link completion detected');
       apiClient.applyAuthToken(token);
-      refreshUser();
-      navigate('/', { replace: true });
+      
+      // Clean URL
+      window.history.replaceState({}, document.title, location.pathname);
+      
+      // Refresh user and redirect to home
+      refreshUser().then(() => {
+        navigate('/', { replace: true });
+      });
     }
   }, [searchParams, navigate, refreshUser]);
 
@@ -50,6 +61,42 @@ const Auth = () => {
     }
   }, [cooldown]);
 
+  // Cross-device polling - start when link is sent
+  useEffect(() => {
+    if (!linkSent || !sessionId || !email) return;
+
+    console.log('🔄 Starting cross-device polling for sessionId:', sessionId);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const status = await apiClient.checkMagicLinkStatus(sessionId, email);
+        console.log('📊 Poll status:', status.status);
+        
+        setPollingStatus(status.status);
+        
+        if (status.status === 'ready' && status.token) {
+          console.log('✅ Cross-device completion detected!');
+          clearInterval(pollInterval);
+          apiClient.applyAuthToken(status.token);
+          await refreshUser();
+          navigate('/', { replace: true });
+        } else if (status.status === 'expired' || status.status === 'not_found') {
+          console.warn('⚠️ Session expired or not found');
+          clearInterval(pollInterval);
+          setLinkSent(false);
+          toast.error('Länken har gått ut. Begär en ny länk.');
+        }
+      } catch (error) {
+        console.error('❌ Polling error:', error);
+      }
+    }, 2000); // Poll every 2 seconds per playbook
+
+    return () => {
+      console.log('🛑 Stopping polling');
+      clearInterval(pollInterval);
+    };
+  }, [linkSent, sessionId, email, refreshUser, navigate]);
+
   const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -66,12 +113,27 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      const redirectUrl = window.location.origin;
+      // Playbook step 1: Request with current location as redirect
+      const redirectUrl = window.location.href;
       console.log('🔐 Requesting magic link:', { email, redirectUrl, isNative: isNativeApp() });
       
-      await apiClient.requestMagicLink(email, redirectUrl);
+      const response = await apiClient.requestMagicLink(email, redirectUrl);
       
-      console.log('✅ Magic link request successful');
+      console.log('✅ Magic link request successful:', response);
+      
+      // Store sessionId for polling
+      if (response.sessionId) {
+        setSessionId(response.sessionId);
+      }
+      
+      // Handle trusted device instant login
+      if (response.trustedLogin && response.token) {
+        console.log('🎯 Trusted device - instant login');
+        await refreshUser();
+        navigate('/', { replace: true });
+        return;
+      }
+      
       setLinkSent(true);
       setCooldown(60);
       toast.success('Magisk länk skickad! Kolla din e-post.');
@@ -86,7 +148,6 @@ const Auth = () => {
       
       let errorMessage = 'Kunde inte skicka länk. Försök igen.';
       
-      // Better error messages for common issues
       if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
         errorMessage = 'Nätverksfel. Kontrollera din internetanslutning.';
       } else if (error.message) {
@@ -102,6 +163,8 @@ const Auth = () => {
   const handleBack = () => {
     setLinkSent(false);
     setEmail('');
+    setSessionId('');
+    setPollingStatus('');
   };
 
   if (linkSent) {
@@ -129,6 +192,19 @@ const Auth = () => {
               <p className="text-sm text-muted-foreground text-center">
                 Klicka på länken i e-posten för att logga in säkert
               </p>
+              {pollingStatus === 'device_mismatch' && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                    Slutför inloggningen på enheten som begärde länken
+                  </p>
+                </div>
+              )}
+              {pollingStatus === 'pending' && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                  <span>Väntar på verifiering...</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
