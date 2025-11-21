@@ -272,7 +272,8 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     },
   ];
 
-  if (selectedPlan) {
+  // iOS should never show the payment details screen - it goes straight to Apple IAP
+  if (selectedPlan && !isIos) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -280,7 +281,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             <DialogTitle>Betalningsuppgifter</DialogTitle>
             <DialogDescription>
               Slutför din Tivly Pro prenumeration
-              {isIos ? ' via Apple In-App Purchase' : ' via Stripe'}
             </DialogDescription>
           </DialogHeader>
 
@@ -343,7 +343,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           {userPlan && (
             <DialogDescription className="text-xs">
               Aktiv plan: <span className="font-medium capitalize">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
-              {isIos ? ' • Betalning via Apple' : ' • Betalning via Stripe'}
+              {isIos && ' • Betalning via Apple'}
             </DialogDescription>
           )}
         </DialogHeader>
