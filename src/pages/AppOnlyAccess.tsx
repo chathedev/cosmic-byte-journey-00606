@@ -5,15 +5,6 @@ import { Button } from '@/components/ui/button';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const AppOnlyAccess = () => {
-  useEffect(() => {
-    // Redirect to web version after a delay if user doesn't take action
-    const timer = setTimeout(() => {
-      window.location.href = 'https://app.tivly.se';
-    }, 10000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-background via-background to-destructive/5 safe-area-inset">
       {/* Background decorative elements */}
@@ -80,10 +71,6 @@ const AppOnlyAccess = () => {
                   <Download className="w-4 h-4 mr-2" />
                   Go to Web Version
                 </Button>
-
-                <p className="text-xs text-muted-foreground">
-                  You'll be redirected automatically in 10 seconds...
-                </p>
               </div>
             </div>
           </div>
