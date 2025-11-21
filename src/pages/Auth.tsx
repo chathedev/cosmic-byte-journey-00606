@@ -29,19 +29,27 @@ const Auth = () => {
   const [sessionId, setSessionId] = useState<string>('');
   const [pollingStatus, setPollingStatus] = useState<string>('');
 
-  // Handle same-device completion: ?token=... parameter
+  // Playbook Step 4: Handle same-device completion via ?token=JWT parameter
+  // (Token already verified by auth.tivly.se/magic-login, just needs to be stored)
   useEffect(() => {
     const token = searchParams.get('token');
     if (token) {
-      console.log('🔐 Same-device magic link completion detected');
+      console.log('🔐 [Playbook Step 4] Same-device magic link completion detected');
+      console.log('📝 Token already verified by magic-login page, applying JWT...');
+      
+      // Step 4.2: Store token (JWT already verified by MagicLogin page)
       apiClient.applyAuthToken(token);
       
-      // Clean URL
+      // Step 4.3: Replace history to clean URL
       window.history.replaceState({}, document.title, location.pathname);
       
-      // Refresh user and redirect to home
+      // Step 4.4: Rehydrate user data via GET /me
       refreshUser().then(() => {
+        console.log('✅ User rehydrated, redirecting to app');
         navigate('/', { replace: true });
+      }).catch((error) => {
+        console.error('❌ Failed to refresh user after magic link:', error);
+        toast.error('Inloggning misslyckades. Försök igen.');
       });
     }
   }, [searchParams, navigate, refreshUser]);
@@ -61,38 +69,48 @@ const Auth = () => {
     }
   }, [cooldown]);
 
-  // Cross-device polling - start when link is sent
+  // Playbook Step 5: Cross-device polling
   useEffect(() => {
     if (!linkSent || !sessionId || !email) return;
 
-    console.log('🔄 Starting cross-device polling for sessionId:', sessionId);
+    console.log('🔄 [Playbook Step 3] Starting cross-device polling for sessionId:', sessionId);
     
     const pollInterval = setInterval(async () => {
       try {
+        // Playbook Step 3: Poll every 2 seconds
         const status = await apiClient.checkMagicLinkStatus(sessionId, email);
         console.log('📊 Poll status:', status.status);
         
         setPollingStatus(status.status);
         
+        // Playbook Step 5: Handle 'ready' status with token
         if (status.status === 'ready' && status.token) {
-          console.log('✅ Cross-device completion detected!');
+          console.log('✅ [Playbook Step 5] Cross-device completion detected!');
           clearInterval(pollInterval);
+          
+          // Store JWT and refresh user
           apiClient.applyAuthToken(status.token);
           await refreshUser();
           navigate('/', { replace: true });
-        } else if (status.status === 'expired' || status.status === 'not_found') {
-          console.warn('⚠️ Session expired or not found');
+        } 
+        // Playbook Step 5: Handle expired/not_found - restart from step 1
+        else if (status.status === 'expired' || status.status === 'not_found') {
+          console.warn('⚠️ Session expired or not found - restarting flow');
           clearInterval(pollInterval);
           setLinkSent(false);
+          setSessionId('');
+          setPollingStatus('');
           toast.error('Länken har gått ut. Begär en ny länk.');
         }
+        // Playbook Step 5: Handle device_mismatch - show message
+        // (UI already shows this based on pollingStatus state)
       } catch (error) {
         console.error('❌ Polling error:', error);
       }
-    }, 2000); // Poll every 2 seconds per playbook
+    }, 2000); // Playbook: Poll every 2 seconds
 
     return () => {
-      console.log('🛑 Stopping polling');
+      console.log('🛑 Stopping cross-device polling');
       clearInterval(pollInterval);
     };
   }, [linkSent, sessionId, email, refreshUser, navigate]);
@@ -113,29 +131,32 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      // Playbook step 1: Request with current location as redirect
+      // Playbook Step 1: Request with current location as redirect
+      // Playbook Step 2: Prefer window.location.href to preserve exact view
       const redirectUrl = window.location.href;
-      console.log('🔐 Requesting magic link:', { email, redirectUrl, isNative: isNativeApp() });
+      console.log('🔐 [Playbook Step 1] Requesting magic link with redirect:', { email, redirectUrl });
       
       const response = await apiClient.requestMagicLink(email, redirectUrl);
       
       console.log('✅ Magic link request successful:', response);
       
-      // Store sessionId for polling
+      // Playbook Step 1: Collect sessionId for polling
       if (response.sessionId) {
         setSessionId(response.sessionId);
+        console.log('📋 SessionId stored for cross-device polling:', response.sessionId);
       }
       
-      // Handle trusted device instant login
+      // Handle trusted device instant login (not in playbook, but backend feature)
       if (response.trustedLogin && response.token) {
-        console.log('🎯 Trusted device - instant login');
+        console.log('🎯 Trusted device detected - instant login bypass');
         await refreshUser();
         navigate('/', { replace: true });
         return;
       }
       
+      // Playbook Step 3: Show waiting screen
       setLinkSent(true);
-      setCooldown(60);
+      setCooldown(60); // Debounce resend for 60 seconds (playbook minimum: 5s)
       toast.success('Magisk länk skickad! Kolla din e-post.');
     } catch (error: any) {
       console.error('❌ Failed to send magic link:', error);
