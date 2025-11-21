@@ -48,15 +48,11 @@ const MagicLogin = () => {
           
           setState('success');
           
-          // Apply token immediately for seamless auth
+          // Apply token and refresh user - no redirect
+          apiClient.applyAuthToken(response.token);
           await refreshUser();
           
-          // Stay on success page for 2 seconds to show confirmation
-          setTimeout(() => {
-            const redirectDomain = returnUrl || window.location.origin;
-            const separator = redirectDomain.includes('?') ? '&' : '?';
-            window.location.href = `${redirectDomain}${separator}token=${response.token}`;
-          }, 2000);
+          console.log('✅ Successfully logged in - staying on success page');
           return;
         } catch (error: any) {
           attempt++;
@@ -136,7 +132,7 @@ const MagicLogin = () => {
               {state === 'success' ? 'Inloggning lyckades!' : state === 'verifying' ? 'Verifierar...' : 'Något gick fel'}
             </CardTitle>
             <CardDescription className="text-base">
-              {state === 'success' ? 'Du är nu inloggad! Omdirigerar om ett ögonblick...' : state === 'verifying' ? 'Verifierar din magiska länk...' : errorMessage}
+              {state === 'success' ? 'Du är nu inloggad!' : state === 'verifying' ? 'Verifierar din magiska länk...' : errorMessage}
             </CardDescription>
           </div>
         </CardHeader>
@@ -157,6 +153,13 @@ const MagicLogin = () => {
                     <p className="text-sm font-medium">Din inloggning är bekräftad</p>
                   </div>
                 </div>
+                <Button 
+                  onClick={() => window.location.href = window.location.origin}
+                  className="w-full"
+                  size="lg"
+                >
+                  Gå till appen
+                </Button>
               </div>
             )}
 
