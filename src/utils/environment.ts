@@ -60,6 +60,53 @@ export function isWebBrowserOnAppDomain(): boolean {
 }
 
 /**
+ * Detects if we're on the dedicated auth domain
+ * @returns {boolean} True if on auth.tivly.se
+ */
+export function isAuthDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const hostname = window.location.hostname;
+    return hostname === 'auth.tivly.se';
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Gets the appropriate redirect domain based on where user came from
+ * @returns {string} The domain to redirect to after auth
+ */
+export function getRedirectDomain(): string {
+  if (typeof window === 'undefined') return 'https://app.tivly.se';
+  
+  try {
+    const stored = localStorage.getItem('auth_origin_domain');
+    if (stored) return stored;
+    
+    // Default to app.tivly.se
+    return 'https://app.tivly.se';
+  } catch {
+    return 'https://app.tivly.se';
+  }
+}
+
+/**
+ * Stores the origin domain for post-auth redirect
+ * @param {string} domain - The domain to store
+ */
+export function storeOriginDomain(domain: string): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.setItem('auth_origin_domain', domain);
+  } catch (error) {
+    console.warn('Failed to store origin domain:', error);
+  }
+}
+
+/**
  * Detects if running in a web browser (not native app)
  * @returns {boolean} True if running in a standard web browser
  */

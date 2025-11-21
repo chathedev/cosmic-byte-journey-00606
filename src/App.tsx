@@ -5,7 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { isWebBrowserOnAppDomain } from "@/utils/environment";
+import { isWebBrowserOnAppDomain, isAuthDomain, storeOriginDomain } from "@/utils/environment";
+import { apiClient } from "@/lib/api";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -17,6 +18,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AuthDomain from "./pages/AuthDomain";
 import MagicLogin from "./pages/MagicLogin";
 import AppOnlyAccess from "./pages/AppOnlyAccess";
 import Library from "./pages/Library";
@@ -46,6 +48,39 @@ const queryClient = new QueryClient({
   },
 });
 
+// Handle auth redirects from auth.tivly.se
+const AuthRedirectHandler = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { refreshUser } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const authToken = params.get('auth_token');
+    const testUser = params.get('test_user');
+    
+    if (authToken) {
+      apiClient.applyAuthToken(authToken);
+      // Clean URL
+      window.history.replaceState({}, document.title, location.pathname);
+      // Refresh user and stay on current page
+      refreshUser().then(() => {
+        // Already on the right page
+      });
+    } else if (testUser === 'true') {
+      // Handle test user
+      const testToken = 'test_unlimited_user_' + Date.now();
+      apiClient.applyAuthToken(testToken);
+      try { sessionStorage.setItem('pendingTestLogin', '1'); } catch {}
+      localStorage.setItem('userEmail', 'review@tivly.se');
+      window.history.replaceState({}, document.title, '/');
+      refreshUser().then(() => navigate('/'));
+    }
+  }, [location, navigate, refreshUser]);
+
+  return null;
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
 
@@ -62,6 +97,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
+    // Store current domain before redirecting to auth
+    storeOriginDomain(window.location.origin);
     return <Navigate to="/auth" replace />;
   }
 
@@ -191,6 +228,35 @@ const App = () => {
     return <AppOnlyAccess />;
   }
 
+  // If on auth domain, render auth-only routes
+  if (isAuthDomain()) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Suspense
+                fallback={
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                }
+              >
+                <Routes>
+                  <Route path="/auth" element={<AuthDomain />} />
+                  <Route path="/magic-login" element={<MagicLogin />} />
+                  <Route path="*" element={<Navigate to="/auth" replace />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ErrorBoundary>
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
@@ -203,6 +269,7 @@ const App = () => {
                 <PlanGate>
                   <ScrollToTop />
                   <PreserveAppParam />
+                  <AuthRedirectHandler />
                   <WelcomeGate>
                     <AppLayout>
                       <Suspense

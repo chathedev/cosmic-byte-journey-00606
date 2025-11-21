@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api';
 import { Loader2, CheckCircle2, XCircle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import tivlyLogo from '@/assets/tivly-logo.png';
+import { getRedirectDomain, isAuthDomain } from '@/utils/environment';
 
 type VerificationState = 'verifying' | 'success' | 'error' | 'invalid';
 
@@ -45,21 +46,26 @@ const MagicLogin = () => {
         const result = await apiClient.verifyMagicLink(token, storedSessionId || undefined);
         
         if (result.token) {
-          apiClient.applyAuthToken(result.token);
-          
           // Clean up stored session data
           localStorage.removeItem('magic_session_id');
           localStorage.removeItem('magic_session_email');
           
-          // Clear token from URL but stay on current domain
-          window.history.replaceState({}, document.title, '/magic-login');
-          
           setState('success');
           
-          await refreshUser();
-          
-          // Redirect to home page on whichever domain we're on
-          setTimeout(() => navigate('/'), 1500);
+          // If we're on auth domain, redirect to origin domain with token
+          if (isAuthDomain()) {
+            const redirectDomain = getRedirectDomain();
+            localStorage.removeItem('auth_origin_domain');
+            setTimeout(() => {
+              window.location.href = `${redirectDomain}?auth_token=${result.token}`;
+            }, 1500);
+          } else {
+            // If we're on app/io domain, apply token and refresh
+            apiClient.applyAuthToken(result.token);
+            window.history.replaceState({}, document.title, '/magic-login');
+            await refreshUser();
+            setTimeout(() => navigate('/'), 1500);
+          }
         } else {
           throw new Error('No token received');
         }
