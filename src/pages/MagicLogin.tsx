@@ -30,7 +30,12 @@ const MagicLogin = () => {
       const token = searchParams.get('token');
       const returnUrl = searchParams.get('return');
       
+      console.log('🔐 [Playbook Step 6] MagicLogin page loaded');
+      console.log('📋 Token present:', !!token);
+      console.log('📋 Return URL:', returnUrl || 'none (will default to app.tivly.se)');
+      
       if (!token) {
+        console.error('❌ No token parameter found in URL');
         setState('invalid');
         setErrorMessage('Ingen verifieringstoken hittades.');
         return;
@@ -39,37 +44,49 @@ const MagicLogin = () => {
       setState('verifying');
       
       try {
-        console.log('🔐 Verifying magic link token...');
+        // Playbook Step 6: Funnel through /auth/magic-link/verify
+        console.log('🔐 [Playbook Step 6] Calling /auth/magic-link/verify...');
         const response = await apiClient.verifyMagicLink(token);
         
         setState('success');
-        console.log('✅ Token verified successfully');
+        console.log('✅ [Playbook Step 6] Token verified successfully');
+        console.log('📝 Received JWT from backend:', response.token ? 'present' : 'missing');
         
-        // Playbook step 6: Redirect back to originating domain with token
+        // Playbook Step 6: Redirect back to originating domain with JWT attached as ?token=
         const redirectDomain = returnUrl || window.location.origin.replace('auth.', 'app.');
         const separator = redirectDomain.includes('?') ? '&' : '?';
         const finalUrl = `${redirectDomain}${separator}token=${response.token}`;
         
-        console.log('🔄 Redirecting to:', finalUrl);
+        console.log('🔄 [Playbook Step 6] Redirecting to originating domain with JWT');
+        console.log('🎯 Final redirect URL:', finalUrl);
         
-        // Show success briefly before redirect
+        // Show success briefly before redirect (1.5s for user feedback)
         setTimeout(() => {
           window.location.href = finalUrl;
         }, 1500);
         
       } catch (error: any) {
-        console.error('❌ Magic link verification failed:', error);
+        console.error('❌ [Playbook Step 6] Magic link verification failed:', error);
         setState('error');
         
         const message = error.message || 'Verifiering misslyckades';
         
+        // Handle specific error cases
         if (message.includes('invalid_token') || message.includes('token_not_found')) {
           setErrorMessage('Länken är ogiltig eller har redan använts.');
-        } else if (message.includes('token_expired')) {
+        } else if (message.includes('token_expired') || message.includes('expired')) {
           setErrorMessage('Länken har gått ut. Begär en ny länk.');
+        } else if (message.includes('CORS') || message.includes('Failed to fetch')) {
+          setErrorMessage('Nätverksfel. Kontrollera din internetanslutning.');
         } else {
           setErrorMessage(message);
         }
+        
+        // Auto-redirect to login after 5 seconds on error
+        setTimeout(() => {
+          const loginUrl = returnUrl || window.location.origin.replace('auth.', 'app.') + '/auth';
+          window.location.href = loginUrl;
+        }, 5000);
       }
     };
 
@@ -141,12 +158,21 @@ const MagicLogin = () => {
             )}
 
             {(state === 'error' || state === 'invalid') && (
-              <div className="space-y-4 w-full">
-                <p className="text-sm text-muted-foreground text-center">
-                  Du omdirigeras till inloggningssidan om några sekunder...
+              <div className="space-y-4 w-full animate-in fade-in duration-500">
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm text-destructive text-center font-medium">
+                    {errorMessage}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Omdirigeras automatiskt om 5 sekunder...
                 </p>
                 <Button 
-                  onClick={() => window.location.href = `${window.location.origin}/auth`}
+                  onClick={() => {
+                    const returnUrl = searchParams.get('return');
+                    const loginUrl = returnUrl || window.location.origin.replace('auth.', 'app.') + '/auth';
+                    window.location.href = loginUrl;
+                  }}
                   className="w-full"
                 >
                   <Mail className="w-4 h-4 mr-2" />
