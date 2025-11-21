@@ -18,7 +18,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import AuthDomain from "./pages/AuthDomain";
 import MagicLogin from "./pages/MagicLogin";
 import EmailVerification from "./pages/EmailVerification";
 import AppOnlyAccess from "./pages/AppOnlyAccess";
@@ -229,7 +228,7 @@ const App = () => {
     return <AppOnlyAccess />;
   }
 
-  // If on auth domain, render auth-only routes
+  // Routes for auth.tivly.se - only verification endpoints
   if (isAuthDomain()) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -246,10 +245,9 @@ const App = () => {
                 }
               >
                 <Routes>
-                  <Route path="/auth" element={<AuthDomain />} />
                   <Route path="/magic-login" element={<MagicLogin />} />
                   <Route path="/verify-email" element={<EmailVerification />} />
-                  <Route path="*" element={<Navigate to="/auth" replace />} />
+                  <Route path="*" element={<Navigate to="https://app.tivly.se" replace />} />
                 </Routes>
               </Suspense>
             </BrowserRouter>
