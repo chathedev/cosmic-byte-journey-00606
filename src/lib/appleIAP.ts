@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { isIosApp } from "@/utils/iosAppDetection";
+import { isIosApp } from "@/utils/environment";
 
 /**
  * Apple In-App Purchase Integration

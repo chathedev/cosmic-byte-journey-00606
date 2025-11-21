@@ -1,22 +1,7 @@
-import { Capacitor } from '@capacitor/core';
+import { isNativeApp } from './environment';
 
 // Check if running in native app (without URL param influence)
-export const isRunningInNativeApp = (): boolean => {
-  if (typeof window === 'undefined') return false;
-
-  // Check Capacitor first
-  try {
-    if (Capacitor.isNativePlatform()) return true;
-  } catch {
-    // Ignore and fall back to heuristics
-  }
-
-  const ua = navigator.userAgent || navigator.vendor || '';
-  const isStandalonePWA = window.matchMedia?.('(display-mode: standalone)').matches;
-
-  // Heuristics for installed app shells / PWAs
-  return /Capacitor|TivlyApp/i.test(ua) || isStandalonePWA;
-};
+export const isRunningInNativeApp = isNativeApp;
 
 // Preserve usingapp parameter across navigation
 export const preserveAppParam = (to: string): string => {
