@@ -237,19 +237,21 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <Suspense
-                fallback={
-                  <div className="min-h-screen bg-background flex items-center justify-center">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                }
-              >
-                <Routes>
-                  <Route path="/magic-login" element={<MagicLogin />} />
-                  <Route path="/verify-email" element={<EmailVerification />} />
-                  <Route path="*" element={<Navigate to="https://app.tivly.se" replace />} />
-                </Routes>
-              </Suspense>
+              <AuthProvider>
+                <Suspense
+                  fallback={
+                    <div className="min-h-screen bg-background flex items-center justify-center">
+                      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  }
+                >
+                  <Routes>
+                    <Route path="/magic-login" element={<MagicLogin />} />
+                    <Route path="/verify-email" element={<EmailVerification />} />
+                    <Route path="*" element={<Navigate to="https://app.tivly.se" replace />} />
+                  </Routes>
+                </Suspense>
+              </AuthProvider>
             </BrowserRouter>
           </TooltipProvider>
         </ErrorBoundary>
