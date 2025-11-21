@@ -17,6 +17,8 @@ import { AdminRoute } from "@/components/AdminRoute";
 import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
@@ -225,18 +227,43 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
 };
 
 const EnvironmentTester = () => {
+  const [open, setOpen] = useState(false);
+  const [info, setInfo] = useState({ isApp: false, hostname: '' });
+
   useEffect(() => {
     const isApp = isIosApp();
     const hostname = window.location.hostname;
     
-    toast({
-      title: isApp ? "🍎 Native App" : "🌐 Web Browser",
-      description: `Domain: ${hostname}`,
-      duration: 5000,
-    });
+    setInfo({ isApp, hostname });
+    setOpen(true);
   }, []);
 
-  return null;
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-center">
+            {info.isApp ? "🍎 Native App" : "🌐 Web Browser"}
+          </DialogTitle>
+          <DialogDescription className="text-center">
+            <div className="space-y-2 pt-2">
+              <div className="text-lg font-semibold">
+                {info.isApp ? "User: App" : "User: Web"}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Domain: {info.hostname}
+              </div>
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-center pt-2">
+          <Button onClick={() => setOpen(false)}>
+            OK
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 const App = () => {
