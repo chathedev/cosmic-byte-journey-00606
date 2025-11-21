@@ -226,45 +226,6 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const EnvironmentTester = () => {
-  const [open, setOpen] = useState(false);
-  const [info, setInfo] = useState({ isApp: false, hostname: '' });
-
-  useEffect(() => {
-    const isApp = isIosApp();
-    const hostname = window.location.hostname;
-    
-    setInfo({ isApp, hostname });
-    setOpen(true);
-  }, []);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-center">
-            {info.isApp ? "🍎 Native App" : "🌐 Web Browser"}
-          </DialogTitle>
-          <DialogDescription className="text-center">
-            <div className="space-y-2 pt-2">
-              <div className="text-lg font-semibold">
-                {info.isApp ? "User: App" : "User: Web"}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Domain: {info.hostname}
-              </div>
-            </div>
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-center pt-2">
-          <Button onClick={() => setOpen(false)}>
-            OK
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 const App = () => {
   // Block web browser access to io.tivly.se domain
@@ -321,7 +282,6 @@ const App = () => {
                   <ScrollToTop />
                   <PreserveAppParam />
                   <AuthRedirectHandler />
-                  <EnvironmentTester />
                   <WelcomeGate>
                     <AppLayout>
                       <Suspense
