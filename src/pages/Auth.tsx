@@ -8,6 +8,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, CheckCircle2, ArrowLeft, Link2 } from 'lucide-react';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
+/**
+ * Auth - Cross-domain magic link authentication
+ * 
+ * This component works seamlessly across app.tivly.se (web) and io.tivly.se (iOS app).
+ * Users can request a login link from either domain and verify it on any device/domain.
+ * The magic link system supports:
+ * - Same-device instant login
+ * - Cross-device login with polling
+ * - Cross-domain verification (app.tivly.se ↔ io.tivly.se)
+ */
 const Auth = () => {
   const navigate = useNavigate();
   const { refreshUser, user } = useAuth();
@@ -170,9 +180,14 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
+      // Always use the current domain for the redirect URL
+      // This allows users to login from either app.tivly.se or io.tivly.se
+      // The magic link will work regardless of which domain they click it from
+      const redirectUrl = `${window.location.origin}/magic-login`;
+      
       const result = await apiClient.requestMagicLink(
         email,
-        `${window.location.origin}/magic-login`
+        redirectUrl
       );
 
       // Handle trusted device auto-login
