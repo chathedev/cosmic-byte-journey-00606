@@ -264,7 +264,7 @@ export default function Auth() {
                 <Label htmlFor="code" className="text-center block">Verifieringskod</Label>
                 <div className="flex justify-center">
                   <InputOTP
-                    maxLength={8}
+                    maxLength={4}
                     value={code}
                     onChange={setCode}
                     disabled={loading || countdown === 0}
@@ -274,10 +274,6 @@ export default function Auth() {
                       <InputOTPSlot index={1} />
                       <InputOTPSlot index={2} />
                       <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                      <InputOTPSlot index={6} />
-                      <InputOTPSlot index={7} />
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
