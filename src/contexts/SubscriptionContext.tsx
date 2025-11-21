@@ -149,6 +149,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         renewDate: typeof user.plan === 'object' ? user.plan?.renewsAt || user.plan?.renewDate : undefined,
         customerId: typeof user.plan === 'object' ? user.plan?.customerId : undefined,
         subscriptionId: typeof user.plan === 'object' ? user.plan?.subscriptionId : undefined,
+        cancelAt: (user as any)?.stripe?.cancelAt || (user as any)?.plan?.cancelAt,
+        cancelAtPeriodEnd: (user as any)?.stripe?.cancelAtPeriodEnd || (user as any)?.plan?.cancelAtPeriodEnd,
+        planCancelledAt: (user as any)?.planCancelledAt || (user as any)?.plan?.planCancelledAt,
       };
       
       console.log('📊 Plan loaded from backend user object:', plan);
