@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
-import { Loader2, CheckCircle2, XCircle, Mail } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Mail, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import tivlyLogo from '@/assets/tivly-logo.png';
 import { getRedirectDomain, isAuthDomain } from '@/utils/environment';
@@ -48,12 +48,15 @@ const MagicLogin = () => {
           
           setState('success');
           
-          // Redirect back to origin domain with token
-          const redirectDomain = returnUrl || window.location.origin;
-          const separator = redirectDomain.includes('?') ? '&' : '?';
+          // Apply token immediately for seamless auth
+          await refreshUser();
           
-          // Immediate redirect - no delay needed
-          window.location.href = `${redirectDomain}${separator}token=${response.token}`;
+          // Stay on success page for 2 seconds to show confirmation
+          setTimeout(() => {
+            const redirectDomain = returnUrl || window.location.origin;
+            const separator = redirectDomain.includes('?') ? '&' : '?';
+            window.location.href = `${redirectDomain}${separator}token=${response.token}`;
+          }, 2000);
           return;
         } catch (error: any) {
           attempt++;
@@ -133,7 +136,7 @@ const MagicLogin = () => {
               {state === 'success' ? 'Inloggning lyckades!' : state === 'verifying' ? 'Verifierar...' : 'Något gick fel'}
             </CardTitle>
             <CardDescription className="text-base">
-              {state === 'success' ? 'Du omdirigeras till startsidan...' : errorMessage}
+              {state === 'success' ? 'Du är nu inloggad! Omdirigerar om ett ögonblick...' : state === 'verifying' ? 'Verifierar din magiska länk...' : errorMessage}
             </CardDescription>
           </div>
         </CardHeader>
@@ -146,13 +149,24 @@ const MagicLogin = () => {
               {getStatusIcon()}
             </div>
             
+            {state === 'success' && (
+              <div className="space-y-4 w-full animate-in fade-in duration-500">
+                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                    <p className="text-sm font-medium">Din inloggning är bekräftad</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {(state === 'error' || state === 'invalid') && (
               <div className="space-y-4 w-full">
                 <p className="text-sm text-muted-foreground text-center">
                   Du omdirigeras till inloggningssidan om några sekunder...
                 </p>
                 <Button 
-                  onClick={() => window.location.href = 'https://app.tivly.se/auth'}
+                  onClick={() => window.location.href = `${window.location.origin}/auth`}
                   className="w-full"
                 >
                   <Mail className="w-4 h-4 mr-2" />
