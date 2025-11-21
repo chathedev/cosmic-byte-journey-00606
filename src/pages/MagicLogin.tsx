@@ -27,72 +27,47 @@ const MagicLogin = () => {
   useEffect(() => {
     const verifyToken = async () => {
       const token = searchParams.get('token');
+      const returnUrl = searchParams.get('return');
       
       if (!token) {
         setState('invalid');
-        setErrorMessage('Ingen inloggningslänk hittades.');
-        setTimeout(() => navigate('/auth'), 3000);
+        setErrorMessage('Ingen verifieringstoken hittades.');
         return;
       }
 
-      // Get stored session ID from localStorage (for same-device verification)
-      const storedSessionId = localStorage.getItem('magic_session_id');
-      
       setState('verifying');
       
       try {
-        // Verification works across domains
-        // User can request login from app.tivly.se and verify on io.tivly.se or vice versa
-        const result = await apiClient.verifyMagicLink(token, storedSessionId || undefined);
+        // Verify the magic link token with the API
+        const response = await apiClient.verifyMagicLink(token);
         
-        if (result.token) {
-          // Clean up stored session data
-          localStorage.removeItem('magic_session_id');
-          localStorage.removeItem('magic_session_email');
-          
-          setState('success');
-          
-          // If we're on auth domain, redirect to origin domain with token
-          if (isAuthDomain()) {
-            const redirectDomain = getRedirectDomain();
-            localStorage.removeItem('auth_origin_domain');
-            setTimeout(() => {
-              window.location.href = `${redirectDomain}?auth_token=${result.token}`;
-            }, 1500);
-          } else {
-            // If we're on app/io domain, apply token and refresh
-            apiClient.applyAuthToken(result.token);
-            window.history.replaceState({}, document.title, '/magic-login');
-            await refreshUser();
-            setTimeout(() => navigate('/'), 1500);
-          }
-        } else {
-          throw new Error('No token received');
-        }
+        setState('success');
+        
+        // Redirect back to origin domain with token
+        const redirectDomain = returnUrl || 'https://app.tivly.se';
+        const separator = redirectDomain.includes('?') ? '&' : '?';
+        
+        setTimeout(() => {
+          window.location.href = `${redirectDomain}${separator}token=${response.token}`;
+        }, 1500);
       } catch (error: any) {
         console.error('Magic link verification error:', error);
         setState('error');
         
         const message = error.message || 'Verifiering misslyckades';
         
-        if (message.includes('token_not_found') || message.includes('invalid_token')) {
-          setErrorMessage('Länken har redan använts eller är ogiltig.');
+        if (message.includes('invalid_token') || message.includes('token_not_found')) {
+          setErrorMessage('Länken är ogiltig eller har redan använts.');
         } else if (message.includes('token_expired')) {
           setErrorMessage('Länken har gått ut. Begär en ny länk.');
-        } else if (message.includes('device_mismatch')) {
-          setErrorMessage('Enhets-matchning misslyckades. Öppna länken på samma enhet eller begär en ny.');
-        } else if (message.includes('persist_failed')) {
-          setErrorMessage('Kunde inte spara inloggningen. Försök igen.');
         } else {
           setErrorMessage(message);
         }
-        
-        setTimeout(() => navigate('/auth'), 4000);
       }
     };
 
     verifyToken();
-  }, [searchParams, navigate, refreshUser]);
+  }, [searchParams]);
 
 
   const getStatusIcon = () => {
@@ -149,7 +124,7 @@ const MagicLogin = () => {
                   Du omdirigeras till inloggningssidan om några sekunder...
                 </p>
                 <Button 
-                  onClick={() => navigate('/auth')}
+                  onClick={() => window.location.href = 'https://app.tivly.se/auth'}
                   className="w-full"
                 >
                   <Mail className="w-4 h-4 mr-2" />
