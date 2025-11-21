@@ -20,7 +20,7 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const loadPlan = useCallback(async (opts?: { background?: boolean }) => {
@@ -33,7 +33,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      if (!background) setIsLoading(true);
+      // Don't block UI on initial load
+      if (!background && userPlan !== null) setIsLoading(true);
       
       // Check payment status
       const exemptedEmails = ['roynewr@gmail.com', 'magisktboendevidhavet@gmail.com'];

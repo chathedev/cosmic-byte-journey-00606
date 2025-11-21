@@ -133,17 +133,8 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Global gate to wait for subscription plan to load before rendering the app
+// Non-blocking gate - app loads immediately, subscription loads in background
 const PlanGate = ({ children }: { children: React.ReactNode }) => {
-  const { isLoading } = useSubscription();
-
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 z-[9999] bg-background/80 backdrop-blur-sm flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
   return <>{children}</>;
 };
 
