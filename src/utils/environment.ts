@@ -1,11 +1,11 @@
 import { Capacitor } from '@capacitor/core';
 
 /**
- * Detects if the code is running inside the native Capacitor wrapper (iOS/Android)
- * or in a standard web browser.
+ * Domain-based detection for iOS app vs web browser.
+ * iOS app uses ios.tivly.se, web browser uses app.tivly.se
  * 
  * This is the single source of truth for environment detection.
- * @returns {boolean} True if running inside the Capacitor native wrapper
+ * @returns {boolean} True if running on ios.tivly.se domain (iOS app)
  */
 export function isNativeApp(): boolean {
   if (typeof window === 'undefined') {
@@ -14,26 +14,18 @@ export function isNativeApp(): boolean {
   }
 
   try {
-    // Primary check: Use Capacitor's official isNativePlatform() method
-    // This is the most reliable way to detect if we're in a native context
-    const isNative = Capacitor.isNativePlatform();
+    const hostname = window.location.hostname;
+    const isIosDomain = hostname === 'ios.tivly.se';
     
-    // Also check for the isNative property for backward compatibility
-    const hasNativeProperty = (window as any).Capacitor?.isNative === true;
-    
-    // Use the official method, fall back to property check
-    const result = isNative || hasNativeProperty;
-    
-    if (result) {
-      const platform = Capacitor.getPlatform();
-      console.log(`✅ Environment Detected: Native Capacitor App (${platform})`);
+    if (isIosDomain) {
+      console.log('✅ Environment Detected: iOS Native App (ios.tivly.se) - Apple IAP enabled');
     } else {
-      console.log('🌍 Environment Detected: Standard Web Browser (app.tivly.se)');
+      console.log('🌍 Environment Detected: Web Browser (app.tivly.se) - Stripe enabled');
     }
     
-    return result;
+    return isIosDomain;
   } catch (error) {
-    console.warn('⚠️ Environment Detection: Capacitor check failed, assuming web browser', error);
+    console.warn('⚠️ Environment Detection failed, assuming web browser', error);
     return false;
   }
 }
@@ -60,10 +52,10 @@ export function getPlatform(): string {
 
 /**
  * Detects if running specifically on iOS native app
- * @returns {boolean} True if running in iOS Capacitor app
+ * @returns {boolean} True if running on ios.tivly.se
  */
 export function isIosApp(): boolean {
-  return isNativeApp() && getPlatform() === 'ios';
+  return isNativeApp();
 }
 
 /**
