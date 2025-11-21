@@ -20,6 +20,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AuthDomain from "./pages/AuthDomain";
 import MagicLogin from "./pages/MagicLogin";
+import EmailVerification from "./pages/EmailVerification";
 import AppOnlyAccess from "./pages/AppOnlyAccess";
 import Library from "./pages/Library";
 import Agendas from "./pages/Agendas";
@@ -247,6 +248,7 @@ const App = () => {
                 <Routes>
                   <Route path="/auth" element={<AuthDomain />} />
                   <Route path="/magic-login" element={<MagicLogin />} />
+                  <Route path="/verify-email" element={<EmailVerification />} />
                   <Route path="*" element={<Navigate to="/auth" replace />} />
                 </Routes>
               </Suspense>
