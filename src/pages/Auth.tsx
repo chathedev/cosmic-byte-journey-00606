@@ -34,8 +34,6 @@ export default function Auth() {
   const [maskedPhone, setMaskedPhone] = useState('');
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
-  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   // Redirect if logged in
   useEffect(() => {
@@ -43,42 +41,6 @@ export default function Auth() {
       navigate('/');
     }
   }, [user, isLoading, navigate]);
-
-  // Load cooldown from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('tivly_sms_cooldown');
-    if (stored) {
-      const cooldownTime = parseInt(stored, 10);
-      if (cooldownTime > Date.now()) {
-        setCooldownUntil(cooldownTime);
-      } else {
-        localStorage.removeItem('tivly_sms_cooldown');
-      }
-    }
-  }, []);
-
-  // Cooldown countdown timer
-  useEffect(() => {
-    if (!cooldownUntil) {
-      setCooldownSeconds(0);
-      return;
-    }
-
-    const updateCooldown = () => {
-      const now = Date.now();
-      const remaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
-      setCooldownSeconds(remaining);
-
-      if (remaining === 0) {
-        setCooldownUntil(null);
-        localStorage.removeItem('tivly_sms_cooldown');
-      }
-    };
-
-    updateCooldown();
-    const timer = setInterval(updateCooldown, 1000);
-    return () => clearInterval(timer);
-  }, [cooldownUntil]);
 
   // Countdown timer (Playbook Step 3)
   useEffect(() => {
@@ -104,17 +66,7 @@ export default function Auth() {
     return () => clearInterval(timer);
   }, [expiresAt, toast]);
 
-  const handleStartSmsVerification = async () => {
-    // Check cooldown first
-    if (cooldownUntil && Date.now() < cooldownUntil) {
-      toast({
-        variant: 'destructive',
-        title: 'Vänta lite',
-        description: `Du kan begära en ny kod om ${cooldownSeconds} sekunder.`,
-      });
-      return;
-    }
-
+  const handleStartSmsVerification = async (isResend = false) => {
     // Playbook Step 1: Validate input locally
     if (!email.trim()) {
       toast({
@@ -160,33 +112,22 @@ export default function Auth() {
       setMaskedPhone(result.phone);
       setExpiresAt(result.expiresAt);
       setCodeSent(true);
-
-      // Set 60-second cooldown
-      const cooldownTime = Date.now() + 60000;
-      setCooldownUntil(cooldownTime);
-      localStorage.setItem('tivly_sms_cooldown', cooldownTime.toString());
+      setCode(''); // Clear any previous code
 
       toast({
-        title: 'SMS skickad!',
-        description: `Din kod skickas till ${result.phone}`,
+        title: isResend ? 'Ny kod skickad!' : 'SMS skickad!',
+        description: isResend 
+          ? `Ny kod skickad till ${result.phone}. Föregående kod är nu ogiltig.`
+          : `Din kod skickas till ${result.phone}`,
       });
     } catch (error: any) {
       console.error('❌ Failed to start SMS verification:', error);
       
-      // Handle 429 verification_pending
-      if (error.message === 'verification_pending') {
-        toast({
-          variant: 'destructive',
-          title: 'Vänta på befintlig kod',
-          description: 'En kod har redan skickats. Vänta tills den går ut.',
-        });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Misslyckades att skicka SMS',
-          description: error.message || 'Försök igen senare.',
-        });
-      }
+      toast({
+        variant: 'destructive',
+        title: 'Misslyckades att skicka SMS',
+        description: error.message || 'Försök igen senare.',
+      });
     } finally {
       setLoading(false);
     }
@@ -254,13 +195,16 @@ export default function Auth() {
     }
   };
 
+  const handleResendCode = async () => {
+    await handleStartSmsVerification(true);
+  };
+
   const handleStartOver = () => {
     setCodeSent(false);
     setCode('');
     setMaskedPhone('');
     setExpiresAt(null);
     setCountdown(0);
-    // Don't clear cooldown - it persists across "start over"
   };
 
   const formatCountdown = (seconds: number): string => {
@@ -306,11 +250,22 @@ export default function Auth() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-start gap-3 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <p className="text-muted-foreground">
-                    Koden gäller i <strong>{formatCountdown(countdown)}</strong>
-                  </p>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      Koden gäller i <strong>{formatCountdown(countdown)}</strong>
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResendCode}
+                    disabled={loading || countdown === 0}
+                    className="text-xs h-auto py-1 px-2"
+                  >
+                    Skicka kod igen
+                  </Button>
                 </div>
               </div>
 
@@ -404,28 +359,15 @@ export default function Auth() {
                 </p>
               </div>
 
-              {cooldownSeconds > 0 && (
-                <div className="rounded-lg border border-muted bg-muted/30 p-3 mb-4">
-                  <p className="text-sm text-center text-muted-foreground">
-                    Vänta {cooldownSeconds} sekunder innan du begär en ny kod
-                  </p>
-                </div>
-              )}
-
               <Button 
                 type="submit" 
                 className="w-full h-11" 
-                disabled={loading || cooldownSeconds > 0}
+                disabled={loading}
               >
                 {loading ? (
                   <>
                     <Clock className="w-4 h-4 mr-2 animate-spin" />
                     Skickar kod...
-                  </>
-                ) : cooldownSeconds > 0 ? (
-                  <>
-                    <Clock className="w-4 h-4 mr-2" />
-                    Vänta {cooldownSeconds}s
                   </>
                 ) : (
                   <>
