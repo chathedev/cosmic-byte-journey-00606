@@ -44,15 +44,23 @@ export function isWebBrowserOnAppDomain(): boolean {
     
     if (!isIosDomain) return false;
     
-    // Check if it's actually running in Capacitor native app
+    // Multiple checks to ensure it's actually a native app
     const isActuallyNative = Capacitor.isNativePlatform();
     
-    if (!isActuallyNative) {
-      console.warn('🚫 Web browser detected on io.tivly.se - blocking access');
-      return true;
+    // Additional native indicators for iOS
+    const hasIosWebkit = !!(window as any).webkit;
+    const isStandalone = (window.navigator as any).standalone === true;
+    const userAgent = window.navigator.userAgent || '';
+    const isIosUserAgent = /iPhone|iPad|iPod/.test(userAgent);
+    
+    // If any native indicator is present on io.tivly.se, allow access
+    if (isActuallyNative || hasIosWebkit || isStandalone || isIosUserAgent) {
+      console.log('✅ Native app access confirmed on io.tivly.se');
+      return false;
     }
     
-    return false;
+    console.warn('🚫 Web browser detected on io.tivly.se - blocking access');
+    return true;
   } catch (error) {
     console.warn('⚠️ App domain check failed', error);
     return false;
