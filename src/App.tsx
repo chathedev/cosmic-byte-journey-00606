@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { isWebBrowserOnAppDomain, isAuthDomain, storeOriginDomain } from "@/utils/environment";
+import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain } from "@/utils/environment";
 import { apiClient } from "@/lib/api";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -21,6 +21,7 @@ import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
 import EmailVerification from "./pages/EmailVerification";
 import AppOnlyAccess from "./pages/AppOnlyAccess";
+import WebOnlyAccess from "./pages/WebOnlyAccess";
 import Library from "./pages/Library";
 import Agendas from "./pages/Agendas";
 import { Chat } from "./pages/Chat";
@@ -226,6 +227,11 @@ const App = () => {
   // Block web browser access to io.tivly.se domain
   if (isWebBrowserOnAppDomain()) {
     return <AppOnlyAccess />;
+  }
+
+  // Block native app access to app.tivly.se domain
+  if (isNativeAppOnWebDomain()) {
+    return <WebOnlyAccess />;
   }
 
   // Routes for auth.tivly.se - only verification endpoints

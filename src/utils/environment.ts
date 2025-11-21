@@ -60,6 +60,35 @@ export function isWebBrowserOnAppDomain(): boolean {
 }
 
 /**
+ * Detects if native app is trying to access app.tivly.se (web domain)
+ * Native app should use io.tivly.se instead
+ * @returns {boolean} True if native app is trying to access web domain
+ */
+export function isNativeAppOnWebDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const hostname = window.location.hostname;
+    const isWebDomain = hostname === 'app.tivly.se';
+    
+    if (!isWebDomain) return false;
+    
+    // Check if it's actually running in Capacitor native app
+    const isActuallyNative = Capacitor.isNativePlatform();
+    
+    if (isActuallyNative) {
+      console.warn('🚫 Native app detected on app.tivly.se - should use io.tivly.se');
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.warn('⚠️ Web domain check failed', error);
+    return false;
+  }
+}
+
+/**
  * Detects if we're on the dedicated auth domain
  * @returns {boolean} True if on auth.tivly.se
  */
