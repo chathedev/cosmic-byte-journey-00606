@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { isIosApp } from '@/utils/iosAppDetection';
+import { buyIosSubscription, restorePurchases, PRODUCT_IDS } from '@/lib/appleIAP';
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
 
@@ -32,6 +34,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const stripeRef = useRef<Stripe | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
+  const isIos = isIosApp();
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -53,7 +56,44 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     }
   }, [open]);
 
+  const handleIosPurchase = async (planName: 'pro' | 'plus') => {
+    setIsLoading(true);
+    try {
+      const productId = planName === 'plus' ? PRODUCT_IDS.PLUS_MONTHLY : PRODUCT_IDS.PRO_MONTHLY;
+      const success = await buyIosSubscription(productId);
+      
+      if (success) {
+        await refreshPlan();
+        onOpenChange(false);
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('iOS purchase error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    setIsLoading(true);
+    try {
+      const success = await restorePurchases();
+      if (success) {
+        await refreshPlan();
+        onOpenChange(false);
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Restore purchases error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubscribe = async (planName: 'pro' | 'plus') => {
+    if (isIos) {
+      return handleIosPurchase(planName);
+    }
     if (!user) return;
 
     setIsLoading(true);
@@ -236,6 +276,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             <DialogTitle>Betalningsuppgifter</DialogTitle>
             <DialogDescription>
               Slutför din {selectedPlan === 'pro' ? 'Tivly Pro' : 'Tivly Plus'} prenumeration
+              {isIos && ' (via Apple)'}
             </DialogDescription>
           </DialogHeader>
 
@@ -294,10 +335,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Välj din plan</DialogTitle>
+          <DialogTitle>Välj din plan {isIos && '(Apple)'}</DialogTitle>
           {userPlan && (
             <DialogDescription className="text-xs">
               Aktiv: <span className="font-medium capitalize">{userPlan.plan === 'free' ? 'Gratis' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
+              {isIos && ' • Betalning via Apple In-App Purchase'}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -353,7 +395,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                     size="lg"
                   >
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {plan.cta}
+                    {isIos ? `Köp med Apple` : plan.cta}
                   </Button>
                 ) : plan.name === 'Enterprise' ? (
                   <Button 
@@ -378,6 +420,19 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             </Card>
           ))}
         </div>
+
+        {isIos && (
+          <div className="flex justify-center pb-4">
+            <Button
+              variant="outline"
+              onClick={handleRestorePurchases}
+              disabled={isLoading}
+              size="sm"
+            >
+              Återställ köp
+            </Button>
+          </div>
+        )}
 
       </DialogContent>
     </Dialog>
