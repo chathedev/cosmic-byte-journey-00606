@@ -5,7 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain } from "@/utils/environment";
+import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
+import { toast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -223,6 +224,21 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const EnvironmentTester = () => {
+  useEffect(() => {
+    const isApp = isIosApp();
+    const hostname = window.location.hostname;
+    
+    toast({
+      title: isApp ? "🍎 Native App" : "🌐 Web Browser",
+      description: `Domain: ${hostname}`,
+      duration: 5000,
+    });
+  }, []);
+
+  return null;
+};
+
 const App = () => {
   // Block web browser access to io.tivly.se domain
   if (isWebBrowserOnAppDomain()) {
@@ -278,6 +294,7 @@ const App = () => {
                   <ScrollToTop />
                   <PreserveAppParam />
                   <AuthRedirectHandler />
+                  <EnvironmentTester />
                   <WelcomeGate>
                     <AppLayout>
                       <Suspense
