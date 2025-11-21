@@ -13,6 +13,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "./SubscribeDialog";
 
+// Helper function to format dates cleanly without timezone info
+const formatSwedishDate = (dateString: string | undefined) => {
+  if (!dateString) return '';
+  
+  try {
+    // Parse the date and format it cleanly
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return '';
+    
+    // Format: "21 november 2025"
+    return date.toLocaleDateString('sv-SE', { 
+      day: 'numeric',
+      month: 'long', 
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
+  }
+};
+
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -81,11 +104,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       const result = await apiClient.cancelSubscription(!cancelImmediately);
 
       const endDate = result.currentPeriodEnd 
-        ? new Date(result.currentPeriodEnd).toLocaleDateString('sv-SE', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })
+        ? formatSwedishDate(result.currentPeriodEnd)
         : null;
 
       toast({
@@ -338,11 +357,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                                     <p className="text-sm text-orange-800 dark:text-orange-200">
                                       Din prenumeration avslutas den{' '}
                                       <strong className="font-bold">
-                                        {new Date(userPlan.planCancelledAt || userPlan.cancelAt!).toLocaleDateString('sv-SE', { 
-                                          year: 'numeric', 
-                                          month: 'long', 
-                                          day: 'numeric' 
-                                        })}
+                                        {formatSwedishDate(userPlan.planCancelledAt || userPlan.cancelAt)}
                                       </strong>
                                     </p>
                                     <p className="text-xs text-orange-700 dark:text-orange-300 mt-2">
@@ -387,7 +402,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
                             {userPlan?.renewDate && !(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (
                               <div className="text-sm text-muted-foreground">
-                                Nästa förnyelse: {new Date(userPlan.renewDate).toLocaleDateString('sv-SE')}
+                                Nästa förnyelse: {formatSwedishDate(userPlan.renewDate)}
                               </div>
                             )}
 
@@ -400,11 +415,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                                   disabled={!!(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt)}
                                 >
                                   {(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (userPlan?.cancelAt || userPlan?.planCancelledAt)
-                                    ? `Avslutas ${new Date(userPlan.planCancelledAt || userPlan.cancelAt!).toLocaleDateString('sv-SE', { 
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric' 
-                                      })}`
+                                    ? `Avslutas ${formatSwedishDate(userPlan.planCancelledAt || userPlan.cancelAt)}`
                                     : 'Avsluta prenumeration'
                                   }
                                 </Button>
@@ -507,11 +518,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                   </p>
                   {userPlan?.renewDate && (
                     <div className="flex items-center gap-2 text-xs font-medium text-primary">
-                      <span>Avslutas {new Date(userPlan.renewDate).toLocaleDateString('sv-SE', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}</span>
+                      <span>Avslutas {formatSwedishDate(userPlan.renewDate)}</span>
                     </div>
                   )}
                 </div>
