@@ -312,6 +312,55 @@ class ApiClient {
     return data;
   }
 
+  async startSmsVerification(email: string, phone: string): Promise<{
+    ok: boolean;
+    expiresAt: string;
+    phone: string;
+    isNewUser: boolean;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/auth/sms/start`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Browser-Id': this.browserId,
+        'X-Device-Id': this.browserId,
+      },
+      body: JSON.stringify({ email, phone })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to start SMS verification' }));
+      throw new Error((error as any).error || (error as any).message || 'Failed to start SMS verification');
+    }
+
+    return response.json();
+  }
+
+  async verifySmsCode(email: string, code: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/sms/verify`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Browser-Id': this.browserId,
+        'X-Device-Id': this.browserId,
+      },
+      body: JSON.stringify({ email, code })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Verification failed' }));
+      throw new Error((error as any).error || (error as any).message || 'Verification failed');
+    }
+
+    const data = await response.json();
+    if (data.token) {
+      this.setToken(data.token);
+    }
+    return data;
+  }
+
   async verifyEmail(code: string): Promise<VerifyEmailResponse> {
     // Prefer stored email to avoid extra authenticated calls
     let email = localStorage.getItem('userEmail') || '';

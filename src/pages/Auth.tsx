@@ -1,258 +1,219 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mail, ArrowLeft, Sparkles } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Smartphone, ArrowLeft, Clock, AlertCircle } from 'lucide-react';
+import { apiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import tivlyLogo from '@/assets/tivly-logo.png';
-import { toast } from 'sonner';
-import { isNativeApp } from '@/utils/environment';
 
 /**
- * Auth - Login page for app.tivly.se and io.tivly.se
+ * Auth - SMS verification login page
  * 
- * Implements the Tivly magic link playbook:
- * - Requests magic link with current location as redirect
- * - Polls for cross-device completion
- * - Handles same-device completion via ?token parameter
+ * Implements the Tivly SMS verification playbook:
+ * - Collects email + phone number (E.164 format)
+ * - Initiates SMS verification via Sinch
+ * - Collects and verifies PIN code
+ * - No resend functionality - user must wait for expiry
  */
-const Auth = () => {
+export default function Auth() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { user, refreshUser } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const { user, isLoading, refreshUser } = useAuth();
+
+  // State management
   const [email, setEmail] = useState('');
-  const [linkSent, setLinkSent] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-  const [sessionId, setSessionId] = useState<string>('');
-  const [pollingStatus, setPollingStatus] = useState<string>('');
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [maskedPhone, setMaskedPhone] = useState('');
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
 
-  // Playbook Step 4: Handle same-device completion via ?token=JWT parameter
-  // (Token already verified by auth.tivly.se/magic-login, just needs to be stored)
+  // Redirect if logged in
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (token) {
-      console.log('🔐 [Playbook Step 4] Same-device magic link completion detected');
-      console.log('📝 Token already verified by magic-login page, applying JWT...');
-      
-      // Step 4.2: Store token (JWT already verified by MagicLogin page)
-      apiClient.applyAuthToken(token);
-      
-      // Step 4.3: Replace history to clean URL
-      window.history.replaceState({}, document.title, location.pathname);
-      
-      // Step 4.4: Rehydrate user data via GET /me
-      refreshUser().then(() => {
-        console.log('✅ User rehydrated, redirecting to app');
-        navigate('/', { replace: true });
-      }).catch((error) => {
-        console.error('❌ Failed to refresh user after magic link:', error);
-        toast.error('Inloggning misslyckades. Försök igen.');
-      });
-    }
-  }, [searchParams, navigate, refreshUser]);
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
+    if (!isLoading && user) {
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, isLoading, navigate]);
 
-  // Cooldown timer
+  // Countdown timer (Playbook Step 3)
   useEffect(() => {
-    if (cooldown > 0) {
-      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [cooldown]);
+    if (!expiresAt) return;
 
-  // Playbook Step 5: Cross-device polling
-  useEffect(() => {
-    if (!linkSent || !sessionId || !email) return;
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const expires = new Date(expiresAt).getTime();
+      const remaining = Math.max(0, Math.floor((expires - now) / 1000));
+      setCountdown(remaining);
 
-    console.log('🔄 [Playbook Step 3] Starting cross-device polling for sessionId:', sessionId);
-    
-    const pollInterval = setInterval(async () => {
-      try {
-        // Playbook Step 3: Poll every 2 seconds
-        const status = await apiClient.checkMagicLinkStatus(sessionId, email);
-        console.log('📊 Poll status:', status.status);
-        
-        setPollingStatus(status.status);
-        
-        // Playbook Step 5: Handle 'ready' status with token
-        if (status.status === 'ready' && status.token) {
-          console.log('✅ [Playbook Step 5] Cross-device completion detected!');
-          clearInterval(pollInterval);
-          
-          // Store JWT and refresh user
-          apiClient.applyAuthToken(status.token);
-          await refreshUser();
-          navigate('/', { replace: true });
-        } 
-        // Playbook Step 5: Handle expired/not_found - restart from step 1
-        else if (status.status === 'expired' || status.status === 'not_found') {
-          console.warn('⚠️ Session expired or not found - restarting flow');
-          clearInterval(pollInterval);
-          setLinkSent(false);
-          setSessionId('');
-          setPollingStatus('');
-          toast.error('Länken har gått ut. Begär en ny länk.');
-        }
-        // Playbook Step 5: Handle device_mismatch - show message
-        // (UI already shows this based on pollingStatus state)
-      } catch (error) {
-        console.error('❌ Polling error:', error);
+      if (remaining === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Koden har gått ut',
+          description: 'Vänligen begär en ny kod.',
+        });
       }
-    }, 2000); // Playbook: Poll every 2 seconds
-
-    return () => {
-      console.log('🛑 Stopping cross-device polling');
-      clearInterval(pollInterval);
     };
-  }, [linkSent, sessionId, email, refreshUser, navigate]);
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
-      toast.error('Ange en giltig e-postadress');
-      return;
-    }
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt, toast]);
 
-    if (cooldown > 0) {
-      toast.error(`Vänta ${cooldown} sekunder innan du skickar igen`);
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      // Playbook Step 1: Request with current location as redirect
-      // Playbook Step 2: Prefer window.location.href to preserve exact view
-      const redirectUrl = window.location.href;
-      console.log('🔐 [Playbook Step 1] Requesting magic link with redirect:', { email, redirectUrl });
-      
-      const response = await apiClient.requestMagicLink(email, redirectUrl);
-      
-      console.log('✅ Magic link request successful:', response);
-      
-      // Playbook Step 1: Collect sessionId for polling
-      if (response.sessionId) {
-        setSessionId(response.sessionId);
-        console.log('📋 SessionId stored for cross-device polling:', response.sessionId);
-      }
-      
-      // Handle trusted device instant login (not in playbook, but backend feature)
-      if (response.trustedLogin && response.token) {
-        console.log('🎯 Trusted device detected - instant login bypass');
-        await refreshUser();
-        navigate('/', { replace: true });
-        return;
-      }
-      
-      // Playbook Step 3: Show waiting screen
-      setLinkSent(true);
-      setCooldown(60); // Debounce resend for 60 seconds (playbook minimum: 5s)
-      toast.success('Magisk länk skickad! Kolla din e-post.');
-    } catch (error: any) {
-      console.error('❌ Failed to send magic link:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        isNative: isNativeApp()
+  const handleStartSmsVerification = async () => {
+    // Playbook Step 1: Validate input locally
+    if (!email.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'E-post krävs',
+        description: 'Vänligen ange din e-postadress.',
       });
+      return;
+    }
+
+    if (!phone.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Telefonnummer krävs',
+        description: 'Vänligen ange ditt telefonnummer.',
+      });
+      return;
+    }
+
+    // Basic E.164 validation
+    if (!phone.startsWith('+') || phone.replace(/\D/g, '').length < 8) {
+      toast({
+        variant: 'destructive',
+        title: 'Ogiltigt telefonnummer',
+        description: 'Ange nummer i internationellt format (t.ex. +46701234567)',
+      });
+      return;
+    }
+
+    console.log('🚀 [Playbook Step 2] Starting SMS verification');
+    console.log('📧 Email:', email);
+    console.log('📱 Phone:', phone);
+
+    setLoading(true);
+    try {
+      // Playbook Step 2: Call POST /auth/sms/start
+      const result = await apiClient.startSmsVerification(email, phone);
+
+      console.log('✅ SMS verification started');
+      console.log('📱 Masked phone:', result.phone);
+      console.log('⏰ Expires at:', result.expiresAt);
+
+      setMaskedPhone(result.phone);
+      setExpiresAt(result.expiresAt);
+      setCodeSent(true);
+
+      toast({
+        title: 'SMS skickad!',
+        description: `Din kod skickas till ${result.phone}`,
+      });
+    } catch (error: any) {
+      console.error('❌ Failed to start SMS verification:', error);
       
-      let errorMessage = 'Kunde inte skicka länk. Försök igen.';
-      
-      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-        errorMessage = 'Nätverksfel. Kontrollera din internetanslutning.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      // Handle 429 verification_pending
+      if (error.message === 'verification_pending') {
+        toast({
+          variant: 'destructive',
+          title: 'Vänta på befintlig kod',
+          description: 'En kod har redan skickats. Vänta tills den går ut.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Misslyckades att skicka SMS',
+          description: error.message || 'Försök igen senare.',
+        });
       }
-      
-      toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleBack = () => {
-    setLinkSent(false);
-    setEmail('');
-    setSessionId('');
-    setPollingStatus('');
+  const handleVerifyCode = async () => {
+    if (code.length < 4) {
+      toast({
+        variant: 'destructive',
+        title: 'Ogiltig kod',
+        description: 'Ange en giltig verifieringskod.',
+      });
+      return;
+    }
+
+    console.log('🚀 [Playbook Step 4] Verifying SMS code');
+    console.log('📧 Email:', email);
+    console.log('🔢 Code length:', code.length);
+
+    setLoading(true);
+    try {
+      // Playbook Step 4: Call POST /auth/sms/verify
+      const result = await apiClient.verifySmsCode(email, code);
+
+      console.log('✅ SMS code verified successfully');
+      console.log('🔑 JWT received');
+
+      // Playbook Step 5: Token is already stored by API client
+      await refreshUser();
+      navigate('/');
+    } catch (error: any) {
+      console.error('❌ SMS verification failed:', error);
+
+      // Playbook Step 4: Handle error cases
+      if (error.message === 'invalid_code') {
+        toast({
+          variant: 'destructive',
+          title: 'Fel kod',
+          description: 'Fel kod – försök igen.',
+        });
+        setCode('');
+      } else if (error.message === 'verification_expired') {
+        toast({
+          variant: 'destructive',
+          title: 'Koden har gått ut',
+          description: 'Begär en ny kod.',
+        });
+        handleStartOver();
+      } else if (error.message === 'verification_not_found') {
+        toast({
+          variant: 'destructive',
+          title: 'Session förlorad',
+          description: 'Vänligen starta om verifieringsprocessen.',
+        });
+        handleStartOver();
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Verifiering misslyckades',
+          description: error.message || 'Försök igen.',
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (linkSent) {
-    return (
-      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
-        
-        <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-sm bg-card/95">
-          <CardHeader className="space-y-4 text-center pb-8">
-            <div className="mx-auto w-24 h-24">
-              <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-            </div>
-            
-            <div className="space-y-2">
-              <CardTitle className="text-3xl font-bold">Kolla din e-post!</CardTitle>
-              <CardDescription className="text-base">
-                Vi har skickat en magisk inloggningslänk till <strong>{email}</strong>
-              </CardDescription>
-            </div>
-          </CardHeader>
-          
-          <CardContent className="space-y-6 pb-8">
-            <div className="flex flex-col items-center space-y-4">
-              <Mail className="w-16 h-16 text-primary" />
-              <p className="text-sm text-muted-foreground text-center">
-                Klicka på länken i e-posten för att logga in säkert
-              </p>
-              {pollingStatus === 'device_mismatch' && (
-                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
-                    Slutför inloggningen på enheten som begärde länken
-                  </p>
-                </div>
-              )}
-              {pollingStatus === 'pending' && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                  <span>Väntar på verifiering...</span>
-                </div>
-              )}
-            </div>
+  const handleStartOver = () => {
+    setCodeSent(false);
+    setCode('');
+    setMaskedPhone('');
+    setExpiresAt(null);
+    setCountdown(0);
+  };
 
-            <div className="space-y-3">
-              <Button
-                onClick={handleSendMagicLink}
-                disabled={isLoading || cooldown > 0}
-                variant="outline"
-                className="w-full"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4 mr-2" />
-                )}
-                {cooldown > 0 ? `Skicka igen om ${cooldown}s` : 'Skicka igen'}
-              </Button>
-
-              <Button onClick={handleBack} variant="ghost" className="w-full">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Tillbaka
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const formatCountdown = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
@@ -265,44 +226,151 @@ const Auth = () => {
           </div>
           
           <div className="space-y-2">
-            <CardTitle className="text-3xl font-bold">Välkommen till Tivly</CardTitle>
+            <CardTitle className="text-3xl font-bold">
+              {codeSent ? 'Ange verifieringskod' : 'Välkommen till Tivly'}
+            </CardTitle>
             <CardDescription className="text-base">
-              Ange din e-postadress för att få en magisk inloggningslänk
+              {codeSent
+                ? `Din SMS-kod skickas till ${maskedPhone}`
+                : 'Ange din e-post och telefonnummer för att få en verifieringskod'}
             </CardDescription>
           </div>
         </CardHeader>
-        
-        <CardContent className="pb-8">
-          <form onSubmit={handleSendMagicLink} className="space-y-6">
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="din@epost.se"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                className="h-12 text-base"
-                autoFocus
-              />
-            </div>
 
-            <Button
-              type="submit"
-              disabled={isLoading || !email}
-              className="w-full h-12 text-base"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              ) : (
-                <Sparkles className="w-5 h-5 mr-2" />
+        <CardContent className="pb-8">
+          {codeSent ? (
+            // Code entry view (Playbook Step 3)
+            <div className="space-y-6">
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <div className="flex items-start gap-3">
+                  <Smartphone className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-medium">Telefonnummer:</p>
+                    <p className="text-sm text-muted-foreground">{maskedPhone}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-muted-foreground">
+                    Koden gäller i <strong>{formatCountdown(countdown)}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="code" className="text-center block">Verifieringskod</Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={8}
+                    value={code}
+                    onChange={setCode}
+                    disabled={loading || countdown === 0}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                      <InputOTPSlot index={6} />
+                      <InputOTPSlot index={7} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </div>
+
+              {countdown === 0 && (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-destructive">
+                      Koden har gått ut. Begär en ny kod.
+                    </p>
+                  </div>
+                </div>
               )}
-              Skicka magisk länk
-            </Button>
-          </form>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={handleStartOver}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Börja om
+                </Button>
+                <Button
+                  onClick={handleVerifyCode}
+                  disabled={loading || code.length < 4 || countdown === 0}
+                  className="flex-1"
+                >
+                  {loading ? 'Verifierar...' : 'Verifiera'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            // Login form view (Playbook Step 1-2)
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleStartSmsVerification();
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="email">E-postadress</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="namn@exempel.se"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  required
+                  autoFocus
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefonnummer</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+46701234567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-11"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ange i internationellt format (t.ex. +46701234567)
+                </p>
+              </div>
+
+              <Button type="submit" className="w-full h-11" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2 animate-spin" />
+                    Skickar kod...
+                  </>
+                ) : (
+                  <>
+                    <Smartphone className="w-4 h-4 mr-2" />
+                    Skicka SMS-kod
+                  </>
+                )}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default Auth;
+}
