@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { isIosApp } from '@/utils/iosAppDetection';
+import { isIosApp } from '@/utils/environment';
 import { buyIosSubscription, restorePurchases, PRODUCT_IDS } from '@/lib/appleIAP';
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
