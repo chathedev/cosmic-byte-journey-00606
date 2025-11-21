@@ -5,15 +5,6 @@ import { Button } from '@/components/ui/button';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 const WebOnlyAccess = () => {
-  useEffect(() => {
-    // Redirect to app domain after a delay if user doesn't take action
-    const timer = setTimeout(() => {
-      window.location.href = 'https://io.tivly.se';
-    }, 8000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 safe-area-inset">
       {/* Background decorative elements */}
@@ -80,10 +71,6 @@ const WebOnlyAccess = () => {
                   <Smartphone className="w-4 h-4 mr-2" />
                   Gå till App-domän
                 </Button>
-
-                <p className="text-xs text-muted-foreground">
-                  Du omdirigeras automatiskt om 8 sekunder...
-                </p>
               </div>
             </div>
           </div>
