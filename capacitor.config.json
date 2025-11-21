@@ -3,7 +3,6 @@
   "appName": "Tivly",
   "webDir": "dist",
   "server": {
-    "url": "https://io.tivly.se",
     "cleartext": true
   },
   "ios": {

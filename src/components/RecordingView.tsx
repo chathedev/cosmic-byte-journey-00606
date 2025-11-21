@@ -118,6 +118,29 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
 
   // Removed automatic upgrade dialog - only show when trying to create NEW meeting
 
+  // Request microphone permissions for native app
+  useEffect(() => {
+    const requestNativePermissions = async () => {
+      if (isNativeApp()) {
+        try {
+          console.log('📱 Native app detected - requesting microphone permissions');
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop()); // Stop immediately, just checking permission
+          console.log('✅ Microphone permissions granted');
+        } catch (error) {
+          console.error('❌ Microphone permission denied:', error);
+          toast({
+            title: "Mikrofon krävs",
+            description: "Gå till Inställningar > Tivly > Mikrofon för att aktivera.",
+            variant: "destructive",
+            duration: 7000,
+          });
+        }
+      }
+    };
+    requestNativePermissions();
+  }, []);
+
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     

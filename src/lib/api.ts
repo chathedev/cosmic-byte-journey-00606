@@ -92,6 +92,7 @@ class ApiClient {
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(fetchOptions.headers as any),
     };
 
@@ -99,11 +100,16 @@ class ApiClient {
       (headers as any)['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    // Enhanced fetch options for native app
+    const enhancedOptions: RequestInit = {
       ...fetchOptions,
-      credentials: 'include',
       headers,
-    });
+      mode: 'cors',
+      credentials: 'include',
+      cache: 'no-cache',
+    };
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, enhancedOptions);
 
     // Only clear token and redirect for actual authentication failures
     // Don't clear token on network errors or other issues
