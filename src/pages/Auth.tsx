@@ -69,7 +69,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-check`, {
+      const response = await fetch('https://api.tivly.se/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -117,7 +117,7 @@ export default function Auth() {
   const handlePasskeyLogin = async () => {
     try {
       // Start WebAuthn authentication
-      const startResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/passkey-login-start`, {
+      const startResponse = await fetch('https://api.tivly.se/auth/passkey/login/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -141,7 +141,7 @@ export default function Auth() {
       });
 
       // Finish authentication
-      const finishResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/passkey-login-finish`, {
+      const finishResponse = await fetch('https://api.tivly.se/auth/passkey/login/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -199,7 +199,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/totp-login`, {
+      const response = await fetch('https://api.tivly.se/auth/totp/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
