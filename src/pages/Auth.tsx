@@ -34,6 +34,8 @@ export default function Auth() {
   const [maskedPhone, setMaskedPhone] = useState('');
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   // Redirect if logged in
   useEffect(() => {
@@ -41,6 +43,42 @@ export default function Auth() {
       navigate('/');
     }
   }, [user, isLoading, navigate]);
+
+  // Load cooldown from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('tivly_sms_cooldown');
+    if (stored) {
+      const cooldownTime = parseInt(stored, 10);
+      if (cooldownTime > Date.now()) {
+        setCooldownUntil(cooldownTime);
+      } else {
+        localStorage.removeItem('tivly_sms_cooldown');
+      }
+    }
+  }, []);
+
+  // Cooldown countdown timer
+  useEffect(() => {
+    if (!cooldownUntil) {
+      setCooldownSeconds(0);
+      return;
+    }
+
+    const updateCooldown = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+      setCooldownSeconds(remaining);
+
+      if (remaining === 0) {
+        setCooldownUntil(null);
+        localStorage.removeItem('tivly_sms_cooldown');
+      }
+    };
+
+    updateCooldown();
+    const timer = setInterval(updateCooldown, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownUntil]);
 
   // Countdown timer (Playbook Step 3)
   useEffect(() => {
@@ -66,7 +104,17 @@ export default function Auth() {
     return () => clearInterval(timer);
   }, [expiresAt, toast]);
 
-  const handleStartSmsVerification = async (isResend = false) => {
+  const handleStartSmsVerification = async () => {
+    // Check cooldown first - 5 minute rate limit
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      toast({
+        variant: 'destructive',
+        title: 'Vänta med att begära en ny kod',
+        description: `Du kan begära en ny kod om ${formatCountdown(cooldownSeconds)}.`,
+      });
+      return;
+    }
+
     // Playbook Step 1: Validate input locally
     if (!email.trim()) {
       toast({
@@ -114,11 +162,14 @@ export default function Auth() {
       setCodeSent(true);
       setCode(''); // Clear any previous code
 
+      // Set 5-minute cooldown to prevent SMS spam
+      const cooldownTime = Date.now() + 300000; // 5 minutes
+      setCooldownUntil(cooldownTime);
+      localStorage.setItem('tivly_sms_cooldown', cooldownTime.toString());
+
       toast({
-        title: isResend ? 'Ny kod skickad!' : 'SMS skickad!',
-        description: isResend 
-          ? `Ny kod skickad till ${result.phone}. Föregående kod är nu ogiltig.`
-          : `Din kod skickas till ${result.phone}`,
+        title: 'SMS skickad!',
+        description: `Din kod skickas till ${result.phone}`,
       });
     } catch (error: any) {
       console.error('❌ Failed to start SMS verification:', error);
@@ -195,16 +246,13 @@ export default function Auth() {
     }
   };
 
-  const handleResendCode = async () => {
-    await handleStartSmsVerification(true);
-  };
-
   const handleStartOver = () => {
     setCodeSent(false);
     setCode('');
     setMaskedPhone('');
     setExpiresAt(null);
     setCountdown(0);
+    // Keep cooldown active to prevent spam
   };
 
   const formatCountdown = (seconds: number): string => {
@@ -250,22 +298,11 @@ export default function Auth() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">
-                      Koden gäller i <strong>{formatCountdown(countdown)}</strong>
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResendCode}
-                    disabled={loading || countdown === 0}
-                    className="text-xs h-auto py-1 px-2"
-                  >
-                    Skicka kod igen
-                  </Button>
+                <div className="flex items-start gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-muted-foreground">
+                    Koden gäller i <strong>{formatCountdown(countdown)}</strong>
+                  </p>
                 </div>
               </div>
 
@@ -359,15 +396,34 @@ export default function Auth() {
                 </p>
               </div>
 
+              {cooldownSeconds > 0 && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Vänta innan du begär en ny kod</p>
+                      <p className="text-sm text-muted-foreground">
+                        Du kan skicka en ny kod om <strong>{formatCountdown(cooldownSeconds)}</strong>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <Button 
                 type="submit" 
                 className="w-full h-11" 
-                disabled={loading}
+                disabled={loading || cooldownSeconds > 0}
               >
                 {loading ? (
                   <>
                     <Clock className="w-4 h-4 mr-2 animate-spin" />
                     Skickar kod...
+                  </>
+                ) : cooldownSeconds > 0 ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2" />
+                    Vänta {formatCountdown(cooldownSeconds)}
                   </>
                 ) : (
                   <>
