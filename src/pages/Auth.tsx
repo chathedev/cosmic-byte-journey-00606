@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Fingerprint, ArrowLeft, Shield, KeyRound } from 'lucide-react';
+import { Fingerprint, ArrowLeft, Shield, KeyRound, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 /**
@@ -20,7 +21,15 @@ import tivlyLogo from '@/assets/tivly-logo.png';
  * - No passwords, SMS, or magic links
  */
 
+// Extend Window interface for auth token
+declare global {
+  interface Window {
+    authToken?: string;
+  }
+}
+
 type AuthMethod = 'passkey' | 'totp' | null;
+type ViewMode = 'email' | 'totp' | 'new-user' | 'setup-required';
 
 interface AuthCheckResponse {
   authMethods: {
@@ -28,6 +37,20 @@ interface AuthCheckResponse {
     totp: boolean;
   };
 }
+
+// Email sanitization as per playbook
+function sanitizeEmail(email: string | undefined): string | null {
+  const trimmed = email?.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return trimmed && emailRegex.test(trimmed) ? trimmed : null;
+}
+
+// Check WebAuthn support
+function isWebAuthnSupported(): boolean {
+  return typeof window !== 'undefined' && 
+         typeof window.PublicKeyCredential !== 'undefined';
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -38,7 +61,13 @@ export default function Auth() {
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
-  const [showAuthInput, setShowAuthInput] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('email');
+  const [webauthnAvailable, setWebauthnAvailable] = useState(false);
+
+  // Check WebAuthn support on mount
+  useEffect(() => {
+    setWebauthnAvailable(isWebAuthnSupported());
+  }, []);
 
   // Redirect if logged in
   useEffect(() => {
@@ -48,17 +77,9 @@ export default function Auth() {
   }, [user, isLoading, navigate]);
 
   const handleCheckAuthMethods = async () => {
-    if (!email.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'E-post krävs',
-        description: 'Vänligen ange din e-postadress.',
-      });
-      return;
-    }
-
-    // Basic email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const sanitized = sanitizeEmail(email);
+    
+    if (!sanitized) {
       toast({
         variant: 'destructive',
         title: 'Ogiltig e-postadress',
@@ -73,32 +94,26 @@ export default function Auth() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: sanitized }),
       });
 
       if (response.ok) {
         const data: AuthCheckResponse = await response.json();
         const { authMethods } = data;
 
-        if (authMethods.passkey) {
+        if (authMethods.passkey && webauthnAvailable) {
           setAuthMethod('passkey');
-          await handlePasskeyLogin();
+          await handlePasskeyLogin(sanitized);
         } else if (authMethods.totp) {
           setAuthMethod('totp');
-          setShowAuthInput(true);
+          setViewMode('totp');
         } else {
-          toast({
-            variant: 'destructive',
-            title: 'Ingen autentiseringsmetod',
-            description: 'Inget konto har konfigurerats för denna e-post. Kontakta support.',
-          });
+          // User exists but no auth methods configured
+          setViewMode('setup-required');
         }
       } else if (response.status === 404) {
-        toast({
-          variant: 'destructive',
-          title: 'Användare hittades inte',
-          description: 'Inget konto finns med denna e-postadress.',
-        });
+        // New user
+        setViewMode('new-user');
       } else {
         throw new Error('Failed to check authentication methods');
       }
@@ -114,14 +129,14 @@ export default function Auth() {
     }
   };
 
-  const handlePasskeyLogin = async () => {
+  const handlePasskeyLogin = async (emailAddress: string) => {
     try {
       // Start WebAuthn authentication
       const startResponse = await fetch('https://api.tivly.se/auth/passkey/login/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: emailAddress }),
       });
 
       if (!startResponse.ok) {
@@ -140,13 +155,17 @@ export default function Auth() {
         publicKey: options,
       });
 
+      if (!credential) {
+        throw new Error('No credential received');
+      }
+
       // Finish authentication
       const finishResponse = await fetch('https://api.tivly.se/auth/passkey/login/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          email,
+          email: emailAddress,
           credential,
           challengeKey,
         }),
@@ -156,6 +175,7 @@ export default function Auth() {
         const { token, user: userData } = await finishResponse.json();
         
         // Store token
+        window.authToken = token;
         localStorage.setItem('tivly_auth_token', token);
         sessionStorage.setItem('tivly_user', JSON.stringify(userData));
 
@@ -177,13 +197,15 @@ export default function Auth() {
         toast({
           variant: 'destructive',
           title: 'Autentisering misslyckades',
-          description: 'Kunde inte autentisera med passkey. Försök igen.',
+          description: 'Kunde inte autentisera med passkey.',
         });
       }
 
       // Show TOTP fallback if available
-      setShowAuthInput(true);
-      setAuthMethod('totp');
+      if (authMethod === 'passkey') {
+        setAuthMethod('totp');
+        setViewMode('totp');
+      }
     }
   };
 
@@ -197,19 +219,23 @@ export default function Auth() {
       return;
     }
 
+    const sanitized = sanitizeEmail(email);
+    if (!sanitized) return;
+
     setLoading(true);
     try {
       const response = await fetch('https://api.tivly.se/auth/totp/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, token: totpCode }),
+        body: JSON.stringify({ email: sanitized, token: totpCode }),
       });
 
       if (response.ok) {
         const { token, user: userData } = await response.json();
         
         // Store token
+        window.authToken = token;
         localStorage.setItem('tivly_auth_token', token);
         sessionStorage.setItem('tivly_user', JSON.stringify(userData));
 
@@ -237,7 +263,7 @@ export default function Auth() {
   };
 
   const handleStartOver = () => {
-    setShowAuthInput(false);
+    setViewMode('email');
     setTotpCode('');
     setAuthMethod(null);
   };
@@ -254,18 +280,22 @@ export default function Auth() {
           
           <div className="space-y-2">
             <CardTitle className="text-3xl font-bold">
-              {showAuthInput ? 'Ange verifieringskod' : 'Välkommen till Tivly'}
+              {viewMode === 'totp' ? 'Ange verifieringskod' : 
+               viewMode === 'new-user' ? 'Välkommen!' :
+               viewMode === 'setup-required' ? 'Inställning krävs' :
+               'Välkommen till Tivly'}
             </CardTitle>
             <CardDescription className="text-base">
-              {showAuthInput
-                ? 'Ange koden från din autentiseringsapp'
-                : 'Ange din e-post för att logga in med passkey eller autentiseringsapp'}
+              {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
+               viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
+               viewMode === 'setup-required' ? 'Ditt konto saknar autentiseringsmetod' :
+               'Ange din e-post för att logga in med passkey eller autentiseringsapp'}
             </CardDescription>
           </div>
         </CardHeader>
 
         <CardContent className="pb-8">
-          {showAuthInput ? (
+          {viewMode === 'totp' ? (
             // TOTP code entry view
             <div className="space-y-6">
               <div className="rounded-lg border border-border bg-muted/30 p-4">
@@ -277,6 +307,15 @@ export default function Auth() {
                   </div>
                 </div>
               </div>
+
+              {!webauthnAvailable && authMethod === 'passkey' && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Passkeys stöds inte i din webbläsare. Använd TOTP istället.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="totp" className="text-center block">
@@ -329,6 +368,56 @@ export default function Auth() {
                 </Button>
               </div>
             </div>
+          ) : viewMode === 'new-user' ? (
+            // New user view
+            <div className="space-y-6">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Inget konto finns med e-postadressen: <strong>{email}</strong>
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground text-center">
+                  För att skapa ett konto, kontakta vår support eller be en administratör om en inbjudan.
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={handleStartOver}
+                className="w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Tillbaka
+              </Button>
+            </div>
+          ) : viewMode === 'setup-required' ? (
+            // Setup required view
+            <div className="space-y-6">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Ditt konto saknar konfigurerade autentiseringsmetoder.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground text-center">
+                  Kontakta support för att konfigurera passkey eller autentiseringsapp för: <strong>{email}</strong>
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={handleStartOver}
+                className="w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Tillbaka
+              </Button>
+            </div>
           ) : (
             // Email input view
             <form
@@ -352,6 +441,15 @@ export default function Auth() {
                   className="h-11"
                 />
               </div>
+
+              {!webauthnAvailable && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Passkeys stöds inte i din webbläsare. TOTP kommer användas som autentiseringsmetod.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                 <div className="flex items-start gap-3">
