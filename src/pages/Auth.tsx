@@ -66,14 +66,24 @@ const Auth = () => {
     
     try {
       const redirectUrl = window.location.origin;
+      console.log('🔐 Requesting magic link:', { email, redirectUrl });
+      
       await apiClient.requestMagicLink(email, redirectUrl);
       
+      console.log('✅ Magic link request successful');
       setLinkSent(true);
       setCooldown(60);
       toast.success('Magisk länk skickad! Kolla din e-post.');
     } catch (error: any) {
-      console.error('Failed to send magic link:', error);
-      toast.error(error.message || 'Kunde inte skicka länk');
+      console.error('❌ Failed to send magic link:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      const errorMessage = error.message || 'Kunde inte skicka länk. Kontrollera att backend-servern fungerar.';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
