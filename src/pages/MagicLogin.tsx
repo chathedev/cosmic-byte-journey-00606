@@ -49,21 +49,8 @@ const MagicLogin = () => {
         const response = await apiClient.verifyMagicLink(token);
         
         setState('success');
-        console.log('✅ [Playbook Step 6] Token verified successfully');
+        console.log('✅ Token verified successfully');
         console.log('📝 Received JWT from backend:', response.token ? 'present' : 'missing');
-        
-        // Playbook Step 6: Redirect back to originating domain with JWT attached as ?token=
-        const redirectDomain = returnUrl || window.location.origin.replace('auth.', 'app.');
-        const separator = redirectDomain.includes('?') ? '&' : '?';
-        const finalUrl = `${redirectDomain}${separator}token=${response.token}`;
-        
-        console.log('🔄 [Playbook Step 6] Redirecting to originating domain with JWT');
-        console.log('🎯 Final redirect URL:', finalUrl);
-        
-        // Show success briefly before redirect (1.5s for user feedback)
-        setTimeout(() => {
-          window.location.href = finalUrl;
-        }, 1500);
         
       } catch (error: any) {
         console.error('❌ [Playbook Step 6] Magic link verification failed:', error);
@@ -81,12 +68,6 @@ const MagicLogin = () => {
         } else {
           setErrorMessage(message);
         }
-        
-        // Auto-redirect to login after 5 seconds on error
-        setTimeout(() => {
-          const loginUrl = returnUrl || window.location.origin.replace('auth.', 'app.') + '/auth';
-          window.location.href = loginUrl;
-        }, 5000);
       }
     };
 
@@ -164,20 +145,6 @@ const MagicLogin = () => {
                     {errorMessage}
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Omdirigeras automatiskt om 5 sekunder...
-                </p>
-                <Button 
-                  onClick={() => {
-                    const returnUrl = searchParams.get('return');
-                    const loginUrl = returnUrl || window.location.origin.replace('auth.', 'app.') + '/auth';
-                    window.location.href = loginUrl;
-                  }}
-                  className="w-full"
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  Gå till inloggning nu
-                </Button>
               </div>
             )}
           </div>
