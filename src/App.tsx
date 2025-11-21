@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
+import { isWebBrowserOnAppDomain } from "@/utils/environment";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -17,6 +18,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
+import AppOnlyAccess from "./pages/AppOnlyAccess";
 import Library from "./pages/Library";
 import Agendas from "./pages/Agendas";
 import { Chat } from "./pages/Chat";
@@ -184,6 +186,11 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
+  // Block web browser access to io.tivly.se domain
+  if (isWebBrowserOnAppDomain()) {
+    return <AppOnlyAccess />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>

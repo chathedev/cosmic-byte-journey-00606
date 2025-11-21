@@ -9,6 +9,13 @@ import tivlyLogo from '@/assets/tivly-logo.png';
 
 type VerificationState = 'verifying' | 'success' | 'error' | 'invalid';
 
+/**
+ * MagicLogin - Handles cross-domain magic link verification
+ * 
+ * Users can request a magic link from either app.tivly.se or io.tivly.se,
+ * and click the link from any device/domain. The verification will work
+ * seamlessly across both domains, allowing flexible authentication flows.
+ */
 const MagicLogin = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -33,6 +40,8 @@ const MagicLogin = () => {
       setState('verifying');
       
       try {
+        // Verification works across domains
+        // User can request login from app.tivly.se and verify on io.tivly.se or vice versa
         const result = await apiClient.verifyMagicLink(token, storedSessionId || undefined);
         
         if (result.token) {
@@ -42,13 +51,14 @@ const MagicLogin = () => {
           localStorage.removeItem('magic_session_id');
           localStorage.removeItem('magic_session_email');
           
-          // Clear token from URL
+          // Clear token from URL but stay on current domain
           window.history.replaceState({}, document.title, '/magic-login');
           
           setState('success');
           
           await refreshUser();
           
+          // Redirect to home page on whichever domain we're on
           setTimeout(() => navigate('/'), 1500);
         } else {
           throw new Error('No token received');

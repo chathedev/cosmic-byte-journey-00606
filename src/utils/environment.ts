@@ -31,6 +31,35 @@ export function isNativeApp(): boolean {
 }
 
 /**
+ * Detects if user is trying to access io.tivly.se from a web browser
+ * This should be blocked - only the native app can access io.tivly.se
+ * @returns {boolean} True if web browser is trying to access app domain
+ */
+export function isWebBrowserOnAppDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const hostname = window.location.hostname;
+    const isIosDomain = hostname === 'io.tivly.se';
+    
+    if (!isIosDomain) return false;
+    
+    // Check if it's actually running in Capacitor native app
+    const isActuallyNative = Capacitor.isNativePlatform();
+    
+    if (!isActuallyNative) {
+      console.warn('🚫 Web browser detected on io.tivly.se - blocking access');
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.warn('⚠️ App domain check failed', error);
+    return false;
+  }
+}
+
+/**
  * Detects if running in a web browser (not native app)
  * @returns {boolean} True if running in a standard web browser
  */
