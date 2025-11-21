@@ -81,10 +81,8 @@ const MagicLogin = () => {
               setErrorMessage(message);
             }
             
-            // Auto-redirect to auth page after error
-            setTimeout(() => {
-              window.location.href = `${window.location.origin}/auth`;
-            }, 3000);
+            // Stay on error screen, no automatic redirect
+            console.warn('Magic link verification failed, staying on error screen');
           } else {
             // Wait before retrying (exponential backoff: 1s, 2s, 4s)
             await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
