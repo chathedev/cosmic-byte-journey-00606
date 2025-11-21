@@ -37,31 +37,59 @@ const MagicLogin = () => {
 
       setState('verifying');
       
-      try {
-        // Verify the magic link token with the API
-        const response = await apiClient.verifyMagicLink(token);
-        
-        setState('success');
-        
-        // Redirect back to origin domain with token
-        const redirectDomain = returnUrl || 'https://app.tivly.se';
-        const separator = redirectDomain.includes('?') ? '&' : '?';
-        
-        setTimeout(() => {
+      // Retry logic with exponential backoff
+      const maxRetries = 3;
+      let attempt = 0;
+      
+      while (attempt < maxRetries) {
+        try {
+          // Verify the magic link token with the API
+          const response = await apiClient.verifyMagicLink(token);
+          
+          setState('success');
+          
+          // Redirect back to origin domain with token
+          const redirectDomain = returnUrl || window.location.origin;
+          const separator = redirectDomain.includes('?') ? '&' : '?';
+          
+          // Immediate redirect - no delay needed
           window.location.href = `${redirectDomain}${separator}token=${response.token}`;
-        }, 1500);
-      } catch (error: any) {
-        console.error('Magic link verification error:', error);
-        setState('error');
-        
-        const message = error.message || 'Verifiering misslyckades';
-        
-        if (message.includes('invalid_token') || message.includes('token_not_found')) {
-          setErrorMessage('Länken är ogiltig eller har redan använts.');
-        } else if (message.includes('token_expired')) {
-          setErrorMessage('Länken har gått ut. Begär en ny länk.');
-        } else {
-          setErrorMessage(message);
+          return;
+        } catch (error: any) {
+          attempt++;
+          console.error(`Magic link verification attempt ${attempt} failed:`, error);
+          
+          // If this was the last attempt, show error
+          if (attempt >= maxRetries) {
+            const message = error.message || 'Verifiering misslyckades';
+            
+            // For generic network errors, just redirect anyway with the token
+            if (message.includes('Failed to fetch') || message.includes('network')) {
+              console.log('Network error, redirecting with token anyway');
+              const redirectDomain = returnUrl || window.location.origin;
+              const separator = redirectDomain.includes('?') ? '&' : '?';
+              window.location.href = `${redirectDomain}${separator}token=${token}`;
+              return;
+            }
+            
+            setState('error');
+            
+            if (message.includes('invalid_token') || message.includes('token_not_found')) {
+              setErrorMessage('Länken är ogiltig eller har redan använts.');
+            } else if (message.includes('token_expired')) {
+              setErrorMessage('Länken har gått ut. Begär en ny länk.');
+            } else {
+              setErrorMessage(message);
+            }
+            
+            // Auto-redirect to auth page after error
+            setTimeout(() => {
+              window.location.href = `${window.location.origin}/auth`;
+            }, 3000);
+          } else {
+            // Wait before retrying (exponential backoff: 1s, 2s, 4s)
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+          }
         }
       }
     };
