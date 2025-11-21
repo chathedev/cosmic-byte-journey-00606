@@ -34,6 +34,8 @@ export default function Auth() {
   const [maskedPhone, setMaskedPhone] = useState('');
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   // Redirect if logged in
   useEffect(() => {
@@ -41,6 +43,42 @@ export default function Auth() {
       navigate('/');
     }
   }, [user, isLoading, navigate]);
+
+  // Load cooldown from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('tivly_sms_cooldown');
+    if (stored) {
+      const cooldownTime = parseInt(stored, 10);
+      if (cooldownTime > Date.now()) {
+        setCooldownUntil(cooldownTime);
+      } else {
+        localStorage.removeItem('tivly_sms_cooldown');
+      }
+    }
+  }, []);
+
+  // Cooldown countdown timer
+  useEffect(() => {
+    if (!cooldownUntil) {
+      setCooldownSeconds(0);
+      return;
+    }
+
+    const updateCooldown = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+      setCooldownSeconds(remaining);
+
+      if (remaining === 0) {
+        setCooldownUntil(null);
+        localStorage.removeItem('tivly_sms_cooldown');
+      }
+    };
+
+    updateCooldown();
+    const timer = setInterval(updateCooldown, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownUntil]);
 
   // Countdown timer (Playbook Step 3)
   useEffect(() => {
@@ -67,6 +105,16 @@ export default function Auth() {
   }, [expiresAt, toast]);
 
   const handleStartSmsVerification = async () => {
+    // Check cooldown first
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      toast({
+        variant: 'destructive',
+        title: 'Vänta lite',
+        description: `Du kan begära en ny kod om ${cooldownSeconds} sekunder.`,
+      });
+      return;
+    }
+
     // Playbook Step 1: Validate input locally
     if (!email.trim()) {
       toast({
@@ -112,6 +160,11 @@ export default function Auth() {
       setMaskedPhone(result.phone);
       setExpiresAt(result.expiresAt);
       setCodeSent(true);
+
+      // Set 60-second cooldown
+      const cooldownTime = Date.now() + 60000;
+      setCooldownUntil(cooldownTime);
+      localStorage.setItem('tivly_sms_cooldown', cooldownTime.toString());
 
       toast({
         title: 'SMS skickad!',
@@ -207,6 +260,7 @@ export default function Auth() {
     setMaskedPhone('');
     setExpiresAt(null);
     setCountdown(0);
+    // Don't clear cooldown - it persists across "start over"
   };
 
   const formatCountdown = (seconds: number): string => {
@@ -350,11 +404,28 @@ export default function Auth() {
                 </p>
               </div>
 
-              <Button type="submit" className="w-full h-11" disabled={loading}>
+              {cooldownSeconds > 0 && (
+                <div className="rounded-lg border border-muted bg-muted/30 p-3 mb-4">
+                  <p className="text-sm text-center text-muted-foreground">
+                    Vänta {cooldownSeconds} sekunder innan du begär en ny kod
+                  </p>
+                </div>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full h-11" 
+                disabled={loading || cooldownSeconds > 0}
+              >
                 {loading ? (
                   <>
                     <Clock className="w-4 h-4 mr-2 animate-spin" />
                     Skickar kod...
+                  </>
+                ) : cooldownSeconds > 0 ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2" />
+                    Vänta {cooldownSeconds}s
                   </>
                 ) : (
                   <>
