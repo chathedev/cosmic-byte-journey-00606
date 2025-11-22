@@ -36,6 +36,7 @@ interface AuthCheckResponse {
     passkey: boolean;
     totp: boolean;
   };
+  preferredMethod?: 'passkey' | 'totp';
 }
 
 // Email sanitization as per playbook
@@ -43,6 +44,51 @@ function sanitizeEmail(email: string | undefined): string | null {
   const trimmed = email?.trim().toLowerCase();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return trimmed && emailRegex.test(trimmed) ? trimmed : null;
+}
+
+// Base64URL to ArrayBuffer conversion (Playbook requirement)
+function base64UrlToArrayBuffer(input: string): ArrayBuffer {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+// Decode WebAuthn options from backend (Playbook requirement)
+function decodeWebAuthnOptions(options: any): any {
+  if (!options) return options;
+  
+  const decodeDescriptor = (descriptor: any) => ({
+    ...descriptor,
+    id: base64UrlToArrayBuffer(descriptor.id),
+  });
+  
+  const decoded: any = {
+    ...options,
+    challenge: base64UrlToArrayBuffer(options.challenge),
+  };
+  
+  // Decode user.id if present (for registration)
+  if (options.user?.id) {
+    decoded.user = {
+      ...options.user,
+      id: base64UrlToArrayBuffer(options.user.id),
+    };
+  }
+  
+  // Decode credential descriptors
+  if (Array.isArray(options.excludeCredentials)) {
+    decoded.excludeCredentials = options.excludeCredentials.map(decodeDescriptor);
+  }
+  if (Array.isArray(options.allowCredentials)) {
+    decoded.allowCredentials = options.allowCredentials.map(decodeDescriptor);
+  }
+  
+  return decoded;
 }
 
 // Check WebAuthn support
@@ -65,6 +111,7 @@ export default function Auth() {
   const [webauthnAvailable, setWebauthnAvailable] = useState(false);
   const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
+  const [preferredMethod, setPreferredMethod] = useState<'passkey' | 'totp'>('passkey');
 
   // Check WebAuthn support on mount
   useEffect(() => {
@@ -101,7 +148,12 @@ export default function Auth() {
 
       if (response.ok) {
         const data: AuthCheckResponse = await response.json();
-        const { authMethods } = data;
+        const { authMethods, preferredMethod: preferred } = data;
+
+        // Store preferred method for setup flow
+        if (preferred) {
+          setPreferredMethod(preferred);
+        }
 
         if (authMethods.passkey && webauthnAvailable) {
           setAuthMethod('passkey');
@@ -158,9 +210,10 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Start WebAuthn ceremony
+      // Decode WebAuthn options and start ceremony
+      const publicKey = decodeWebAuthnOptions(options);
       const credential = await navigator.credentials.get({
-        publicKey: options,
+        publicKey,
       });
 
       if (!credential) {
@@ -314,9 +367,10 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Start WebAuthn registration
+      // Decode WebAuthn options and start registration
+      const publicKey = decodeWebAuthnOptions(options);
       const credential = await navigator.credentials.create({
-        publicKey: options,
+        publicKey,
       });
 
       if (!credential) {
@@ -655,12 +709,13 @@ export default function Auth() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Ditt konto saknar autentiseringsmetod. Välj hur du vill logga in:
+                  Ditt konto saknar autentiseringsmetod för <strong>{email}</strong>
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-3">
-                {webauthnAvailable && (
+                {/* Show preferred method first */}
+                {webauthnAvailable && preferredMethod === 'passkey' && (
                   <button
                     onClick={handleStartPasskeySetup}
                     disabled={loading}
@@ -678,25 +733,71 @@ export default function Auth() {
                   </button>
                 )}
 
-                <button
-                  onClick={handleStartTotpSetup}
-                  disabled={loading}
-                  className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50 transition-all text-left group"
-                >
-                  <div className="flex items-start gap-3">
-                    <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                    <div className="flex-1 space-y-1">
-                      <p className="font-medium">Använd Autentiseringsapp</p>
-                      <p className="text-sm text-muted-foreground">
-                        Koppla Google Authenticator, Authy eller annan TOTP-app
-                      </p>
+                {preferredMethod === 'totp' && (
+                  <button
+                    onClick={handleStartTotpSetup}
+                    disabled={loading}
+                    className="w-full p-4 rounded-lg border-2 border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium">Anslut Autentiseringsapp (Rekommenderat)</p>
+                        <p className="text-sm text-muted-foreground">
+                          Koppla Google Authenticator, Authy eller annan TOTP-app
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                )}
+
+                {/* Show alternative method second */}
+                {webauthnAvailable && preferredMethod === 'totp' && (
+                  <button
+                    onClick={handleStartPasskeySetup}
+                    disabled={loading}
+                    className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50 transition-all text-left group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium">Skapa Passkey istället</p>
+                        <p className="text-sm text-muted-foreground">
+                          Använd Face ID, Touch ID eller Windows Hello
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {preferredMethod === 'passkey' && (
+                  <button
+                    onClick={handleStartTotpSetup}
+                    disabled={loading}
+                    className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50 transition-all text-left group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium">Använd Autentiseringsapp istället</p>
+                        <p className="text-sm text-muted-foreground">
+                          Koppla Google Authenticator, Authy eller annan TOTP-app
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
               </div>
 
-              <div className="text-xs text-muted-foreground text-center space-y-1">
-                <p>Konto: <strong>{email}</strong></p>
+              <div className="pt-2 text-center">
+                <a 
+                  href="https://docs.tivly.se/support/authentication" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  Behöver du hjälp?
+                </a>
               </div>
 
               <Button
