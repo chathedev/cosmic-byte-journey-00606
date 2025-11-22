@@ -49,15 +49,21 @@ function sanitizeEmail(email: string | undefined): string | null {
 }
 
 // Base64URL to ArrayBuffer conversion (Playbook requirement)
-function base64UrlToArrayBuffer(input: string): ArrayBuffer {
-  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
+function base64UrlToArrayBuffer(input: string | null | undefined): ArrayBuffer | null {
+  if (!input) return null;
+  try {
+    const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (error) {
+    console.error('❌ Failed to decode base64url:', error);
+    return null;
   }
-  return bytes.buffer;
 }
 
 // Buffer JSON to ArrayBuffer (for legacy format)
@@ -72,14 +78,25 @@ function bufferJSONToArrayBuffer(bufferJson: any): ArrayBuffer | null {
 function decodeEncodedWebAuthnOptions(options: any): any {
   if (!options) return null;
   
-  const decodeDescriptor = (descriptor: any) => ({
-    ...descriptor,
-    id: base64UrlToArrayBuffer(descriptor.id),
-  });
+  const decodeDescriptor = (descriptor: any) => {
+    if (!descriptor) return null;
+    const decodedId = base64UrlToArrayBuffer(descriptor.id);
+    if (!decodedId) return null;
+    return {
+      ...descriptor,
+      id: decodedId,
+    };
+  };
+  
+  const challengeBuffer = base64UrlToArrayBuffer(options.challenge);
+  if (!challengeBuffer) {
+    console.error('❌ Invalid challenge in WebAuthn options');
+    return null;
+  }
   
   const decoded: any = {
     ...options,
-    challenge: base64UrlToArrayBuffer(options.challenge),
+    challenge: challengeBuffer,
     user: options.user
       ? {
           ...options.user,
@@ -89,10 +106,14 @@ function decodeEncodedWebAuthnOptions(options: any): any {
   };
   
   if (Array.isArray(options.excludeCredentials)) {
-    decoded.excludeCredentials = options.excludeCredentials.map(decodeDescriptor);
+    decoded.excludeCredentials = options.excludeCredentials
+      .map(decodeDescriptor)
+      .filter((d: any) => d !== null);
   }
   if (Array.isArray(options.allowCredentials)) {
-    decoded.allowCredentials = options.allowCredentials.map(decodeDescriptor);
+    decoded.allowCredentials = options.allowCredentials
+      .map(decodeDescriptor)
+      .filter((d: any) => d !== null);
   }
   
   return decoded;
@@ -102,14 +123,25 @@ function decodeEncodedWebAuthnOptions(options: any): any {
 function decodeLegacyWebAuthnOptions(options: any): any {
   if (!options) return null;
   
-  const decodeDescriptor = (descriptor: any) => ({
-    ...descriptor,
-    id: bufferJSONToArrayBuffer(descriptor.id),
-  });
+  const decodeDescriptor = (descriptor: any) => {
+    if (!descriptor) return null;
+    const decodedId = bufferJSONToArrayBuffer(descriptor.id);
+    if (!decodedId) return null;
+    return {
+      ...descriptor,
+      id: decodedId,
+    };
+  };
+  
+  const challengeBuffer = bufferJSONToArrayBuffer(options.challenge);
+  if (!challengeBuffer) {
+    console.error('❌ Invalid challenge in legacy WebAuthn options');
+    return null;
+  }
   
   const decoded: any = {
     ...options,
-    challenge: bufferJSONToArrayBuffer(options.challenge),
+    challenge: challengeBuffer,
     user: options.user
       ? {
           ...options.user,
@@ -119,10 +151,14 @@ function decodeLegacyWebAuthnOptions(options: any): any {
   };
   
   if (Array.isArray(options.excludeCredentials)) {
-    decoded.excludeCredentials = options.excludeCredentials.map(decodeDescriptor);
+    decoded.excludeCredentials = options.excludeCredentials
+      .map(decodeDescriptor)
+      .filter((d: any) => d !== null);
   }
   if (Array.isArray(options.allowCredentials)) {
-    decoded.allowCredentials = options.allowCredentials.map(decodeDescriptor);
+    decoded.allowCredentials = options.allowCredentials
+      .map(decodeDescriptor)
+      .filter((d: any) => d !== null);
   }
   
   return decoded;
