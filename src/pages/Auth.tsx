@@ -29,7 +29,7 @@ declare global {
 }
 
 type AuthMethod = 'passkey' | 'totp' | null;
-type ViewMode = 'welcome' | 'email' | 'totp' | 'new-user' | 'setup-required';
+type ViewMode = 'welcome' | 'email' | 'totp' | 'new-user' | 'setup-required' | 'setup-totp' | 'passkey-setup';
 
 interface AuthCheckResponse {
   authMethods: {
@@ -63,6 +63,8 @@ export default function Auth() {
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('welcome');
   const [webauthnAvailable, setWebauthnAvailable] = useState(false);
+  const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
+  const [totpSecret, setTotpSecret] = useState<string | null>(null);
 
   // Check WebAuthn support on mount
   useEffect(() => {
@@ -273,6 +275,171 @@ export default function Auth() {
     setViewMode('email');
   };
 
+  const handleStartPasskeySetup = async () => {
+    const sanitized = sanitizeEmail(email);
+    if (!sanitized) return;
+
+    setLoading(true);
+    setViewMode('passkey-setup');
+    
+    try {
+      // Start passkey registration
+      const startResponse = await fetch('https://api.tivly.se/auth/passkey/register/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: sanitized }),
+      });
+
+      if (!startResponse.ok) {
+        throw new Error('Failed to start passkey registration');
+      }
+
+      const { options, challengeKey } = await startResponse.json();
+
+      toast({
+        title: 'Skapa din passkey',
+        description: 'Följ anvisningarna på din enhet...',
+      });
+
+      // Start WebAuthn registration
+      const credential = await navigator.credentials.create({
+        publicKey: options,
+      });
+
+      if (!credential) {
+        throw new Error('No credential created');
+      }
+
+      // Finish registration
+      const finishResponse = await fetch('https://api.tivly.se/auth/passkey/register/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: sanitized,
+          credential,
+          challengeKey,
+        }),
+      });
+
+      if (finishResponse.ok) {
+        toast({
+          title: 'Passkey skapad!',
+          description: 'Loggar in...',
+        });
+        
+        // Auto-login after successful registration
+        await handlePasskeyLogin(sanitized);
+      } else {
+        throw new Error('Passkey registration failed');
+      }
+    } catch (error: any) {
+      console.error('❌ Passkey registration failed:', error);
+      
+      if (error.name === 'NotAllowedError') {
+        toast({
+          variant: 'destructive',
+          title: 'Registrering avbruten',
+          description: 'Passkey-skapandet avbröts.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Kunde inte skapa passkey',
+          description: 'Försök igen eller välj autentiseringsapp istället.',
+        });
+      }
+      setViewMode('setup-required');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartTotpSetup = async () => {
+    const sanitized = sanitizeEmail(email);
+    if (!sanitized) return;
+
+    setLoading(true);
+    try {
+      // Get TOTP setup QR code
+      const response = await fetch('https://api.tivly.se/auth/totp/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: sanitized }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to setup TOTP');
+      }
+
+      const { qrCode, manualEntryKey } = await response.json();
+      setTotpQrCode(qrCode);
+      setTotpSecret(manualEntryKey);
+      setViewMode('setup-totp');
+    } catch (error: any) {
+      console.error('❌ TOTP setup failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Kunde inte starta konfiguration',
+        description: 'Försök igen.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEnableTotp = async () => {
+    if (totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
+      toast({
+        variant: 'destructive',
+        title: 'Ogiltig kod',
+        description: 'Ange en giltig 6-siffrig kod.',
+      });
+      return;
+    }
+
+    const sanitized = sanitizeEmail(email);
+    if (!sanitized) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch('https://api.tivly.se/auth/totp/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: sanitized, token: totpCode }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Autentiseringsapp konfigurerad!',
+          description: 'Loggar in...',
+        });
+        
+        // Auto-login after successful TOTP setup
+        await handleVerifyTotp();
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Ogiltig verifieringskod',
+          description: 'Kontrollera koden och försök igen.',
+        });
+        setTotpCode('');
+      }
+    } catch (error: any) {
+      console.error('❌ TOTP enable failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Kunde inte aktivera TOTP',
+        description: 'Försök igen.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
@@ -352,18 +519,22 @@ export default function Auth() {
               </div>
               
               <div className="space-y-2">
-                <CardTitle className="text-3xl font-bold">
-                  {viewMode === 'totp' ? 'Ange verifieringskod' : 
+                 <CardTitle className="text-3xl font-bold">
+                   {viewMode === 'totp' ? 'Ange verifieringskod' : 
                    viewMode === 'new-user' ? 'Välkommen!' :
-                   viewMode === 'setup-required' ? 'Inställning krävs' :
+                   viewMode === 'setup-required' ? 'Välj autentiseringsmetod' :
+                   viewMode === 'setup-totp' ? 'Konfigurera autentiseringsapp' :
+                   viewMode === 'passkey-setup' ? 'Skapar passkey...' :
                    'Logga in'}
-                </CardTitle>
-                <CardDescription className="text-base">
-                  {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
+                 </CardTitle>
+                 <CardDescription className="text-base">
+                   {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
                    viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
-                   viewMode === 'setup-required' ? 'Ditt konto saknar autentiseringsmetod' :
+                   viewMode === 'setup-required' ? 'Välj hur du vill logga in' :
+                   viewMode === 'setup-totp' ? 'Skanna QR-koden med din autentiseringsapp' :
+                   viewMode === 'passkey-setup' ? 'Följ anvisningarna på din enhet' :
                    'Ange din e-post för att fortsätta'}
-                </CardDescription>
+                 </CardDescription>
               </div>
             </CardHeader>
 
@@ -467,28 +638,165 @@ export default function Auth() {
               </Button>
             </div>
           ) : viewMode === 'setup-required' ? (
-            // Setup required view
+            // Setup required view - Let user configure auth method
             <div className="space-y-6">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Ditt konto saknar konfigurerade autentiseringsmetoder.
+                  Ditt konto saknar autentiseringsmetod. Välj hur du vill logga in:
                 </AlertDescription>
               </Alert>
 
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground text-center">
-                  Kontakta support för att konfigurera passkey eller autentiseringsapp för: <strong>{email}</strong>
-                </p>
+              <div className="space-y-3">
+                {webauthnAvailable && (
+                  <button
+                    onClick={handleStartPasskeySetup}
+                    disabled={loading}
+                    className="w-full p-4 rounded-lg border-2 border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium">Skapa Passkey (Rekommenderat)</p>
+                        <p className="text-sm text-muted-foreground">
+                          Använd Face ID, Touch ID eller Windows Hello för snabb och säker inloggning
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleStartTotpSetup}
+                  disabled={loading}
+                  className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50 transition-all text-left group"
+                >
+                  <div className="flex items-start gap-3">
+                    <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                    <div className="flex-1 space-y-1">
+                      <p className="font-medium">Använd Autentiseringsapp</p>
+                      <p className="text-sm text-muted-foreground">
+                        Koppla Google Authenticator, Authy eller annan TOTP-app
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="text-xs text-muted-foreground text-center space-y-1">
+                <p>Konto: <strong>{email}</strong></p>
               </div>
 
               <Button
                 variant="outline"
                 onClick={handleStartOver}
+                disabled={loading}
                 className="w-full"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Tillbaka
+              </Button>
+            </div>
+          ) : viewMode === 'setup-totp' ? (
+            // TOTP Setup view
+            <div className="space-y-6">
+              <div className="space-y-4">
+                {totpQrCode && (
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="bg-white p-4 rounded-lg">
+                      <img src={totpQrCode} alt="TOTP QR Code" className="w-48 h-48" />
+                    </div>
+                    
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-medium">Eller ange koden manuellt:</p>
+                      <code className="text-xs bg-muted px-3 py-2 rounded block break-all">
+                        {totpSecret}
+                      </code>
+                    </div>
+                  </div>
+                )}
+
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs space-y-1">
+                    <p>1. Öppna Google Authenticator, Authy eller liknande app</p>
+                    <p>2. Skanna QR-koden ovan</p>
+                    <p>3. Ange den 6-siffriga koden nedan för att verifiera</p>
+                  </AlertDescription>
+                </Alert>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="totp-verify" className="text-center block">
+                  Ange verifieringskod
+                </Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={(value) => {
+                      setTotpCode(value);
+                      // Auto-submit when 6 digits entered
+                      if (value.length === 6 && /^\d{6}$/.test(value)) {
+                        handleEnableTotp();
+                      }
+                    }}
+                    disabled={loading}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewMode('setup-required');
+                    setTotpCode('');
+                    setTotpQrCode(null);
+                    setTotpSecret(null);
+                  }}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Tillbaka
+                </Button>
+                <Button
+                  onClick={handleEnableTotp}
+                  disabled={loading || totpCode.length !== 6}
+                  className="flex-1"
+                >
+                  {loading ? 'Verifierar...' : 'Aktivera'}
+                </Button>
+              </div>
+            </div>
+          ) : viewMode === 'passkey-setup' ? (
+            // Passkey setup in progress view
+            <div className="space-y-6">
+              <div className="flex flex-col items-center space-y-4 py-8">
+                <Fingerprint className="h-16 w-16 text-primary animate-pulse" />
+                <p className="text-center text-muted-foreground">
+                  Följ anvisningarna på din enhet för att skapa din passkey...
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={() => setViewMode('setup-required')}
+                disabled={loading}
+                className="w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Avbryt
               </Button>
             </div>
           ) : (
