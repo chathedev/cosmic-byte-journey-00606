@@ -220,6 +220,16 @@ export default function Auth() {
 
       const data = await startResponse.json();
 
+      console.log('🔍 RAW LOGIN DATA:', {
+        hasOptions: !!data.options,
+        hasOptionsEncoded: !!data.optionsEncoded,
+        hasOptionsLegacy: !!data.optionsLegacy,
+        hasPublicKey: !!data.publicKey,
+        hasPublicKeyLegacy: !!data.publicKeyLegacy,
+        optionsChallengeType: data.options?.challenge ? typeof data.options.challenge : 'none',
+        publicKeyChallengeType: data.publicKey?.challenge ? typeof data.publicKey.challenge : 'none',
+      });
+
       if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy) {
         throw new Error(data.error || 'Kunde inte starta passkey-autentisering');
       }
@@ -231,7 +241,14 @@ export default function Auth() {
 
       const publicKeyOptions = decodeWebAuthnOptions(data);
 
+      console.log('🔍 LOGIN DECODED OPTIONS:', {
+        hasOptions: !!publicKeyOptions,
+        hasChallenge: !!publicKeyOptions?.challenge,
+        challengeIsArrayBuffer: publicKeyOptions?.challenge instanceof ArrayBuffer,
+      });
+
       if (!publicKeyOptions || !publicKeyOptions.challenge) {
+        console.error('❌ LOGIN DECODE FAILED - publicKeyOptions:', publicKeyOptions);
         throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
       }
 
@@ -385,6 +402,19 @@ export default function Auth() {
 
       const data = await startResponse.json();
 
+      console.log('🔍 RAW SERVER DATA:', {
+        hasOptions: !!data.options,
+        hasOptionsEncoded: !!data.optionsEncoded,
+        hasOptionsLegacy: !!data.optionsLegacy,
+        hasPublicKey: !!data.publicKey,
+        hasPublicKeyLegacy: !!data.publicKeyLegacy,
+        optionsType: data.options ? typeof data.options : 'none',
+        publicKeyType: data.publicKey ? typeof data.publicKey : 'none',
+        optionsChallengeType: data.options?.challenge ? typeof data.options.challenge : 'none',
+        publicKeyChallengeType: data.publicKey?.challenge ? typeof data.publicKey.challenge : 'none',
+        optionsEncodedChallengeType: data.optionsEncoded?.challenge ? typeof data.optionsEncoded.challenge : 'none',
+      });
+
       if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy) {
         throw new Error(data.error || 'Servern kunde inte skapa passkey-inställningar');
       }
@@ -396,7 +426,16 @@ export default function Auth() {
 
       const publicKeyOptions = decodeWebAuthnOptions(data);
 
+      console.log('🔍 DECODED OPTIONS:', {
+        hasOptions: !!publicKeyOptions,
+        hasChallenge: !!publicKeyOptions?.challenge,
+        challengeType: publicKeyOptions?.challenge ? typeof publicKeyOptions.challenge : 'none',
+        challengeIsArrayBuffer: publicKeyOptions?.challenge instanceof ArrayBuffer,
+        challengeByteLength: publicKeyOptions?.challenge instanceof ArrayBuffer ? publicKeyOptions.challenge.byteLength : 0,
+      });
+
       if (!publicKeyOptions || !publicKeyOptions.challenge) {
+        console.error('❌ DECODE FAILED - publicKeyOptions:', publicKeyOptions);
         throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
       }
 
