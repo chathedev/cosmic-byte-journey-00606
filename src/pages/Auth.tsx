@@ -178,30 +178,30 @@ function resolvePublicKeyOptions({
   optionsLegacy?: any;
   optionsEncoded?: any;
 }): any {
-  // 1. Prefer explicitly encoded options from backend
-  if (optionsEncoded) {
+  // 1. If backend already gives a browser-ready publicKey, use it as-is
+  if (publicKey && publicKey.challenge) {
+    return publicKey;
+  }
+
+  // 2. Prefer encoded options when provided and with a non-null challenge
+  if (optionsEncoded && optionsEncoded.challenge) {
     const decoded = decodeEncodedWebAuthnOptions(optionsEncoded);
     if (decoded) return decoded;
   }
 
-  // 2. Then try encoded-style "options" field
-  if (options) {
+  // 3. Then try encoded-style "options" field
+  if (options && options.challenge) {
     const decoded = decodeEncodedWebAuthnOptions(options);
     if (decoded) return decoded;
   }
 
-  // 3. If publicKey is provided and already has a binary challenge, assume it's ready
-  if (publicKey && publicKey.challenge && typeof publicKey.challenge !== 'string') {
-    return publicKey;
-  }
-
-  // 4. Fallback to legacy formats
-  if (publicKeyLegacy) {
+  // 4. Fallback to legacy formats (buffer-json style)
+  if (publicKeyLegacy && publicKeyLegacy.challenge) {
     const decodedLegacy = decodeLegacyWebAuthnOptions(publicKeyLegacy);
     if (decodedLegacy) return decodedLegacy;
   }
 
-  if (optionsLegacy) {
+  if (optionsLegacy && optionsLegacy.challenge) {
     const decodedLegacy = decodeLegacyWebAuthnOptions(optionsLegacy);
     if (decodedLegacy) return decodedLegacy;
   }
@@ -212,6 +212,11 @@ function resolvePublicKeyOptions({
     hasOptions: !!options,
     hasOptionsLegacy: !!optionsLegacy,
     hasOptionsEncoded: !!optionsEncoded,
+    publicKeyChallenge: publicKey?.challenge,
+    optionsEncodedChallenge: optionsEncoded?.challenge,
+    optionsChallenge: options?.challenge,
+    publicKeyLegacyChallenge: publicKeyLegacy?.challenge,
+    optionsLegacyChallenge: optionsLegacy?.challenge,
   });
   return null;
 }
