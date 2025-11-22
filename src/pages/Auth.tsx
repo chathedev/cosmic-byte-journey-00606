@@ -145,7 +145,13 @@ export default function Auth() {
         throw new Error('Failed to start passkey authentication');
       }
 
-      const { options, challengeKey } = await startResponse.json();
+      const data = await startResponse.json();
+      const { options, challengeKey, error } = data;
+
+      if (!options || !options.challenge) {
+        console.error('❌ Ogiltiga WebAuthn-inloggningsdata från servern:', data);
+        throw new Error(error || 'Kunde inte starta passkey-autentisering. Försök igen senare.');
+      }
 
       toast({
         title: 'Använd din passkey',
@@ -295,7 +301,13 @@ export default function Auth() {
         throw new Error('Failed to start passkey registration');
       }
 
-      const { options, challengeKey } = await startResponse.json();
+      const data = await startResponse.json();
+      const { options, challengeKey, error } = data;
+
+      if (!options || !options.challenge) {
+        console.error('❌ Ogiltiga WebAuthn-registreringsdata från servern:', data);
+        throw new Error(error || 'Servern kunde inte skapa passkey-inställningar. Försök igen senare.');
+      }
 
       toast({
         title: 'Skapa din passkey',
