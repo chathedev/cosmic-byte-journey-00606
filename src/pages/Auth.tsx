@@ -642,6 +642,12 @@ export default function Auth() {
                         handleVerifyTotp();
                       }
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && totpCode.length === 6) {
+                        e.preventDefault();
+                        handleVerifyTotp();
+                      }
+                    }}
                     disabled={loading}
                   >
                     <InputOTPGroup>
@@ -844,6 +850,12 @@ export default function Auth() {
                       setTotpCode(value);
                       // Auto-submit when 6 digits entered
                       if (value.length === 6 && /^\d{6}$/.test(value)) {
+                        handleEnableTotp();
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && totpCode.length === 6) {
+                        e.preventDefault();
                         handleEnableTotp();
                       }
                     }}
