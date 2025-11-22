@@ -15,15 +15,9 @@ import { apiClient } from '@/lib/api';
 
 /**
  * Auth - WebAuthn (Passkey) + TOTP login page
- * 
- * Implements the Tivly WebAuthn + TOTP authentication playbook:
- * - Collects email and checks available auth methods
- * - Primary: WebAuthn (Passkeys) for passwordless auth
- * - Fallback: TOTP (Authenticator apps) with 6-digit codes
- * - No passwords, SMS, or magic links
+ * Implements the Tivly authentication playbook
  */
 
-// Extend Window interface for auth token
 declare global {
   interface Window {
     authToken?: string;
@@ -41,190 +35,79 @@ interface AuthCheckResponse {
   preferredMethod?: 'passkey' | 'totp';
 }
 
-// Email sanitization as per playbook
+// Email sanitization
 function sanitizeEmail(email: string | undefined): string | null {
   const trimmed = email?.trim().toLowerCase();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return trimmed && emailRegex.test(trimmed) ? trimmed : null;
 }
 
-// Base64URL to ArrayBuffer conversion (Playbook requirement)
-function base64UrlToArrayBuffer(input: string | null | undefined): ArrayBuffer | null {
-  if (!input) return null;
+// Base64URL to ArrayBuffer (Playbook spec)
+function base64ToArrayBuffer(value: string | null | undefined): ArrayBuffer | null {
+  if (!value) return null;
   try {
-    const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+    const bytes = Uint8Array.from(atob(normalized), (c) => c.charCodeAt(0));
     return bytes.buffer;
   } catch (error) {
-    console.error('❌ Failed to decode base64url:', error);
+    console.error('Failed to decode base64url:', error);
     return null;
   }
 }
 
-// Buffer JSON to ArrayBuffer (for legacy format)
-function bufferJSONToArrayBuffer(bufferJson: any): ArrayBuffer | null {
-  if (!bufferJson) return null;
-  const { data } = bufferJson;
-  if (!Array.isArray(data)) return null;
-  return new Uint8Array(data).buffer;
+// Buffer JSON to ArrayBuffer (Playbook spec)
+function bufferJsonToArrayBuffer(bufferJson: any): ArrayBuffer | null {
+  if (!bufferJson?.data) return null;
+  if (!Array.isArray(bufferJson.data)) return null;
+  return new Uint8Array(bufferJson.data).buffer;
 }
 
-// Decode encoded WebAuthn options (base64url format)
-function decodeEncodedWebAuthnOptions(options: any): any {
-  if (!options) return null;
-
-  const decodeDescriptor = (descriptor: any) => {
-    if (!descriptor) return null;
-    const decodedId = base64UrlToArrayBuffer(descriptor.id);
-    if (!decodedId) return null;
-    return {
-      ...descriptor,
-      id: decodedId,
-    };
-  };
-  
-  const challengeBuffer = base64UrlToArrayBuffer(options.challenge);
-  if (!challengeBuffer) {
-    console.error('❌ Invalid challenge in WebAuthn options', options.challenge);
-    return null;
-  }
-  
-  const decoded: any = {
-    ...options,
-    challenge: challengeBuffer,
-    user: options.user
-      ? {
-          ...options.user,
-          id: base64UrlToArrayBuffer(options.user.id),
-        }
-      : undefined,
-  };
-  
-  if (Array.isArray(options.excludeCredentials)) {
-    decoded.excludeCredentials = options.excludeCredentials
-      .map(decodeDescriptor)
-      .filter((d: any) => d !== null);
-  }
-  if (Array.isArray(options.allowCredentials)) {
-    decoded.allowCredentials = options.allowCredentials
-      .map(decodeDescriptor)
-      .filter((d: any) => d !== null);
-  }
-  
-  return decoded;
-}
-
-// Decode legacy WebAuthn options (buffer JSON format)
-function decodeLegacyWebAuthnOptions(options: any): any {
-  if (!options) return null;
-  
-  const decodeDescriptor = (descriptor: any) => {
-    if (!descriptor) return null;
-    const decodedId = bufferJSONToArrayBuffer(descriptor.id);
-    if (!decodedId) return null;
-    return {
-      ...descriptor,
-      id: decodedId,
-    };
-  };
-  
-  const challengeBuffer = bufferJSONToArrayBuffer(options.challenge);
-  if (!challengeBuffer) {
-    console.error('❌ Invalid challenge in legacy WebAuthn options');
-    return null;
-  }
-  
-  const decoded: any = {
-    ...options,
-    challenge: challengeBuffer,
-    user: options.user
-      ? {
-          ...options.user,
-          id: bufferJSONToArrayBuffer(options.user.id),
-        }
-      : undefined,
-  };
-  
-  if (Array.isArray(options.excludeCredentials)) {
-    decoded.excludeCredentials = options.excludeCredentials
-      .map(decodeDescriptor)
-      .filter((d: any) => d !== null);
-  }
-  if (Array.isArray(options.allowCredentials)) {
-    decoded.allowCredentials = options.allowCredentials
-      .map(decodeDescriptor)
-      .filter((d: any) => d !== null);
-  }
-  
-  return decoded;
-}
-
-// Resolve public key options - handles all possible formats (Playbook)
-function resolvePublicKeyOptions({
-  publicKey,
-  publicKeyLegacy,
-  options,
-  optionsLegacy,
-  optionsEncoded,
-}: {
+// Decode WebAuthn options - handles all formats (Playbook spec)
+function decodeWebAuthnOptions({ publicKey, publicKeyLegacy, options, optionsEncoded }: {
   publicKey?: any;
   publicKeyLegacy?: any;
   options?: any;
-  optionsLegacy?: any;
   optionsEncoded?: any;
 }): any {
-  // 1. If backend already gives a browser-ready publicKey, use it as-is
-  if (publicKey && publicKey.challenge) {
-    return publicKey;
+  const source = optionsEncoded || publicKey || options;
+  
+  if (source) {
+    // Base64-encoded format
+    const decodeDescriptor = (descriptor: any) => ({
+      ...descriptor,
+      id: base64ToArrayBuffer(descriptor.id),
+    });
+    
+    return {
+      ...source,
+      challenge: base64ToArrayBuffer(source.challenge),
+      user: source.user ? { ...source.user, id: base64ToArrayBuffer(source.user.id) } : undefined,
+      excludeCredentials: (source.excludeCredentials || []).map(decodeDescriptor).filter((d: any) => d.id),
+      allowCredentials: (source.allowCredentials || []).map(decodeDescriptor).filter((d: any) => d.id),
+    };
   }
-
-  // 2. Prefer encoded options when provided and with a non-null challenge
-  if (optionsEncoded && optionsEncoded.challenge) {
-    const decoded = decodeEncodedWebAuthnOptions(optionsEncoded);
-    if (decoded) return decoded;
-  }
-
-  // 3. Then try encoded-style "options" field
-  if (options && options.challenge) {
-    const decoded = decodeEncodedWebAuthnOptions(options);
-    if (decoded) return decoded;
-  }
-
-  // 4. Fallback to legacy formats (buffer-json style)
-  if (publicKeyLegacy && publicKeyLegacy.challenge) {
-    const decodedLegacy = decodeLegacyWebAuthnOptions(publicKeyLegacy);
-    if (decodedLegacy) return decodedLegacy;
-  }
-
-  if (optionsLegacy && optionsLegacy.challenge) {
-    const decodedLegacy = decodeLegacyWebAuthnOptions(optionsLegacy);
-    if (decodedLegacy) return decodedLegacy;
-  }
-
-  console.error('❌ Could not resolve valid WebAuthn publicKey options', {
-    hasPublicKey: !!publicKey,
-    hasPublicKeyLegacy: !!publicKeyLegacy,
-    hasOptions: !!options,
-    hasOptionsLegacy: !!optionsLegacy,
-    hasOptionsEncoded: !!optionsEncoded,
-    publicKeyChallenge: publicKey?.challenge,
-    optionsEncodedChallenge: optionsEncoded?.challenge,
-    optionsChallenge: options?.challenge,
-    publicKeyLegacyChallenge: publicKeyLegacy?.challenge,
-    optionsLegacyChallenge: optionsLegacy?.challenge,
+  
+  // Legacy buffer-json format
+  const legacy = publicKeyLegacy || options;
+  if (!legacy) return null;
+  
+  const decodeLegacy = (descriptor: any) => ({
+    ...descriptor,
+    id: bufferJsonToArrayBuffer(descriptor.id),
   });
-  return null;
+  
+  return {
+    ...legacy,
+    challenge: bufferJsonToArrayBuffer(legacy.challenge),
+    user: legacy.user ? { ...legacy.user, id: bufferJsonToArrayBuffer(legacy.user.id) } : undefined,
+    excludeCredentials: (legacy.excludeCredentials || []).map(decodeLegacy).filter((d: any) => d.id),
+    allowCredentials: (legacy.allowCredentials || []).map(decodeLegacy).filter((d: any) => d.id),
+  };
 }
 
 // Check WebAuthn support
 function isWebAuthnSupported(): boolean {
-  return typeof window !== 'undefined' && 
-         typeof window.PublicKeyCredential !== 'undefined';
+  return typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
 }
 
 // Generate QR code from otpauth:// URL
@@ -233,10 +116,7 @@ async function generateQRCodeFromUrl(otpauthUrl: string): Promise<string> {
     const dataUrl = await QRCode.toDataURL(otpauthUrl, {
       width: 256,
       margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF'
-      }
+      color: { dark: '#000000', light: '#FFFFFF' }
     });
     return dataUrl;
   } catch (error) {
@@ -250,7 +130,6 @@ export default function Auth() {
   const { toast } = useToast();
   const { user, isLoading, refreshUser } = useAuth();
 
-  // State management
   const [email, setEmail] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -261,12 +140,10 @@ export default function Auth() {
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [preferredMethod, setPreferredMethod] = useState<'passkey' | 'totp'>('passkey');
 
-  // Check WebAuthn support on mount
   useEffect(() => {
     setWebauthnAvailable(isWebAuthnSupported());
   }, []);
 
-  // Redirect if logged in
   useEffect(() => {
     if (!isLoading && user) {
       navigate('/');
@@ -298,7 +175,6 @@ export default function Auth() {
         const data: AuthCheckResponse = await response.json();
         const { authMethods, preferredMethod: preferred } = data;
 
-        // Store preferred method for setup flow
         if (preferred) {
           setPreferredMethod(preferred);
         }
@@ -310,17 +186,15 @@ export default function Auth() {
           setAuthMethod('totp');
           setViewMode('totp');
         } else {
-          // User exists but no auth methods configured
           setViewMode('setup-required');
         }
       } else if (response.status === 404) {
-        // New user
         setViewMode('new-user');
       } else {
         throw new Error('Failed to check authentication methods');
       }
     } catch (error: any) {
-      console.error('❌ Failed to check auth methods:', error);
+      console.error('Failed to check auth methods:', error);
       toast({
         variant: 'destructive',
         title: 'Något gick fel',
@@ -333,7 +207,6 @@ export default function Auth() {
 
   const handlePasskeyLogin = async (emailAddress: string) => {
     try {
-      // Start WebAuthn authentication
       const startResponse = await fetch('https://api.tivly.se/auth/passkey/login/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -346,28 +219,9 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const {
-        options,
-        optionsLegacy,
-        optionsEncoded,
-        publicKey,
-        publicKeyLegacy,
-        challengeKey,
-        error
-      } = data;
 
-      console.log('🔐 WebAuthn login options received:', { 
-        hasOptions: !!options,
-        hasLegacy: !!optionsLegacy,
-        hasEncoded: !!optionsEncoded,
-        hasPublicKey: !!publicKey,
-        hasPublicKeyLegacy: !!publicKeyLegacy,
-        challengeKey 
-      });
-
-      if (!options && !optionsEncoded && !optionsLegacy && !publicKey && !publicKeyLegacy) {
-        console.error('❌ Ogiltiga WebAuthn-inloggningsdata från servern:', data);
-        throw new Error(error || 'Kunde inte starta passkey-autentisering. Försök igen senare.');
+      if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy) {
+        throw new Error(data.error || 'Kunde inte starta passkey-autentisering');
       }
 
       toast({
@@ -375,16 +229,9 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Decode WebAuthn options and start ceremony (supports all formats)
-      const publicKeyOptions = resolvePublicKeyOptions({
-        options,
-        optionsLegacy,
-        optionsEncoded,
-        publicKey,
-        publicKeyLegacy,
-      });
+      const publicKeyOptions = decodeWebAuthnOptions(data);
 
-      if (!publicKeyOptions) {
+      if (!publicKeyOptions || !publicKeyOptions.challenge) {
         throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
       }
 
@@ -396,7 +243,6 @@ export default function Auth() {
         throw new Error('No credential received');
       }
 
-      // Finish authentication
       const finishResponse = await fetch('https://api.tivly.se/auth/passkey/login/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -404,38 +250,26 @@ export default function Auth() {
         body: JSON.stringify({
           email: emailAddress,
           credential,
-          challengeKey,
+          challengeKey: data.challengeKey,
         }),
       });
 
       if (finishResponse.ok) {
-        const { token, user: userData } = await finishResponse.json();
-        
-        console.log('✅ Passkey auth successful:', { hasToken: !!token, userEmail: userData?.email });
-        
-        // Use apiClient to store token properly
+        const { token } = await finishResponse.json();
         apiClient.applyAuthToken(token);
-        
-        console.log('✅ Token stored via apiClient');
 
         toast({
           title: '✓ Passkey verifierad!',
           description: 'Loggar in...',
         });
 
-        console.log('🔄 Refreshing user context...');
         await refreshUser();
-        console.log('✅ User context refreshed');
-        
-        setTimeout(() => {
-          console.log('🏠 Navigating to home...');
-          navigate('/', { replace: true });
-        }, 300);
+        setTimeout(() => navigate('/', { replace: true }), 300);
       } else {
         throw new Error('Passkey verification failed');
       }
     } catch (error: any) {
-      console.error('❌ Passkey authentication failed:', error);
+      console.error('Passkey authentication failed:', error);
 
       if (error.name === 'NotAllowedError') {
         toast({
@@ -451,7 +285,6 @@ export default function Auth() {
         });
       }
 
-      // Show TOTP fallback if available
       if (authMethod === 'passkey') {
         setAuthMethod('totp');
         setViewMode('totp');
@@ -474,7 +307,6 @@ export default function Auth() {
 
     setLoading(true);
     
-    // Show verifying feedback
     toast({
       title: 'Verifierar kod...',
       description: 'Ett ögonblick...',
@@ -489,31 +321,16 @@ export default function Auth() {
       });
 
       if (response.ok) {
-        const { token, user: userData } = await response.json();
-        
-        console.log('✅ TOTP login successful:', { hasToken: !!token, userEmail: userData?.email });
-        
-        // Use apiClient to store token properly
+        const { token } = await response.json();
         apiClient.applyAuthToken(token);
-        
-        console.log('✅ Token stored via apiClient');
 
-        // Success feedback
         toast({
           title: '✓ Inloggad!',
           description: 'Omdirigerar...',
         });
 
-        // Refresh user context
-        console.log('🔄 Refreshing user context...');
         await refreshUser();
-        console.log('✅ User context refreshed');
-        
-        // Navigate to home with a small delay for smooth transition
-        setTimeout(() => {
-          console.log('🏠 Navigating to home...');
-          navigate('/', { replace: true });
-        }, 300);
+        setTimeout(() => navigate('/', { replace: true }), 300);
       } else {
         const error = await response.json();
         toast({
@@ -524,7 +341,7 @@ export default function Auth() {
         setTotpCode('');
       }
     } catch (error: any) {
-      console.error('❌ TOTP verification failed:', error);
+      console.error('TOTP verification failed:', error);
       toast({
         variant: 'destructive',
         title: 'Autentisering misslyckades',
@@ -555,7 +372,6 @@ export default function Auth() {
     setViewMode('passkey-setup');
     
     try {
-      // Start passkey registration
       const startResponse = await fetch('https://api.tivly.se/auth/passkey/register/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -568,28 +384,9 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const {
-        options,
-        optionsLegacy,
-        optionsEncoded,
-        publicKey,
-        publicKeyLegacy,
-        challengeKey,
-        error
-      } = data;
 
-      console.log('🔐 WebAuthn registration options received:', { 
-        hasOptions: !!options,
-        hasLegacy: !!optionsLegacy,
-        hasEncoded: !!optionsEncoded,
-        hasPublicKey: !!publicKey,
-        hasPublicKeyLegacy: !!publicKeyLegacy,
-        challengeKey 
-      });
-
-      if (!options && !optionsEncoded && !optionsLegacy && !publicKey && !publicKeyLegacy) {
-        console.error('❌ Ogiltiga WebAuthn-registreringsdata från servern:', data);
-        throw new Error(error || 'Servern kunde inte skapa passkey-inställningar. Försök igen senare.');
+      if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy) {
+        throw new Error(data.error || 'Servern kunde inte skapa passkey-inställningar');
       }
 
       toast({
@@ -597,16 +394,9 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Decode WebAuthn options and start registration (supports all formats)
-      const publicKeyOptions = resolvePublicKeyOptions({
-        options,
-        optionsLegacy,
-        optionsEncoded,
-        publicKey,
-        publicKeyLegacy,
-      });
+      const publicKeyOptions = decodeWebAuthnOptions(data);
 
-      if (!publicKeyOptions) {
+      if (!publicKeyOptions || !publicKeyOptions.challenge) {
         throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
       }
 
@@ -618,7 +408,6 @@ export default function Auth() {
         throw new Error('No credential created');
       }
 
-      // Finish registration
       const finishResponse = await fetch('https://api.tivly.se/auth/passkey/register/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -626,7 +415,7 @@ export default function Auth() {
         body: JSON.stringify({
           email: sanitized,
           credential,
-          challengeKey,
+          challengeKey: data.challengeKey,
         }),
       });
 
@@ -636,13 +425,12 @@ export default function Auth() {
           description: 'Loggar in...',
         });
         
-        // Auto-login after successful registration
         await handlePasskeyLogin(sanitized);
       } else {
         throw new Error('Passkey registration failed');
       }
     } catch (error: any) {
-      console.error('❌ Passkey registration failed:', error);
+      console.error('Passkey registration failed:', error);
       
       if (error.name === 'NotAllowedError') {
         toast({
@@ -669,7 +457,6 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      // Get TOTP setup QR code
       const response = await fetch('https://api.tivly.se/auth/totp/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -683,13 +470,9 @@ export default function Auth() {
 
       const { qrCode, otpauthUrl, manualEntryKey } = await response.json();
       
-      // Handle both QR code formats: base64 image or otpauth:// URL
       if (qrCode) {
-        // If it's a data URL or direct base64, use as-is
         setTotpQrCode(qrCode);
       } else if (otpauthUrl) {
-        // Convert otpauth URL to QR code using a QR code generator
-        // For now, we'll generate a simple QR code data URL
         const qrCodeDataUrl = await generateQRCodeFromUrl(otpauthUrl);
         setTotpQrCode(qrCodeDataUrl);
       }
@@ -697,7 +480,7 @@ export default function Auth() {
       setTotpSecret(manualEntryKey);
       setViewMode('setup-totp');
     } catch (error: any) {
-      console.error('❌ TOTP setup failed:', error);
+      console.error('TOTP setup failed:', error);
       toast({
         variant: 'destructive',
         title: 'Kunde inte starta konfiguration',
@@ -723,7 +506,6 @@ export default function Auth() {
 
     setLoading(true);
     
-    // Show enabling feedback
     toast({
       title: 'Aktiverar autentiseringsapp...',
       description: 'Ett ögonblick...',
@@ -738,15 +520,12 @@ export default function Auth() {
       });
 
       if (response.ok) {
-        // Success feedback
         toast({
           title: '✓ Autentiseringsapp aktiverad!',
           description: 'Loggar in...',
         });
         
-        // Small delay before auto-login for better UX
         setTimeout(async () => {
-          // Re-check auth methods to confirm TOTP is now enabled
           const checkResponse = await fetch('https://api.tivly.se/auth/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -755,10 +534,8 @@ export default function Auth() {
           });
 
           if (checkResponse.ok) {
-            // Now perform TOTP login
             await handleVerifyTotp();
           } else {
-            // Fallback: switch to TOTP view for manual login
             setViewMode('totp');
             setTotpCode('');
           }
@@ -773,7 +550,7 @@ export default function Auth() {
         setTotpCode('');
       }
     } catch (error: any) {
-      console.error('❌ TOTP enable failed:', error);
+      console.error('TOTP enable failed:', error);
       toast({
         variant: 'destructive',
         title: 'Kunde inte aktivera TOTP',
@@ -791,7 +568,6 @@ export default function Auth() {
       
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-sm bg-card/95">
         {viewMode === 'welcome' ? (
-          // Welcome Screen
           <>
             <CardHeader className="space-y-6 text-center pb-8 pt-12">
               <div className="mx-auto w-32 h-32 animate-in fade-in zoom-in duration-500">
@@ -885,7 +661,6 @@ export default function Auth() {
 
             <CardContent className="pb-8">
               {viewMode === 'totp' ? (
-            // TOTP code entry view
             <div className="space-y-6">
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <div className="flex items-start gap-3">
@@ -916,7 +691,6 @@ export default function Auth() {
                     value={totpCode}
                     onChange={(value) => {
                       setTotpCode(value);
-                      // Auto-submit when 6 digits entered
                       if (value.length === 6 && /^\d{6}$/.test(value)) {
                         handleVerifyTotp();
                       }
@@ -972,7 +746,6 @@ export default function Auth() {
               </div>
             </div>
           ) : viewMode === 'new-user' ? (
-            // New user view
             <div className="space-y-6">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
@@ -983,7 +756,7 @@ export default function Auth() {
 
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground text-center">
-                  För att skapa ett konto, kontakta vår support eller be en administratör om en inbjudan.
+                  Kontakta administratören för att få tillgång till systemet.
                 </p>
               </div>
 
@@ -997,99 +770,47 @@ export default function Auth() {
               </Button>
             </div>
           ) : viewMode === 'setup-required' ? (
-            // Setup required view - Let user configure auth method
             <div className="space-y-6">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Ditt konto saknar autentiseringsmetod för <strong>{email}</strong>
+                  Du behöver välja en autentiseringsmetod för att fortsätta.
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-3">
-                {webauthnAvailable ? (
-                  <>
-                    {/* Show passkey as primary if preferred or available */}
-                    <button
-                      onClick={handleStartPasskeySetup}
-                      disabled={loading}
-                      className={`w-full p-4 rounded-lg border-2 transition-all text-left group ${
-                        preferredMethod === 'passkey' 
-                          ? 'border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10' 
-                          : 'border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                        <div className="flex-1 space-y-1">
-                          <p className="font-medium">
-                            Skapa Passkey {preferredMethod === 'passkey' && '(Rekommenderat)'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Använd Face ID, Touch ID eller Windows Hello för snabb och säker inloggning
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* TOTP option */}
-                    <button
-                      onClick={handleStartTotpSetup}
-                      disabled={loading}
-                      className={`w-full p-4 rounded-lg border-2 transition-all text-left group ${
-                        preferredMethod === 'totp' 
-                          ? 'border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10' 
-                          : 'border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                        <div className="flex-1 space-y-1">
-                          <p className="font-medium">
-                            Använd Autentiseringsapp {preferredMethod === 'totp' && '(Rekommenderat)'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Koppla Google Authenticator, Authy eller annan TOTP-app
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  </>
-                ) : (
-                  // Only TOTP available when WebAuthn not supported
-                  <button
-                    onClick={handleStartTotpSetup}
+                {webauthnAvailable && (
+                  <Button
+                    onClick={handleStartPasskeySetup}
                     disabled={loading}
-                    className="w-full p-4 rounded-lg border-2 border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left group"
+                    className="w-full h-14 flex items-center gap-3 justify-start px-6"
+                    variant={preferredMethod === 'passkey' ? 'default' : 'outline'}
                   >
-                    <div className="flex items-start gap-3">
-                      <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">Använd Autentiseringsapp</p>
-                        <p className="text-sm text-muted-foreground">
-                          Koppla Google Authenticator, Authy eller annan TOTP-app
-                        </p>
-                      </div>
+                    <Fingerprint className="h-6 w-6 flex-shrink-0" />
+                    <div className="flex-1 text-left">
+                      <div className="font-medium">Passkey</div>
+                      <div className="text-xs opacity-80">Face ID, Touch ID eller Windows Hello</div>
                     </div>
-                  </button>
+                  </Button>
                 )}
-              </div>
 
-              <div className="pt-2 text-center">
-                <a 
-                  href="https://docs.tivly.se/support/authentication" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline"
+                <Button
+                  onClick={handleStartTotpSetup}
+                  disabled={loading}
+                  className="w-full h-14 flex items-center gap-3 justify-start px-6"
+                  variant={preferredMethod === 'totp' ? 'default' : 'outline'}
                 >
-                  Behöver du hjälp?
-                </a>
+                  <KeyRound className="h-6 w-6 flex-shrink-0" />
+                  <div className="flex-1 text-left">
+                    <div className="font-medium">Autentiseringsapp</div>
+                    <div className="text-xs opacity-80">Google Authenticator, Authy eller liknande</div>
+                  </div>
+                </Button>
               </div>
 
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={handleStartOver}
-                disabled={loading}
                 className="w-full"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1097,69 +818,29 @@ export default function Auth() {
               </Button>
             </div>
           ) : viewMode === 'setup-totp' ? (
-            // TOTP Setup view
             <div className="space-y-6">
-              <div className="space-y-4">
-                {(totpQrCode || totpSecret) ? (
-                  <div className="flex flex-col items-center space-y-4">
-                    {totpQrCode && (
-                      <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-primary/10">
-                        <img 
-                          src={totpQrCode} 
-                          alt="TOTP QR Code" 
-                          className="w-56 h-56 rounded-lg"
-                          onError={(e) => {
-                            console.error('QR code failed to load');
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    
-                    {totpSecret && (
-                      <div className="w-full text-center space-y-2 bg-muted/50 p-4 rounded-lg border border-border">
-                        <p className="text-sm font-medium text-foreground">Eller ange koden manuellt:</p>
-                        <code className="text-xs bg-background px-4 py-2 rounded block font-mono break-all text-primary">
-                          {totpSecret}
-                        </code>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(totpSecret);
-                            toast({
-                              title: 'Kopierad!',
-                              description: 'Hemlig nyckel kopierad till urklipp',
-                            });
-                          }}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Kopiera nyckel
-                        </button>
-                      </div>
-                    )}
+              {totpQrCode && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                  <div className="flex justify-center">
+                    <img src={totpQrCode} alt="QR Code" className="w-48 h-48" />
                   </div>
-                ) : (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                  </div>
-                )}
-
-                <Alert className="bg-primary/5 border-primary/20">
-                  <AlertCircle className="h-4 w-4 text-primary" />
-                  <AlertDescription className="text-xs space-y-2">
-                    <div className="font-medium text-foreground">Så här gör du:</div>
-                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                      <li>Öppna Google Authenticator, Authy eller liknande app</li>
-                      <li>Skanna QR-koden ovan eller ange den manuella nyckeln</li>
-                      <li>Ange den 6-siffriga koden nedan för att verifiera</li>
-                    </ol>
-                  </AlertDescription>
-                </Alert>
-              </div>
+                  
+                  {totpSecret && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-center text-muted-foreground">
+                        Eller ange manuellt:
+                      </p>
+                      <div className="rounded bg-muted p-2 text-center">
+                        <code className="text-xs font-mono">{totpSecret}</code>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-3">
-                <Label htmlFor="totp-verify" className="text-center block font-medium">
-                  Ange verifieringskod från din app
+                <Label htmlFor="totp-setup" className="text-center block font-medium">
+                  Ange koden från din app för att verifiera
                 </Label>
                 <div className="flex justify-center">
                   <InputOTP
@@ -1167,7 +848,6 @@ export default function Auth() {
                     value={totpCode}
                     onChange={(value) => {
                       setTotpCode(value);
-                      // Auto-submit when 6 digits entered
                       if (value.length === 6 && /^\d{6}$/.test(value)) {
                         handleEnableTotp();
                       }
@@ -1191,26 +871,15 @@ export default function Auth() {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
-                <div className="text-center space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    Koden uppdateras var 30:e sekund
-                  </p>
-                  {loading && (
-                    <p className="text-xs text-primary font-medium animate-pulse">
-                      Aktiverar och loggar in...
-                    </p>
-                  )}
-                </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setViewMode('setup-required');
                     setTotpCode('');
                     setTotpQrCode(null);
-                    setTotpSecret(null);
                   }}
                   disabled={loading}
                   className="flex-1"
@@ -1223,104 +892,62 @@ export default function Auth() {
                   disabled={loading || totpCode.length !== 6}
                   className="flex-1"
                 >
-                  {loading ? 'Verifierar...' : 'Aktivera'}
+                  {loading ? 'Aktiverar...' : 'Aktivera'}
                 </Button>
               </div>
             </div>
           ) : viewMode === 'passkey-setup' ? (
-            // Passkey setup in progress view
-            <div className="space-y-6">
-              <div className="flex flex-col items-center space-y-4 py-8">
-                <Fingerprint className="h-16 w-16 text-primary animate-pulse" />
-                <p className="text-center text-muted-foreground">
-                  Följ anvisningarna på din enhet för att skapa din passkey...
-                </p>
+            <div className="space-y-6 text-center">
+              <div className="flex justify-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+                  <Fingerprint className="w-8 h-8 text-primary" />
+                </div>
               </div>
-
-              <Button
-                variant="outline"
-                onClick={() => setViewMode('setup-required')}
-                disabled={loading}
-                className="w-full"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Avbryt
-              </Button>
+              
+              <p className="text-sm text-muted-foreground">
+                Följ anvisningarna på din enhet för att skapa en passkey...
+              </p>
             </div>
           ) : (
-            // Email input view
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleCheckAuthMethods();
-              }}
-              className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500"
-            >
+            <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email">E-postadress</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="namn@exempel.se"
+                  placeholder="din@email.se"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCheckAuthMethods();
+                    }
+                  }}
                   disabled={loading}
-                  required
+                  autoComplete="email"
                   autoFocus
-                  className="h-11"
+                  className="h-12"
                 />
               </div>
 
-              {!webauthnAvailable && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Passkeys stöds inte i din webbläsare. TOTP kommer användas som autentiseringsmetod.
-                  </AlertDescription>
-                </Alert>
-              )}
+              <Button
+                onClick={handleCheckAuthMethods}
+                disabled={loading || !email.trim()}
+                className="w-full h-12"
+              >
+                {loading ? 'Kontrollerar...' : 'Fortsätt'}
+              </Button>
 
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Säker inloggning</p>
-                    <p className="text-xs text-muted-foreground">
-                      Vi använder passkeys eller autentiseringsappar för säker, lösenordsfri inloggning
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleStartOver}
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Tillbaka
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="flex-1 h-11" 
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Shield className="w-4 h-4 mr-2 animate-spin" />
-                      Kontrollerar...
-                    </>
-                  ) : (
-                    <>
-                      <Fingerprint className="w-4 h-4 mr-2" />
-                      Fortsätt
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
+              <Button
+                variant="ghost"
+                onClick={handleStartOver}
+                className="w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Tillbaka
+              </Button>
+            </div>
           )}
             </CardContent>
           </>
