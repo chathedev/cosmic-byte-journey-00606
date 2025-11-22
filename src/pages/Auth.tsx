@@ -129,9 +129,11 @@ function decodeLegacyWebAuthnOptions(options: any): any {
 }
 
 // Resolve public key options - handles both encoded and legacy formats (Playbook)
-function resolvePublicKeyOptions({ options, optionsEncoded }: { options?: any; optionsEncoded?: any }): any {
-  if (optionsEncoded) return decodeEncodedWebAuthnOptions(optionsEncoded);
-  return decodeLegacyWebAuthnOptions(options);
+function resolvePublicKeyOptions({ options, optionsEncoded, optionsLegacy }: { options?: any; optionsEncoded?: any; optionsLegacy?: any }): any {
+  if (optionsEncoded || options) {
+    return decodeEncodedWebAuthnOptions(optionsEncoded || options);
+  }
+  return decodeLegacyWebAuthnOptions(optionsLegacy);
 }
 
 // Check WebAuthn support
@@ -259,9 +261,16 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const { options, optionsEncoded, challengeKey, error } = data;
+      const { options, optionsEncoded, optionsLegacy, challengeKey, error } = data;
 
-      if ((!options && !optionsEncoded) || (!options?.challenge && !optionsEncoded?.challenge)) {
+      console.log('🔐 WebAuthn login options received:', { 
+        hasOptions: !!options, 
+        hasEncoded: !!optionsEncoded, 
+        hasLegacy: !!optionsLegacy,
+        challengeKey 
+      });
+
+      if (!options && !optionsEncoded && !optionsLegacy) {
         console.error('❌ Ogiltiga WebAuthn-inloggningsdata från servern:', data);
         throw new Error(error || 'Kunde inte starta passkey-autentisering. Försök igen senare.');
       }
@@ -271,8 +280,8 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Decode WebAuthn options and start ceremony (supports both formats)
-      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded });
+      // Decode WebAuthn options and start ceremony (supports all formats)
+      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded, optionsLegacy });
       const credential = await navigator.credentials.get({
         publicKey,
       });
@@ -453,9 +462,16 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const { options, optionsEncoded, challengeKey, error } = data;
+      const { options, optionsEncoded, optionsLegacy, challengeKey, error } = data;
 
-      if ((!options && !optionsEncoded) || (!options?.challenge && !optionsEncoded?.challenge)) {
+      console.log('🔐 WebAuthn registration options received:', { 
+        hasOptions: !!options, 
+        hasEncoded: !!optionsEncoded, 
+        hasLegacy: !!optionsLegacy,
+        challengeKey 
+      });
+
+      if (!options && !optionsEncoded && !optionsLegacy) {
         console.error('❌ Ogiltiga WebAuthn-registreringsdata från servern:', data);
         throw new Error(error || 'Servern kunde inte skapa passkey-inställningar. Försök igen senare.');
       }
@@ -465,8 +481,8 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Decode WebAuthn options and start registration (supports both formats)
-      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded });
+      // Decode WebAuthn options and start registration (supports all formats)
+      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded, optionsLegacy });
       const credential = await navigator.credentials.create({
         publicKey,
       });
