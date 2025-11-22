@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
+import QRCode from 'qrcode';
 
 /**
  * Auth - WebAuthn (Passkey) + TOTP login page
@@ -58,9 +59,17 @@ function base64UrlToArrayBuffer(input: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-// Decode WebAuthn options from backend (Playbook requirement)
-function decodeWebAuthnOptions(options: any): any {
-  if (!options) return options;
+// Buffer JSON to ArrayBuffer (for legacy format)
+function bufferJSONToArrayBuffer(bufferJson: any): ArrayBuffer | null {
+  if (!bufferJson) return null;
+  const { data } = bufferJson;
+  if (!Array.isArray(data)) return null;
+  return new Uint8Array(data).buffer;
+}
+
+// Decode encoded WebAuthn options (base64url format)
+function decodeEncodedWebAuthnOptions(options: any): any {
+  if (!options) return null;
   
   const decodeDescriptor = (descriptor: any) => ({
     ...descriptor,
@@ -70,17 +79,14 @@ function decodeWebAuthnOptions(options: any): any {
   const decoded: any = {
     ...options,
     challenge: base64UrlToArrayBuffer(options.challenge),
+    user: options.user
+      ? {
+          ...options.user,
+          id: base64UrlToArrayBuffer(options.user.id),
+        }
+      : undefined,
   };
   
-  // Decode user.id if present (for registration)
-  if (options.user?.id) {
-    decoded.user = {
-      ...options.user,
-      id: base64UrlToArrayBuffer(options.user.id),
-    };
-  }
-  
-  // Decode credential descriptors
   if (Array.isArray(options.excludeCredentials)) {
     decoded.excludeCredentials = options.excludeCredentials.map(decodeDescriptor);
   }
@@ -91,10 +97,64 @@ function decodeWebAuthnOptions(options: any): any {
   return decoded;
 }
 
+// Decode legacy WebAuthn options (buffer JSON format)
+function decodeLegacyWebAuthnOptions(options: any): any {
+  if (!options) return null;
+  
+  const decodeDescriptor = (descriptor: any) => ({
+    ...descriptor,
+    id: bufferJSONToArrayBuffer(descriptor.id),
+  });
+  
+  const decoded: any = {
+    ...options,
+    challenge: bufferJSONToArrayBuffer(options.challenge),
+    user: options.user
+      ? {
+          ...options.user,
+          id: bufferJSONToArrayBuffer(options.user.id),
+        }
+      : undefined,
+  };
+  
+  if (Array.isArray(options.excludeCredentials)) {
+    decoded.excludeCredentials = options.excludeCredentials.map(decodeDescriptor);
+  }
+  if (Array.isArray(options.allowCredentials)) {
+    decoded.allowCredentials = options.allowCredentials.map(decodeDescriptor);
+  }
+  
+  return decoded;
+}
+
+// Resolve public key options - handles both encoded and legacy formats (Playbook)
+function resolvePublicKeyOptions({ options, optionsEncoded }: { options?: any; optionsEncoded?: any }): any {
+  if (optionsEncoded) return decodeEncodedWebAuthnOptions(optionsEncoded);
+  return decodeLegacyWebAuthnOptions(options);
+}
+
 // Check WebAuthn support
 function isWebAuthnSupported(): boolean {
   return typeof window !== 'undefined' && 
          typeof window.PublicKeyCredential !== 'undefined';
+}
+
+// Generate QR code from otpauth:// URL
+async function generateQRCodeFromUrl(otpauthUrl: string): Promise<string> {
+  try {
+    const dataUrl = await QRCode.toDataURL(otpauthUrl, {
+      width: 256,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    return dataUrl;
+  } catch (error) {
+    console.error('Failed to generate QR code:', error);
+    throw new Error('Could not generate QR code');
+  }
 }
 
 export default function Auth() {
@@ -198,9 +258,9 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const { options, challengeKey, error } = data;
+      const { options, optionsEncoded, challengeKey, error } = data;
 
-      if (!options || !options.challenge) {
+      if ((!options && !optionsEncoded) || (!options?.challenge && !optionsEncoded?.challenge)) {
         console.error('❌ Ogiltiga WebAuthn-inloggningsdata från servern:', data);
         throw new Error(error || 'Kunde inte starta passkey-autentisering. Försök igen senare.');
       }
@@ -210,8 +270,8 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Decode WebAuthn options and start ceremony
-      const publicKey = decodeWebAuthnOptions(options);
+      // Decode WebAuthn options and start ceremony (supports both formats)
+      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded });
       const credential = await navigator.credentials.get({
         publicKey,
       });
@@ -355,9 +415,9 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const { options, challengeKey, error } = data;
+      const { options, optionsEncoded, challengeKey, error } = data;
 
-      if (!options || !options.challenge) {
+      if ((!options && !optionsEncoded) || (!options?.challenge && !optionsEncoded?.challenge)) {
         console.error('❌ Ogiltiga WebAuthn-registreringsdata från servern:', data);
         throw new Error(error || 'Servern kunde inte skapa passkey-inställningar. Försök igen senare.');
       }
@@ -367,8 +427,8 @@ export default function Auth() {
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      // Decode WebAuthn options and start registration
-      const publicKey = decodeWebAuthnOptions(options);
+      // Decode WebAuthn options and start registration (supports both formats)
+      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded });
       const credential = await navigator.credentials.create({
         publicKey,
       });
@@ -440,8 +500,19 @@ export default function Auth() {
         throw new Error('Failed to setup TOTP');
       }
 
-      const { qrCode, manualEntryKey } = await response.json();
-      setTotpQrCode(qrCode);
+      const { qrCode, otpauthUrl, manualEntryKey } = await response.json();
+      
+      // Handle both QR code formats: base64 image or otpauth:// URL
+      if (qrCode) {
+        // If it's a data URL or direct base64, use as-is
+        setTotpQrCode(qrCode);
+      } else if (otpauthUrl) {
+        // Convert otpauth URL to QR code using a QR code generator
+        // For now, we'll generate a simple QR code data URL
+        const qrCodeDataUrl = await generateQRCodeFromUrl(otpauthUrl);
+        setTotpQrCode(qrCodeDataUrl);
+      }
+      
       setTotpSecret(manualEntryKey);
       setViewMode('setup-totp');
     } catch (error: any) {
@@ -813,34 +884,66 @@ export default function Auth() {
             // TOTP Setup view
             <div className="space-y-6">
               <div className="space-y-4">
-                {totpQrCode && (
+                {(totpQrCode || totpSecret) ? (
                   <div className="flex flex-col items-center space-y-4">
-                    <div className="bg-white p-4 rounded-lg">
-                      <img src={totpQrCode} alt="TOTP QR Code" className="w-48 h-48" />
-                    </div>
+                    {totpQrCode && (
+                      <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-primary/10">
+                        <img 
+                          src={totpQrCode} 
+                          alt="TOTP QR Code" 
+                          className="w-56 h-56 rounded-lg"
+                          onError={(e) => {
+                            console.error('QR code failed to load');
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
                     
-                    <div className="text-center space-y-2">
-                      <p className="text-sm font-medium">Eller ange koden manuellt:</p>
-                      <code className="text-xs bg-muted px-3 py-2 rounded block break-all">
-                        {totpSecret}
-                      </code>
-                    </div>
+                    {totpSecret && (
+                      <div className="w-full text-center space-y-2 bg-muted/50 p-4 rounded-lg border border-border">
+                        <p className="text-sm font-medium text-foreground">Eller ange koden manuellt:</p>
+                        <code className="text-xs bg-background px-4 py-2 rounded block font-mono break-all text-primary">
+                          {totpSecret}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(totpSecret);
+                            toast({
+                              title: 'Kopierad!',
+                              description: 'Hemlig nyckel kopierad till urklipp',
+                            });
+                          }}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Kopiera nyckel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                   </div>
                 )}
 
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs space-y-1">
-                    <p>1. Öppna Google Authenticator, Authy eller liknande app</p>
-                    <p>2. Skanna QR-koden ovan</p>
-                    <p>3. Ange den 6-siffriga koden nedan för att verifiera</p>
+                <Alert className="bg-primary/5 border-primary/20">
+                  <AlertCircle className="h-4 w-4 text-primary" />
+                  <AlertDescription className="text-xs space-y-2">
+                    <div className="font-medium text-foreground">Så här gör du:</div>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                      <li>Öppna Google Authenticator, Authy eller liknande app</li>
+                      <li>Skanna QR-koden ovan eller ange den manuella nyckeln</li>
+                      <li>Ange den 6-siffriga koden nedan för att verifiera</li>
+                    </ol>
                   </AlertDescription>
                 </Alert>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="totp-verify" className="text-center block">
-                  Ange verifieringskod
+                <Label htmlFor="totp-verify" className="text-center block font-medium">
+                  Ange verifieringskod från din app
                 </Label>
                 <div className="flex justify-center">
                   <InputOTP
@@ -871,6 +974,9 @@ export default function Auth() {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Koden uppdateras var 30:e sekund
+                </p>
               </div>
 
               <div className="flex gap-2">
