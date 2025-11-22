@@ -77,10 +77,16 @@ function bufferJSONToArrayBuffer(bufferJson: any): ArrayBuffer | null {
 // Decode encoded WebAuthn options (base64url format)
 function decodeEncodedWebAuthnOptions(options: any): any {
   if (!options) return null;
+
+  // If challenge is already an ArrayBuffer or TypedArray, assume options are already decoded
+  if (options.challenge && typeof options.challenge !== 'string') {
+    return options;
+  }
   
   const decodeDescriptor = (descriptor: any) => {
     if (!descriptor) return null;
-    const decodedId = base64UrlToArrayBuffer(descriptor.id);
+    // Some backends may already send ArrayBuffers here
+    const decodedId = typeof descriptor.id === 'string' ? base64UrlToArrayBuffer(descriptor.id) : descriptor.id;
     if (!decodedId) return null;
     return {
       ...descriptor,
@@ -90,7 +96,7 @@ function decodeEncodedWebAuthnOptions(options: any): any {
   
   const challengeBuffer = base64UrlToArrayBuffer(options.challenge);
   if (!challengeBuffer) {
-    console.error('❌ Invalid challenge in WebAuthn options');
+    console.error('❌ Invalid challenge in WebAuthn options', options.challenge);
     return null;
   }
   
@@ -100,7 +106,7 @@ function decodeEncodedWebAuthnOptions(options: any): any {
     user: options.user
       ? {
           ...options.user,
-          id: base64UrlToArrayBuffer(options.user.id),
+          id: typeof options.user.id === 'string' ? base64UrlToArrayBuffer(options.user.id) : options.user.id,
         }
       : undefined,
   };
@@ -178,11 +184,43 @@ function resolvePublicKeyOptions({
   optionsLegacy?: any;
   optionsEncoded?: any;
 }): any {
-  const encoded = optionsEncoded || options || publicKey;
-  if (encoded) {
-    return decodeEncodedWebAuthnOptions(encoded);
+  // 1. Prefer explicit publicKey from backend (already correct shape)
+  if (publicKey) return publicKey;
+
+  // 2. Prefer encoded options when provided
+  if (optionsEncoded) {
+    const decoded = decodeEncodedWebAuthnOptions(optionsEncoded);
+    if (decoded) return decoded;
   }
-  return decodeLegacyWebAuthnOptions(optionsLegacy || publicKeyLegacy);
+
+  // 3. If options look already decoded (non-string challenge), return as-is
+  if (options) {
+    if (options.challenge && typeof options.challenge !== 'string') {
+      return options;
+    }
+    const decoded = decodeEncodedWebAuthnOptions(options);
+    if (decoded) return decoded;
+  }
+
+  // 4. Fallback to legacy formats
+  if (publicKeyLegacy) {
+    const decodedLegacy = decodeLegacyWebAuthnOptions(publicKeyLegacy);
+    if (decodedLegacy) return decodedLegacy;
+  }
+
+  if (optionsLegacy) {
+    const decodedLegacy = decodeLegacyWebAuthnOptions(optionsLegacy);
+    if (decodedLegacy) return decodedLegacy;
+  }
+
+  console.error('❌ Could not resolve valid WebAuthn publicKey options', {
+    hasPublicKey: !!publicKey,
+    hasPublicKeyLegacy: !!publicKeyLegacy,
+    hasOptions: !!options,
+    hasOptionsLegacy: !!optionsLegacy,
+    hasOptionsEncoded: !!optionsEncoded,
+  });
+  return null;
 }
 
 // Check WebAuthn support
@@ -347,6 +385,11 @@ export default function Auth() {
         publicKey,
         publicKeyLegacy,
       });
+
+      if (!publicKeyOptions) {
+        throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
+      }
+
       const credential = await navigator.credentials.get({
         publicKey: publicKeyOptions,
       });
@@ -564,6 +607,11 @@ export default function Auth() {
         publicKey,
         publicKeyLegacy,
       });
+
+      if (!publicKeyOptions) {
+        throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
+      }
+
       const credential = await navigator.credentials.create({
         publicKey: publicKeyOptions,
       });
