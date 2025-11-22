@@ -344,6 +344,13 @@ export default function Auth() {
     if (!sanitized) return;
 
     setLoading(true);
+    
+    // Show verifying feedback
+    toast({
+      title: 'Verifierar kod...',
+      description: 'Ett ögonblick...',
+    });
+
     try {
       const response = await fetch('https://api.tivly.se/auth/totp/login', {
         method: 'POST',
@@ -355,19 +362,30 @@ export default function Auth() {
       if (response.ok) {
         const { token, user: userData } = await response.json();
         
-        // Store token
+        // Store token in multiple places for reliability
         window.authToken = token;
         localStorage.setItem('tivly_auth_token', token);
         sessionStorage.setItem('tivly_user', JSON.stringify(userData));
 
+        // Success feedback
+        toast({
+          title: '✓ Inloggad!',
+          description: 'Omdirigerar...',
+        });
+
+        // Refresh user context
         await refreshUser();
-        navigate('/');
+        
+        // Navigate to home with a small delay for smooth transition
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 300);
       } else {
         const error = await response.json();
         toast({
           variant: 'destructive',
           title: 'Ogiltig kod',
-          description: error.message || 'Autentiseringen misslyckades. Försök igen.',
+          description: error.message || 'Autentiseringen misslyckades. Kontrollera koden och försök igen.',
         });
         setTotpCode('');
       }
@@ -376,8 +394,9 @@ export default function Auth() {
       toast({
         variant: 'destructive',
         title: 'Autentisering misslyckades',
-        description: 'Försök igen.',
+        description: 'Kontrollera din internetanslutning och försök igen.',
       });
+      setTotpCode('');
     } finally {
       setLoading(false);
     }
@@ -541,6 +560,13 @@ export default function Auth() {
     if (!sanitized) return;
 
     setLoading(true);
+    
+    // Show enabling feedback
+    toast({
+      title: 'Aktiverar autentiseringsapp...',
+      description: 'Ett ögonblick...',
+    });
+
     try {
       const response = await fetch('https://api.tivly.se/auth/totp/enable', {
         method: 'POST',
@@ -550,18 +576,37 @@ export default function Auth() {
       });
 
       if (response.ok) {
+        // Success feedback
         toast({
-          title: 'Autentiseringsapp konfigurerad!',
+          title: '✓ Autentiseringsapp aktiverad!',
           description: 'Loggar in...',
         });
         
-        // Auto-login after successful TOTP setup
-        await handleVerifyTotp();
+        // Small delay before auto-login for better UX
+        setTimeout(async () => {
+          // Re-check auth methods to confirm TOTP is now enabled
+          const checkResponse = await fetch('https://api.tivly.se/auth/check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email: sanitized }),
+          });
+
+          if (checkResponse.ok) {
+            // Now perform TOTP login
+            await handleVerifyTotp();
+          } else {
+            // Fallback: switch to TOTP view for manual login
+            setViewMode('totp');
+            setTotpCode('');
+          }
+        }, 500);
       } else {
+        const error = await response.json();
         toast({
           variant: 'destructive',
           title: 'Ogiltig verifieringskod',
-          description: 'Kontrollera koden och försök igen.',
+          description: error.message || 'Kontrollera koden i din app och försök igen.',
         });
         setTotpCode('');
       }
@@ -570,8 +615,9 @@ export default function Auth() {
       toast({
         variant: 'destructive',
         title: 'Kunde inte aktivera TOTP',
-        description: 'Försök igen.',
+        description: 'Kontrollera din internetanslutning och försök igen.',
       });
+      setTotpCode('');
     } finally {
       setLoading(false);
     }
@@ -698,8 +744,8 @@ export default function Auth() {
                 </Alert>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="totp" className="text-center block">
+              <div className="space-y-3">
+                <Label htmlFor="totp" className="text-center block font-medium">
                   Ange kod från din autentiseringsapp
                 </Label>
                 <div className="flex justify-center">
@@ -720,6 +766,7 @@ export default function Auth() {
                       }
                     }}
                     disabled={loading}
+                    autoFocus
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
@@ -731,9 +778,16 @@ export default function Auth() {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Använd Google Authenticator, Authy eller liknande app
-                </p>
+                <div className="text-center space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Använd Google Authenticator, Authy eller liknande app
+                  </p>
+                  {loading && (
+                    <p className="text-xs text-primary font-medium animate-pulse">
+                      Verifierar kod...
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -941,7 +995,7 @@ export default function Auth() {
                 </Alert>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label htmlFor="totp-verify" className="text-center block font-medium">
                   Ange verifieringskod från din app
                 </Label>
@@ -963,6 +1017,7 @@ export default function Auth() {
                       }
                     }}
                     disabled={loading}
+                    autoFocus
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
@@ -974,9 +1029,16 @@ export default function Auth() {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Koden uppdateras var 30:e sekund
-                </p>
+                <div className="text-center space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Koden uppdateras var 30:e sekund
+                  </p>
+                  {loading && (
+                    <p className="text-xs text-primary font-medium animate-pulse">
+                      Aktiverar och loggar in...
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2">
