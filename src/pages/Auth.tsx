@@ -78,15 +78,9 @@ function bufferJSONToArrayBuffer(bufferJson: any): ArrayBuffer | null {
 function decodeEncodedWebAuthnOptions(options: any): any {
   if (!options) return null;
 
-  // If challenge is already an ArrayBuffer or TypedArray, assume options are already decoded
-  if (options.challenge && typeof options.challenge !== 'string') {
-    return options;
-  }
-  
   const decodeDescriptor = (descriptor: any) => {
     if (!descriptor) return null;
-    // Some backends may already send ArrayBuffers here
-    const decodedId = typeof descriptor.id === 'string' ? base64UrlToArrayBuffer(descriptor.id) : descriptor.id;
+    const decodedId = base64UrlToArrayBuffer(descriptor.id);
     if (!decodedId) return null;
     return {
       ...descriptor,
@@ -106,7 +100,7 @@ function decodeEncodedWebAuthnOptions(options: any): any {
     user: options.user
       ? {
           ...options.user,
-          id: typeof options.user.id === 'string' ? base64UrlToArrayBuffer(options.user.id) : options.user.id,
+          id: base64UrlToArrayBuffer(options.user.id),
         }
       : undefined,
   };
@@ -184,22 +178,21 @@ function resolvePublicKeyOptions({
   optionsLegacy?: any;
   optionsEncoded?: any;
 }): any {
-  // 1. Prefer explicit publicKey from backend (already correct shape)
-  if (publicKey) return publicKey;
-
-  // 2. Prefer encoded options when provided
+  // 1. Prefer explicitly encoded options from backend
   if (optionsEncoded) {
     const decoded = decodeEncodedWebAuthnOptions(optionsEncoded);
     if (decoded) return decoded;
   }
 
-  // 3. If options look already decoded (non-string challenge), return as-is
+  // 2. Then try encoded-style "options" field
   if (options) {
-    if (options.challenge && typeof options.challenge !== 'string') {
-      return options;
-    }
     const decoded = decodeEncodedWebAuthnOptions(options);
     if (decoded) return decoded;
+  }
+
+  // 3. If publicKey is provided and already has a binary challenge, assume it's ready
+  if (publicKey && publicKey.challenge && typeof publicKey.challenge !== 'string') {
+    return publicKey;
   }
 
   // 4. Fallback to legacy formats
