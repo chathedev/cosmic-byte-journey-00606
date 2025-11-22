@@ -714,26 +714,56 @@ export default function Auth() {
               </Alert>
 
               <div className="space-y-3">
-                {/* Show preferred method first */}
-                {webauthnAvailable && preferredMethod === 'passkey' && (
-                  <button
-                    onClick={handleStartPasskeySetup}
-                    disabled={loading}
-                    className="w-full p-4 rounded-lg border-2 border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">Skapa Passkey (Rekommenderat)</p>
-                        <p className="text-sm text-muted-foreground">
-                          Använd Face ID, Touch ID eller Windows Hello för snabb och säker inloggning
-                        </p>
+                {webauthnAvailable ? (
+                  <>
+                    {/* Show passkey as primary if preferred or available */}
+                    <button
+                      onClick={handleStartPasskeySetup}
+                      disabled={loading}
+                      className={`w-full p-4 rounded-lg border-2 transition-all text-left group ${
+                        preferredMethod === 'passkey' 
+                          ? 'border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10' 
+                          : 'border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">
+                            Skapa Passkey {preferredMethod === 'passkey' && '(Rekommenderat)'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Använd Face ID, Touch ID eller Windows Hello för snabb och säker inloggning
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                )}
+                    </button>
 
-                {preferredMethod === 'totp' && (
+                    {/* TOTP option */}
+                    <button
+                      onClick={handleStartTotpSetup}
+                      disabled={loading}
+                      className={`w-full p-4 rounded-lg border-2 transition-all text-left group ${
+                        preferredMethod === 'totp' 
+                          ? 'border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10' 
+                          : 'border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">
+                            Använd Autentiseringsapp {preferredMethod === 'totp' && '(Rekommenderat)'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Koppla Google Authenticator, Authy eller annan TOTP-app
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </>
+                ) : (
+                  // Only TOTP available when WebAuthn not supported
                   <button
                     onClick={handleStartTotpSetup}
                     disabled={loading}
@@ -742,44 +772,7 @@ export default function Auth() {
                     <div className="flex items-start gap-3">
                       <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
                       <div className="flex-1 space-y-1">
-                        <p className="font-medium">Anslut Autentiseringsapp (Rekommenderat)</p>
-                        <p className="text-sm text-muted-foreground">
-                          Koppla Google Authenticator, Authy eller annan TOTP-app
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Show alternative method second */}
-                {webauthnAvailable && preferredMethod === 'totp' && (
-                  <button
-                    onClick={handleStartPasskeySetup}
-                    disabled={loading}
-                    className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50 transition-all text-left group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">Skapa Passkey istället</p>
-                        <p className="text-sm text-muted-foreground">
-                          Använd Face ID, Touch ID eller Windows Hello
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
-                {preferredMethod === 'passkey' && (
-                  <button
-                    onClick={handleStartTotpSetup}
-                    disabled={loading}
-                    className="w-full p-4 rounded-lg border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/50 transition-all text-left group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <KeyRound className="h-6 w-6 text-primary flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">Använd Autentiseringsapp istället</p>
+                        <p className="font-medium">Använd Autentiseringsapp</p>
                         <p className="text-sm text-muted-foreground">
                           Koppla Google Authenticator, Authy eller annan TOTP-app
                         </p>
