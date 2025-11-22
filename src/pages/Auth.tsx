@@ -164,12 +164,25 @@ function decodeLegacyWebAuthnOptions(options: any): any {
   return decoded;
 }
 
-// Resolve public key options - handles both encoded and legacy formats (Playbook)
-function resolvePublicKeyOptions({ options, optionsEncoded, optionsLegacy }: { options?: any; optionsEncoded?: any; optionsLegacy?: any }): any {
-  if (optionsEncoded || options) {
-    return decodeEncodedWebAuthnOptions(optionsEncoded || options);
+// Resolve public key options - handles all possible formats (Playbook)
+function resolvePublicKeyOptions({
+  publicKey,
+  publicKeyLegacy,
+  options,
+  optionsLegacy,
+  optionsEncoded,
+}: {
+  publicKey?: any;
+  publicKeyLegacy?: any;
+  options?: any;
+  optionsLegacy?: any;
+  optionsEncoded?: any;
+}): any {
+  const encoded = optionsEncoded || options || publicKey;
+  if (encoded) {
+    return decodeEncodedWebAuthnOptions(encoded);
   }
-  return decodeLegacyWebAuthnOptions(optionsLegacy);
+  return decodeLegacyWebAuthnOptions(optionsLegacy || publicKeyLegacy);
 }
 
 // Check WebAuthn support
@@ -297,16 +310,26 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const { options, optionsEncoded, optionsLegacy, challengeKey, error } = data;
+      const {
+        options,
+        optionsLegacy,
+        optionsEncoded,
+        publicKey,
+        publicKeyLegacy,
+        challengeKey,
+        error
+      } = data;
 
       console.log('🔐 WebAuthn login options received:', { 
-        hasOptions: !!options, 
-        hasEncoded: !!optionsEncoded, 
+        hasOptions: !!options,
         hasLegacy: !!optionsLegacy,
+        hasEncoded: !!optionsEncoded,
+        hasPublicKey: !!publicKey,
+        hasPublicKeyLegacy: !!publicKeyLegacy,
         challengeKey 
       });
 
-      if (!options && !optionsEncoded && !optionsLegacy) {
+      if (!options && !optionsEncoded && !optionsLegacy && !publicKey && !publicKeyLegacy) {
         console.error('❌ Ogiltiga WebAuthn-inloggningsdata från servern:', data);
         throw new Error(error || 'Kunde inte starta passkey-autentisering. Försök igen senare.');
       }
@@ -317,9 +340,15 @@ export default function Auth() {
       });
 
       // Decode WebAuthn options and start ceremony (supports all formats)
-      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded, optionsLegacy });
-      const credential = await navigator.credentials.get({
+      const publicKeyOptions = resolvePublicKeyOptions({
+        options,
+        optionsLegacy,
+        optionsEncoded,
         publicKey,
+        publicKeyLegacy,
+      });
+      const credential = await navigator.credentials.get({
+        publicKey: publicKeyOptions,
       });
 
       if (!credential) {
@@ -498,16 +527,26 @@ export default function Auth() {
       }
 
       const data = await startResponse.json();
-      const { options, optionsEncoded, optionsLegacy, challengeKey, error } = data;
+      const {
+        options,
+        optionsLegacy,
+        optionsEncoded,
+        publicKey,
+        publicKeyLegacy,
+        challengeKey,
+        error
+      } = data;
 
       console.log('🔐 WebAuthn registration options received:', { 
-        hasOptions: !!options, 
-        hasEncoded: !!optionsEncoded, 
+        hasOptions: !!options,
         hasLegacy: !!optionsLegacy,
+        hasEncoded: !!optionsEncoded,
+        hasPublicKey: !!publicKey,
+        hasPublicKeyLegacy: !!publicKeyLegacy,
         challengeKey 
       });
 
-      if (!options && !optionsEncoded && !optionsLegacy) {
+      if (!options && !optionsEncoded && !optionsLegacy && !publicKey && !publicKeyLegacy) {
         console.error('❌ Ogiltiga WebAuthn-registreringsdata från servern:', data);
         throw new Error(error || 'Servern kunde inte skapa passkey-inställningar. Försök igen senare.');
       }
@@ -518,9 +557,15 @@ export default function Auth() {
       });
 
       // Decode WebAuthn options and start registration (supports all formats)
-      const publicKey = resolvePublicKeyOptions({ options, optionsEncoded, optionsLegacy });
-      const credential = await navigator.credentials.create({
+      const publicKeyOptions = resolvePublicKeyOptions({
+        options,
+        optionsLegacy,
+        optionsEncoded,
         publicKey,
+        publicKeyLegacy,
+      });
+      const credential = await navigator.credentials.create({
+        publicKey: publicKeyOptions,
       });
 
       if (!credential) {
