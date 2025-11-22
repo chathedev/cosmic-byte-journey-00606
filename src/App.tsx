@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
@@ -250,51 +250,51 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <AuthProvider>
-              <SubscriptionProvider>
-                <PlanGate>
-                  <ScrollToTop />
-                  <PreserveAppParam />
-                  <AuthRedirectHandler />
-                  <WelcomeGate>
-                    <AppLayout>
-                      <Suspense
-                        fallback={
-                          <div className="min-h-screen bg-background flex items-center justify-center">
-                            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
-                          </div>
-                        }
-                      >
-                        <Routes>
-                          <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
-                          <Route path="/magic-login" element={<MagicLogin />} />
-                          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                          <Route path="/free-trial" element={<FreeTrial />} />
-                          <Route path="/generate-protocol" element={<GenerateProtocol />} />
-                          <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
-                          <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
-                          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                          <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-                          <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
-                          <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
-                          <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-                          <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
-                          <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
-                          <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
-                          <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
-                          <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
-                          <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
-                          <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
-                          <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                      </Suspense>
-                    </AppLayout>
-                  </WelcomeGate>
-                </PlanGate>
-              </SubscriptionProvider>
-            </AuthProvider>
-          </BrowserRouter>
+            <HashRouter>
+              <AuthProvider>
+                <SubscriptionProvider>
+                  <PlanGate>
+                    <ScrollToTop />
+                    <PreserveAppParam />
+                    <AuthRedirectHandler />
+                    <WelcomeGate>
+                      <AppLayout>
+                        <Suspense
+                          fallback={
+                            <div className="min-h-screen bg-background flex items-center justify-center">
+                              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+                            </div>
+                          }
+                        >
+                          <Routes>
+                            <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                            <Route path="/magic-login" element={<MagicLogin />} />
+                            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                            <Route path="/free-trial" element={<FreeTrial />} />
+                            <Route path="/generate-protocol" element={<GenerateProtocol />} />
+                            <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
+                            <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
+                            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+                            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                            <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
+                            <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+                            <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                            <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
+                            <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
+                            <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+                            <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
+                            <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                            <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
+                            <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                          </Routes>
+                        </Suspense>
+                      </AppLayout>
+                    </WelcomeGate>
+                  </PlanGate>
+                </SubscriptionProvider>
+              </AuthProvider>
+            </HashRouter>
         </TooltipProvider>
       </ErrorBoundary>
     </QueryClientProvider>
