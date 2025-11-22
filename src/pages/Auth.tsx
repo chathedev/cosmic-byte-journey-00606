@@ -11,6 +11,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
 import QRCode from 'qrcode';
+import { apiClient } from '@/lib/api';
 
 /**
  * Auth - WebAuthn (Passkey) + TOTP login page
@@ -295,13 +296,26 @@ export default function Auth() {
       if (finishResponse.ok) {
         const { token, user: userData } = await finishResponse.json();
         
-        // Store token
-        window.authToken = token;
-        localStorage.setItem('tivly_auth_token', token);
-        sessionStorage.setItem('tivly_user', JSON.stringify(userData));
+        console.log('✅ Passkey auth successful:', { hasToken: !!token, userEmail: userData?.email });
+        
+        // Use apiClient to store token properly
+        apiClient.applyAuthToken(token);
+        
+        console.log('✅ Token stored via apiClient');
 
+        toast({
+          title: '✓ Passkey verifierad!',
+          description: 'Loggar in...',
+        });
+
+        console.log('🔄 Refreshing user context...');
         await refreshUser();
-        navigate('/');
+        console.log('✅ User context refreshed');
+        
+        setTimeout(() => {
+          console.log('🏠 Navigating to home...');
+          navigate('/', { replace: true });
+        }, 300);
       } else {
         throw new Error('Passkey verification failed');
       }
@@ -362,10 +376,12 @@ export default function Auth() {
       if (response.ok) {
         const { token, user: userData } = await response.json();
         
-        // Store token in multiple places for reliability
-        window.authToken = token;
-        localStorage.setItem('tivly_auth_token', token);
-        sessionStorage.setItem('tivly_user', JSON.stringify(userData));
+        console.log('✅ TOTP login successful:', { hasToken: !!token, userEmail: userData?.email });
+        
+        // Use apiClient to store token properly
+        apiClient.applyAuthToken(token);
+        
+        console.log('✅ Token stored via apiClient');
 
         // Success feedback
         toast({
@@ -374,10 +390,13 @@ export default function Auth() {
         });
 
         // Refresh user context
+        console.log('🔄 Refreshing user context...');
         await refreshUser();
+        console.log('✅ User context refreshed');
         
         // Navigate to home with a small delay for smooth transition
         setTimeout(() => {
+          console.log('🏠 Navigating to home...');
           navigate('/', { replace: true });
         }, 300);
       } else {
