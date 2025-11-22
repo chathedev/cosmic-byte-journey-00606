@@ -42,13 +42,31 @@ function sanitizeEmail(email: string | undefined): string | null {
   return trimmed && emailRegex.test(trimmed) ? trimmed : null;
 }
 
-// Base64URL to ArrayBuffer (Playbook spec)
-function base64ToArrayBuffer(value: string | null | undefined): ArrayBuffer | null {
-  if (!value) return null;
+// Base64URL / BufferJSON / ArrayBuffer to ArrayBuffer (Playbook-compatible)
+function base64ToArrayBuffer(value: any): ArrayBuffer | null {
+  if (value == null) return null;
+
+  // Already an ArrayBuffer
+  if (value instanceof ArrayBuffer) return value;
+
+  // Uint8Array or similar typed array
+  if (value instanceof Uint8Array) return value.buffer as ArrayBuffer;
+
+  // Legacy buffer-json format: { data: number[] }
+  if (typeof value === 'object' && Array.isArray((value as any).data)) {
+    return bufferJsonToArrayBuffer(value);
+  }
+
+  // Expect a base64/base64url string from modern backends
+  if (typeof value !== 'string') return null;
+
   try {
-    const normalized = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+    const normalized = value
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(value.length / 4) * 4, '=');
     const bytes = Uint8Array.from(atob(normalized), (c) => c.charCodeAt(0));
-    return bytes.buffer;
+    return bytes.buffer as ArrayBuffer;
   } catch (error) {
     console.error('Failed to decode base64url:', error);
     return null;
@@ -59,7 +77,7 @@ function base64ToArrayBuffer(value: string | null | undefined): ArrayBuffer | nu
 function bufferJsonToArrayBuffer(bufferJson: any): ArrayBuffer | null {
   if (!bufferJson?.data) return null;
   if (!Array.isArray(bufferJson.data)) return null;
-  return new Uint8Array(bufferJson.data).buffer;
+  return new Uint8Array(bufferJson.data).buffer as ArrayBuffer;
 }
 
 // Decode WebAuthn options - handles all formats (Playbook spec)
@@ -70,41 +88,53 @@ function decodeWebAuthnOptions({ publicKey, publicKeyLegacy, options, optionsEnc
   optionsEncoded?: any;
 }): any {
   const source = optionsEncoded || publicKey || options;
-  
+
   if (source) {
-    // Base64-encoded format
     const decodeDescriptor = (descriptor: any) => ({
       ...descriptor,
       id: base64ToArrayBuffer(descriptor.id),
     });
-    
+
+    const challenge = base64ToArrayBuffer(source.challenge);
+    const userId = source.user ? base64ToArrayBuffer(source.user.id) : null;
+
     return {
       ...source,
-      challenge: base64ToArrayBuffer(source.challenge),
-      user: source.user ? { ...source.user, id: base64ToArrayBuffer(source.user.id) } : undefined,
-      excludeCredentials: (source.excludeCredentials || []).map(decodeDescriptor).filter((d: any) => d.id),
-      allowCredentials: (source.allowCredentials || []).map(decodeDescriptor).filter((d: any) => d.id),
+      challenge,
+      user: source.user && userId ? { ...source.user, id: userId } : source.user,
+      excludeCredentials: (source.excludeCredentials || [])
+        .map(decodeDescriptor)
+        .filter((d: any) => d.id),
+      allowCredentials: (source.allowCredentials || [])
+        .map(decodeDescriptor)
+        .filter((d: any) => d.id),
     };
   }
-  
+
   // Legacy buffer-json format
   const legacy = publicKeyLegacy || options;
   if (!legacy) return null;
-  
+
   const decodeLegacy = (descriptor: any) => ({
     ...descriptor,
     id: bufferJsonToArrayBuffer(descriptor.id),
   });
-  
+
+  const challenge = bufferJsonToArrayBuffer(legacy.challenge);
+  const userId = legacy.user ? bufferJsonToArrayBuffer(legacy.user.id) : null;
+
   return {
     ...legacy,
-    challenge: bufferJsonToArrayBuffer(legacy.challenge),
-    user: legacy.user ? { ...legacy.user, id: bufferJsonToArrayBuffer(legacy.user.id) } : undefined,
-    excludeCredentials: (legacy.excludeCredentials || []).map(decodeLegacy).filter((d: any) => d.id),
-    allowCredentials: (legacy.allowCredentials || []).map(decodeLegacy).filter((d: any) => d.id),
+    challenge,
+    user: legacy.user && userId ? { ...legacy.user, id: userId } : legacy.user,
+    excludeCredentials: (legacy.excludeCredentials || [])
+      .map(decodeLegacy)
+      .filter((d: any) => d.id),
+    allowCredentials: (legacy.allowCredentials || [])
+      .map(decodeLegacy)
+      .filter((d: any) => d.id),
   };
 }
-
 // Check WebAuthn support
 function isWebAuthnSupported(): boolean {
   return typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
@@ -220,16 +250,6 @@ export default function Auth() {
 
       const data = await startResponse.json();
 
-      console.log('🔍 RAW LOGIN DATA:', {
-        hasOptions: !!data.options,
-        hasOptionsEncoded: !!data.optionsEncoded,
-        hasOptionsLegacy: !!data.optionsLegacy,
-        hasPublicKey: !!data.publicKey,
-        hasPublicKeyLegacy: !!data.publicKeyLegacy,
-        optionsChallengeType: data.options?.challenge ? typeof data.options.challenge : 'none',
-        publicKeyChallengeType: data.publicKey?.challenge ? typeof data.publicKey.challenge : 'none',
-      });
-
       if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy) {
         throw new Error(data.error || 'Kunde inte starta passkey-autentisering');
       }
@@ -240,12 +260,6 @@ export default function Auth() {
       });
 
       const publicKeyOptions = decodeWebAuthnOptions(data);
-
-      console.log('🔍 LOGIN DECODED OPTIONS:', {
-        hasOptions: !!publicKeyOptions,
-        hasChallenge: !!publicKeyOptions?.challenge,
-        challengeIsArrayBuffer: publicKeyOptions?.challenge instanceof ArrayBuffer,
-      });
 
       if (!publicKeyOptions || !publicKeyOptions.challenge) {
         console.error('❌ LOGIN DECODE FAILED - publicKeyOptions:', publicKeyOptions);
@@ -402,19 +416,6 @@ export default function Auth() {
 
       const data = await startResponse.json();
 
-      console.log('🔍 RAW SERVER DATA:', {
-        hasOptions: !!data.options,
-        hasOptionsEncoded: !!data.optionsEncoded,
-        hasOptionsLegacy: !!data.optionsLegacy,
-        hasPublicKey: !!data.publicKey,
-        hasPublicKeyLegacy: !!data.publicKeyLegacy,
-        optionsType: data.options ? typeof data.options : 'none',
-        publicKeyType: data.publicKey ? typeof data.publicKey : 'none',
-        optionsChallengeType: data.options?.challenge ? typeof data.options.challenge : 'none',
-        publicKeyChallengeType: data.publicKey?.challenge ? typeof data.publicKey.challenge : 'none',
-        optionsEncodedChallengeType: data.optionsEncoded?.challenge ? typeof data.optionsEncoded.challenge : 'none',
-      });
-
       if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy) {
         throw new Error(data.error || 'Servern kunde inte skapa passkey-inställningar');
       }
@@ -425,14 +426,6 @@ export default function Auth() {
       });
 
       const publicKeyOptions = decodeWebAuthnOptions(data);
-
-      console.log('🔍 DECODED OPTIONS:', {
-        hasOptions: !!publicKeyOptions,
-        hasChallenge: !!publicKeyOptions?.challenge,
-        challengeType: publicKeyOptions?.challenge ? typeof publicKeyOptions.challenge : 'none',
-        challengeIsArrayBuffer: publicKeyOptions?.challenge instanceof ArrayBuffer,
-        challengeByteLength: publicKeyOptions?.challenge instanceof ArrayBuffer ? publicKeyOptions.challenge.byteLength : 0,
-      });
 
       if (!publicKeyOptions || !publicKeyOptions.challenge) {
         console.error('❌ DECODE FAILED - publicKeyOptions:', publicKeyOptions);
