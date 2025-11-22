@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Fingerprint, ArrowLeft, Shield, KeyRound, AlertCircle } from 'lucide-react';
+import { Fingerprint, ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -29,7 +29,7 @@ declare global {
 }
 
 type AuthMethod = 'passkey' | 'totp' | null;
-type ViewMode = 'email' | 'totp' | 'new-user' | 'setup-required';
+type ViewMode = 'welcome' | 'email' | 'totp' | 'new-user' | 'setup-required';
 
 interface AuthCheckResponse {
   authMethods: {
@@ -61,7 +61,7 @@ export default function Auth() {
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('email');
+  const [viewMode, setViewMode] = useState<ViewMode>('welcome');
   const [webauthnAvailable, setWebauthnAvailable] = useState(false);
 
   // Check WebAuthn support on mount
@@ -263,9 +263,14 @@ export default function Auth() {
   };
 
   const handleStartOver = () => {
-    setViewMode('email');
+    setViewMode('welcome');
+    setEmail('');
     setTotpCode('');
     setAuthMethod(null);
+  };
+
+  const handleGetStarted = () => {
+    setViewMode('email');
   };
 
   return (
@@ -273,29 +278,97 @@ export default function Auth() {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
       
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-sm bg-card/95">
-        <CardHeader className="space-y-4 text-center pb-8">
-          <div className="mx-auto w-24 h-24">
-            <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-          </div>
-          
-          <div className="space-y-2">
-            <CardTitle className="text-3xl font-bold">
-              {viewMode === 'totp' ? 'Ange verifieringskod' : 
-               viewMode === 'new-user' ? 'Välkommen!' :
-               viewMode === 'setup-required' ? 'Inställning krävs' :
-               'Välkommen till Tivly'}
-            </CardTitle>
-            <CardDescription className="text-base">
-              {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
-               viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
-               viewMode === 'setup-required' ? 'Ditt konto saknar autentiseringsmetod' :
-               'Ange din e-post för att logga in med passkey eller autentiseringsapp'}
-            </CardDescription>
-          </div>
-        </CardHeader>
+        {viewMode === 'welcome' ? (
+          // Welcome Screen
+          <>
+            <CardHeader className="space-y-6 text-center pb-8 pt-12">
+              <div className="mx-auto w-32 h-32 animate-in fade-in zoom-in duration-500">
+                <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
+              </div>
+              
+              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+                <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  Välkommen till Tivly
+                </CardTitle>
+                <CardDescription className="text-lg">
+                  Säker och enkel inloggning med passkeys eller autentiseringsapp
+                </CardDescription>
+              </div>
+            </CardHeader>
 
-        <CardContent className="pb-8">
-          {viewMode === 'totp' ? (
+            <CardContent className="pb-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+              <div className="space-y-4">
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <Fingerprint className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Lösenordsfri inloggning</p>
+                      <p className="text-xs text-muted-foreground">
+                        Använd Face ID, Touch ID, Windows Hello eller din autentiseringsapp
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <Shield className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Bankäker säkerhet</p>
+                      <p className="text-xs text-muted-foreground">
+                        Krypterad autentisering som skyddar dina uppgifter
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Snabbt och smidigt</p>
+                      <p className="text-xs text-muted-foreground">
+                        Logga in på sekunder utan att komma ihåg lösenord
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleGetStarted}
+                className="w-full h-12 text-base font-medium"
+                size="lg"
+              >
+                Kom igång
+              </Button>
+            </CardContent>
+          </>
+        ) : (
+          <>
+            <CardHeader className="space-y-4 text-center pb-8">
+              <div className="mx-auto w-24 h-24">
+                <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
+              </div>
+              
+              <div className="space-y-2">
+                <CardTitle className="text-3xl font-bold">
+                  {viewMode === 'totp' ? 'Ange verifieringskod' : 
+                   viewMode === 'new-user' ? 'Välkommen!' :
+                   viewMode === 'setup-required' ? 'Inställning krävs' :
+                   'Logga in'}
+                </CardTitle>
+                <CardDescription className="text-base">
+                  {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
+                   viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
+                   viewMode === 'setup-required' ? 'Ditt konto saknar autentiseringsmetod' :
+                   'Ange din e-post för att fortsätta'}
+                </CardDescription>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pb-8">
+              {viewMode === 'totp' ? (
             // TOTP code entry view
             <div className="space-y-6">
               <div className="rounded-lg border border-border bg-muted/30 p-4">
@@ -425,7 +498,7 @@ export default function Auth() {
                 e.preventDefault();
                 handleCheckAuthMethods();
               }}
-              className="space-y-6"
+              className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500"
             >
               <div className="space-y-2">
                 <Label htmlFor="email">E-postadress</Label>
@@ -463,26 +536,39 @@ export default function Auth() {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full h-11" 
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Shield className="w-4 h-4 mr-2 animate-spin" />
-                    Kontrollerar...
-                  </>
-                ) : (
-                  <>
-                    <Fingerprint className="w-4 h-4 mr-2" />
-                    Fortsätt
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleStartOver}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Tillbaka
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="flex-1 h-11" 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Shield className="w-4 h-4 mr-2 animate-spin" />
+                      Kontrollerar...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="w-4 h-4 mr-2" />
+                      Fortsätt
+                    </>
+                  )}
+                </Button>
+              </div>
             </form>
           )}
-        </CardContent>
+            </CardContent>
+          </>
+        )}
       </Card>
     </div>
   );
