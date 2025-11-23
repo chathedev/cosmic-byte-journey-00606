@@ -117,9 +117,11 @@ export default function Auth() {
   }, [setupPolling, email, toast]);
 
   const handleCheckAuthMethods = async () => {
+    console.log('[Auth] handleCheckAuthMethods called with email:', email);
     const sanitized = sanitizeEmail(email);
     
     if (!sanitized) {
+      console.log('[Auth] Invalid email:', email);
       toast({
         variant: 'destructive',
         title: 'Ogiltig e-postadress',
@@ -128,8 +130,11 @@ export default function Auth() {
       return;
     }
 
+    console.log('[Auth] Sanitized email:', sanitized);
     setLoading(true);
+    
     try {
+      console.log('[Auth] Fetching auth methods from API...');
       const response = await fetch('https://api.tivly.se/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,27 +142,34 @@ export default function Auth() {
         body: JSON.stringify({ email: sanitized }),
       });
 
+      console.log('[Auth] Response status:', response.status);
+
       if (response.ok) {
         const data: AuthCheckResponse = await response.json();
+        console.log('[Auth] Auth methods data:', data);
         const { authMethods } = data;
 
         if (authMethods.totp) {
+          console.log('[Auth] TOTP configured, showing TOTP input');
           setViewMode('totp');
         } else {
-          // No TOTP configured, start setup
+          console.log('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
       } else if (response.status === 404) {
+        console.log('[Auth] User not found');
         setViewMode('new-user');
       } else {
-        throw new Error('Failed to check authentication methods');
+        const errorText = await response.text();
+        console.error('[Auth] API error:', errorText);
+        throw new Error(`API returned ${response.status}: ${errorText}`);
       }
     } catch (error: any) {
-      console.error('Failed to check auth methods:', error);
+      console.error('[Auth] Failed to check auth methods:', error);
       toast({
         variant: 'destructive',
         title: 'Något gick fel',
-        description: 'Kunde inte kontrollera autentiseringsmetoder.',
+        description: error.message || 'Kunde inte kontrollera autentiseringsmetoder.',
       });
     } finally {
       setLoading(false);
@@ -725,9 +737,13 @@ export default function Auth() {
               </div>
 
               <Button
-                onClick={handleCheckAuthMethods}
+                onClick={() => {
+                  console.log('[Auth] Fortsätt button clicked');
+                  handleCheckAuthMethods();
+                }}
                 disabled={loading || !email.trim()}
                 className="w-full h-12"
+                type="button"
               >
                 {loading ? 'Kontrollerar...' : 'Fortsätt'}
               </Button>
