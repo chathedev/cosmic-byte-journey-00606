@@ -1,12 +1,6 @@
 import { getUserIP } from '@/utils/ipDetection';
-
-// Dynamically resolve API base URL so the iOS app shell (io.tivly.se)
-// talks to its own backend origin instead of api.tivly.se, ensuring
-// that cookie-based authentication and /me work correctly there.
-const API_BASE_URL =
-  typeof window !== 'undefined' && window.location.hostname.includes('io.tivly.se')
-    ? 'https://io.tivly.se'
-    : 'https://api.tivly.se';
+ 
+const API_BASE_URL = 'https://api.tivly.se';
 
 interface User {
   id: string;
