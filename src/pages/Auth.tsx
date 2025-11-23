@@ -123,25 +123,21 @@ export default function Auth() {
 
   const handleCheckAuthMethods = async () => {
     const sanitized = sanitizeEmail(email);
-    
     if (!sanitized) {
       console.error('[Auth] Invalid email:', email);
       return;
     }
 
-    const onIoDomain = isIoDomain();
-
-    console.log('[Auth] Email validated, checking auth methods...', { onIoDomain });
+    console.log('[Auth] Email validated, checking auth methods...');
     setLoading(true);
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.error('[Auth] Request timed out after 10s');
+        console.error('[Auth] auth/check request timed out after 10s');
         controller.abort();
       }, 10000);
 
-      console.log('[Auth] Calling auth/check endpoint...');
       const response = await fetch('https://api.tivly.se/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,35 +147,27 @@ export default function Auth() {
       });
 
       clearTimeout(timeoutId);
-      console.log('[Auth] API response status:', response.status);
+      console.log('[Auth] auth/check status:', response.status);
 
       if (response.ok) {
         const data: AuthCheckResponse = await response.json();
-        console.log('[Auth] Auth methods:', data.authMethods);
         const { authMethods } = data;
 
-        // Backend says TOTP is configured -> show login screen
         if (authMethods.totp) {
           console.log('[Auth] TOTP enabled, switching to login screen');
           setViewMode('totp');
         } else {
-          // No TOTP configured -> start setup flow
           console.log('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
-      } else if (response.status === 404 || onIoDomain) {
-        // On io.tivly.se we ALWAYS trust backend to drive setup and never block on "no account" UI
-        console.log('[Auth] Non-success response, starting TOTP setup for io domain', {
-          status: response.status,
-          onIoDomain,
-        });
+      } else if (response.status === 404) {
+        console.log('[Auth] No user found, starting TOTP setup flow');
         await handleStartTotpSetup();
       } else {
         const errorText = await response.text();
-        console.error('[Auth] API error:', response.status, errorText);
-        throw new Error(`Servern svarade med fel (${response.status}): ${errorText}`);
+        console.error('[Auth] auth/check error:', response.status, errorText);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('[Auth] Error during auth check:', error);
     } finally {
       setLoading(false);
