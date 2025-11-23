@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+
 import { ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles, Copy, Check, Download, Smartphone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
@@ -74,7 +74,6 @@ async function generateQRCodeFromUrl(otpauthUrl: string): Promise<string> {
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user, isLoading, refreshUser } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -112,10 +111,6 @@ export default function Auth() {
           const data: AuthCheckResponse = await response.json();
           if (data.authMethods.totp) {
             setSetupPolling(false);
-            toast({
-              title: '✓ Konfiguration klar!',
-              description: 'Ange koden från din app för att logga in.',
-            });
           }
         }
       } catch (error) {
@@ -124,18 +119,13 @@ export default function Auth() {
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [setupPolling, email, toast]);
+  }, [setupPolling, email]);
 
   const handleCheckAuthMethods = async () => {
     const sanitized = sanitizeEmail(email);
     
     if (!sanitized) {
       console.error('[Auth] Invalid email:', email);
-      toast({
-        variant: 'destructive',
-        title: 'Ogiltig e-postadress',
-        description: 'Vänligen ange en giltig e-postadress.',
-      });
       return;
     }
 
@@ -191,21 +181,6 @@ export default function Auth() {
       }
     } catch (error: any) {
       console.error('[Auth] Error during auth check:', error);
-      
-      let errorMessage = 'Kunde inte ansluta till servern. Kontrollera din internetanslutning.';
-      
-      if (error.name === 'AbortError') {
-        errorMessage = 'Begäran tog för lång tid. Försök igen.';
-      } else if (error.message && !error.message.includes('Load failed')) {
-        errorMessage = error.message;
-      }
-
-      toast({
-        variant: 'destructive',
-        title: 'Anslutningsfel',
-        description: errorMessage,
-        duration: 5000,
-      });
     } finally {
       setLoading(false);
     }
@@ -217,27 +192,14 @@ export default function Auth() {
     try {
       await navigator.clipboard.writeText(totpSecret);
       setCopied(true);
-      toast({
-        title: '✓ Kopierat!',
-        description: 'Klistra nu in koden i din autentiseringsapp.',
-      });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Kunde inte kopiera',
-        description: 'Skriv av koden manuellt istället.',
-      });
+      console.error('Failed to copy TOTP secret:', error);
     }
   };
 
   const handleVerifyTotp = async () => {
     if (totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
-      toast({
-        variant: 'destructive',
-        title: 'Ogiltig kod',
-        description: 'Ange en giltig 6-siffrig kod.',
-      });
       return;
     }
 
@@ -258,29 +220,16 @@ export default function Auth() {
         const { token } = await response.json();
         apiClient.applyAuthToken(token);
 
-        toast({
-          title: '✓ Inloggad!',
-          description: 'Omdirigerar...',
-        });
 
         await refreshUser();
         setTimeout(() => navigate('/', { replace: true }), 300);
       } else {
         const error = await response.json();
-        toast({
-          variant: 'destructive',
-          title: 'Ogiltig kod',
-          description: error.message || 'Autentiseringen misslyckades. Kontrollera koden och försök igen.',
-        });
+        console.error('Invalid TOTP code:', error);
         setTotpCode('');
       }
     } catch (error: any) {
       console.error('TOTP verification failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Autentisering misslyckades',
-        description: 'Kontrollera din internetanslutning och försök igen.',
-      });
       setTotpCode('');
     } finally {
       setLoading(false);
@@ -337,11 +286,6 @@ export default function Auth() {
       setSetupPolling(true);
     } catch (error: any) {
       console.error('TOTP setup failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Kunde inte starta konfiguration',
-        description: 'Försök igen.',
-      });
     } finally {
       setLoading(false);
     }
@@ -349,11 +293,6 @@ export default function Auth() {
 
   const handleEnableTotp = async () => {
     if (totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
-      toast({
-        variant: 'destructive',
-        title: 'Ogiltig kod',
-        description: 'Ange en giltig 6-siffrig kod.',
-      });
       return;
     }
 
@@ -371,10 +310,6 @@ export default function Auth() {
       });
 
       if (response.ok) {
-        toast({
-          title: '✓ Autentiseringsapp aktiverad!',
-          description: 'Loggar in...',
-        });
         
         setTimeout(async () => {
           const checkResponse = await fetch('https://api.tivly.se/auth/check', {
@@ -393,20 +328,11 @@ export default function Auth() {
         }, 500);
       } else {
         const error = await response.json();
-        toast({
-          variant: 'destructive',
-          title: 'Ogiltig verifieringskod',
-          description: error.message || 'Kontrollera koden i din app och försök igen.',
-        });
+        console.error('Invalid TOTP setup code:', error);
         setTotpCode('');
       }
     } catch (error: any) {
       console.error('TOTP enable failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Kunde inte aktivera TOTP',
-        description: 'Kontrollera din internetanslutning och försök igen.',
-      });
       setTotpCode('');
     } finally {
       setLoading(false);
