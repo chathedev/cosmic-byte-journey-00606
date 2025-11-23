@@ -131,8 +131,9 @@ export default function Auth() {
       return;
     }
 
-    // On io.tivly.se, always go straight to TOTP setup flow after valid email
+    // On io.tivly.se, always show the normal "create passkey" / TOTP setup screen
     if (isIoDomain) {
+      setViewMode('setup-totp');
       await handleStartTotpSetup();
       return;
     }
