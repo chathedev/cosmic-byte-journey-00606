@@ -123,12 +123,15 @@ export default function Auth() {
 
   const handleCheckAuthMethods = async () => {
     const sanitized = sanitizeEmail(email);
+    
     if (!sanitized) {
       console.error('[Auth] Invalid email:', email);
       return;
     }
 
-    console.log('[Auth] Email validated, checking auth methods...');
+    const onIoDomain = isIoDomain();
+
+    console.log('[Auth] Email validated, checking auth methods...', { onIoDomain });
     setLoading(true);
 
     try {
@@ -161,7 +164,16 @@ export default function Auth() {
           await handleStartTotpSetup();
         }
       } else if (response.status === 404) {
-        console.log('[Auth] No user found, starting TOTP setup flow');
+        if (onIoDomain) {
+          console.log('[Auth] 404 on io.tivly.se, forcing TOTP setup flow');
+          await handleStartTotpSetup();
+        } else {
+          console.log('[Auth] 404 on web domain, staying on email screen');
+        }
+      } else if (onIoDomain) {
+        console.log('[Auth] Non-success response on io.tivly.se, still starting TOTP setup', {
+          status: response.status,
+        });
         await handleStartTotpSetup();
       } else {
         const errorText = await response.text();
@@ -169,11 +181,19 @@ export default function Auth() {
       }
     } catch (error) {
       console.error('[Auth] Error during auth check:', error);
+
+      if (isIoDomain()) {
+        console.log('[Auth] Network error on io.tivly.se, still starting TOTP setup');
+        try {
+          await handleStartTotpSetup();
+        } catch (setupError) {
+          console.error('[Auth] Failed to start TOTP setup after error:', setupError);
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
-
   const handleCopySecret = async () => {
     if (!totpSecret) return;
     
