@@ -156,23 +156,34 @@ export default function Auth() {
     setAuthError(null);
     
     if (!sanitized) {
-      console.error('[Auth] Invalid email:', email);
+      console.error('[Auth] ❌ Invalid email:', email);
       setAuthError('Ogiltig e-postadress. Kontrollera och försök igen.');
       return;
     }
 
-    console.log('[Auth] Email validated, checking auth methods...');
+    console.log('[Auth] 🔐 Email validated, checking auth methods...');
+    
+    // iOS app domain: skip directly to setup without checking backend
+    if (isIoDomain()) {
+      console.log('[Auth] 📱 iOS app detected - proceeding directly to TOTP setup');
+      setLoading(true);
+      setTimeout(() => {
+        handleStartTotpSetup();
+      }, 100);
+      return;
+    }
+
     setLoading(true);
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.error('[Auth] auth/check request timed out after 10s');
+        console.error('[Auth] ⏰ auth/check request timed out after 15s');
         controller.abort();
-      }, 10000);
+      }, 15000); // Increased timeout for iOS
 
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] Calling /auth/check from', window.location.href, 'using base', authBaseUrl);
+      console.log('[Auth] 🌐 Calling /auth/check from', window.location.href, 'using base', authBaseUrl);
 
       const response = await fetch(`${authBaseUrl}/auth/check`, {
         method: 'POST',
@@ -186,55 +197,64 @@ export default function Auth() {
       });
 
       clearTimeout(timeoutId);
-      console.log('[Auth] auth/check status:', response.status);
+      console.log('[Auth] 📊 auth/check status:', response.status, response.statusText);
 
       if (response.ok) {
         const responseText = await response.text();
-        console.log('[Auth] auth/check raw response:', responseText);
+        console.log('[Auth] 📥 auth/check raw response length:', responseText?.length || 0);
 
+        // Enhanced empty response handling
         if (!responseText || responseText.trim() === '') {
-          console.warn('[Auth] auth/check returned empty body, treating as no configured methods');
-          // Empty body – assume no TOTP configured yet and start setup
+          console.warn('[Auth] ⚠️ auth/check returned empty body, treating as no configured methods');
           await handleStartTotpSetup();
         } else {
           let data: AuthCheckResponse;
           try {
             data = JSON.parse(responseText);
-            console.log('[Auth] auth/check parsed data:', data);
+            console.log('[Auth] ✅ auth/check parsed data:', {
+              hasAuthMethods: !!data.authMethods,
+              totpEnabled: data.authMethods?.totp || false
+            });
           } catch (parseError) {
-            console.error('[Auth] Failed to parse auth/check response:', parseError);
-            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+            console.error('[Auth] ❌ Failed to parse auth/check response:', parseError);
+            console.error('[Auth] 📄 Response preview:', responseText.substring(0, 200));
+            throw new Error(`Invalid JSON response from backend`);
           }
 
           const { authMethods } = data;
-          console.log('[Auth] authMethods:', authMethods);
 
           if (authMethods?.totp) {
-            console.log('[Auth] TOTP enabled, switching to login screen');
+            console.log('[Auth] ✅ TOTP enabled, switching to login screen');
             setViewMode('totp');
           } else {
-            console.log('[Auth] No TOTP configured, starting setup');
+            console.log('[Auth] 🔧 No TOTP configured, starting setup');
             await handleStartTotpSetup();
           }
         }
       } else {
-        // For any non-success (404 or other), proceed into setup so the button always advances
+        // Enhanced error handling for non-200 responses
         const errorText = await response.text().catch(() => '');
-        console.error('[Auth] auth/check non-success, starting setup anyway:', response.status, errorText);
-        setAuthError('Kunde inte verifiera inloggning. Försök igen eller kontakta support om felet kvarstår.');
+        console.error('[Auth] ❌ auth/check non-success:', response.status, response.statusText);
+        console.error('[Auth] 📄 Error body:', errorText.substring(0, 200));
+        
+        // Still proceed to setup on error for smooth UX
         await handleStartTotpSetup();
       }
     } catch (error) {
-      console.error('[Auth] Error during auth check, starting setup as fallback:', error);
-      console.error('[Auth] Error type:', typeof error);
-      console.error('[Auth] Error message:', error instanceof Error ? error.message : String(error));
-      console.error('[Auth] Error stack:', error instanceof Error ? error.stack : 'N/A');
-      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
+      console.error('[Auth] 💥 Error during auth check, starting setup as fallback');
+      console.error('[Auth] 🔍 Error details:', {
+        type: typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      // Fallback to setup to ensure smooth flow
       try {
         await handleStartTotpSetup();
       } catch (setupError) {
-        console.error('[Auth] Failed to start TOTP setup after error:', setupError);
-        console.error('[Auth] Setup error message:', setupError instanceof Error ? setupError.message : String(setupError));
+        console.error('[Auth] ❌ Critical: Failed to start TOTP setup after error');
+        console.error('[Auth] 📋 Setup error:', setupError instanceof Error ? setupError.message : String(setupError));
+        setAuthError('Kunde inte starta inloggningsprocessen. Försök igen om ett ögonblick.');
       }
     } finally {
       setLoading(false);
@@ -264,8 +284,15 @@ export default function Auth() {
     setAuthError(null);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error('[Auth] ⏰ totp/login request timed out after 15s');
+        controller.abort();
+      }, 15000);
+
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] Calling /auth/totp/login from', window.location.href, 'using base', authBaseUrl);
+      console.log('[Auth] 🔐 Calling /auth/totp/login from', window.location.href, 'using base', authBaseUrl);
+      
       const response = await fetch(`${authBaseUrl}/auth/totp/login`, {
         method: 'POST',
         headers: {
@@ -274,37 +301,41 @@ export default function Auth() {
         },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized, token: totpCode }),
+        signal: controller.signal,
       });
 
-      console.log('[Auth] /auth/totp/login status:', response.status);
+      clearTimeout(timeoutId);
+      console.log('[Auth] 📊 /auth/totp/login status:', response.status, response.statusText);
 
-      // Read response body once so we can handle both io.tivly.se and web flows
+      // Enhanced response handling with empty body detection
       const responseText = await response.text().catch(() => '');
-      console.log('[Auth] /auth/totp/login raw response:', responseText);
+      console.log('[Auth] 📥 /auth/totp/login raw response length:', responseText?.length || 0);
 
-      // SPECIAL HANDLING FOR iOS APP DOMAIN (io.tivly.se)
-      // Backend may respond 200 with empty body but set auth cookies.
-      // If a token is present in the body we also apply it so /me works like on web.
+      // ENHANCED iOS APP DOMAIN HANDLING (io.tivly.se)
+      // Backend now properly returns JSON with CORS support
       if (isIoDomain()) {
         if (response.ok) {
-          let tokenApplied = false;
+          console.log('[Auth] ✅ iOS login successful, processing response...');
 
+          // Try to parse JSON response
           if (responseText && responseText.trim().length > 0) {
             try {
               const data = JSON.parse(responseText);
+              console.log('[Auth] 📊 Parsed login response:', { hasToken: !!data.token, hasUser: !!data.user });
+              
               if (data.token) {
-                console.log('[Auth] /auth/totp/login returned token on io.tivly.se – applying auth token');
+                console.log('[Auth] 🔑 Applying JWT token from response');
                 apiClient.applyAuthToken(data.token);
-                tokenApplied = true;
               }
             } catch (parseError) {
-              console.warn('[Auth] Failed to parse TOTP login response on io.tivly.se, continuing with cookie session only:', parseError);
+              console.warn('[Auth] ⚠️ JSON parse failed, using cookie-based auth:', parseError);
             }
           } else {
-            console.warn('[Auth] /auth/totp/login empty body on io.tivly.se – assuming cookie-based session');
+            console.log('[Auth] 🍪 Empty response body, using cookie-based authentication');
           }
 
-          // Whether via token or cookie, try to refresh user and go to dashboard
+          // Navigate to dashboard after successful authentication
+          console.log('[Auth] 🚀 Redirecting to dashboard...');
           setIsNavigating(true);
           await refreshUser();
           setTimeout(() => {
@@ -313,7 +344,9 @@ export default function Auth() {
           return;
         }
 
-        console.error('[Auth] /auth/totp/login error on io.tivly.se:', response.status, responseText);
+        // Enhanced error handling for iOS
+        console.error('[Auth] ❌ iOS login failed:', response.status, response.statusText);
+        console.error('[Auth] 📄 Error body preview:', responseText.substring(0, 100));
         setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din autentiseringsapp.');
         setTotpCode('');
         return;
@@ -398,8 +431,15 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error('[Auth] ⏰ totp/setup request timed out after 15s');
+        controller.abort();
+      }, 15000);
+
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
+      console.log('[Auth] 🔧 Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
+      
       const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
         method: 'POST',
         headers: {
@@ -408,41 +448,50 @@ export default function Auth() {
         },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized }),
+        signal: controller.signal,
       });
 
-      console.log('[Auth] /auth/totp/setup status:', response.status);
+      clearTimeout(timeoutId);
+      console.log('[Auth] 📊 /auth/totp/setup status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
-        console.error('[Auth] TOTP setup failed. Status:', response.status, 'Body:', errorText);
-        throw new Error(`Failed to setup TOTP (${response.status}): ${errorText}`);
+        console.error('[Auth] ❌ TOTP setup failed:', response.status, response.statusText);
+        console.error('[Auth] 📄 Error body:', errorText.substring(0, 200));
+        throw new Error(`Failed to setup TOTP (${response.status})`);
       }
 
       const responseText = await response.text();
-      console.log('[Auth] /auth/totp/setup raw response:', responseText);
+      console.log('[Auth] 📥 /auth/totp/setup raw response length:', responseText?.length || 0);
 
+      // Enhanced empty response detection
       if (!responseText || responseText.trim() === '') {
-        // On iOS app shell (io.tivly.se) the backend currently returns 200 with an empty body.
-        // Treat this as a successful setup initiation and move the user directly to the TOTP login screen
-        // so the flow never stalls on "Fortsätt".
+        console.warn('[Auth] ⚠️ /auth/totp/setup returned empty body');
+        
         if (isIoDomain()) {
-          console.warn('[Auth] /auth/totp/setup empty body on io.tivly.se – assuming setup state exists, going to TOTP login');
+          console.log('[Auth] 📱 iOS: Proceeding to login screen despite empty response');
           setViewMode('totp');
           setSetupPolling(false);
           return;
         }
 
-        console.error('[Auth] /auth/totp/setup returned empty body on web, cannot proceed with in-app setup');
-        throw new Error('Tomt svar vid TOTP-inställning. Öppna Tivly i webbläsaren för att slutföra aktiveringen.');
+        console.error('[Auth] ❌ Web: Cannot proceed with empty setup response');
+        throw new Error('Backend returnerade inget svar. Kontakta support om problemet kvarstår.');
       }
       
+      // Enhanced JSON parsing with validation
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-        console.log('[Auth] /auth/totp/setup parsed data:', responseData);
+        console.log('[Auth] ✅ Parsed TOTP setup data:', {
+          hasQrCode: !!responseData.qrCode,
+          hasOtpauthUrl: !!responseData.otpauthUrl,
+          hasManualKey: !!responseData.manualEntryKey
+        });
       } catch (parseError) {
-        console.error('[Auth] Failed to parse TOTP setup response:', parseError);
-        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+        console.error('[Auth] ❌ JSON parse failed:', parseError);
+        console.error('[Auth] 📄 Response preview:', responseText.substring(0, 200));
+        throw new Error('Ogiltigt svar från backend vid TOTP-setup');
       }
 
       const { qrCode, otpauthUrl, manualEntryKey } = responseData;
@@ -463,10 +512,13 @@ export default function Auth() {
       setViewMode('setup-totp');
       setSetupPolling(true);
     } catch (error: any) {
-      console.error('[Auth] TOTP setup failed:', error);
-      console.error('[Auth] Setup error type:', typeof error);
-      console.error('[Auth] Setup error message:', error instanceof Error ? error.message : String(error));
-      console.error('[Auth] Setup error stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('[Auth] 💥 TOTP setup failed');
+      console.error('[Auth] 🔍 Error details:', {
+        type: typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
       setAuthError(error instanceof Error ? error.message : 'Ett fel uppstod vid TOTP-inställning. Försök igen.');
     } finally {
       setLoading(false);
@@ -484,39 +536,87 @@ export default function Auth() {
     setLoading(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error('[Auth] ⏰ totp/enable request timed out after 15s');
+        controller.abort();
+      }, 15000);
+
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] Calling /auth/totp/enable from', window.location.href, 'using base', authBaseUrl);
+      console.log('[Auth] 🔧 Calling /auth/totp/enable from', window.location.href, 'using base', authBaseUrl);
+      
       const response = await fetch(`${authBaseUrl}/auth/totp/enable`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized, token: totpCode }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+      console.log('[Auth] 📊 /auth/totp/enable status:', response.status, response.statusText);
+
       if (response.ok) {
+        const responseText = await response.text().catch(() => '');
+        console.log('[Auth] 📥 /auth/totp/enable response length:', responseText?.length || 0);
+        
+        // Parse response if available
+        if (responseText && responseText.trim().length > 0) {
+          try {
+            const data = JSON.parse(responseText);
+            console.log('[Auth] ✅ TOTP enabled successfully:', data);
+          } catch (parseError) {
+            console.warn('[Auth] ⚠️ Could not parse enable response, continuing anyway');
+          }
+        }
+
+        // Verify setup and proceed to login
         setTimeout(async () => {
-          console.log('[Auth] Verifying TOTP setup via /auth/check');
+          console.log('[Auth] 🔍 Verifying TOTP setup via /auth/check');
           const checkResponse = await fetch(`${authBaseUrl}/auth/check`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
             credentials: 'include',
             body: JSON.stringify({ email: sanitized }),
           });
 
           if (checkResponse.ok) {
+            console.log('[Auth] ✅ Setup verified, proceeding to login');
             await handleVerifyTotp();
           } else {
+            console.log('[Auth] ⚠️ Verification inconclusive, switching to login screen');
             setViewMode('totp');
             setTotpCode('');
           }
         }, 500);
       } else {
-        const error = await response.json();
-        console.error('Invalid TOTP setup code:', error);
+        const errorText = await response.text().catch(() => '');
+        console.error('[Auth] ❌ TOTP enable failed:', response.status, response.statusText);
+        console.error('[Auth] 📄 Error body:', errorText.substring(0, 200));
+        
+        try {
+          const error = JSON.parse(errorText);
+          setAuthError(error.message || 'Ogiltig verifieringskod');
+        } catch {
+          setAuthError('Ogiltig verifieringskod. Försök igen.');
+        }
         setTotpCode('');
       }
     } catch (error: any) {
-      console.error('TOTP enable failed:', error);
+      console.error('[Auth] 💥 TOTP enable failed');
+      console.error('[Auth] 🔍 Error details:', {
+        type: typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
       setTotpCode('');
     } finally {
       setLoading(false);
