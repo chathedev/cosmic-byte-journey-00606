@@ -32,6 +32,12 @@ if ('serviceWorker' in navigator) {
 
 const rootElement = document.getElementById("root")!;
 
+// Migrate legacy hash URLs (/#/feedback → /feedback)
+if (window.location.hash.startsWith("#/")) {
+  const cleanPath = window.location.hash.slice(1); // "#/feedback" → "/feedback"
+  window.history.replaceState({}, document.title, cleanPath + window.location.search);
+}
+
 // Show content once React is ready to render
 requestAnimationFrame(() => {
   rootElement.classList.add('loaded');
