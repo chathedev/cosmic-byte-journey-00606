@@ -39,16 +39,22 @@ function sanitizeEmail(email: string | undefined): string | null {
   return trimmed && emailRegex.test(trimmed) ? trimmed : null;
 }
 
-// Detect if user is on mobile device
-function isMobileDevice(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-// Detect if running on the app-exclusive io.tivly.se domain
+// Detect if running on app.tivly.se (skip welcome screen)
 function isAppDomain(): boolean {
   if (typeof window === 'undefined') return false;
+  return window.location.hostname.includes('app.tivly.se');
+}
+
+// Detect if running on io.tivly.se (auto-proceed to setup)
+function isIoDomain(): boolean {
+  if (typeof window === 'undefined') return false;
   return window.location.hostname.includes('io.tivly.se');
+}
+
+// Detect if user is on iPhone specifically
+function isIPhone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /iPhone/i.test(navigator.userAgent);
 }
 
 // Generate QR code from otpauth:// URL
@@ -77,7 +83,6 @@ export default function Auth() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => (isAppDomain() ? 'email' : 'welcome'));
   const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
-  const [isMobile] = useState(isMobileDevice());
   const [copied, setCopied] = useState(false);
   const [setupPolling, setSetupPolling] = useState(false);
 
@@ -134,9 +139,9 @@ export default function Auth() {
       return;
     }
 
-    const onAppDomain = isAppDomain();
+    const onIoDomain = isIoDomain();
 
-    console.log('[Auth] Email validated, checking auth methods...', { onAppDomain });
+    console.log('[Auth] Email validated, checking auth methods...', { onIoDomain });
     setLoading(true);
     
     try {
@@ -172,10 +177,11 @@ export default function Auth() {
           console.log('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
-      } else if (response.status === 404 || onAppDomain) {
+      } else if (response.status === 404 || onIoDomain) {
         // On io.tivly.se we ALWAYS trust backend to drive setup and never block on "no account" UI
-        console.log('[Auth] Non-success response, starting TOTP setup anyway for app domain', {
+        console.log('[Auth] Non-success response, starting TOTP setup for io domain', {
           status: response.status,
+          onIoDomain,
         });
         await handleStartTotpSetup();
       } else {
@@ -319,8 +325,10 @@ export default function Auth() {
 
       const { qrCode, otpauthUrl, manualEntryKey } = await response.json();
       
-      // Only generate QR code for desktop
-      if (!isMobile) {
+      // Only generate QR code for desktop/non-iPhone devices
+      // Skip QR code on iPhone but show on PC/tablets/Android
+      const shouldShowQR = !isIPhone();
+      if (shouldShowQR) {
         if (qrCode) {
           setTotpQrCode(qrCode);
         } else if (otpauthUrl) {
@@ -502,7 +510,7 @@ export default function Auth() {
                  <CardDescription className="text-base">
                    {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
                    viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
-                   viewMode === 'setup-totp' ? (isMobile ? 'Följ instruktionerna nedan' : 'Skanna QR-koden med din autentiseringsapp') :
+                   viewMode === 'setup-totp' ? (isIPhone() ? 'Följ instruktionerna nedan' : 'Skanna QR-koden med din autentiseringsapp') :
                    'Ange din e-post för att fortsätta'}
                  </CardDescription>
               </div>
@@ -612,8 +620,8 @@ export default function Auth() {
             </div>
           ) : viewMode === 'setup-totp' ? (
             <div className="space-y-6">
-              {/* Desktop: Show QR code */}
-              {!isMobile && totpQrCode && (
+              {/* Desktop/Non-iPhone: Show QR code */}
+              {!isIPhone() && totpQrCode && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <p className="text-sm text-center font-medium">Skanna QR-koden med din app</p>
                   <div className="flex justify-center">
@@ -633,8 +641,8 @@ export default function Auth() {
                 </div>
               )}
 
-              {/* Mobile: Show manual code with copy button and instructions */}
-              {isMobile && totpSecret && (
+              {/* iPhone: Show manual code with copy button and instructions */}
+              {isIPhone() && totpSecret && (
                 <div className="space-y-4">
                   <Alert>
                     <Download className="h-4 w-4" />
