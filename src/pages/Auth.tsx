@@ -58,6 +58,22 @@ function isIPhone(): boolean {
   return /iPhone/i.test(navigator.userAgent);
 }
 
+// Determine which base URL to use for auth-related backend calls
+// Web: https://app.tivly.se
+// iOS app shell: https://io.tivly.se
+// Fallback: https://api.tivly.se (development/preview environments)
+function getAuthBaseUrl(): string {
+  if (typeof window === 'undefined') return 'https://api.tivly.se';
+  const hostname = window.location.hostname;
+
+  if (hostname.includes('io.tivly.se')) return 'https://io.tivly.se';
+  if (hostname.includes('app.tivly.se')) return 'https://app.tivly.se';
+
+  // Default for sandbox/preview or local environments
+  return 'https://api.tivly.se';
+}
+
+
 // Generate QR code from otpauth:// URL
 async function generateQRCodeFromUrl(otpauthUrl: string): Promise<string> {
   try {
@@ -85,6 +101,8 @@ export default function Auth() {
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [setupPolling, setSetupPolling] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -101,12 +119,15 @@ export default function Auth() {
       if (!sanitized) return;
 
       try {
-        const response = await fetch('https://api.tivly.se/auth/check', {
+        const authBaseUrl = getAuthBaseUrl();
+        console.log('[Auth] Polling /auth/check from', window.location.href, 'using base', authBaseUrl);
+        const response = await fetch(`${authBaseUrl}/auth/check`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ email: sanitized }),
         });
+
 
         if (response.ok) {
           const data: AuthCheckResponse = await response.json();
@@ -124,9 +145,11 @@ export default function Auth() {
 
   const handleCheckAuthMethods = async () => {
     const sanitized = sanitizeEmail(email);
+    setAuthError(null);
     
     if (!sanitized) {
       console.error('[Auth] Invalid email:', email);
+      setAuthError('Ogiltig e-postadress. Kontrollera och försök igen.');
       return;
     }
 
@@ -140,7 +163,10 @@ export default function Auth() {
         controller.abort();
       }, 10000);
 
-      const response = await fetch('https://api.tivly.se/auth/check', {
+      const authBaseUrl = getAuthBaseUrl();
+      console.log('[Auth] Calling /auth/check from', window.location.href, 'using base', authBaseUrl);
+
+      const response = await fetch(`${authBaseUrl}/auth/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -166,10 +192,12 @@ export default function Auth() {
         // For any non-success (404 or other), proceed into setup so the button always advances
         const errorText = await response.text().catch(() => '');
         console.error('[Auth] auth/check non-success, starting setup anyway:', response.status, errorText);
+        setAuthError('Kunde inte verifiera inloggning. Försök igen eller kontakta support om felet kvarstår.');
         await handleStartTotpSetup();
       }
     } catch (error) {
       console.error('[Auth] Error during auth check, starting setup as fallback:', error);
+      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
       try {
         await handleStartTotpSetup();
       } catch (setupError) {
@@ -202,7 +230,9 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const response = await fetch('https://api.tivly.se/auth/totp/login', {
+      const authBaseUrl = getAuthBaseUrl();
+      console.log('[Auth] Calling /auth/totp/login from', window.location.href, 'using base', authBaseUrl);
+      const response = await fetch(`${authBaseUrl}/auth/totp/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -249,7 +279,9 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const response = await fetch('https://api.tivly.se/auth/totp/setup', {
+      const authBaseUrl = getAuthBaseUrl();
+      console.log('[Auth] Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
+      const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -295,7 +327,9 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const response = await fetch('https://api.tivly.se/auth/totp/enable', {
+      const authBaseUrl = getAuthBaseUrl();
+      console.log('[Auth] Calling /auth/totp/enable from', window.location.href, 'using base', authBaseUrl);
+      const response = await fetch(`${authBaseUrl}/auth/totp/enable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -303,9 +337,9 @@ export default function Auth() {
       });
 
       if (response.ok) {
-        
         setTimeout(async () => {
-          const checkResponse = await fetch('https://api.tivly.se/auth/check', {
+          console.log('[Auth] Verifying TOTP setup via /auth/check');
+          const checkResponse = await fetch(`${authBaseUrl}/auth/check`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -759,6 +793,13 @@ export default function Auth() {
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {loading ? 'Kontrollerar...' : 'Fortsätt'}
               </Button>
+
+              {authError && (
+                <p className="text-xs text-destructive text-center mt-2">
+                  {authError}
+                </p>
+              )}
+
 
               <Button
                 variant="ghost"
