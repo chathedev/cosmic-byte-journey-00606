@@ -130,9 +130,7 @@ export default function Auth() {
       return;
     }
 
-    const onIoDomain = isIoDomain();
-
-    console.log('[Auth] Email validated, checking auth methods...', { onIoDomain });
+    console.log('[Auth] Email validated, checking auth methods...');
     setLoading(true);
 
     try {
@@ -164,32 +162,18 @@ export default function Auth() {
           console.log('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
-      } else if (response.status === 404) {
-        if (onIoDomain) {
-          console.log('[Auth] 404 on io.tivly.se, forcing TOTP setup flow');
-          await handleStartTotpSetup();
-        } else {
-          console.log('[Auth] 404 on web domain, staying on email screen');
-        }
-      } else if (onIoDomain) {
-        console.log('[Auth] Non-success response on io.tivly.se, still starting TOTP setup', {
-          status: response.status,
-        });
-        await handleStartTotpSetup();
       } else {
-        const errorText = await response.text();
-        console.error('[Auth] auth/check error:', response.status, errorText);
+        // For any non-success (404 or other), proceed into setup so the button always advances
+        const errorText = await response.text().catch(() => '');
+        console.error('[Auth] auth/check non-success, starting setup anyway:', response.status, errorText);
+        await handleStartTotpSetup();
       }
     } catch (error) {
-      console.error('[Auth] Error during auth check:', error);
-
-      if (isIoDomain()) {
-        console.log('[Auth] Network error on io.tivly.se, still starting TOTP setup');
-        try {
-          await handleStartTotpSetup();
-        } catch (setupError) {
-          console.error('[Auth] Failed to start TOTP setup after error:', setupError);
-        }
+      console.error('[Auth] Error during auth check, starting setup as fallback:', error);
+      try {
+        await handleStartTotpSetup();
+      } catch (setupError) {
+        console.error('[Auth] Failed to start TOTP setup after error:', setupError);
       }
     } finally {
       setLoading(false);
