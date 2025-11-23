@@ -117,9 +117,13 @@ export default function Auth() {
   }, [setupPolling, email, toast]);
 
   const handleCheckAuthMethods = async () => {
+    const isIoDomain = window.location.hostname.includes('io.tivly.se');
+    console.log('[Auth] Button clicked, checking auth methods for:', email);
+    
     const sanitized = sanitizeEmail(email);
     
     if (!sanitized) {
+      console.error('[Auth] Invalid email:', email);
       toast({
         variant: 'destructive',
         title: 'Ogiltig e-postadress',
@@ -128,12 +132,17 @@ export default function Auth() {
       return;
     }
 
+    console.log('[Auth] Email validated, starting API call...');
     setLoading(true);
     
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const timeoutId = setTimeout(() => {
+        console.error('[Auth] Request timed out after 10s');
+        controller.abort();
+      }, 10000);
 
+      console.log('[Auth] Fetching from API...');
       const response = await fetch('https://api.tivly.se/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,25 +152,48 @@ export default function Auth() {
       });
 
       clearTimeout(timeoutId);
+      console.log('[Auth] API response status:', response.status);
 
       if (response.ok) {
         const data: AuthCheckResponse = await response.json();
+        console.log('[Auth] Auth methods:', data.authMethods);
         const { authMethods } = data;
 
         if (authMethods.totp) {
+          console.log('[Auth] TOTP enabled, switching to TOTP view');
           setViewMode('totp');
+          setLoading(false);
         } else {
+          console.log('[Auth] No TOTP, starting setup');
           await handleStartTotpSetup();
         }
       } else if (response.status === 404) {
+        console.log('[Auth] User not found, switching to new-user view');
         setViewMode('new-user');
+        setLoading(false);
       } else {
         const errorText = await response.text();
         console.error('[Auth] API error:', response.status, errorText);
-        throw new Error(`Servern svarade med fel (${response.status})`);
+        
+        if (isIoDomain) {
+          toast({
+            variant: 'destructive',
+            title: `API Fel ${response.status}`,
+            description: errorText || 'Servern returnerade ett fel',
+            duration: 8000,
+          });
+        }
+        
+        // Force to new-user view on error for iOS to unblock user
+        if (isIoDomain) {
+          console.log('[Auth] Forcing new-user view on iOS due to error');
+          setViewMode('new-user');
+        } else {
+          throw new Error(`Servern svarade med fel (${response.status})`);
+        }
       }
     } catch (error: any) {
-      console.error('[Auth] Error:', error);
+      console.error('[Auth] Catch block error:', error);
       
       let errorMessage = 'Kunde inte ansluta till servern. Kontrollera din internetanslutning.';
       
@@ -171,14 +203,34 @@ export default function Auth() {
         errorMessage = error.message;
       }
 
-      toast({
-        variant: 'destructive',
-        title: 'Anslutningsfel',
-        description: errorMessage,
-        duration: 5000,
-      });
+      if (isIoDomain) {
+        toast({
+          variant: 'destructive',
+          title: 'Anslutningsfel',
+          description: `${errorMessage} (${error.name || 'Unknown error'})`,
+          duration: 8000,
+        });
+        
+        // Force to setup on iOS to unblock user
+        console.log('[Auth] Forcing new-user view on iOS due to network error');
+        setTimeout(() => {
+          setViewMode('new-user');
+          setLoading(false);
+        }, 1000);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Anslutningsfel',
+          description: errorMessage,
+          duration: 5000,
+        });
+      }
     } finally {
-      setLoading(false);
+      // Ensure loading is always cleared
+      setTimeout(() => {
+        console.log('[Auth] Clearing loading state');
+        setLoading(false);
+      }, 100);
     }
   };
 
