@@ -245,11 +245,6 @@ export default function Auth() {
     if (!sanitized) return;
 
     setLoading(true);
-    
-    toast({
-      title: 'Verifierar kod...',
-      description: 'Ett ögonblick...',
-    });
 
     try {
       const response = await fetch('https://api.tivly.se/auth/totp/login', {
@@ -366,11 +361,6 @@ export default function Auth() {
     if (!sanitized) return;
 
     setLoading(true);
-    
-    toast({
-      title: 'Aktiverar autentiseringsapp...',
-      description: 'Ett ögonblick...',
-    });
 
     try {
       const response = await fetch('https://api.tivly.se/auth/totp/enable', {
@@ -538,12 +528,7 @@ export default function Auth() {
                   <InputOTP
                     maxLength={6}
                     value={totpCode}
-                    onChange={(value) => {
-                      setTotpCode(value);
-                      if (value.length === 6 && /^\d{6}$/.test(value)) {
-                        handleVerifyTotp();
-                      }
-                    }}
+                    onChange={(value) => setTotpCode(value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && totpCode.length === 6) {
                         e.preventDefault();
@@ -692,12 +677,7 @@ export default function Auth() {
                   <InputOTP
                     maxLength={6}
                     value={totpCode}
-                    onChange={(value) => {
-                      setTotpCode(value);
-                      if (value.length === 6 && /^\d{6}$/.test(value)) {
-                        handleEnableTotp();
-                      }
-                    }}
+                    onChange={(value) => setTotpCode(value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && totpCode.length === 6) {
                         e.preventDefault();
