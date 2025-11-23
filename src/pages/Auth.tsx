@@ -81,7 +81,17 @@ export default function Auth() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [codeExpiry, setCodeExpiry] = useState<number>(600); // 10 minutes in seconds
+  const [platform, setPlatform] = useState<'ios' | 'web'>('web');
 
+
+  // Detect platform on mount
+  useEffect(() => {
+    const isIosDomain = window.location.hostname === 'io.tivly.se';
+    const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const detectedPlatform = isIosDomain || isIosDevice ? 'ios' : 'web';
+    setPlatform(detectedPlatform);
+    console.log(`[Auth] 🎯 Platform detected: ${detectedPlatform.toUpperCase()}`);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && user && !isNavigating) {
@@ -112,23 +122,26 @@ export default function Auth() {
     setAuthError(null);
     
     if (!sanitized) {
-      console.error('[Auth] ❌ Invalid email:', email);
-      setAuthError('Ogiltig e-postadress. Kontrollera och försök igen.');
+      console.error(`[Auth] ❌ Invalid email on ${platform} platform:`, email);
+      const errorMsg = platform === 'ios' 
+        ? 'Ange en giltig e-postadress'
+        : 'Ogiltig e-postadress. Kontrollera och försök igen.';
+      setAuthError(errorMsg);
       return;
     }
 
-    console.log('[Auth] 📧 Email validated, requesting verification code...');
+    console.log(`[Auth] 📧 Email validated for ${platform.toUpperCase()} platform, requesting verification code...`);
     setLoading(true);
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.error('[Auth] ⏰ totp/setup request timed out after 15s');
+        console.error(`[Auth] ⏰ totp/setup request timed out after 15s (${platform})`);
         controller.abort();
       }, 15000);
 
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] 🔧 Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
+      console.log(`[Auth] 🔧 Calling /auth/totp/setup from ${window.location.href} (${platform}) using base ${authBaseUrl}`);
       
       const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
         method: 'POST',
@@ -142,11 +155,11 @@ export default function Auth() {
       });
 
       clearTimeout(timeoutId);
-      console.log('[Auth] 📊 /auth/totp/setup status:', response.status, response.statusText);
+      console.log(`[Auth] 📊 /auth/totp/setup status: ${response.status} ${response.statusText} (${platform})`);
 
       if (response.ok) {
         const responseText = await response.text();
-        console.log('[Auth] 📥 Code request successful, showing verification screen');
+        console.log(`[Auth] 📥 Code request successful for ${platform}, showing verification screen`);
         
         // Reset expiry timer
         setCodeExpiry(600); // 10 minutes
@@ -154,12 +167,18 @@ export default function Auth() {
         setPinCode('');
       } else {
         const errorText = await response.text().catch(() => '');
-        console.error('[Auth] ❌ Code request failed:', response.status, response.statusText);
-        setAuthError('Kunde inte skicka verifieringskod. Försök igen.');
+        console.error(`[Auth] ❌ Code request failed (${platform}):`, response.status, response.statusText);
+        const errorMsg = platform === 'ios'
+          ? 'Kunde inte skicka kod. Försök igen.'
+          : 'Kunde inte skicka verifieringskod. Försök igen.';
+        setAuthError(errorMsg);
       }
     } catch (error) {
-      console.error('[Auth] 💥 Error requesting code:', error);
-      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
+      console.error(`[Auth] 💥 Error requesting code (${platform}):`, error);
+      const errorMsg = platform === 'ios'
+        ? 'Anslutningen misslyckades. Kontrollera din internetanslutning.'
+        : 'Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.';
+      setAuthError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -184,7 +203,7 @@ export default function Auth() {
       }, 15000);
 
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] 🔐 Calling /auth/totp/login from', window.location.href, 'using base', authBaseUrl);
+      console.log(`[Auth] 🔐 Calling /auth/totp/login from ${window.location.href} (${platform}) using base ${authBaseUrl}`);
       
       const response = await fetch(`${authBaseUrl}/auth/totp/login`, {
         method: 'POST',
@@ -198,14 +217,14 @@ export default function Auth() {
       });
 
       clearTimeout(timeoutId);
-      console.log('[Auth] 📊 /auth/totp/login status:', response.status, response.statusText);
+      console.log(`[Auth] 📊 /auth/totp/login status: ${response.status} ${response.statusText} (${platform})`);
 
       const responseText = await response.text().catch(() => '');
-      console.log('[Auth] 📥 /auth/totp/login raw response length:', responseText?.length || 0);
+      console.log(`[Auth] 📥 /auth/totp/login raw response length: ${responseText?.length || 0} (${platform})`);
 
       if (isIoDomain()) {
         if (response.ok) {
-          console.log('[Auth] ✅ iOS login successful, processing response...');
+          console.log(`[Auth] ✅ iOS login successful (${platform}), processing response...`);
 
           if (responseText && responseText.trim().length > 0) {
             try {
@@ -232,8 +251,8 @@ export default function Auth() {
           return;
         }
 
-        console.error('[Auth] ❌ iOS login failed:', response.status, response.statusText);
-        setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din e-post.');
+        console.error(`[Auth] ❌ iOS login failed (${platform}):`, response.status, response.statusText);
+        setAuthError('Fel kod. Försök igen eller begär en ny kod.');
         setPinCode('');
         return;
       }
@@ -337,10 +356,12 @@ export default function Auth() {
                   transition={{ delay: 0.2, duration: 0.4 }}
                 >
                   <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    Välkommen till Tivly
+                    {platform === 'ios' ? 'Välkommen till Tivly' : 'Välkommen till Tivly'}
                   </CardTitle>
                   <CardDescription className="text-lg">
-                    Säker och enkel inloggning med e-postkod
+                    {platform === 'ios' 
+                      ? 'Din smarta mötesassistent med AI - optimerad för iOS'
+                      : 'Säker och enkel inloggning med e-postkod'}
                   </CardDescription>
                 </motion.div>
               </CardHeader>
@@ -418,16 +439,22 @@ export default function Auth() {
                 transition={{ delay: 0.1, duration: 0.3 }}
               >
                  <CardTitle className="text-3xl font-bold">
-                   {viewMode === 'verify-code' ? 'Ange verifieringskod' : 
+                   {viewMode === 'verify-code' ? (platform === 'ios' ? 'Verifiera din kod' : 'Ange verifieringskod') : 
                    viewMode === 'awaiting-code' ? 'Kolla din e-post' :
                    viewMode === 'new-user' ? 'Välkommen!' :
-                   'Logga in'}
+                   (platform === 'ios' ? 'Logga in i Tivly' : 'Logga in')}
                  </CardTitle>
                  <CardDescription className="text-base">
-                   {viewMode === 'verify-code' ? 'Ange koden från din e-post' :
+                   {viewMode === 'verify-code' ? (
+                     platform === 'ios' 
+                       ? `Ange den 6-siffriga koden från ditt e-postmeddelande`
+                       : 'Ange koden från din e-post'
+                   ) :
                    viewMode === 'awaiting-code' ? 'Vi har skickat en 6-siffrig kod till din e-post' :
                    viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
-                   'Ange din e-post för att fortsätta'}
+                   (platform === 'ios' 
+                     ? 'Ange din e-postadress så skickar vi en 6-siffrig kod'
+                     : 'Ange din e-post för att fortsätta')}
                  </CardDescription>
                  
                  {/* Progress indicator */}
