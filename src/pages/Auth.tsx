@@ -97,19 +97,31 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => (isAppDomain() ? 'email' : 'welcome'));
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // Check if user has already seen welcome screen
+    const hasSeenWelcome = localStorage.getItem('tivly_seen_welcome') === 'true';
+    
+    // App domain or already seen welcome -> go straight to email
+    if (isAppDomain() || hasSeenWelcome) {
+      return 'email';
+    }
+    
+    return 'welcome';
+  });
   const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [setupPolling, setSetupPolling] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
 
 
   useEffect(() => {
-    if (!isLoading && user) {
-      navigate('/');
+    if (!isLoading && user && !isNavigating) {
+      setIsNavigating(true);
+      navigate('/', { replace: true });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, navigate, isNavigating]);
 
   // Poll for TOTP setup completion
   useEffect(() => {
@@ -271,8 +283,12 @@ export default function Auth() {
       if (isIoDomain()) {
         if (response.ok) {
           console.log('[Auth] /auth/totp/login success on io.tivly.se – assuming cookie-based session, refreshing user and navigating home');
+          setIsNavigating(true);
           await refreshUser();
-          setTimeout(() => navigate('/', { replace: true }), 300);
+          // Small delay to ensure auth state is updated
+          setTimeout(() => {
+            navigate('/', { replace: true });
+          }, 500);
           return;
         }
 
@@ -307,8 +323,11 @@ export default function Auth() {
 
         console.log('[Auth] TOTP login successful, applying auth token');
         apiClient.applyAuthToken(data.token);
+        setIsNavigating(true);
         await refreshUser();
-        setTimeout(() => navigate('/', { replace: true }), 300);
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 500);
       } else {
         // Handle error responses
         if (!responseText || responseText.trim() === '') {
@@ -350,6 +369,8 @@ export default function Auth() {
   };
 
   const handleGetStarted = () => {
+    // Mark that user has seen the welcome screen
+    localStorage.setItem('tivly_seen_welcome', 'true');
     setViewMode('email');
   };
 
