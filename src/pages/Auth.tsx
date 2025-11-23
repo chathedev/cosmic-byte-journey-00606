@@ -264,12 +264,32 @@ export default function Auth() {
       });
 
       console.log('[Auth] /auth/totp/login status:', response.status);
+
+      // SPECIAL HANDLING FOR iOS APP DOMAIN (io.tivly.se)
+      // Backend may respond 200 with empty body but set auth cookies.
+      // In that case we treat ANY 2xx as successful login and rely on cookies.
+      if (isIoDomain()) {
+        if (response.ok) {
+          console.log('[Auth] /auth/totp/login success on io.tivly.se – assuming cookie-based session, refreshing user and navigating home');
+          await refreshUser();
+          setTimeout(() => navigate('/', { replace: true }), 300);
+          return;
+        }
+
+        const errorText = await response.text().catch(() => '');
+        console.error('[Auth] /auth/totp/login error on io.tivly.se:', response.status, errorText);
+        setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din autentiseringsapp.');
+        setTotpCode('');
+        return;
+      }
+
+      // STANDARD WEB FLOW (expects JSON with token)
       const responseText = await response.text();
       console.log('[Auth] /auth/totp/login raw response:', responseText);
 
       if (response.ok) {
         if (!responseText || responseText.trim() === '') {
-          console.error('[Auth] /auth/totp/login returned empty body on success');
+          console.error('[Auth] /auth/totp/login returned empty body on success (web)');
           setAuthError('Servern returnerade ett tomt svar. Försök igen.');
           setTotpCode('');
           return;
@@ -292,7 +312,7 @@ export default function Auth() {
       } else {
         // Handle error responses
         if (!responseText || responseText.trim() === '') {
-          console.error('[Auth] /auth/totp/login returned empty error body');
+          console.error('[Auth] /auth/totp/login returned empty error body (web)');
           setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din app.');
           setTotpCode('');
           return;
