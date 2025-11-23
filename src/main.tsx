@@ -38,6 +38,13 @@ if (window.location.hash.startsWith("#/")) {
   window.history.replaceState({}, document.title, cleanPath + window.location.search);
 }
 
+// Handle 404 redirects from 404.html
+const redirectPath = sessionStorage.getItem('redirectPath');
+if (redirectPath) {
+  sessionStorage.removeItem('redirectPath');
+  window.history.replaceState({}, document.title, redirectPath);
+}
+
 // Show content once React is ready to render
 requestAnimationFrame(() => {
   rootElement.classList.add('loaded');
