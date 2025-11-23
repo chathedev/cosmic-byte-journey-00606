@@ -323,7 +323,17 @@ export default function Auth() {
       console.log('[Auth] /auth/totp/setup raw response:', responseText);
 
       if (!responseText || responseText.trim() === '') {
-        console.error('[Auth] /auth/totp/setup returned empty body, cannot proceed with in-app setup');
+        // On iOS app shell (io.tivly.se) the backend currently returns 200 with an empty body.
+        // Treat this as a successful setup initiation and move the user directly to the TOTP login screen
+        // so the flow never stalls on "Fortsätt".
+        if (isIoDomain()) {
+          console.warn('[Auth] /auth/totp/setup empty body on io.tivly.se – assuming setup state exists, going to TOTP login');
+          setViewMode('totp');
+          setSetupPolling(false);
+          return;
+        }
+
+        console.error('[Auth] /auth/totp/setup returned empty body on web, cannot proceed with in-app setup');
         throw new Error('Tomt svar vid TOTP-inställning. Öppna Tivly i webbläsaren för att slutföra aktiveringen.');
       }
       
@@ -358,6 +368,7 @@ export default function Auth() {
       console.error('[Auth] Setup error type:', typeof error);
       console.error('[Auth] Setup error message:', error instanceof Error ? error.message : String(error));
       console.error('[Auth] Setup error stack:', error instanceof Error ? error.stack : 'N/A');
+      setAuthError(error instanceof Error ? error.message : 'Ett fel uppstod vid TOTP-inställning. Försök igen.');
     } finally {
       setLoading(false);
     }
