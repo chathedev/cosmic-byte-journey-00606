@@ -116,8 +116,6 @@ export default function Auth() {
   }, [setupPolling, email, toast]);
 
   const handleCheckAuthMethods = async () => {
-    const isIoDomain = window.location.hostname.includes('io.tivly.se');
-
     const sanitized = sanitizeEmail(email);
     
     if (!sanitized) {
@@ -130,14 +128,7 @@ export default function Auth() {
       return;
     }
 
-    // On io.tivly.se, always show the normal "create passkey" / TOTP setup screen
-    if (isIoDomain) {
-      setViewMode('setup-totp');
-      await handleStartTotpSetup();
-      return;
-    }
-
-    console.log('[Auth] Email validated, starting API call...');
+    console.log('[Auth] Email validated, checking auth methods...');
     setLoading(true);
     
     try {
@@ -147,7 +138,7 @@ export default function Auth() {
         controller.abort();
       }, 10000);
 
-      console.log('[Auth] Fetching from API...');
+      console.log('[Auth] Calling auth/check endpoint...');
       const response = await fetch('https://api.tivly.se/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,40 +155,26 @@ export default function Auth() {
         console.log('[Auth] Auth methods:', data.authMethods);
         const { authMethods } = data;
 
+        // Backend says TOTP is configured -> show login screen
         if (authMethods.totp) {
-          console.log('[Auth] TOTP enabled, switching to TOTP view');
+          console.log('[Auth] TOTP enabled, switching to login screen');
           setViewMode('totp');
-          setLoading(false);
         } else {
-          console.log('[Auth] No TOTP, starting setup');
+          // No TOTP configured -> start setup flow
+          console.log('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
       } else if (response.status === 404) {
-        console.log('[Auth] User not found, starting TOTP setup for new user');
+        // User not found -> start setup flow (new user)
+        console.log('[Auth] User not found (404), starting TOTP setup');
         await handleStartTotpSetup();
       } else {
         const errorText = await response.text();
         console.error('[Auth] API error:', response.status, errorText);
-        
-        if (isIoDomain) {
-          toast({
-            variant: 'destructive',
-            title: `API Fel ${response.status}`,
-            description: errorText || 'Servern returnerade ett fel',
-            duration: 8000,
-          });
-        }
-        
-        // Force to setup flow on error for iOS to unblock user
-        if (isIoDomain) {
-          console.log('[Auth] Starting TOTP setup on iOS due to error');
-          await handleStartTotpSetup();
-        } else {
-          throw new Error(`Servern svarade med fel (${response.status})`);
-        }
+        throw new Error(`Servern svarade med fel (${response.status}): ${errorText}`);
       }
     } catch (error: any) {
-      console.error('[Auth] Catch block error:', error);
+      console.error('[Auth] Error during auth check:', error);
       
       let errorMessage = 'Kunde inte ansluta till servern. Kontrollera din internetanslutning.';
       
@@ -207,33 +184,14 @@ export default function Auth() {
         errorMessage = error.message;
       }
 
-      if (isIoDomain) {
-        toast({
-          variant: 'destructive',
-          title: 'Anslutningsfel',
-          description: `${errorMessage} (${error.name || 'Unknown error'})`,
-          duration: 8000,
-        });
-        
-        // Force to setup flow on iOS to unblock user
-        console.log('[Auth] Starting TOTP setup on iOS due to network error');
-        setTimeout(async () => {
-          await handleStartTotpSetup();
-        }, 1000);
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Anslutningsfel',
-          description: errorMessage,
-          duration: 5000,
-        });
-      }
+      toast({
+        variant: 'destructive',
+        title: 'Anslutningsfel',
+        description: errorMessage,
+        duration: 5000,
+      });
     } finally {
-      // Ensure loading is always cleared
-      setTimeout(() => {
-        console.log('[Auth] Clearing loading state');
-        setLoading(false);
-      }, 100);
+      setLoading(false);
     }
   };
 

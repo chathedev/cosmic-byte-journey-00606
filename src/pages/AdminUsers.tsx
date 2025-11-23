@@ -11,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck } from 'lucide-react';
+import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { backendApi } from '@/lib/backendApi';
 
 interface UserData {
   email: string;
@@ -69,6 +70,8 @@ export default function AdminUsers() {
   const [resetUsageUser, setResetUsageUser] = useState<UserData | null>(null);
   const [resetNote, setResetNote] = useState('');
   const [isResettingUsage, setIsResettingUsage] = useState(false);
+  const [resetAuthUser, setResetAuthUser] = useState<UserData | null>(null);
+  const [isResettingAuth, setIsResettingAuth] = useState(false);
   const { toast } = useToast();
 
   // Filter users based on search
@@ -328,6 +331,32 @@ export default function AdminUsers() {
         description: 'Kunde inte öppna Stripe dashboard',
         variant: "destructive",
       });
+    }
+  };
+
+  const handleResetAuth = async () => {
+    if (!resetAuthUser) return;
+
+    setIsResettingAuth(true);
+    try {
+      await backendApi.resetUserAuth(resetAuthUser.email);
+      
+      toast({
+        title: '✓ Auth Reset',
+        description: `Återställde passkey/TOTP för ${resetAuthUser.email}. Användaren måste registrera sig igen.`,
+      });
+      
+      setResetAuthUser(null);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Failed to reset auth:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Reset Failed',
+        description: error.message || 'Det gick inte att återställa auth-data',
+      });
+    } finally {
+      setIsResettingAuth(false);
     }
   };
 
@@ -783,6 +812,15 @@ export default function AdminUsers() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => setResetAuthUser(user)}
+                          className="h-9 px-2 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+                          title="Reset authentication (passkey/TOTP)"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setDeleteUser(user)}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                         >
@@ -950,6 +988,49 @@ export default function AdminUsers() {
                 </>
               ) : (
                 'Reset Usage'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Auth Dialog */}
+      <AlertDialog open={!!resetAuthUser} onOpenChange={(open) => { if (!open) setResetAuthUser(null); }}>
+        <AlertDialogContent className="border-blue-500/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <KeyRound className="w-5 h-5" />
+              Återställ Autentisering
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Detta kommer att återställa all autentiseringsdata för <span className="font-semibold text-foreground">{resetAuthUser?.email}</span>:
+              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                <li>Radera alla passkey-nycklar</li>
+                <li>Inaktivera TOTP (authenticator app)</li>
+                <li>Rensa alla pågående verifieringar</li>
+              </ul>
+              <span className="block mt-3 font-medium text-blue-600 dark:text-blue-400">
+                Användaren måste registrera en ny passkey eller TOTP för att logga in igen.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResettingAuth}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetAuth}
+              disabled={isResettingAuth}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {isResettingAuth ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Återställer...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  Återställ Auth
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

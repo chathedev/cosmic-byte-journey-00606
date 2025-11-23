@@ -311,4 +311,21 @@ export const backendApi = {
 
     return response.json();
   },
+
+  // Admin Auth Management
+  async resetUserAuth(email: string): Promise<{ ok: boolean; user: any }> {
+    const response = await fetch(`${BACKEND_URL}/admin/users/auth/reset`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Det gick inte att återställa auth-data' }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
 };
