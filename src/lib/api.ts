@@ -769,6 +769,12 @@ class ApiClient {
   }
 
   isAuthenticated(): boolean {
+    // On io.tivly.se (native app shell), authentication is cookie-based only.
+    // We should not block auth checks just because there is no bearer token.
+    if (typeof window !== 'undefined' && window.location.hostname.includes('io.tivly.se')) {
+      return true;
+    }
+
     return !!this.getToken();
   }
 
