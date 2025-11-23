@@ -13,6 +13,7 @@ import tivlyLogo from '@/assets/tivly-logo.png';
 import QRCode from 'qrcode';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DevConsole } from '@/components/DevConsole';
 
 /**
  * Auth - TOTP-only authentication (App-based)
@@ -368,6 +369,9 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+      {/* Dev Console - only on iOS app domain */}
+      {isIoDomain() && <DevConsole />}
+      
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
       
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-sm bg-card/95">
