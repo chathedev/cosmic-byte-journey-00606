@@ -691,6 +691,15 @@ export default function AdminUsers() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                onClick={() => setResetAuthUser(user)}
+                                className="h-9 w-9 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+                                title="Reset authentication (passkey/TOTP)"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => setDeleteUser(user)}
                                 className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                                 title="Delete user"
