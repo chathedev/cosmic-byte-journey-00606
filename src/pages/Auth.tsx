@@ -128,7 +128,10 @@ export default function Auth() {
         console.log('[Auth] Polling /auth/check from', window.location.href, 'using base', authBaseUrl);
         const response = await fetch(`${authBaseUrl}/auth/check`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
           credentials: 'include',
           body: JSON.stringify({ email: sanitized }),
         });
@@ -169,15 +172,13 @@ export default function Auth() {
       }, 10000);
 
       const authBaseUrl = getAuthBaseUrl();
-      const originHeader = isIoDomain() ? 'https://io.tivly.se' : (typeof window !== 'undefined' ? window.location.origin : 'https://app.tivly.se');
-      console.log('[Auth] Calling /auth/check from', window.location.href, 'using base', authBaseUrl, 'with Origin', originHeader);
+      console.log('[Auth] Calling /auth/check from', window.location.href, 'using base', authBaseUrl);
 
       const response = await fetch(`${authBaseUrl}/auth/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Origin': originHeader,
         },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized }),
@@ -264,14 +265,12 @@ export default function Auth() {
 
     try {
       const authBaseUrl = getAuthBaseUrl();
-      const originHeader = isIoDomain() ? 'https://io.tivly.se' : (typeof window !== 'undefined' ? window.location.origin : 'https://app.tivly.se');
-      console.log('[Auth] Calling /auth/totp/login from', window.location.href, 'using base', authBaseUrl, 'with Origin', originHeader);
+      console.log('[Auth] Calling /auth/totp/login from', window.location.href, 'using base', authBaseUrl);
       const response = await fetch(`${authBaseUrl}/auth/totp/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Origin': originHeader,
         },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized, token: totpCode }),
@@ -400,14 +399,12 @@ export default function Auth() {
     setLoading(true);
     try {
       const authBaseUrl = getAuthBaseUrl();
-      const originHeader = isIoDomain() ? 'https://io.tivly.se' : (typeof window !== 'undefined' ? window.location.origin : 'https://app.tivly.se');
-      console.log('[Auth] Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl, 'with Origin', originHeader);
+      console.log('[Auth] Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
       const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Origin': originHeader,
         },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized }),
