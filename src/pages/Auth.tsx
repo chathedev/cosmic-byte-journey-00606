@@ -277,32 +277,48 @@ export default function Auth() {
 
       console.log('[Auth] /auth/totp/login status:', response.status);
 
+      // Read response body once so we can handle both io.tivly.se and web flows
+      const responseText = await response.text().catch(() => '');
+      console.log('[Auth] /auth/totp/login raw response:', responseText);
+
       // SPECIAL HANDLING FOR iOS APP DOMAIN (io.tivly.se)
       // Backend may respond 200 with empty body but set auth cookies.
-      // In that case we treat ANY 2xx as successful login and rely on cookies.
+      // If a token is present in the body we also apply it so /me works like on web.
       if (isIoDomain()) {
         if (response.ok) {
-          console.log('[Auth] /auth/totp/login success on io.tivly.se – assuming cookie-based session, refreshing user and navigating home');
+          let tokenApplied = false;
+
+          if (responseText && responseText.trim().length > 0) {
+            try {
+              const data = JSON.parse(responseText);
+              if (data.token) {
+                console.log('[Auth] /auth/totp/login returned token on io.tivly.se – applying auth token');
+                apiClient.applyAuthToken(data.token);
+                tokenApplied = true;
+              }
+            } catch (parseError) {
+              console.warn('[Auth] Failed to parse TOTP login response on io.tivly.se, continuing with cookie session only:', parseError);
+            }
+          } else {
+            console.warn('[Auth] /auth/totp/login empty body on io.tivly.se – assuming cookie-based session');
+          }
+
+          // Whether via token or cookie, try to refresh user and go to dashboard
           setIsNavigating(true);
           await refreshUser();
-          // Small delay to ensure auth state is updated
           setTimeout(() => {
             navigate('/', { replace: true });
           }, 500);
           return;
         }
 
-        const errorText = await response.text().catch(() => '');
-        console.error('[Auth] /auth/totp/login error on io.tivly.se:', response.status, errorText);
+        console.error('[Auth] /auth/totp/login error on io.tivly.se:', response.status, responseText);
         setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din autentiseringsapp.');
         setTotpCode('');
         return;
       }
 
       // STANDARD WEB FLOW (expects JSON with token)
-      const responseText = await response.text();
-      console.log('[Auth] /auth/totp/login raw response:', responseText);
-
       if (response.ok) {
         if (!responseText || responseText.trim() === '') {
           console.error('[Auth] /auth/totp/login returned empty body on success (web)');
