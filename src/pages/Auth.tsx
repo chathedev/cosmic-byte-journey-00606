@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
-import { ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles, Copy, Check, Download, Smartphone } from 'lucide-react';
+import { ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles, Copy, Check, Download, Smartphone, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
 import QRCode from 'qrcode';
 import { apiClient } from '@/lib/api';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * Auth - TOTP-only authentication (App-based)
@@ -352,24 +353,41 @@ export default function Auth() {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
       
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-sm bg-card/95">
-        {viewMode === 'welcome' ? (
-          <>
-            <CardHeader className="space-y-6 text-center pb-8 pt-12">
-              <div className="mx-auto w-32 h-32 animate-in fade-in zoom-in duration-500">
-                <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-              </div>
-              
-              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-                <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                  Välkommen till Tivly
-                </CardTitle>
-                <CardDescription className="text-lg">
-                  Säker och enkel inloggning med autentiseringsapp
-                </CardDescription>
-              </div>
-            </CardHeader>
+        <AnimatePresence mode="wait">
+          {viewMode === 'welcome' ? (
+            <motion.div
+              key="welcome"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <CardHeader className="space-y-6 text-center pb-8 pt-12">
+                <motion.div 
+                  className="mx-auto w-32 h-32"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4 }}
+                >
+                  <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
+                </motion.div>
+                
+                <motion.div 
+                  className="space-y-3"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.4 }}
+                >
+                  <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                    Välkommen till Tivly
+                  </CardTitle>
+                  <CardDescription className="text-lg">
+                    Säker och enkel inloggning med autentiseringsapp
+                  </CardDescription>
+                </motion.div>
+              </CardHeader>
 
-            <CardContent className="pb-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+              <CardContent className="pb-12 space-y-6">{/* ... keep existing code */}
               <div className="space-y-4">
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                   <div className="flex items-start gap-3">
@@ -416,15 +434,31 @@ export default function Auth() {
                 Kom igång
               </Button>
             </CardContent>
-          </>
+          </motion.div>
         ) : (
-          <>
+          <motion.div
+            key={viewMode}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.25 }}
+          >
             <CardHeader className="space-y-4 text-center pb-8">
-              <div className="mx-auto w-24 h-24">
+              <motion.div 
+                className="mx-auto w-24 h-24"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
                 <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-              </div>
+              </motion.div>
               
-              <div className="space-y-2">
+              <motion.div 
+                className="space-y-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+              >
                  <CardTitle className="text-3xl font-bold">
                    {viewMode === 'totp' ? 'Ange verifieringskod' : 
                    viewMode === 'new-user' ? 'Välkommen!' :
@@ -437,12 +471,34 @@ export default function Auth() {
                    viewMode === 'setup-totp' ? (isIPhone() ? 'Följ instruktionerna nedan' : 'Skanna QR-koden med din autentiseringsapp') :
                    'Ange din e-post för att fortsätta'}
                  </CardDescription>
-              </div>
+                 
+                 {/* Progress indicator */}
+                 {(viewMode === 'email' || viewMode === 'setup-totp' || viewMode === 'totp') && (
+                   <motion.div 
+                     className="flex gap-1.5 justify-center pt-3"
+                     initial={{ opacity: 0 }}
+                     animate={{ opacity: 1 }}
+                     transition={{ delay: 0.2 }}
+                   >
+                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'email' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
+                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'setup-totp' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
+                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'totp' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
+                   </motion.div>
+                 )}
+              </motion.div>
             </CardHeader>
 
             <CardContent className="pb-8">
-              {viewMode === 'totp' ? (
-            <div className="space-y-6">
+              <AnimatePresence mode="wait">
+                {viewMode === 'totp' ? (
+              <motion.div 
+                key="totp-view"
+                className="space-y-6"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <div className="flex items-start gap-3">
                   <KeyRound className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
@@ -509,12 +565,20 @@ export default function Auth() {
                   disabled={loading || totpCode.length !== 6}
                   className="flex-1"
                 >
+                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {loading ? 'Verifierar...' : 'Verifiera'}
                 </Button>
               </div>
-            </div>
-          ) : viewMode === 'new-user' ? (
-            <div className="space-y-6">
+              </motion.div>
+            ) : viewMode === 'new-user' ? (
+              <motion.div 
+                key="new-user-view"
+                className="space-y-6"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
@@ -536,9 +600,16 @@ export default function Auth() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Tillbaka
               </Button>
-            </div>
-          ) : viewMode === 'setup-totp' ? (
-            <div className="space-y-6">
+              </motion.div>
+            ) : viewMode === 'setup-totp' ? (
+              <motion.div 
+                key="setup-totp-view"
+                className="space-y-6"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
               {/* Desktop/Non-iPhone: Show QR code */}
               {!isIPhone() && totpQrCode && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
@@ -654,6 +725,7 @@ export default function Auth() {
                   disabled={loading || totpCode.length !== 6}
                   className="flex-1"
                 >
+                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {loading ? 'Aktiverar...' : 'Aktivera'}
                 </Button>
               </div>
@@ -663,9 +735,16 @@ export default function Auth() {
                   Sidan uppdateras automatiskt när konfigurationen är klar...
                 </p>
               )}
-            </div>
-          ) : (
-            <div className="space-y-6">
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="email-view"
+                className="space-y-6"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
               <div className="space-y-2">
                 <Label htmlFor="email">E-postadress</Label>
                 <Input
@@ -690,9 +769,10 @@ export default function Auth() {
               <Button
                 onClick={handleCheckAuthMethods}
                 disabled={loading || !email.trim()}
-                className="w-full h-12"
+                className="w-full h-12 relative"
                 type="button"
               >
+                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {loading ? 'Kontrollerar...' : 'Fortsätt'}
               </Button>
 
@@ -704,11 +784,13 @@ export default function Auth() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Tillbaka
               </Button>
-            </div>
-          )}
+              </motion.div>
+            )}
+              </AnimatePresence>
             </CardContent>
-          </>
+          </motion.div>
         )}
+        </AnimatePresence>
       </Card>
     </div>
   );
