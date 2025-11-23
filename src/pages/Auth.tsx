@@ -168,9 +168,8 @@ export default function Auth() {
           await handleStartTotpSetup();
         }
       } else if (response.status === 404) {
-        console.log('[Auth] User not found, switching to new-user view');
-        setViewMode('new-user');
-        setLoading(false);
+        console.log('[Auth] User not found, starting TOTP setup for new user');
+        await handleStartTotpSetup();
       } else {
         const errorText = await response.text();
         console.error('[Auth] API error:', response.status, errorText);
@@ -184,10 +183,10 @@ export default function Auth() {
           });
         }
         
-        // Force to new-user view on error for iOS to unblock user
+        // Force to setup flow on error for iOS to unblock user
         if (isIoDomain) {
-          console.log('[Auth] Forcing new-user view on iOS due to error');
-          setViewMode('new-user');
+          console.log('[Auth] Starting TOTP setup on iOS due to error');
+          await handleStartTotpSetup();
         } else {
           throw new Error(`Servern svarade med fel (${response.status})`);
         }
@@ -211,11 +210,10 @@ export default function Auth() {
           duration: 8000,
         });
         
-        // Force to setup on iOS to unblock user
-        console.log('[Auth] Forcing new-user view on iOS due to network error');
-        setTimeout(() => {
-          setViewMode('new-user');
-          setLoading(false);
+        // Force to setup flow on iOS to unblock user
+        console.log('[Auth] Starting TOTP setup on iOS due to network error');
+        setTimeout(async () => {
+          await handleStartTotpSetup();
         }, 1000);
       } else {
         toast({
