@@ -251,6 +251,7 @@ export default function Auth() {
     if (!sanitized) return;
 
     setLoading(true);
+    setAuthError(null);
 
     try {
       const authBaseUrl = getAuthBaseUrl();
@@ -262,20 +263,57 @@ export default function Auth() {
         body: JSON.stringify({ email: sanitized, token: totpCode }),
       });
 
+      console.log('[Auth] /auth/totp/login status:', response.status);
+      const responseText = await response.text();
+      console.log('[Auth] /auth/totp/login raw response:', responseText);
+
       if (response.ok) {
-        const { token } = await response.json();
-        apiClient.applyAuthToken(token);
+        if (!responseText || responseText.trim() === '') {
+          console.error('[Auth] /auth/totp/login returned empty body on success');
+          setAuthError('Servern returnerade ett tomt svar. Försök igen.');
+          setTotpCode('');
+          return;
+        }
 
+        let data: { token: string };
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('[Auth] Failed to parse TOTP login response:', parseError);
+          setAuthError('Ogiltigt svar från servern. Försök igen.');
+          setTotpCode('');
+          return;
+        }
 
+        console.log('[Auth] TOTP login successful, applying auth token');
+        apiClient.applyAuthToken(data.token);
         await refreshUser();
         setTimeout(() => navigate('/', { replace: true }), 300);
       } else {
-        const error = await response.json();
-        console.error('Invalid TOTP code:', error);
+        // Handle error responses
+        if (!responseText || responseText.trim() === '') {
+          console.error('[Auth] /auth/totp/login returned empty error body');
+          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din app.');
+          setTotpCode('');
+          return;
+        }
+
+        try {
+          const error = JSON.parse(responseText);
+          console.error('[Auth] TOTP login error:', error);
+          setAuthError(error.error || error.message || 'Ogiltig kod. Försök igen.');
+        } catch {
+          console.error('[Auth] Non-JSON error response:', responseText);
+          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din app.');
+        }
         setTotpCode('');
       }
     } catch (error: any) {
-      console.error('TOTP verification failed:', error);
+      console.error('[Auth] TOTP verification failed:', error);
+      console.error('[Auth] Error type:', typeof error);
+      console.error('[Auth] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[Auth] Error stack:', error instanceof Error ? error.stack : 'N/A');
+      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
       setTotpCode('');
     } finally {
       setLoading(false);
