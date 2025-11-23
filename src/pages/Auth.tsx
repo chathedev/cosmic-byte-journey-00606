@@ -5,19 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
-import { ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles, Copy, Check, Download, Smartphone, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles, Mail, Loader2, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
-import QRCode from 'qrcode';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DevConsole } from '@/components/DevConsole';
 
 /**
- * Auth - TOTP-only authentication (App-based)
+ * Auth - Email + PIN authentication
  * Works on both app.tivly.se and io.tivly.se domains
+ * Users receive 6-digit codes via email
  */
 
 declare global {
@@ -26,7 +26,7 @@ declare global {
   }
 }
 
-type ViewMode = 'welcome' | 'email' | 'totp' | 'new-user' | 'setup-totp';
+type ViewMode = 'welcome' | 'email' | 'verify-code' | 'new-user' | 'awaiting-code';
 
 interface AuthCheckResponse {
   authMethods: {
@@ -53,12 +53,6 @@ function isIoDomain(): boolean {
   return window.location.hostname.includes('io.tivly.se');
 }
 
-// Detect if user is on iPhone specifically
-function isIPhone(): boolean {
-  if (typeof window === 'undefined') return false;
-  return /iPhone/i.test(navigator.userAgent);
-}
-
 // Determine which base URL to use for auth-related backend calls
 // For iOS app shell (io.tivly.se) the backend is still api.tivly.se –
 // we only vary the Origin header, not the server URL.
@@ -66,28 +60,12 @@ function getAuthBaseUrl(): string {
   return 'https://api.tivly.se';
 }
 
-
-// Generate QR code from otpauth:// URL
-async function generateQRCodeFromUrl(otpauthUrl: string): Promise<string> {
-  try {
-    const dataUrl = await QRCode.toDataURL(otpauthUrl, {
-      width: 256,
-      margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' }
-    });
-    return dataUrl;
-  } catch (error) {
-    console.error('Failed to generate QR code:', error);
-    throw new Error('Could not generate QR code');
-  }
-}
-
 export default function Auth() {
   const navigate = useNavigate();
   const { user, isLoading, refreshUser } = useAuth();
 
   const [email, setEmail] = useState('');
-  const [totpCode, setTotpCode] = useState('');
+  const [pinCode, setPinCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     // Check if user has already seen welcome screen
@@ -100,12 +78,9 @@ export default function Auth() {
     
     return 'welcome';
   });
-  const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
-  const [totpSecret, setTotpSecret] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [setupPolling, setSetupPolling] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [codeExpiry, setCodeExpiry] = useState<number>(600); // 10 minutes in seconds
 
 
   useEffect(() => {
@@ -115,43 +90,24 @@ export default function Auth() {
     }
   }, [user, isLoading, navigate, isNavigating]);
 
-  // Poll for TOTP setup completion
+  // Countdown timer for code expiry
   useEffect(() => {
-    if (!setupPolling) return;
+    if (viewMode !== 'awaiting-code' && viewMode !== 'verify-code') return;
 
-    const pollInterval = setInterval(async () => {
-      const sanitized = sanitizeEmail(email);
-      if (!sanitized) return;
-
-      try {
-        const authBaseUrl = getAuthBaseUrl();
-        console.log('[Auth] Polling /auth/check from', window.location.href, 'using base', authBaseUrl);
-        const response = await fetch(`${authBaseUrl}/auth/check`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ email: sanitized }),
-        });
-
-
-        if (response.ok) {
-          const data: AuthCheckResponse = await response.json();
-          if (data.authMethods.totp) {
-            setSetupPolling(false);
-          }
+    const timer = setInterval(() => {
+      setCodeExpiry((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
         }
-      } catch (error) {
-        console.error('Polling error:', error);
-      }
-    }, 2000);
+        return prev - 1;
+      });
+    }, 1000);
 
-    return () => clearInterval(pollInterval);
-  }, [setupPolling, email]);
+    return () => clearInterval(timer);
+  }, [viewMode]);
 
-  const handleCheckAuthMethods = async () => {
+  const handleRequestCode = async () => {
     const sanitized = sanitizeEmail(email);
     setAuthError(null);
     
@@ -161,31 +117,20 @@ export default function Auth() {
       return;
     }
 
-    console.log('[Auth] 🔐 Email validated, checking auth methods...');
-    
-    // iOS app domain: skip directly to setup without checking backend
-    if (isIoDomain()) {
-      console.log('[Auth] 📱 iOS app detected - proceeding directly to TOTP setup');
-      setLoading(true);
-      setTimeout(() => {
-        handleStartTotpSetup();
-      }, 100);
-      return;
-    }
-
+    console.log('[Auth] 📧 Email validated, requesting verification code...');
     setLoading(true);
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.error('[Auth] ⏰ auth/check request timed out after 15s');
+        console.error('[Auth] ⏰ totp/setup request timed out after 15s');
         controller.abort();
-      }, 15000); // Increased timeout for iOS
+      }, 15000);
 
       const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] 🌐 Calling /auth/check from', window.location.href, 'using base', authBaseUrl);
-
-      const response = await fetch(`${authBaseUrl}/auth/check`, {
+      console.log('[Auth] 🔧 Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
+      
+      const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,83 +142,31 @@ export default function Auth() {
       });
 
       clearTimeout(timeoutId);
-      console.log('[Auth] 📊 auth/check status:', response.status, response.statusText);
+      console.log('[Auth] 📊 /auth/totp/setup status:', response.status, response.statusText);
 
       if (response.ok) {
         const responseText = await response.text();
-        console.log('[Auth] 📥 auth/check raw response length:', responseText?.length || 0);
-
-        // Enhanced empty response handling
-        if (!responseText || responseText.trim() === '') {
-          console.warn('[Auth] ⚠️ auth/check returned empty body, treating as no configured methods');
-          await handleStartTotpSetup();
-        } else {
-          let data: AuthCheckResponse;
-          try {
-            data = JSON.parse(responseText);
-            console.log('[Auth] ✅ auth/check parsed data:', {
-              hasAuthMethods: !!data.authMethods,
-              totpEnabled: data.authMethods?.totp || false
-            });
-          } catch (parseError) {
-            console.error('[Auth] ❌ Failed to parse auth/check response:', parseError);
-            console.error('[Auth] 📄 Response preview:', responseText.substring(0, 200));
-            throw new Error(`Invalid JSON response from backend`);
-          }
-
-          const { authMethods } = data;
-
-          if (authMethods?.totp) {
-            console.log('[Auth] ✅ TOTP enabled, switching to login screen');
-            setViewMode('totp');
-          } else {
-            console.log('[Auth] 🔧 No TOTP configured, starting setup');
-            await handleStartTotpSetup();
-          }
-        }
-      } else {
-        // Enhanced error handling for non-200 responses
-        const errorText = await response.text().catch(() => '');
-        console.error('[Auth] ❌ auth/check non-success:', response.status, response.statusText);
-        console.error('[Auth] 📄 Error body:', errorText.substring(0, 200));
+        console.log('[Auth] 📥 Code request successful, showing verification screen');
         
-        // Still proceed to setup on error for smooth UX
-        await handleStartTotpSetup();
+        // Reset expiry timer
+        setCodeExpiry(600); // 10 minutes
+        setViewMode('awaiting-code');
+        setPinCode('');
+      } else {
+        const errorText = await response.text().catch(() => '');
+        console.error('[Auth] ❌ Code request failed:', response.status, response.statusText);
+        setAuthError('Kunde inte skicka verifieringskod. Försök igen.');
       }
     } catch (error) {
-      console.error('[Auth] 💥 Error during auth check, starting setup as fallback');
-      console.error('[Auth] 🔍 Error details:', {
-        type: typeof error,
-        message: error instanceof Error ? error.message : String(error),
-        name: error instanceof Error ? error.name : 'Unknown'
-      });
-      
-      // Fallback to setup to ensure smooth flow
-      try {
-        await handleStartTotpSetup();
-      } catch (setupError) {
-        console.error('[Auth] ❌ Critical: Failed to start TOTP setup after error');
-        console.error('[Auth] 📋 Setup error:', setupError instanceof Error ? setupError.message : String(setupError));
-        setAuthError('Kunde inte starta inloggningsprocessen. Försök igen om ett ögonblick.');
-      }
+      console.error('[Auth] 💥 Error requesting code:', error);
+      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
     } finally {
       setLoading(false);
     }
   };
-  const handleCopySecret = async () => {
-    if (!totpSecret) return;
-    
-    try {
-      await navigator.clipboard.writeText(totpSecret);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy TOTP secret:', error);
-    }
-  };
 
-  const handleVerifyTotp = async () => {
-    if (totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
+  const handleVerifyPin = async () => {
+    if (pinCode.length !== 6 || !/^\d{6}$/.test(pinCode)) {
       return;
     }
 
@@ -300,24 +193,20 @@ export default function Auth() {
           'Accept': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ email: sanitized, token: totpCode }),
+        body: JSON.stringify({ email: sanitized, token: pinCode }),
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
       console.log('[Auth] 📊 /auth/totp/login status:', response.status, response.statusText);
 
-      // Enhanced response handling with empty body detection
       const responseText = await response.text().catch(() => '');
       console.log('[Auth] 📥 /auth/totp/login raw response length:', responseText?.length || 0);
 
-      // ENHANCED iOS APP DOMAIN HANDLING (io.tivly.se)
-      // Backend now properly returns JSON with CORS support
       if (isIoDomain()) {
         if (response.ok) {
           console.log('[Auth] ✅ iOS login successful, processing response...');
 
-          // Try to parse JSON response
           if (responseText && responseText.trim().length > 0) {
             try {
               const data = JSON.parse(responseText);
@@ -334,7 +223,6 @@ export default function Auth() {
             console.log('[Auth] 🍪 Empty response body, using cookie-based authentication');
           }
 
-          // Navigate to dashboard after successful authentication
           console.log('[Auth] 🚀 Redirecting to dashboard...');
           setIsNavigating(true);
           await refreshUser();
@@ -344,20 +232,18 @@ export default function Auth() {
           return;
         }
 
-        // Enhanced error handling for iOS
         console.error('[Auth] ❌ iOS login failed:', response.status, response.statusText);
-        console.error('[Auth] 📄 Error body preview:', responseText.substring(0, 100));
-        setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din autentiseringsapp.');
-        setTotpCode('');
+        setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din e-post.');
+        setPinCode('');
         return;
       }
 
-      // STANDARD WEB FLOW (expects JSON with token)
+      // STANDARD WEB FLOW
       if (response.ok) {
         if (!responseText || responseText.trim() === '') {
           console.error('[Auth] /auth/totp/login returned empty body on success (web)');
           setAuthError('Servern returnerade ett tomt svar. Försök igen.');
-          setTotpCode('');
+          setPinCode('');
           return;
         }
 
@@ -365,13 +251,13 @@ export default function Auth() {
         try {
           data = JSON.parse(responseText);
         } catch (parseError) {
-          console.error('[Auth] Failed to parse TOTP login response:', parseError);
+          console.error('[Auth] Failed to parse login response:', parseError);
           setAuthError('Ogiltigt svar från servern. Försök igen.');
-          setTotpCode('');
+          setPinCode('');
           return;
         }
 
-        console.log('[Auth] TOTP login successful, applying auth token');
+        console.log('[Auth] Email + PIN login successful, applying auth token');
         apiClient.applyAuthToken(data.token);
         setIsNavigating(true);
         await refreshUser();
@@ -379,31 +265,27 @@ export default function Auth() {
           navigate('/', { replace: true });
         }, 500);
       } else {
-        // Handle error responses
         if (!responseText || responseText.trim() === '') {
           console.error('[Auth] /auth/totp/login returned empty error body (web)');
-          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din app.');
-          setTotpCode('');
+          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din e-post.');
+          setPinCode('');
           return;
         }
 
         try {
           const error = JSON.parse(responseText);
-          console.error('[Auth] TOTP login error:', error);
+          console.error('[Auth] Login error:', error);
           setAuthError(error.error || error.message || 'Ogiltig kod. Försök igen.');
         } catch {
           console.error('[Auth] Non-JSON error response:', responseText);
-          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din app.');
+          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din e-post.');
         }
-        setTotpCode('');
+        setPinCode('');
       }
     } catch (error: any) {
-      console.error('[Auth] TOTP verification failed:', error);
-      console.error('[Auth] Error type:', typeof error);
-      console.error('[Auth] Error message:', error instanceof Error ? error.message : String(error));
-      console.error('[Auth] Error stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('[Auth] PIN verification failed:', error);
       setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
-      setTotpCode('');
+      setPinCode('');
     } finally {
       setLoading(false);
     }
@@ -412,215 +294,13 @@ export default function Auth() {
   const handleStartOver = () => {
     setViewMode('welcome');
     setEmail('');
-    setTotpCode('');
-    setTotpQrCode(null);
-    setTotpSecret(null);
-    setSetupPolling(false);
+    setPinCode('');
+    setCodeExpiry(600);
   };
 
   const handleGetStarted = () => {
-    // Mark that user has seen the welcome screen
     localStorage.setItem('tivly_seen_welcome', 'true');
     setViewMode('email');
-  };
-
-
-  const handleStartTotpSetup = async () => {
-    const sanitized = sanitizeEmail(email);
-    if (!sanitized) return;
-
-    setLoading(true);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.error('[Auth] ⏰ totp/setup request timed out after 15s');
-        controller.abort();
-      }, 15000);
-
-      const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] 🔧 Calling /auth/totp/setup from', window.location.href, 'using base', authBaseUrl);
-      
-      const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email: sanitized }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      console.log('[Auth] 📊 /auth/totp/setup status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        console.error('[Auth] ❌ TOTP setup failed:', response.status, response.statusText);
-        console.error('[Auth] 📄 Error body:', errorText.substring(0, 200));
-        throw new Error(`Failed to setup TOTP (${response.status})`);
-      }
-
-      const responseText = await response.text();
-      console.log('[Auth] 📥 /auth/totp/setup raw response length:', responseText?.length || 0);
-
-      // Enhanced empty response detection
-      if (!responseText || responseText.trim() === '') {
-        console.warn('[Auth] ⚠️ /auth/totp/setup returned empty body');
-        
-        if (isIoDomain()) {
-          console.log('[Auth] 📱 iOS: Proceeding to login screen despite empty response');
-          setViewMode('totp');
-          setSetupPolling(false);
-          return;
-        }
-
-        console.error('[Auth] ❌ Web: Cannot proceed with empty setup response');
-        throw new Error('Backend returnerade inget svar. Kontakta support om problemet kvarstår.');
-      }
-      
-      // Enhanced JSON parsing with validation
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-        console.log('[Auth] ✅ Parsed TOTP setup data:', {
-          hasQrCode: !!responseData.qrCode,
-          hasOtpauthUrl: !!responseData.otpauthUrl,
-          hasManualKey: !!responseData.manualEntryKey
-        });
-      } catch (parseError) {
-        console.error('[Auth] ❌ JSON parse failed:', parseError);
-        console.error('[Auth] 📄 Response preview:', responseText.substring(0, 200));
-        throw new Error('Ogiltigt svar från backend vid TOTP-setup');
-      }
-
-      const { qrCode, otpauthUrl, manualEntryKey } = responseData;
-      
-      // Only generate QR code for desktop/non-iPhone devices
-      // Skip QR code on iPhone but show on PC/tablets/Android
-      const shouldShowQR = !isIPhone();
-      if (shouldShowQR) {
-        if (qrCode) {
-          setTotpQrCode(qrCode);
-        } else if (otpauthUrl) {
-          const qrCodeDataUrl = await generateQRCodeFromUrl(otpauthUrl);
-          setTotpQrCode(qrCodeDataUrl);
-        }
-      }
-      
-      setTotpSecret(manualEntryKey);
-      setViewMode('setup-totp');
-      setSetupPolling(true);
-    } catch (error: any) {
-      console.error('[Auth] 💥 TOTP setup failed');
-      console.error('[Auth] 🔍 Error details:', {
-        type: typeof error,
-        message: error instanceof Error ? error.message : String(error),
-        name: error instanceof Error ? error.name : 'Unknown'
-      });
-      
-      setAuthError(error instanceof Error ? error.message : 'Ett fel uppstod vid TOTP-inställning. Försök igen.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEnableTotp = async () => {
-    if (totpCode.length !== 6 || !/^\d{6}$/.test(totpCode)) {
-      return;
-    }
-
-    const sanitized = sanitizeEmail(email);
-    if (!sanitized) return;
-
-    setLoading(true);
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.error('[Auth] ⏰ totp/enable request timed out after 15s');
-        controller.abort();
-      }, 15000);
-
-      const authBaseUrl = getAuthBaseUrl();
-      console.log('[Auth] 🔧 Calling /auth/totp/enable from', window.location.href, 'using base', authBaseUrl);
-      
-      const response = await fetch(`${authBaseUrl}/auth/totp/enable`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email: sanitized, token: totpCode }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      console.log('[Auth] 📊 /auth/totp/enable status:', response.status, response.statusText);
-
-      if (response.ok) {
-        const responseText = await response.text().catch(() => '');
-        console.log('[Auth] 📥 /auth/totp/enable response length:', responseText?.length || 0);
-        
-        // Parse response if available
-        if (responseText && responseText.trim().length > 0) {
-          try {
-            const data = JSON.parse(responseText);
-            console.log('[Auth] ✅ TOTP enabled successfully:', data);
-          } catch (parseError) {
-            console.warn('[Auth] ⚠️ Could not parse enable response, continuing anyway');
-          }
-        }
-
-        // Verify setup and proceed to login
-        setTimeout(async () => {
-          console.log('[Auth] 🔍 Verifying TOTP setup via /auth/check');
-          const checkResponse = await fetch(`${authBaseUrl}/auth/check`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({ email: sanitized }),
-          });
-
-          if (checkResponse.ok) {
-            console.log('[Auth] ✅ Setup verified, proceeding to login');
-            await handleVerifyTotp();
-          } else {
-            console.log('[Auth] ⚠️ Verification inconclusive, switching to login screen');
-            setViewMode('totp');
-            setTotpCode('');
-          }
-        }, 500);
-      } else {
-        const errorText = await response.text().catch(() => '');
-        console.error('[Auth] ❌ TOTP enable failed:', response.status, response.statusText);
-        console.error('[Auth] 📄 Error body:', errorText.substring(0, 200));
-        
-        try {
-          const error = JSON.parse(errorText);
-          setAuthError(error.message || 'Ogiltig verifieringskod');
-        } catch {
-          setAuthError('Ogiltig verifieringskod. Försök igen.');
-        }
-        setTotpCode('');
-      }
-    } catch (error: any) {
-      console.error('[Auth] 💥 TOTP enable failed');
-      console.error('[Auth] 🔍 Error details:', {
-        type: typeof error,
-        message: error instanceof Error ? error.message : String(error),
-        name: error instanceof Error ? error.name : 'Unknown'
-      });
-      
-      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
-      setTotpCode('');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -660,7 +340,7 @@ export default function Auth() {
                     Välkommen till Tivly
                   </CardTitle>
                   <CardDescription className="text-lg">
-                    Säker och enkel inloggning med autentiseringsapp
+                    Säker och enkel inloggning med e-postkod
                   </CardDescription>
                 </motion.div>
               </CardHeader>
@@ -669,11 +349,11 @@ export default function Auth() {
               <div className="space-y-4">
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                   <div className="flex items-start gap-3">
-                    <Smartphone className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                    <Mail className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">Autentiseringsapp krävs</p>
+                      <p className="text-sm font-medium">Kod via e-post</p>
                       <p className="text-xs text-muted-foreground">
-                        Använd Google Authenticator, Microsoft Authenticator eller Authy
+                        Få en 6-siffrig kod direkt i din inkorg
                       </p>
                     </div>
                   </div>
@@ -683,7 +363,7 @@ export default function Auth() {
                   <div className="flex items-start gap-3">
                     <Shield className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">Bankäker säkerhet</p>
+                      <p className="text-sm font-medium">Banksäker säkerhet</p>
                       <p className="text-xs text-muted-foreground">
                         Krypterad autentisering som skyddar dina uppgifter
                       </p>
@@ -738,20 +418,20 @@ export default function Auth() {
                 transition={{ delay: 0.1, duration: 0.3 }}
               >
                  <CardTitle className="text-3xl font-bold">
-                   {viewMode === 'totp' ? 'Ange verifieringskod' : 
+                   {viewMode === 'verify-code' ? 'Ange verifieringskod' : 
+                   viewMode === 'awaiting-code' ? 'Kolla din e-post' :
                    viewMode === 'new-user' ? 'Välkommen!' :
-                   viewMode === 'setup-totp' ? 'Konfigurera autentiseringsapp' :
                    'Logga in'}
                  </CardTitle>
                  <CardDescription className="text-base">
-                   {viewMode === 'totp' ? 'Ange koden från din autentiseringsapp' :
+                   {viewMode === 'verify-code' ? 'Ange koden från din e-post' :
+                   viewMode === 'awaiting-code' ? 'Vi har skickat en 6-siffrig kod till din e-post' :
                    viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
-                   viewMode === 'setup-totp' ? (isIPhone() ? 'Följ instruktionerna nedan' : 'Skanna QR-koden med din autentiseringsapp') :
                    'Ange din e-post för att fortsätta'}
                  </CardDescription>
                  
                  {/* Progress indicator */}
-                 {(viewMode === 'email' || viewMode === 'setup-totp' || viewMode === 'totp') && (
+                 {(viewMode === 'email' || viewMode === 'awaiting-code' || viewMode === 'verify-code') && (
                    <motion.div 
                      className="flex gap-1.5 justify-center pt-3"
                      initial={{ opacity: 0 }}
@@ -759,8 +439,8 @@ export default function Auth() {
                      transition={{ delay: 0.2 }}
                    >
                      <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'email' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
-                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'setup-totp' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
-                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'totp' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
+                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'awaiting-code' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
+                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'verify-code' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
                    </motion.div>
                  )}
               </motion.div>
@@ -768,9 +448,9 @@ export default function Auth() {
 
             <CardContent className="pb-8">
               <AnimatePresence mode="wait">
-                {viewMode === 'totp' ? (
+                {viewMode === 'verify-code' ? (
               <motion.div 
-                key="totp-view"
+                key="verify-code-view"
                 className="space-y-6"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -787,20 +467,19 @@ export default function Auth() {
                 </div>
               </div>
 
-
               <div className="space-y-3">
-                <Label htmlFor="totp" className="text-center block font-medium">
-                  Ange kod från din autentiseringsapp
+                <Label htmlFor="pin" className="text-center block font-medium">
+                  Ange 6-siffrig kod från din e-post
                 </Label>
                 <div className="flex justify-center">
                   <InputOTP
                     maxLength={6}
-                    value={totpCode}
-                    onChange={(value) => setTotpCode(value)}
+                    value={pinCode}
+                    onChange={(value) => setPinCode(value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && totpCode.length === 6) {
+                      if (e.key === 'Enter' && pinCode.length === 6) {
                         e.preventDefault();
-                        handleVerifyTotp();
+                        handleVerifyPin();
                       }
                     }}
                     disabled={loading}
@@ -818,8 +497,14 @@ export default function Auth() {
                 </div>
                 <div className="text-center space-y-1">
                   <p className="text-xs text-muted-foreground">
-                    Använd Google Authenticator, Authy eller liknande app
+                    Kolla din inkorg efter koden
                   </p>
+                  {codeExpiry > 0 && (
+                    <p className="text-xs text-primary font-medium flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Giltig i {Math.floor(codeExpiry / 60)}:{String(codeExpiry % 60).padStart(2, '0')}
+                    </p>
+                  )}
                   {loading && (
                     <p className="text-xs text-primary font-medium animate-pulse">
                       Verifierar kod...
@@ -839,8 +524,8 @@ export default function Auth() {
                   Tillbaka
                 </Button>
                 <Button
-                  onClick={handleVerifyTotp}
-                  disabled={loading || totpCode.length !== 6}
+                  onClick={handleVerifyPin}
+                  disabled={loading || pinCode.length !== 6}
                   className="flex-1"
                 >
                   {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -879,92 +564,48 @@ export default function Auth() {
                 Tillbaka
               </Button>
               </motion.div>
-            ) : viewMode === 'setup-totp' ? (
+            ) : viewMode === 'awaiting-code' ? (
               <motion.div 
-                key="setup-totp-view"
+                key="awaiting-code-view"
                 className="space-y-6"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
               >
-              {/* Desktop/Non-iPhone: Show QR code */}
-              {!isIPhone() && totpQrCode && (
-                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                  <p className="text-sm text-center font-medium">Skanna QR-koden med din app</p>
-                  <div className="flex justify-center">
-                    <img src={totpQrCode} alt="QR Code" className="w-56 h-56" />
-                  </div>
-                  
-                  {totpSecret && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-center text-muted-foreground">
-                        Eller ange manuellt:
-                      </p>
-                      <div className="rounded bg-muted p-3 text-center font-mono text-sm break-all">
-                        {totpSecret}
-                      </div>
-                    </div>
-                  )}
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-center">
+                <Mail className="h-12 w-12 mx-auto text-primary" />
+                <div className="space-y-2">
+                  <p className="font-medium">E-post skickad!</p>
+                  <p className="text-sm text-muted-foreground">
+                    Vi har skickat en 6-siffrig verifieringskod till:
+                  </p>
+                  <p className="text-sm font-medium">{email}</p>
                 </div>
-              )}
+              </div>
 
-              {/* iPhone: Show manual code with copy button and instructions */}
-              {isIPhone() && totpSecret && (
-                <div className="space-y-4">
-                  <Alert>
-                    <Download className="h-4 w-4" />
-                    <AlertDescription className="space-y-2">
-                      <p className="font-medium">Steg 1: Ladda ner en autentiseringsapp</p>
-                      <p className="text-xs">
-                        Google Authenticator, Microsoft Authenticator eller Authy
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
-                    <p className="text-sm font-medium text-center">Steg 2: Kopiera denna kod</p>
-                    <div className="rounded bg-background p-3 text-center">
-                      <code className="text-sm font-mono break-all block mb-3">{totpSecret}</code>
-                      <Button
-                        onClick={handleCopySecret}
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-4 h-4 mr-2" />
-                            Kopierad!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4 mr-2" />
-                            Kopiera kod
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Steg 3: Klistra in i din autentiseringsapp under "Lägg till konto"
-                    </p>
-                  </div>
-                </div>
-              )}
+              <Alert>
+                <Clock className="h-4 w-4" />
+                <AlertDescription className="space-y-1">
+                  <p className="font-medium">Koden är giltig i 10 minuter</p>
+                  <p className="text-xs">
+                    Hittar du inte e-posten? Kolla i skräpposten också.
+                  </p>
+                </AlertDescription>
+              </Alert>
 
               <div className="space-y-3">
-                <Label htmlFor="totp-setup" className="text-center block font-medium">
-                  Ange koden från din app för att verifiera
+                <Label htmlFor="pin-await" className="text-center block font-medium">
+                  Ange 6-siffrig kod från din e-post
                 </Label>
                 <div className="flex justify-center">
                   <InputOTP
                     maxLength={6}
-                    value={totpCode}
-                    onChange={(value) => setTotpCode(value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && totpCode.length === 6) {
-                        e.preventDefault();
-                        handleEnableTotp();
+                    value={pinCode}
+                    onChange={(value) => {
+                      setPinCode(value);
+                      if (value.length === 6) {
+                        setViewMode('verify-code');
                       }
                     }}
                     disabled={loading}
@@ -980,39 +621,34 @@ export default function Auth() {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
+                {codeExpiry > 0 && (
+                  <p className="text-xs text-center text-primary font-medium flex items-center justify-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Giltig i {Math.floor(codeExpiry / 60)}:{String(codeExpiry % 60).padStart(2, '0')}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2 pt-2">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setViewMode('email');
-                    setTotpCode('');
-                    setTotpQrCode(null);
-                    setTotpSecret(null);
-                    setSetupPolling(false);
-                  }}
+                  onClick={handleStartOver}
                   disabled={loading}
                   className="flex-1"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Tillbaka
+                  Avbryt
                 </Button>
                 <Button
-                  onClick={handleEnableTotp}
-                  disabled={loading || totpCode.length !== 6}
+                  onClick={handleRequestCode}
+                  variant="ghost"
+                  disabled={loading}
                   className="flex-1"
                 >
                   {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {loading ? 'Aktiverar...' : 'Aktivera'}
+                  Skicka ny kod
                 </Button>
               </div>
-              
-              {setupPolling && (
-                <p className="text-xs text-center text-muted-foreground animate-pulse">
-                  Sidan uppdateras automatiskt när konfigurationen är klar...
-                </p>
-              )}
               </motion.div>
             ) : (
               <motion.div 
@@ -1034,7 +670,7 @@ export default function Auth() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleCheckAuthMethods();
+                      handleRequestCode();
                     }
                   }}
                   disabled={loading}
@@ -1045,13 +681,13 @@ export default function Auth() {
               </div>
 
               <Button
-                onClick={handleCheckAuthMethods}
+                onClick={handleRequestCode}
                 disabled={loading || !email.trim()}
                 className="w-full h-12 relative"
                 type="button"
               >
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {loading ? 'Kontrollerar...' : 'Fortsätt'}
+                {loading ? 'Skickar kod...' : 'Skicka verifieringskod'}
               </Button>
 
               {authError && (
@@ -1059,7 +695,6 @@ export default function Auth() {
                   {authError}
                 </p>
               )}
-
 
               <Button
                 variant="ghost"
