@@ -117,18 +117,9 @@ export default function Auth() {
   }, [setupPolling, email, toast]);
 
   const handleCheckAuthMethods = async () => {
-    const isIoDomain = window.location.hostname.includes('io.tivly.se');
-    const debug = (msg: string, data?: any) => {
-      const logMsg = data ? `${msg} ${JSON.stringify(data)}` : msg;
-      console.log(logMsg);
-      if (isIoDomain) alert(logMsg);
-    };
-
-    debug('[Auth] handleCheckAuthMethods called', { email });
     const sanitized = sanitizeEmail(email);
     
     if (!sanitized) {
-      debug('[Auth] Invalid email', { email });
       toast({
         variant: 'destructive',
         title: 'Ogiltig e-postadress',
@@ -137,46 +128,54 @@ export default function Auth() {
       return;
     }
 
-    debug('[Auth] Sanitized email', { sanitized });
     setLoading(true);
     
     try {
-      debug('[Auth] Fetching auth methods from API...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
       const response = await fetch('https://api.tivly.se/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ email: sanitized }),
+        signal: controller.signal,
       });
 
-      debug('[Auth] Response status', { status: response.status });
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data: AuthCheckResponse = await response.json();
-        debug('[Auth] Auth methods data', data);
         const { authMethods } = data;
 
         if (authMethods.totp) {
-          debug('[Auth] TOTP configured, showing TOTP input');
           setViewMode('totp');
         } else {
-          debug('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
       } else if (response.status === 404) {
-        debug('[Auth] User not found');
         setViewMode('new-user');
       } else {
         const errorText = await response.text();
-        debug('[Auth] API error', { status: response.status, error: errorText });
-        throw new Error(`API returned ${response.status}: ${errorText}`);
+        console.error('[Auth] API error:', response.status, errorText);
+        throw new Error(`Servern svarade med fel (${response.status})`);
       }
     } catch (error: any) {
-      debug('[Auth] CATCH ERROR', { message: error.message, stack: error.stack });
+      console.error('[Auth] Error:', error);
+      
+      let errorMessage = 'Kunde inte ansluta till servern. Kontrollera din internetanslutning.';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'Begäran tog för lång tid. Försök igen.';
+      } else if (error.message && !error.message.includes('Load failed')) {
+        errorMessage = error.message;
+      }
+
       toast({
         variant: 'destructive',
-        title: 'Något gick fel',
-        description: error.message || 'Kunde inte kontrollera autentiseringsmetoder.',
+        title: 'Anslutningsfel',
+        description: errorMessage,
+        duration: 5000,
       });
     } finally {
       setLoading(false);
@@ -744,12 +743,7 @@ export default function Auth() {
               </div>
 
               <Button
-                onClick={() => {
-                  const isIoDomain = window.location.hostname.includes('io.tivly.se');
-                  if (isIoDomain) alert('[Auth] Fortsätt button clicked');
-                  console.log('[Auth] Fortsätt button clicked');
-                  handleCheckAuthMethods();
-                }}
+                onClick={handleCheckAuthMethods}
                 disabled={loading || !email.trim()}
                 className="w-full h-12"
                 type="button"
