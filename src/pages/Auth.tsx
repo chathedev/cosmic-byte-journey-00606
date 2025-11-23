@@ -45,6 +45,12 @@ function isMobileDevice(): boolean {
   return window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+// Detect if running on the app-exclusive io.tivly.se domain
+function isAppDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname.includes('io.tivly.se');
+}
+
 // Generate QR code from otpauth:// URL
 async function generateQRCodeFromUrl(otpauthUrl: string): Promise<string> {
   try {
@@ -68,7 +74,7 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('welcome');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => (isAppDomain() ? 'email' : 'welcome'));
   const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [isMobile] = useState(isMobileDevice());
@@ -128,7 +134,9 @@ export default function Auth() {
       return;
     }
 
-    console.log('[Auth] Email validated, checking auth methods...');
+    const onAppDomain = isAppDomain();
+
+    console.log('[Auth] Email validated, checking auth methods...', { onAppDomain });
     setLoading(true);
     
     try {
@@ -164,9 +172,11 @@ export default function Auth() {
           console.log('[Auth] No TOTP configured, starting setup');
           await handleStartTotpSetup();
         }
-      } else if (response.status === 404) {
-        // User not found -> start setup flow (new user)
-        console.log('[Auth] User not found (404), starting TOTP setup');
+      } else if (response.status === 404 || onAppDomain) {
+        // On io.tivly.se we ALWAYS trust backend to drive setup and never block on "no account" UI
+        console.log('[Auth] Non-success response, starting TOTP setup anyway for app domain', {
+          status: response.status,
+        });
         await handleStartTotpSetup();
       } else {
         const errorText = await response.text();
