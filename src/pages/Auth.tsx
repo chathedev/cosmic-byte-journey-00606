@@ -101,7 +101,6 @@ export default function Auth() {
           const data: AuthCheckResponse = await response.json();
           if (data.authMethods.totp) {
             setSetupPolling(false);
-            setViewMode('totp');
             toast({
               title: '✓ Konfiguration klar!',
               description: 'Ange koden från din app för att logga in.',
