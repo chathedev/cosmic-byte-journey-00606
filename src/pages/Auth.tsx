@@ -179,10 +179,22 @@ export default function Auth() {
       console.log('[Auth] auth/check status:', response.status);
 
       if (response.ok) {
-        const data: AuthCheckResponse = await response.json();
-        const { authMethods } = data;
+        const responseText = await response.text();
+        console.log('[Auth] auth/check raw response:', responseText);
+        
+        let data: AuthCheckResponse;
+        try {
+          data = JSON.parse(responseText);
+          console.log('[Auth] auth/check parsed data:', data);
+        } catch (parseError) {
+          console.error('[Auth] Failed to parse auth/check response:', parseError);
+          throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+        }
 
-        if (authMethods.totp) {
+        const { authMethods } = data;
+        console.log('[Auth] authMethods:', authMethods);
+
+        if (authMethods?.totp) {
           console.log('[Auth] TOTP enabled, switching to login screen');
           setViewMode('totp');
         } else {
@@ -198,11 +210,15 @@ export default function Auth() {
       }
     } catch (error) {
       console.error('[Auth] Error during auth check, starting setup as fallback:', error);
+      console.error('[Auth] Error type:', typeof error);
+      console.error('[Auth] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[Auth] Error stack:', error instanceof Error ? error.stack : 'N/A');
       setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
       try {
         await handleStartTotpSetup();
       } catch (setupError) {
         console.error('[Auth] Failed to start TOTP setup after error:', setupError);
+        console.error('[Auth] Setup error message:', setupError instanceof Error ? setupError.message : String(setupError));
       }
     } finally {
       setLoading(false);
@@ -289,11 +305,27 @@ export default function Auth() {
         body: JSON.stringify({ email: sanitized }),
       });
 
+      console.log('[Auth] /auth/totp/setup status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to setup TOTP');
+        const errorText = await response.text().catch(() => '');
+        console.error('[Auth] TOTP setup failed. Status:', response.status, 'Body:', errorText);
+        throw new Error(`Failed to setup TOTP (${response.status}): ${errorText}`);
       }
 
-      const { qrCode, otpauthUrl, manualEntryKey } = await response.json();
+      const responseText = await response.text();
+      console.log('[Auth] /auth/totp/setup raw response:', responseText);
+      
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('[Auth] /auth/totp/setup parsed data:', responseData);
+      } catch (parseError) {
+        console.error('[Auth] Failed to parse TOTP setup response:', parseError);
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+      }
+
+      const { qrCode, otpauthUrl, manualEntryKey } = responseData;
       
       // Only generate QR code for desktop/non-iPhone devices
       // Skip QR code on iPhone but show on PC/tablets/Android
@@ -311,7 +343,10 @@ export default function Auth() {
       setViewMode('setup-totp');
       setSetupPolling(true);
     } catch (error: any) {
-      console.error('TOTP setup failed:', error);
+      console.error('[Auth] TOTP setup failed:', error);
+      console.error('[Auth] Setup error type:', typeof error);
+      console.error('[Auth] Setup error message:', error instanceof Error ? error.message : String(error));
+      console.error('[Auth] Setup error stack:', error instanceof Error ? error.stack : 'N/A');
     } finally {
       setLoading(false);
     }
@@ -409,7 +444,7 @@ export default function Auth() {
                 </motion.div>
               </CardHeader>
 
-              <CardContent className="pb-12 space-y-6">{/* ... keep existing code */}
+              <CardContent className="pb-12 space-y-6">
               <div className="space-y-4">
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                   <div className="flex items-start gap-3">
