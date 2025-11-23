@@ -181,25 +181,31 @@ export default function Auth() {
       if (response.ok) {
         const responseText = await response.text();
         console.log('[Auth] auth/check raw response:', responseText);
-        
-        let data: AuthCheckResponse;
-        try {
-          data = JSON.parse(responseText);
-          console.log('[Auth] auth/check parsed data:', data);
-        } catch (parseError) {
-          console.error('[Auth] Failed to parse auth/check response:', parseError);
-          throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
-        }
 
-        const { authMethods } = data;
-        console.log('[Auth] authMethods:', authMethods);
-
-        if (authMethods?.totp) {
-          console.log('[Auth] TOTP enabled, switching to login screen');
-          setViewMode('totp');
-        } else {
-          console.log('[Auth] No TOTP configured, starting setup');
+        if (!responseText || responseText.trim() === '') {
+          console.warn('[Auth] auth/check returned empty body, treating as no configured methods');
+          // Empty body – assume no TOTP configured yet and start setup
           await handleStartTotpSetup();
+        } else {
+          let data: AuthCheckResponse;
+          try {
+            data = JSON.parse(responseText);
+            console.log('[Auth] auth/check parsed data:', data);
+          } catch (parseError) {
+            console.error('[Auth] Failed to parse auth/check response:', parseError);
+            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+          }
+
+          const { authMethods } = data;
+          console.log('[Auth] authMethods:', authMethods);
+
+          if (authMethods?.totp) {
+            console.log('[Auth] TOTP enabled, switching to login screen');
+            setViewMode('totp');
+          } else {
+            console.log('[Auth] No TOTP configured, starting setup');
+            await handleStartTotpSetup();
+          }
         }
       } else {
         // For any non-success (404 or other), proceed into setup so the button always advances
@@ -315,6 +321,11 @@ export default function Auth() {
 
       const responseText = await response.text();
       console.log('[Auth] /auth/totp/setup raw response:', responseText);
+
+      if (!responseText || responseText.trim() === '') {
+        console.error('[Auth] /auth/totp/setup returned empty body, cannot proceed with in-app setup');
+        throw new Error('Tomt svar vid TOTP-inställning. Öppna Tivly i webbläsaren för att slutföra aktiveringen.');
+      }
       
       let responseData;
       try {
