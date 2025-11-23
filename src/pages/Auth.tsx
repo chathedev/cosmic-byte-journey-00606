@@ -118,8 +118,7 @@ export default function Auth() {
 
   const handleCheckAuthMethods = async () => {
     const isIoDomain = window.location.hostname.includes('io.tivly.se');
-    console.log('[Auth] Button clicked, checking auth methods for:', email);
-    
+
     const sanitized = sanitizeEmail(email);
     
     if (!sanitized) {
@@ -129,6 +128,12 @@ export default function Auth() {
         title: 'Ogiltig e-postadress',
         description: 'Vänligen ange en giltig e-postadress.',
       });
+      return;
+    }
+
+    // On io.tivly.se, always go straight to TOTP setup flow after valid email
+    if (isIoDomain) {
+      await handleStartTotpSetup();
       return;
     }
 
