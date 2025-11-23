@@ -89,32 +89,26 @@ function decodeWebAuthnOptions({ publicKey, publicKeyLegacy, options, optionsLeg
   optionsEncoded?: any;
   publicKeyEncoded?: any;
 }): any {
-  const source = optionsEncoded || publicKeyEncoded || publicKey || options;
-
+  // Try encoded options first (Base64URL strings)
+  const source = optionsEncoded || publicKeyEncoded || options || publicKey;
+  
   if (source) {
     const decodeDescriptor = (descriptor: any) => ({
       ...descriptor,
       id: base64ToArrayBuffer(descriptor.id),
     });
 
-    const challenge = base64ToArrayBuffer(source.challenge);
-    const userId = source.user ? base64ToArrayBuffer(source.user.id) : null;
-
     return {
       ...source,
-      challenge,
-      user: source.user && userId ? { ...source.user, id: userId } : source.user,
-      excludeCredentials: (source.excludeCredentials || [])
-        .map(decodeDescriptor)
-        .filter((d: any) => d.id),
-      allowCredentials: (source.allowCredentials || [])
-        .map(decodeDescriptor)
-        .filter((d: any) => d.id),
+      challenge: base64ToArrayBuffer(source.challenge),
+      user: source.user ? { ...source.user, id: base64ToArrayBuffer(source.user.id) } : undefined,
+      excludeCredentials: (source.excludeCredentials || []).map(decodeDescriptor),
+      allowCredentials: (source.allowCredentials || []).map(decodeDescriptor),
     };
   }
 
-  // Legacy buffer-json format
-  const legacy = publicKeyLegacy || optionsLegacy;
+  // Fallback to legacy buffer-json format
+  const legacy = publicKeyLegacy || optionsLegacy || options || publicKey;
   if (!legacy) return null;
 
   const decodeLegacy = (descriptor: any) => ({
@@ -122,19 +116,12 @@ function decodeWebAuthnOptions({ publicKey, publicKeyLegacy, options, optionsLeg
     id: bufferJsonToArrayBuffer(descriptor.id),
   });
 
-  const challenge = bufferJsonToArrayBuffer(legacy.challenge);
-  const userId = legacy.user ? bufferJsonToArrayBuffer(legacy.user.id) : null;
-
   return {
     ...legacy,
-    challenge,
-    user: legacy.user && userId ? { ...legacy.user, id: userId } : legacy.user,
-    excludeCredentials: (legacy.excludeCredentials || [])
-      .map(decodeLegacy)
-      .filter((d: any) => d.id),
-    allowCredentials: (legacy.allowCredentials || [])
-      .map(decodeLegacy)
-      .filter((d: any) => d.id),
+    challenge: bufferJsonToArrayBuffer(legacy.challenge),
+    user: legacy.user ? { ...legacy.user, id: bufferJsonToArrayBuffer(legacy.user.id) } : undefined,
+    excludeCredentials: (legacy.excludeCredentials || []).map(decodeLegacy),
+    allowCredentials: (legacy.allowCredentials || []).map(decodeLegacy),
   };
 }
 // Check WebAuthn support
@@ -247,29 +234,24 @@ export default function Auth() {
       });
 
       if (!startResponse.ok) {
-        throw new Error('Failed to start passkey authentication');
+        throw new Error('Servern kunde inte starta passkeyinloggning');
       }
 
-      const data = await startResponse.json();
-
-      if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy && !data.publicKeyEncoded) {
-        throw new Error(data.error || 'Kunde inte starta passkey-autentisering');
-      }
+      const payload = await startResponse.json();
 
       toast({
         title: 'Använd din passkey',
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      const publicKeyOptions = decodeWebAuthnOptions(data);
+      const publicKey = decodeWebAuthnOptions(payload);
 
-      if (!publicKeyOptions || !publicKeyOptions.challenge) {
+      if (!publicKey || !publicKey.challenge) {
+        console.error('Passkey login - invalid options:', payload);
         throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
       }
 
-      const credential = await navigator.credentials.get({
-        publicKey: publicKeyOptions,
-      });
+      const credential = await navigator.credentials.get({ publicKey });
 
       if (!credential) {
         throw new Error('No credential received');
@@ -282,24 +264,24 @@ export default function Auth() {
         body: JSON.stringify({
           email: emailAddress,
           credential,
-          challengeKey: data.challengeKey,
+          challengeKey: payload.challengeKey,
         }),
       });
 
-      if (finishResponse.ok) {
-        const { token } = await finishResponse.json();
-        apiClient.applyAuthToken(token);
-
-        toast({
-          title: '✓ Passkey verifierad!',
-          description: 'Loggar in...',
-        });
-
-        await refreshUser();
-        setTimeout(() => navigate('/', { replace: true }), 300);
-      } else {
-        throw new Error('Passkey verification failed');
+      if (!finishResponse.ok) {
+        throw new Error('Passkey-inloggningen misslyckades');
       }
+
+      const { token } = await finishResponse.json();
+      apiClient.applyAuthToken(token);
+
+      toast({
+        title: '✓ Passkey verifierad!',
+        description: 'Loggar in...',
+      });
+
+      await refreshUser();
+      setTimeout(() => navigate('/', { replace: true }), 300);
     } catch (error: any) {
       console.error('Passkey authentication failed:', error);
 
@@ -313,7 +295,7 @@ export default function Auth() {
         toast({
           variant: 'destructive',
           title: 'Autentisering misslyckades',
-          description: 'Kunde inte autentisera med passkey.',
+          description: error.message || 'Kunde inte autentisera med passkey.',
         });
       }
 
@@ -412,29 +394,24 @@ export default function Auth() {
       });
 
       if (!startResponse.ok) {
-        throw new Error('Failed to start passkey registration');
+        throw new Error('Servern kunde inte skapa passkey-inställningar');
       }
 
-      const data = await startResponse.json();
-
-      if (!data.options && !data.optionsEncoded && !data.optionsLegacy && !data.publicKey && !data.publicKeyLegacy && !data.publicKeyEncoded) {
-        throw new Error(data.error || 'Servern kunde inte skapa passkey-inställningar');
-      }
+      const payload = await startResponse.json();
 
       toast({
         title: 'Skapa din passkey',
         description: 'Följ anvisningarna på din enhet...',
       });
 
-      const publicKeyOptions = decodeWebAuthnOptions(data);
+      const publicKey = decodeWebAuthnOptions(payload);
 
-      if (!publicKeyOptions || !publicKeyOptions.challenge) {
+      if (!publicKey || !publicKey.challenge) {
+        console.error('Passkey registration - invalid options:', payload);
         throw new Error('Kunde inte tolka WebAuthn-inställningar från servern');
       }
 
-      const credential = await navigator.credentials.create({
-        publicKey: publicKeyOptions,
-      });
+      const credential = await navigator.credentials.create({ publicKey });
 
       if (!credential) {
         throw new Error('No credential created');
@@ -447,20 +424,20 @@ export default function Auth() {
         body: JSON.stringify({
           email: sanitized,
           credential,
-          challengeKey: data.challengeKey,
+          challengeKey: payload.challengeKey,
         }),
       });
 
-      if (finishResponse.ok) {
-        toast({
-          title: 'Passkey skapad!',
-          description: 'Loggar in...',
-        });
-        
-        await handlePasskeyLogin(sanitized);
-      } else {
-        throw new Error('Passkey registration failed');
+      if (!finishResponse.ok) {
+        throw new Error('Passkey-registreringen misslyckades');
       }
+
+      toast({
+        title: 'Passkey skapad!',
+        description: 'Loggar in...',
+      });
+      
+      await handlePasskeyLogin(sanitized);
     } catch (error: any) {
       console.error('Passkey registration failed:', error);
       
@@ -474,7 +451,7 @@ export default function Auth() {
         toast({
           variant: 'destructive',
           title: 'Kunde inte skapa passkey',
-          description: 'Försök igen eller välj autentiseringsapp istället.',
+          description: error.message || 'Försök igen eller välj autentiseringsapp istället.',
         });
       }
       setViewMode('setup-required');
