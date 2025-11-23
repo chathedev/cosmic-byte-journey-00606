@@ -52,49 +52,31 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Prevent background scroll and stabilize viewport when sidebar is open on mobile (iOS-safe lock)
+  // Prevent background scroll when sidebar is open on mobile
   useEffect(() => {
     if (!isMobile) return;
-    const body = document.body;
-
-    const prev = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-    };
-
+    
     if (open) {
-      scrollYRef.current = window.scrollY || window.pageYOffset || 0;
-      body.style.position = 'fixed';
-      body.style.top = `-${scrollYRef.current}px`;
-      body.style.left = '0';
-      body.style.right = '0';
-      body.style.width = '100%';
-      body.style.overflow = 'hidden';
+      scrollYRef.current = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollYRef.current}px`;
+      document.body.style.width = '100%';
     } else {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
-      if (scrollYRef.current) {
-        window.scrollTo(0, scrollYRef.current);
-      }
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollYRef.current);
     }
 
     return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
     };
-  }, [isMobile, open]);
+  }, [open, isMobile]);
 
   const unlimited = planLoading ? false : hasUnlimitedAccess(user, userPlan);
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
@@ -204,49 +186,45 @@ export function AppSidebar() {
         </motion.button>
       )}
 
-      {/* Backdrop - Mobile Only (always mounted to avoid flashes) */}
-      {isMobile && (
+      {/* Backdrop - Mobile Only */}
+      {isMobile && open && (
         <motion.div
-          initial={false}
-          animate={{ opacity: open ? 1 : 0 }}
-          transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
-          onClick={() => open && setOpen(false)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => setOpen(false)}
           className="fixed inset-0 z-40 bg-black/50"
           style={{ 
-            pointerEvents: open ? 'auto' : 'none', 
-            willChange: 'opacity',
-            transform: 'translate3d(0, 0, 0)',
+            WebkitBackfaceVisibility: 'hidden',
             backfaceVisibility: 'hidden',
           }}
         />
       )}
 
-      {/* Sidebar Navigation - Always Rendered */}
-      <motion.aside
-        initial={false}
-        animate={{
-          x: isMobile ? (open ? 0 : -280) : 0,
-          ...(isMobile ? {} : { width: collapsed ? '70px' : '280px' }),
-        }}
-        transition={{
-          type: "tween",
-          duration: 0.2,
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-card border-r border-border`}
-        style={{
-          height: isMobile ? '100dvh' : '100vh',
-          paddingTop: (isMobile && isNative) ? 'max(env(safe-area-inset-top, 0px), 0px)' : 0,
-          paddingBottom: (isMobile && isNative) ? 'max(env(safe-area-inset-bottom, 0px), 0px)' : 0,
-          willChange: 'transform',
-          transform: 'translate3d(0, 0, 0)',
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          perspective: 1000,
-          contain: 'paint',
-          touchAction: 'manipulation',
-        }}
-      >
+      {/* Sidebar Navigation */}
+      {(open || !isMobile) && (
+        <motion.aside
+          initial={false}
+          animate={{
+            x: isMobile ? (open ? 0 : -280) : 0,
+            ...(isMobile ? {} : { width: collapsed ? '70px' : '280px' }),
+          }}
+          transition={{
+            type: "tween",
+            duration: 0.2,
+            ease: "easeInOut",
+          }}
+          className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-card border-r border-border`}
+          style={{
+            height: isMobile ? '100dvh' : '100vh',
+            width: isMobile ? '280px' : undefined,
+            paddingTop: (isMobile && isNative) ? 'env(safe-area-inset-top, 0px)' : 0,
+            paddingBottom: (isMobile && isNative) ? 'env(safe-area-inset-bottom, 0px)' : 0,
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
+          }}
+        >
         {/* Toggle Buttons */}
         {isMobile ? (
           <div className="flex justify-end p-2">
@@ -476,7 +454,8 @@ export function AppSidebar() {
             </>
           )}
         </div>
-      </motion.aside>
+        </motion.aside>
+      )}
 
       {/* Dialogs */}
       <SettingsDialog open={showSettings} onOpenChange={setShowSettings} />
