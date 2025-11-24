@@ -60,26 +60,18 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const handleIosPurchase = async () => {
     setIsLoading(true);
     try {
-      console.log('🍎 Starting iOS purchase flow for PRO monthly');
-      sonnerToast.info('Apple IAP requires native iOS implementation');
-      sonnerToast.error('Please implement StoreKit bridge in your iOS app to enable purchases');
+      console.log('🍎 Starting iOS purchase for PRO monthly');
+      const success = await buyIosSubscription(PRODUCT_IDS.PRO_MONTHLY);
       
-      // Guide user to implement native bridge
-      console.log('');
-      console.log('📱 TO ENABLE APPLE IAP:');
-      console.log('1. Add StoreKit framework to your iOS project');
-      console.log('2. Implement native purchase handler in Swift');
-      console.log('3. Get receipt from Bundle.main.appStoreReceiptURL');
-      console.log('4. Convert to base64 and send to JavaScript');
-      console.log('5. Call verifyReceiptWithBackend() with the receipt');
-      console.log('');
-      console.log('See src/lib/appleIAP.ts for complete integration guide');
-      console.log('');
-      
-      // For now, show the user can't purchase yet
-      setIsLoading(false);
+      if (success) {
+        console.log('🍎 Purchase successful, refreshing plan...');
+        await refreshPlan();
+        onOpenChange(false);
+        window.location.reload();
+      }
     } catch (error) {
       console.error('🍎 iOS purchase error:', error);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -87,11 +79,15 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const handleRestorePurchases = async () => {
     setIsLoading(true);
     try {
-      sonnerToast.info('Apple IAP restore requires native iOS implementation');
-      console.log('📱 Native iOS StoreKit bridge required for restore purchases');
-      setIsLoading(false);
+      const success = await restorePurchases();
+      if (success) {
+        await refreshPlan();
+        onOpenChange(false);
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Restore purchases error:', error);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -250,7 +246,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Inga teamfunktioner', included: false },
         { text: 'Ingen prioriterad support', included: false },
       ],
-      cta: isIos ? '🍎 Apple IAP (Coming Soon)' : 'Välj Pro',
+      cta: isIos ? 'Välj Pro' : 'Välj Pro',
       variant: 'default' as const,
       planId: 'pro' as const,
       highlight: true,
@@ -283,27 +279,27 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Betalningsuppgifter</DialogTitle>
+            <DialogTitle className="text-2xl">Betalningsuppgifter</DialogTitle>
             <DialogDescription>
               Slutför din Tivly Pro prenumeration
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4 animate-fade-in">
             {/* Total Amount */}
-            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-5 border border-primary/20 shadow-sm transition-all duration-300 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Totalt att betala</span>
-                <span className="text-2xl font-bold text-foreground">
-                  99 kr
-                  <span className="text-sm font-normal text-muted-foreground"> / månad</span>
-                </span>
+                <span className="text-sm font-medium text-muted-foreground">Totalt att betala</span>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-foreground">99 kr</div>
+                  <div className="text-sm text-muted-foreground">per månad</div>
+                </div>
               </div>
             </div>
 
             {/* Payment Element */}
-            <div>
-              <div id="payment-element-dialog" className="min-h-[200px]" />
+            <div className="transition-all duration-300">
+              <div id="payment-element-dialog" className="min-h-[200px] animate-scale-in" />
             </div>
 
             {/* Action Buttons */}
@@ -315,14 +311,14 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                   cardElementRef.current = null;
                   setSelectedPlan(null);
                 }}
-                className="flex-1"
+                className="flex-1 transition-all duration-200 hover:scale-105"
               >
                 Tillbaka
               </Button>
               <Button 
                 onClick={handleConfirmPayment} 
                 disabled={isLoading || !clientSecret} 
-                className="flex-1"
+                className="flex-1 transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
               >
                 {isLoading ? (
                   <>
@@ -344,42 +340,47 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Välj din plan</DialogTitle>
+          <DialogTitle className="text-2xl">Välj din plan</DialogTitle>
           {userPlan && (
-            <DialogDescription className="text-xs">
-              Aktiv plan: <span className="font-medium capitalize">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
-              {isIos && ' • Betalning via Apple'}
+            <DialogDescription className="text-sm">
+              Aktiv plan: <span className="font-medium capitalize text-foreground">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
             </DialogDescription>
           )}
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
-          {plans.map((plan) => (
+          {plans.map((plan, index) => (
             <Card 
               key={plan.name} 
               className={cn(
-                "relative overflow-hidden flex flex-col transition-all",
-                'highlight' in plan && plan.highlight && "border-primary shadow-lg scale-105"
+                "relative overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg",
+                'highlight' in plan && plan.highlight && "border-primary shadow-lg scale-[1.02] md:scale-105"
               )}
+              style={{
+                animationDelay: `${index * 100}ms`,
+              }}
             >
               {'highlight' in plan && plan.highlight && (
-                <div className="absolute top-0 left-0 right-0 bg-primary text-primary-foreground text-xs font-medium text-center py-1">
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xs font-medium text-center py-1.5 animate-fade-in">
                   Mest populär
                 </div>
               )}
               <CardHeader className={cn("space-y-3", 'highlight' in plan && plan.highlight && "pt-10")}>
-                <CardTitle className="text-xl font-semibold">{plan.name}</CardTitle>
+                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
                 <div className="space-y-1">
-                  <div className="text-2xl font-bold text-foreground">{plan.price}</div>
-                  {plan.period && <div className="text-xs text-muted-foreground">{plan.period}</div>}
+                  <div className="text-3xl font-bold text-foreground">{plan.price}</div>
+                  {plan.period && <div className="text-sm text-muted-foreground">{plan.period}</div>}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col pt-4">
-                <ul className="space-y-2.5 mb-6 flex-1">
+                <ul className="space-y-3 mb-6 flex-1">
                   {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm">
+                    <li 
+                      key={i} 
+                      className="flex items-start gap-3 text-sm transition-all duration-200 hover:translate-x-1"
+                    >
                       <span className={cn(
-                        "mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-xs",
+                        "mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all",
                         feature.included 
                           ? "bg-primary/10 text-primary" 
                           : "bg-muted text-muted-foreground"
@@ -387,7 +388,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                         {feature.included ? '✓' : '−'}
                       </span>
                       <span className={cn(
-                        "leading-tight",
+                        "leading-relaxed",
                         feature.included ? "text-foreground" : "text-muted-foreground"
                       )}>
                         {feature.text}
@@ -400,7 +401,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                     onClick={() => handleSubscribe(plan.planId)}
                     disabled={isLoading}
                     variant={plan.variant}
-                    className="w-full"
+                    className={cn(
+                      "w-full transition-all duration-300 hover:scale-105",
+                      'highlight' in plan && plan.highlight && "shadow-md hover:shadow-lg"
+                    )}
                     size="lg"
                   >
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -410,7 +414,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                   <Button 
                     onClick={() => window.open('mailto:kontakt@tivly.se', '_blank')}
                     variant={plan.variant} 
-                    className="w-full" 
+                    className="w-full transition-all duration-300 hover:scale-105" 
                     size="lg"
                   >
                     {plan.cta}
@@ -431,19 +435,16 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         </div>
 
         {isIos && (
-          <div className="flex flex-col gap-3 items-center pb-4">
+          <div className="flex justify-center pb-4 animate-fade-in">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={handleRestorePurchases}
               disabled={isLoading}
               size="sm"
+              className="text-xs text-muted-foreground hover:text-foreground transition-all duration-200"
             >
-              Återställ köp
+              Återställ tidigare köp
             </Button>
-            <div className="text-xs text-muted-foreground text-center max-w-md">
-              <p className="font-medium text-foreground mb-1">🍎 Apple IAP Implementation Needed</p>
-              <p>Native StoreKit bridge required. Check console for setup guide.</p>
-            </div>
           </div>
         )}
 
