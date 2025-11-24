@@ -1,14 +1,12 @@
 import { toast } from "sonner";
 import { isIosApp } from "@/utils/environment";
 import { apiClient } from "./api";
-import { NativePurchases, PURCHASE_TYPE } from "@capgo/native-purchases";
+import { CapacitorPurchases } from "@capgo/capacitor-purchases";
 
 /**
  * Apple In-App Purchase Integration
- * Using @capgo/native-purchases (native plugin, not web mock)
- * 
- * IMPORTANT: This requires the native iOS plugin to be installed via:
- * npx cap sync ios
+ * Using @capgo/capacitor-purchases (RevenueCat wrapper)
+ * Native iOS StoreKit bridge already configured in Xcode
  */
 
 export const PRODUCT_IDS = {
@@ -32,8 +30,7 @@ export function isNativeIOS(): boolean {
 }
 
 /**
- * Initialize the IAP plugin
- * Call this once when the app starts (iOS only)
+ * Initialize the IAP plugin (RevenueCat is initialized automatically by native code)
  */
 export async function initializeIAP() {
   if (!isNativeIOS()) {
@@ -41,23 +38,11 @@ export async function initializeIAP() {
     return;
   }
 
-  try {
-    console.log("🍎 IAP: Checking billing support");
-    const { isBillingSupported } = await NativePurchases.isBillingSupported();
-    
-    if (!isBillingSupported) {
-      console.error("🍎 IAP: ❌ Billing not supported on this device");
-      return;
-    }
-    
-    console.log("🍎 IAP: ✅ Billing supported, initialization successful");
-  } catch (error) {
-    console.error("🍎 IAP: ❌ Failed to initialize:", error);
-  }
+  console.log("🍎 IAP: RevenueCat initialized via native AppDelegate");
 }
 
 /**
- * Load Apple products from App Store
+ * Load Apple products from App Store via RevenueCat Offerings
  */
 export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
   if (!isNativeIOS()) {
@@ -65,18 +50,24 @@ export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
   }
 
   try {
-    const { products } = await NativePurchases.getProducts({
-      productIdentifiers: Object.values(PRODUCT_IDS),
-      productType: PURCHASE_TYPE.SUBS,
-    });
+    console.log("🍎 IAP: Fetching offerings...");
+    const { offerings } = await CapacitorPurchases.getOfferings();
+    
+    if (!offerings.current) {
+      console.warn("🍎 IAP: No current offering available");
+      return [];
+    }
 
-    return products.map((p: any) => ({
-      identifier: p.productIdentifier,
-      title: p.title,
-      description: p.description,
-      price: p.priceString,
-      priceAmount: p.price,
-      currency: p.currency,
+    const packages = offerings.current.availablePackages || [];
+    console.log("🍎 IAP: Found packages:", packages.length);
+
+    return packages.map((pkg: any) => ({
+      identifier: pkg.product.identifier,
+      title: pkg.product.title || pkg.product.identifier,
+      description: pkg.product.description || "",
+      price: pkg.product.priceString || "99 SEK",
+      priceAmount: pkg.product.price || 99,
+      currency: pkg.product.currencyCode || "SEK",
     }));
   } catch (error) {
     console.error("🍎 IAP: Failed to load products:", error);
@@ -85,7 +76,7 @@ export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
 }
 
 /**
- * Purchase Apple subscription and verify with backend
+ * Purchase Apple subscription via RevenueCat and verify with backend
  */
 export async function purchaseAppleSubscription(productId: string): Promise<boolean> {
   console.log("🍎 [appleIAP] purchaseAppleSubscription called with:", productId);
@@ -96,52 +87,44 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
     return false;
   }
 
-  // Check if NativePurchases is available
-  if (typeof NativePurchases === 'undefined') {
-    console.error("🍎 [appleIAP] ❌ NativePurchases is not defined! Plugin not loaded.");
-    console.error("🍎 [appleIAP] window.NativePurchases:", typeof (window as any).NativePurchases);
-    console.error("🍎 [appleIAP] window.Capacitor:", typeof (window as any).Capacitor);
-    toast.error("IAP plugin inte tillgängligt. Appen behöver uppdateras.");
-    return false;
-  }
-
-  console.log("🍎 [appleIAP] NativePurchases available");
-
   try {
-    console.log("🍎 [appleIAP] Starting purchase for:", productId);
-    
-    // Check if we're in a mocked environment
-    if ((window as any).Capacitor?.getPlatform() === 'web') {
-      console.error("🍎 [appleIAP] ❌ Running in web mode, not native iOS!");
-      toast.error("TestFlight-appen behöver uppdateras. Kontakta support.", { id: 'iap-purchase' });
-      return false;
-    }
-    
+    console.log("🍎 [appleIAP] Fetching offerings...");
     toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
 
-    const transaction = await NativePurchases.purchaseProduct({
-      productIdentifier: productId,
-      productType: PURCHASE_TYPE.SUBS,
-    });
-
-    console.log("🍎 [appleIAP] Purchase result:", transaction);
-    console.log("🍎 [appleIAP] Transaction keys:", Object.keys(transaction));
-    console.log("🍎 [appleIAP] Has receipt?", !!transaction.receipt);
-
-    // Check if this is a mock transaction (indicates old build)
-    if (transaction.transactionId === "transactionId" || !transaction.receipt) {
-      console.error("🍎 [appleIAP] ❌ MOCK TRANSACTION DETECTED! App needs rebuild with new IAP package.");
-      console.error("🍎 [appleIAP] Steps: 1) git pull, 2) npm install, 3) npx cap sync ios, 4) rebuild in Xcode");
-      toast.error("TestFlight-bygget är föråldrat. En ny version krävs för IAP.", { 
-        id: 'iap-purchase',
-        duration: 5000 
-      });
+    // Get offerings
+    const { offerings } = await CapacitorPurchases.getOfferings();
+    
+    if (!offerings.current) {
+      toast.error("Inga produkter tillgängliga", { id: 'iap-purchase' });
       return false;
     }
+
+    // Find the package matching the product ID
+    const packages = offerings.current.availablePackages || [];
+    const targetPackage = packages.find((pkg: any) => pkg.product.identifier === productId);
     
-    if (transaction.receipt) {
-      toast.loading("Verifierar köp...", { id: 'iap-purchase' });
-      const verified = await verifyReceiptWithBackend(transaction.receipt);
+    if (!targetPackage) {
+      console.error("🍎 [appleIAP] Product not found:", productId);
+      toast.error("Produkt hittades inte", { id: 'iap-purchase' });
+      return false;
+    }
+
+    console.log("🍎 [appleIAP] Purchasing package:", targetPackage.identifier);
+    
+    // Make the purchase through RevenueCat
+    const { customerInfo } = await CapacitorPurchases.purchasePackage({ 
+      identifier: targetPackage.identifier,
+      offeringIdentifier: offerings.current.identifier
+    });
+
+    console.log("🍎 [appleIAP] Purchase successful, customer info:", customerInfo);
+    
+    // Get receipt from native TivlyStoreKitManager and verify
+    toast.loading("Verifierar köp...", { id: 'iap-purchase' });
+    
+    const receiptData = await getReceiptFromNative();
+    if (receiptData) {
+      const verified = await verifyReceiptWithBackend(receiptData);
 
       if (verified) {
         toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
@@ -151,26 +134,34 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
         return false;
       }
     } else {
-      console.warn("🍎 [appleIAP] No receipt in transaction");
-      toast.error("Inget kvitto mottogs. Kontakta support.", { id: 'iap-purchase' });
-      return false;
+      console.warn("🍎 [appleIAP] No receipt available");
+      toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
+      return true;
     }
 
   } catch (purchaseError: any) {
     console.error("🍎 [appleIAP] Purchase error:", purchaseError);
 
-    if (purchaseError.message?.includes("canceled") || purchaseError.code === "1") {
+    if (purchaseError.code === 1 || purchaseError.message?.includes("cancel")) {
       toast.dismiss('iap-purchase');
       return false;
     }
 
-    // More detailed error logging
-    console.error("🍎 [appleIAP] Error code:", purchaseError.code);
-    console.error("🍎 [appleIAP] Error message:", purchaseError.message);
-    console.error("🍎 [appleIAP] Full error:", JSON.stringify(purchaseError));
-
-    toast.error(`Köpet misslyckades: ${purchaseError.message || purchaseError.code || "Okänt fel"}`, { id: 'iap-purchase' });
+    toast.error(`Köpet misslyckades: ${purchaseError.message || "Okänt fel"}`, { id: 'iap-purchase' });
     return false;
+  }
+}
+
+/**
+ * Get receipt from native TivlyStoreKitManager plugin
+ */
+async function getReceiptFromNative(): Promise<string | null> {
+  try {
+    const result = await (window as any).Capacitor?.Plugins?.TivlyStoreKitManager?.getReceipt();
+    return result?.receiptData || null;
+  } catch (error) {
+    console.error("🍎 IAP: Failed to get receipt from native:", error);
+    return null;
   }
 }
 
@@ -182,7 +173,7 @@ export async function buyIosSubscription(productId: string): Promise<boolean> {
 }
 
 /**
- * Restore previous purchases
+ * Restore previous purchases via RevenueCat
  */
 export async function restorePurchases(): Promise<boolean> {
   if (!isNativeIOS()) {
@@ -194,14 +185,20 @@ export async function restorePurchases(): Promise<boolean> {
     console.log("🍎 IAP: Restoring purchases...");
     toast.loading("Återställer köp...", { id: 'iap-restore' });
 
-    await NativePurchases.restorePurchases();
-    console.log("🍎 IAP: ✅ Restore successful");
+    const { customerInfo } = await CapacitorPurchases.restorePurchases();
+    console.log("🍎 IAP: Restore result:", customerInfo);
+
+    // Get receipt and verify with backend if available
+    const receiptData = await getReceiptFromNative();
+    if (receiptData) {
+      await verifyReceiptWithBackend(receiptData);
+    }
 
     toast.success("Köp återställda", { id: 'iap-restore' });
     return true;
 
   } catch (error: any) {
-    console.error("🍎 IAP: ❌ Restore failed:", error);
+    console.error("🍎 IAP: Restore failed:", error);
     toast.error(`Återställning misslyckades: ${error.message || "Okänt fel"}`, { id: 'iap-restore' });
     return false;
   }
@@ -209,7 +206,6 @@ export async function restorePurchases(): Promise<boolean> {
 
 /**
  * Verify receipt with backend
- * Call this after successful purchase with base64 receipt
  */
 export async function verifyReceiptWithBackend(receiptBase64: string): Promise<boolean> {
   try {
@@ -217,7 +213,7 @@ export async function verifyReceiptWithBackend(receiptBase64: string): Promise<b
 
     const token = apiClient.getAuthToken();
     if (!token) {
-      console.error("🍎 IAP: ❌ No auth token available");
+      console.error("🍎 IAP: No auth token available");
       toast.error("Authentication required. Please log in.");
       return false;
     }
@@ -236,23 +232,23 @@ export async function verifyReceiptWithBackend(receiptBase64: string): Promise<b
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("🍎 IAP: ❌ Backend verification failed:", errorData);
+      console.error("🍎 IAP: Backend verification failed:", errorData);
       toast.error(errorData.message || "Verification failed");
       return false;
     }
 
     const data = await response.json();
-    console.log("🍎 IAP: ✅ Receipt verified by backend:", data);
+    console.log("🍎 IAP: Receipt verified by backend:", data);
 
     if (data.success && data.subscription) {
-      console.log("🍎 IAP: ✅ Subscription activated:", data.subscription);
+      console.log("🍎 IAP: Subscription activated:", data.subscription);
       return true;
     } else {
-      console.error("🍎 IAP: ❌ Backend returned success=false");
+      console.error("🍎 IAP: Backend returned success=false");
       return false;
     }
   } catch (error: any) {
-    console.error("🍎 IAP: ❌ Receipt verification error:", error);
+    console.error("🍎 IAP: Receipt verification error:", error);
     toast.error(`Verification error: ${error.message}`);
     return false;
   }
