@@ -251,8 +251,23 @@ export default function Auth() {
           return;
         }
 
+        // iOS error handling - parse backend error
         console.error(`[Auth] ❌ iOS login failed (${platform}):`, response.status, response.statusText);
-        setAuthError('Fel kod. Försök igen eller begär en ny kod.');
+        console.log(`[Auth] 📥 iOS error response body:`, responseText);
+        
+        if (!responseText || responseText.trim() === '') {
+          console.error('[Auth] Empty error response from backend (iOS)');
+          setAuthError('Servern returnerade ett tomt svar. Försök igen.');
+        } else {
+          try {
+            const error = JSON.parse(responseText);
+            console.error('[Auth] iOS parsed error:', error);
+            setAuthError(error.error || error.message || 'Fel kod. Försök igen eller begär en ny kod.');
+          } catch (parseError) {
+            console.error('[Auth] Non-JSON iOS error response:', responseText, parseError);
+            setAuthError('Fel kod. Försök igen eller begär en ny kod.');
+          }
+        }
         setPinCode('');
         return;
       }
