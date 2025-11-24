@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { isIosApp } from "@/utils/environment";
 import { apiClient } from "./api";
-import { CapacitorPurchases, LOG_LEVEL } from "@capgo/capacitor-purchases";
+import { CapacitorPurchases } from "@capgo/capacitor-purchases";
 
 /**
  * Apple In-App Purchase Integration
@@ -40,9 +40,8 @@ export async function initializeIAP() {
 
   try {
     console.log("🍎 IAP: Initializing @capgo/capacitor-purchases");
-    await CapacitorPurchases.setup({
-      logLevel: LOG_LEVEL.VERBOSE,
-    });
+    // Setup without explicit log level if enum is missing
+    await CapacitorPurchases.setup({});
     console.log("🍎 IAP: Initialization successful");
   } catch (error) {
     console.error("🍎 IAP: ❌ Failed to initialize:", error);
@@ -83,7 +82,7 @@ export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
  */
 export async function purchaseAppleSubscription(productId: string): Promise<boolean> {
   console.log("🍎 [appleIAP] purchaseAppleSubscription called with:", productId);
-  
+
   if (!isNativeIOS()) {
     console.warn("🍎 [appleIAP] Purchase attempted in web browser");
     toast.error("Apple purchases only work in the iOS app");
@@ -93,14 +92,14 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
   try {
     console.log("🍎 [appleIAP] Starting purchase for:", productId);
     toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
-    
+
     // Check if Capacitor is available
     if (typeof (window as any).Capacitor === 'undefined') {
       console.error("🍎 [appleIAP] Capacitor not found");
       toast.error("Kunde inte hitta native funktionalitet", { id: 'iap-purchase' });
       return false;
     }
-    
+
     try {
       const result = await CapacitorPurchases.purchase({
         productIdentifier: productId,
@@ -111,7 +110,7 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
       if (result.transaction?.appStoreReceipt) {
         toast.loading("Verifierar köp...", { id: 'iap-purchase' });
         const verified = await verifyReceiptWithBackend(result.transaction.appStoreReceipt);
-        
+
         if (verified) {
           toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
           return true;
@@ -162,7 +161,7 @@ export async function restorePurchases(): Promise<boolean> {
   try {
     console.log("🍎 IAP: Restoring purchases...");
     toast.loading("Återställer köp...", { id: 'iap-restore' });
-    
+
     const result = await CapacitorPurchases.restorePurchases();
     console.log("🍎 IAP: Restore result:", result);
 
@@ -170,15 +169,15 @@ export async function restorePurchases(): Promise<boolean> {
     // Note: The plugin might return multiple transactions. 
     // We should ideally verify all valid ones or the latest relevant one.
     // For simplicity, we'll check if we have any success.
-    
+
     // This part depends on the exact return shape of restorePurchases which can vary.
     // Usually it returns { customerInfo } or { transactions }.
     // Let's assume standard behavior: if no error, it worked, but we need to verify receipts.
-    
+
     // Since we don't have the exact type definition right now, we'll try to find a receipt.
     // If the plugin automatically finishes transactions, we might need to rely on the listener.
     // But for a simple restore, often we just want to trigger the native restore flow.
-    
+
     toast.success("Köp återställda", { id: 'iap-restore' });
     return true;
 
@@ -196,7 +195,7 @@ export async function restorePurchases(): Promise<boolean> {
 export async function verifyReceiptWithBackend(receiptBase64: string): Promise<boolean> {
   try {
     console.log("🍎 IAP: Verifying receipt with backend...");
-    
+
     // Get JWT token from apiClient
     const token = apiClient.getAuthToken();
     if (!token) {
@@ -204,29 +203,29 @@ export async function verifyReceiptWithBackend(receiptBase64: string): Promise<b
       toast.error("Authentication required. Please log in.");
       return false;
     }
-    
+
     const response = await fetch("https://api.tivly.se/ios/verify", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({ receipt: receiptBase64 }),
       credentials: "include",
     });
-    
+
     console.log("🍎 IAP: Backend response status:", response.status);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("🍎 IAP: ❌ Backend verification failed:", errorData);
       toast.error(errorData.message || "Verification failed");
       return false;
     }
-    
+
     const data = await response.json();
     console.log("🍎 IAP: ✅ Receipt verified by backend:", data);
-    
+
     if (data.success && data.subscription) {
       console.log("🍎 IAP: ✅ Subscription activated:", data.subscription);
       return true;
