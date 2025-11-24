@@ -106,6 +106,14 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
 
   try {
     console.log("🍎 [appleIAP] Starting purchase for:", productId);
+    
+    // Check if we're in a mocked environment
+    if ((window as any).Capacitor?.getPlatform() === 'web') {
+      console.error("🍎 [appleIAP] ❌ Running in web mode, not native iOS!");
+      toast.error("TestFlight-appen behöver uppdateras. Kontakta support.", { id: 'iap-purchase' });
+      return false;
+    }
+    
     toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
 
     const transaction = await NativePurchases.purchaseProduct({
@@ -114,7 +122,20 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
     });
 
     console.log("🍎 [appleIAP] Purchase result:", transaction);
+    console.log("🍎 [appleIAP] Transaction keys:", Object.keys(transaction));
+    console.log("🍎 [appleIAP] Has receipt?", !!transaction.receipt);
 
+    // Check if this is a mock transaction (indicates old build)
+    if (transaction.transactionId === "transactionId" || !transaction.receipt) {
+      console.error("🍎 [appleIAP] ❌ MOCK TRANSACTION DETECTED! App needs rebuild with new IAP package.");
+      console.error("🍎 [appleIAP] Steps: 1) git pull, 2) npm install, 3) npx cap sync ios, 4) rebuild in Xcode");
+      toast.error("TestFlight-bygget är föråldrat. En ny version krävs för IAP.", { 
+        id: 'iap-purchase',
+        duration: 5000 
+      });
+      return false;
+    }
+    
     if (transaction.receipt) {
       toast.loading("Verifierar köp...", { id: 'iap-purchase' });
       const verified = await verifyReceiptWithBackend(transaction.receipt);
@@ -128,7 +149,7 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
       }
     } else {
       console.warn("🍎 [appleIAP] No receipt in transaction");
-      toast.error("Inget kvitto mottogs", { id: 'iap-purchase' });
+      toast.error("Inget kvitto mottogs. Kontakta support.", { id: 'iap-purchase' });
       return false;
     }
 
