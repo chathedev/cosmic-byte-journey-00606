@@ -206,22 +206,116 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
 // Global Dev Button Component
 const GlobalDevButton = () => {
   const { userPlan } = useSubscription();
+  const [logs, setLogs] = useState<string[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+
+  // Capture console logs and errors
+  useEffect(() => {
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
+    const logBuffer: string[] = [];
+    const errorBuffer: string[] = [];
+
+    console.log = (...args: any[]) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      logBuffer.push(`[LOG] ${new Date().toISOString()} - ${message}`);
+      if (logBuffer.length > 100) logBuffer.shift();
+      setLogs([...logBuffer]);
+      originalLog.apply(console, args);
+    };
+
+    console.error = (...args: any[]) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      errorBuffer.push(`[ERROR] ${new Date().toISOString()} - ${message}`);
+      if (errorBuffer.length > 50) errorBuffer.shift();
+      setErrors([...errorBuffer]);
+      originalError.apply(console, args);
+    };
+
+    console.warn = (...args: any[]) => {
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      errorBuffer.push(`[WARN] ${new Date().toISOString()} - ${message}`);
+      if (errorBuffer.length > 50) errorBuffer.shift();
+      setErrors([...errorBuffer]);
+      originalWarn.apply(console, args);
+    };
+
+    return () => {
+      console.log = originalLog;
+      console.error = originalError;
+      console.warn = originalWarn;
+    };
+  }, []);
   
-  const handleDevClick = () => {
+  const handleDevClick = async () => {
     const isIos = isIosApp();
-    const info = {
-      platform: isIos ? 'iOS App (io.tivly.se)' : 'Web (app.tivly.se)',
-      hostname: window.location.hostname,
-      userPlan: userPlan?.plan || 'unknown',
-      meetingsUsed: userPlan?.meetingsUsed || 0,
-      meetingsLimit: userPlan?.meetingsLimit || 0,
-      capacitor: typeof (window as any).Capacitor !== 'undefined',
+    
+    // Gather comprehensive debug info
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      session: {
+        platform: isIos ? 'iOS App (io.tivly.se)' : 'Web (app.tivly.se)',
+        hostname: window.location.hostname,
+        pathname: window.location.pathname,
+        userAgent: navigator.userAgent,
+        capacitor: typeof (window as any).Capacitor !== 'undefined',
+      },
+      user: {
+        plan: userPlan?.plan || 'unknown',
+        meetingsUsed: userPlan?.meetingsUsed || 0,
+        meetingsLimit: userPlan?.meetingsLimit || 0,
+      },
+      errors: errors.slice(-20), // Last 20 errors
+      logs: logs.slice(-50), // Last 50 logs
     };
     
-    console.log('🔧 DEV INFO:', info);
-    sonnerToast.info(`Platform: ${info.platform} | Plan: ${info.userPlan} | Meetings: ${info.meetingsUsed}/${info.meetingsLimit}`, {
-      duration: 5000,
-    });
+    const formattedOutput = `
+=== TIVLY DEBUG INFO ===
+Timestamp: ${debugInfo.timestamp}
+
+--- SESSION INFO ---
+Platform: ${debugInfo.session.platform}
+Hostname: ${debugInfo.session.hostname}
+Path: ${debugInfo.session.pathname}
+Capacitor: ${debugInfo.session.capacitor}
+
+--- USER INFO ---
+Plan: ${debugInfo.user.plan}
+Meetings: ${debugInfo.user.meetingsUsed}/${debugInfo.user.meetingsLimit}
+
+--- ERRORS (Last 20) ---
+${debugInfo.errors.length > 0 ? debugInfo.errors.join('\n') : 'No errors recorded'}
+
+--- LOGS (Last 50) ---
+${debugInfo.logs.length > 0 ? debugInfo.logs.join('\n') : 'No logs recorded'}
+
+--- RAW DATA ---
+${JSON.stringify(debugInfo, null, 2)}
+`.trim();
+    
+    // Copy to clipboard
+    try {
+      await navigator.clipboard.writeText(formattedOutput);
+      sonnerToast.success('Debug info copied to clipboard! 📋', {
+        duration: 3000,
+        description: `${errors.length} errors, ${logs.length} logs captured`,
+      });
+      console.log('🔧 DEBUG INFO COPIED:', debugInfo);
+    } catch (err) {
+      sonnerToast.error('Failed to copy to clipboard', {
+        description: 'Check console for debug info',
+      });
+      console.log('🔧 DEBUG INFO:', debugInfo);
+      console.log('📋 FORMATTED OUTPUT:', formattedOutput);
+    }
   };
 
   return (
@@ -229,7 +323,8 @@ const GlobalDevButton = () => {
       onClick={handleDevClick}
       size="icon"
       variant="outline"
-      className="fixed bottom-4 left-4 z-[9999] h-12 w-12 rounded-full shadow-lg bg-background/80 backdrop-blur-sm border-2 hover:scale-110 transition-transform"
+      className="fixed bottom-4 right-4 z-[9999] h-12 w-12 rounded-full shadow-lg bg-background/80 backdrop-blur-sm border-2 hover:scale-110 transition-transform"
+      title="Copy debug info"
     >
       <Bug className="h-5 w-5" />
     </Button>
