@@ -54,7 +54,8 @@ export async function initializeIAP() {
     return;
   }
 
-  console.log("🍎 IAP: RevenueCat initialized via native AppDelegate with test API key");
+  console.log("🍎 IAP: RevenueCat initialized via native AppDelegate with production API key");
+  console.log("🍎 IAP: API Key: appl_FKrIkzvUZsEugFXZaYznvBWjEvK");
 }
 
 /**
@@ -100,25 +101,38 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
 
   if (!isNativeIOS()) {
     console.error("🍎 [appleIAP] Not iOS, aborting");
-    toast.error("Apple purchases only work in the iOS app");
+    toast.error("Apple-köp fungerar endast i iOS-appen");
     return false;
   }
 
   try {
-    console.log("🍎 [appleIAP] Showing native paywall...");
+    console.log("🍎 [appleIAP] Showing native RevenueCat paywall...");
+    toast.loading("Öppnar prenumerationer...", { id: 'iap-purchase' });
     
     // Show native SwiftUI paywall
     await RevenueCatManager.showPaywall();
     
-    // Check subscription status after paywall closes
+    // Give user time to interact with paywall
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Check subscription status after paywall interaction
+    console.log("🍎 [appleIAP] Checking customer info after paywall...");
     const customerInfo = await RevenueCatManager.getCustomerInfo();
     const isPro = customerInfo.isPro || false;
     
+    console.log("🍎 [appleIAP] Customer info result:", { isPro });
+    
     if (isPro) {
-      toast.success("Köp genomfört! 🎉");
+      console.log("✅ Purchase successful! User is now Tivly Pro");
+      toast.success("Välkommen till Tivly Pro! 🎉", { id: 'iap-purchase' });
+      
+      // Reload page to refresh subscription status
+      setTimeout(() => window.location.reload(), 1500);
       return true;
     }
     
+    console.log("⚠️ User closed paywall without purchasing");
+    toast.dismiss('iap-purchase');
     return false;
 
   } catch (purchaseError: any) {
@@ -191,12 +205,15 @@ export async function restorePurchases(): Promise<boolean> {
     const isPro = result.isPro || false;
     
     if (isPro) {
-      toast.success("Köp återställda! Du har Tivly Pro", { id: 'iap-restore' });
+      toast.success("Köp återställda! Du har Tivly Pro 🎉", { id: 'iap-restore' });
+      
+      // Reload page to refresh subscription status
+      setTimeout(() => window.location.reload(), 1500);
+      return true;
     } else {
       toast.info("Inga tidigare köp hittades", { id: 'iap-restore' });
+      return false;
     }
-
-    return isPro;
 
   } catch (error: any) {
     console.error("🍎 IAP: Restore failed:", error);

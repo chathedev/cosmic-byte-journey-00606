@@ -8,11 +8,11 @@ public class RevenueCatManager: CAPPlugin {
     // MARK: - Configuration
     
     public static func configure() {
-        // Configure RevenueCat with your API key
+        // Configure RevenueCat with production API key
         Purchases.logLevel = .debug
-        Purchases.configure(withAPIKey: "test_ZPMHNNIDGuUIiXIRsmsotqQaNdo")
+        Purchases.configure(withAPIKey: "appl_FKrIkzvUZsEugFXZaYznvBWjEvK")
         
-        print("🎯 RevenueCat configured successfully")
+        print("🎯 RevenueCat configured with production API key")
     }
     
     // MARK: - Plugin Methods
