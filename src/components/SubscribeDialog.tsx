@@ -32,7 +32,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [showXcodeSetup, setShowXcodeSetup] = useState(false);
   const stripeRef = useRef<Stripe | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
@@ -75,13 +74,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       }
     } catch (error: any) {
       console.error('❌ [SubscribeDialog] iOS purchase error:', error);
-      
-      // Show Xcode setup dialog if UNIMPLEMENTED
-      if (error.code === 'UNIMPLEMENTED' || error.message?.includes('UNIMPLEMENTED')) {
-        setShowXcodeSetup(true);
-      } else {
-        sonnerToast.error("Köpet misslyckades. Försök igen.");
-      }
+      sonnerToast.error("Köpet misslyckades. Försök igen.");
     } finally {
       setIsLoading(false);
     }
@@ -483,46 +476,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             </Button>
           </div>
         )}
-
-        {/* Xcode Setup Dialog */}
-        <Dialog open={showXcodeSetup} onOpenChange={setShowXcodeSetup}>
-          <DialogContent className="max-w-lg animate-scale-in">
-            <DialogHeader>
-              <DialogTitle className="text-xl flex items-center gap-2 animate-fade-in">
-                <span className="text-3xl">🔧</span>
-                Xcode-konfiguration krävs
-              </DialogTitle>
-              <DialogDescription className="text-left space-y-3 pt-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                <p className="font-medium text-foreground">
-                  RevenueCat SDK är inte installerat än
-                </p>
-                <p>
-                  För att aktivera iOS-betalningar behöver du slutföra konfigurationen i Xcode:
-                </p>
-                <ol className="list-decimal list-inside space-y-2 text-sm">
-                  <li>Exportera projektet till GitHub</li>
-                  <li>Öppna projektet i Xcode</li>
-                  <li>Installera RevenueCat SDK via Swift Package Manager</li>
-                  <li>Bygg och kör appen</li>
-                </ol>
-                <div className="bg-muted/50 rounded-lg p-3 mt-4 border border-border">
-                  <p className="text-xs font-mono">
-                    Se <span className="font-semibold">XCODE_SETUP_REQUIRED.md</span> för fullständig guide
-                  </p>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end pt-4">
-              <Button 
-                onClick={() => setShowXcodeSetup(false)}
-                className="animate-fade-in transition-all duration-200 hover:scale-105"
-                style={{ animationDelay: '0.2s' }}
-              >
-                Förstått
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
       </DialogContent>
     </Dialog>
