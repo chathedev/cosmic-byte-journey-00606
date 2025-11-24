@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DevConsole } from '@/components/DevConsole';
 
 /**
  * Auth - Email + PIN authentication
@@ -339,12 +338,27 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Dev Console - only on iOS app domain */}
-      {isIoDomain() && <DevConsole />}
+      {/* Animated background with gradient orbs */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
+        <motion.div 
+          className="absolute top-20 -left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div 
+          className="absolute bottom-20 -right-20 w-96 h-96 bg-accent/20 rounded-full blur-3xl"
+          animate={{
+            scale: [1.2, 1, 1.2],
+            opacity: [0.2, 0.4, 0.2],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
       
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10" />
-      
-      <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-sm bg-card/95">
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-xl bg-card/98 hover:shadow-primary/10 hover:shadow-3xl transition-all duration-300">
         <AnimatePresence mode="wait">
           {viewMode === 'welcome' ? (
             <motion.div
@@ -513,7 +527,12 @@ export default function Auth() {
                 <Label htmlFor="pin" className="text-center block font-medium">
                   Ange 6-siffrig kod från din e-post
                 </Label>
-                <div className="flex justify-center">
+                <motion.div 
+                  className="flex justify-center"
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                >
                   <InputOTP
                     maxLength={6}
                     value={pinCode}
@@ -536,7 +555,7 @@ export default function Auth() {
                       <InputOTPSlot index={5} />
                     </InputOTPGroup>
                   </InputOTP>
-                </div>
+                </motion.div>
                 <div className="text-center space-y-1">
                   <p className="text-xs text-muted-foreground">
                     Kolla din inkorg efter koden
@@ -615,16 +634,32 @@ export default function Auth() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
               >
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-center">
-                <Mail className="h-12 w-12 mx-auto text-primary" />
-                <div className="space-y-2">
+              <motion.div 
+                className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-center"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+                >
+                  <Mail className="h-12 w-12 mx-auto text-primary" />
+                </motion.div>
+                <motion.div 
+                  className="space-y-2"
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
                   <p className="font-medium">E-post skickad!</p>
                   <p className="text-sm text-muted-foreground">
                     Vi har skickat en 6-siffrig verifieringskod till:
                   </p>
                   <p className="text-sm font-medium">{email}</p>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               <Alert>
                 <Clock className="h-4 w-4" />
@@ -640,7 +675,12 @@ export default function Auth() {
                 <Label htmlFor="pin-await" className="text-center block font-medium">
                   Ange 6-siffrig kod från din e-post
                 </Label>
-                <div className="flex justify-center">
+                <motion.div 
+                  className="flex justify-center"
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
                   <InputOTP
                     maxLength={6}
                     value={pinCode}
@@ -662,7 +702,7 @@ export default function Auth() {
                       <InputOTPSlot index={5} />
                     </InputOTPGroup>
                   </InputOTP>
-                </div>
+                </motion.div>
                 {codeExpiry > 0 && (
                   <p className="text-xs text-center text-primary font-medium flex items-center justify-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -733,9 +773,15 @@ export default function Auth() {
               </Button>
 
               {authError && (
-                <p className="text-xs text-destructive text-center mt-2">
-                  {authError}
-                </p>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+                >
+                  <p className="text-sm text-destructive text-center font-medium">
+                    {authError}
+                  </p>
+                </motion.div>
               )}
 
               <Button
