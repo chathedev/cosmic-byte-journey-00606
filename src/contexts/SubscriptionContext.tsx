@@ -66,8 +66,15 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           } else {
             console.log('⚠️ [SubscriptionContext] No active RevenueCat subscription');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ [SubscriptionContext] Failed to check RevenueCat:', error);
+          
+          // Don't show error toast on UNIMPLEMENTED - just log it
+          if (error.code !== 'UNIMPLEMENTED') {
+            console.error('RevenueCat error (not UNIMPLEMENTED):', error);
+          } else {
+            console.log('ℹ️ RevenueCat SDK not installed in Xcode yet - using backend plan');
+          }
         }
       }
       

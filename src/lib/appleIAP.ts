@@ -138,6 +138,16 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
   } catch (purchaseError: any) {
     console.error("🍎 [appleIAP] Purchase error:", purchaseError);
 
+    // Handle UNIMPLEMENTED error (native plugin not installed in Xcode yet)
+    if (purchaseError.code === 'UNIMPLEMENTED') {
+      console.error("❌ RevenueCat native plugin not installed in Xcode");
+      toast.error("RevenueCat SDK krävs. Följ installationsinstruktioner i Xcode.", { 
+        id: 'iap-purchase',
+        duration: 5000 
+      });
+      return false;
+    }
+
     if (purchaseError.code === 1 || purchaseError.message?.includes("cancel")) {
       toast.dismiss('iap-purchase');
       return false;
@@ -217,6 +227,17 @@ export async function restorePurchases(): Promise<boolean> {
 
   } catch (error: any) {
     console.error("🍎 IAP: Restore failed:", error);
+    
+    // Handle UNIMPLEMENTED error (native plugin not installed in Xcode yet)
+    if (error.code === 'UNIMPLEMENTED') {
+      console.error("❌ RevenueCat native plugin not installed in Xcode");
+      toast.error("RevenueCat SDK krävs. Följ installationsinstruktioner i Xcode.", { 
+        id: 'iap-restore',
+        duration: 5000 
+      });
+      return false;
+    }
+    
     toast.error(`Återställning misslyckades: ${error.message || "Okänt fel"}`, { id: 'iap-restore' });
     return false;
   }
