@@ -75,19 +75,26 @@ export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
  * This should be called from native iOS code after successful purchase
  */
 export async function purchaseAppleSubscription(productId: string): Promise<boolean> {
+  console.log("🍎 [appleIAP] purchaseAppleSubscription called with:", productId);
+  console.log("🍎 [appleIAP] isNativeIOS():", isNativeIOS());
+  console.log("🍎 [appleIAP] window.location.hostname:", window.location.hostname);
+  
   if (!isNativeIOS()) {
-    console.warn("🍎 IAP: Purchase attempted in web browser");
+    console.warn("🍎 [appleIAP] Purchase attempted in web browser");
     toast.error("Apple purchases only work in the iOS app");
     return false;
   }
 
   try {
-    console.log("🍎 IAP: Starting purchase for:", productId);
+    console.log("🍎 [appleIAP] Starting purchase for:", productId);
     toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
     
     // Check if Capacitor and native bridge are available
+    console.log("🍎 [appleIAP] Checking Capacitor availability...");
+    console.log("🍎 [appleIAP] window.Capacitor:", typeof (window as any).Capacitor);
+    
     if (typeof (window as any).Capacitor === 'undefined') {
-      console.log("🍎 IAP: Capacitor not available - showing demo flow");
+      console.log("🍎 [appleIAP] Capacitor not available - showing demo flow");
       
       // Simulate purchase flow for demo
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -97,12 +104,13 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
     }
     
     // Call native bridge when implemented
+    console.log("🍎 [appleIAP] Capacitor available, calling native bridge...");
     // const result = await Capacitor.Plugins.IAPManager.purchaseProduct({ productId });
     
     toast.error("Native köpflöde behöver implementeras", { id: 'iap-purchase' });
     return false;
   } catch (error: any) {
-    console.error("🍎 IAP: ❌ Purchase failed:", error);
+    console.error("🍎 [appleIAP] ❌ Purchase failed:", error);
     
     if (!error.message?.includes("cancelled")) {
       toast.error(`Köpet misslyckades: ${error.message || "Okänt fel"}`, { id: 'iap-purchase' });

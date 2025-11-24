@@ -58,19 +58,24 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   }, [open]);
 
   const handleIosPurchase = async () => {
+    console.log('🍎 [SubscribeDialog] handleIosPurchase called');
+    console.log('🍎 [SubscribeDialog] isIos:', isIos);
+    console.log('🍎 [SubscribeDialog] isLoading:', isLoading);
+    
     setIsLoading(true);
     try {
-      console.log('🍎 Starting iOS purchase for PRO monthly');
+      console.log('🍎 [SubscribeDialog] Starting iOS purchase for PRO monthly');
       const success = await buyIosSubscription(PRODUCT_IDS.PRO_MONTHLY);
+      console.log('🍎 [SubscribeDialog] Purchase result:', success);
       
       if (success) {
-        console.log('🍎 Purchase successful, refreshing plan...');
+        console.log('🍎 [SubscribeDialog] Purchase successful, refreshing plan...');
         await refreshPlan();
         onOpenChange(false);
         window.location.reload();
       }
     } catch (error) {
-      console.error('🍎 iOS purchase error:', error);
+      console.error('🍎 [SubscribeDialog] iOS purchase error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -93,12 +98,16 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   };
 
   const handleSubscribe = async (planName: 'pro') => {
+    console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
+    console.log('🔘 [SubscribeDialog] isIos:', isIos);
+    console.log('🔘 [SubscribeDialog] Platform check:', { isIos, hostname: window.location.hostname });
+    
     if (isIos) {
-      console.log('🍎 User is on iOS app, using Apple IAP');
+      console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP');
       return handleIosPurchase();
     }
     
-    console.log('🌐 User is on web browser, using Stripe');
+    console.log('🌐 [SubscribeDialog] User is on web browser, using Stripe');
     if (!user) return;
 
     setIsLoading(true);
@@ -398,7 +407,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                 </ul>
                 {'planId' in plan ? (
                   <Button
-                    onClick={() => handleSubscribe(plan.planId)}
+                    onClick={() => {
+                      console.log('🔘 [SubscribeDialog] Button clicked for plan:', plan.planId);
+                      handleSubscribe(plan.planId);
+                    }}
                     disabled={isLoading}
                     variant={plan.variant}
                     className={cn(
