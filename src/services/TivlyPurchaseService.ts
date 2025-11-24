@@ -1,11 +1,16 @@
 /**
  * Tivly Purchase Service
- * Handles Apple In-App Purchases using @capgo/capacitor-purchases
+ * Handles Apple In-App Purchases using @capgo/capacitor-purchases (RevenueCat)
  */
 
 import { Capacitor } from '@capacitor/core';
+import type { 
+  CustomerInfo, 
+  PurchasesPackage, 
+  PurchasesOffering 
+} from '@capgo/capacitor-purchases';
 
-// Type definitions for purchase plugin
+// Type definitions
 interface PurchaseProduct {
   identifier: string;
   description: string;
@@ -13,13 +18,6 @@ interface PurchaseProduct {
   price: number;
   priceString: string;
   currency: string;
-}
-
-interface PurchaseResult {
-  productIdentifier: string;
-  transactionIdentifier: string;
-  transactionDate: string;
-  receipt?: string;
 }
 
 interface SubscriptionStatus {
@@ -58,9 +56,9 @@ export class TivlyPurchaseService {
   }
 
   /**
-   * Initialize the purchase service
+   * Initialize the purchase service with RevenueCat API key
    */
-  async initialize(): Promise<void> {
+  async initialize(apiKey?: string): Promise<void> {
     if (this.initialized) {
       console.log('TivlyPurchaseService: Already initialized');
       return;
@@ -73,7 +71,9 @@ export class TivlyPurchaseService {
 
     try {
       const plugin = await getPurchasesPlugin();
-      await plugin.setup();
+      // Setup with RevenueCat API key
+      const key = apiKey || 'YOUR_REVENUECAT_API_KEY'; // Replace with actual key
+      await plugin.setup({ apiKey: key });
       this.initialized = true;
       console.log('TivlyPurchaseService: Initialized successfully');
     } catch (error) {
@@ -83,18 +83,38 @@ export class TivlyPurchaseService {
   }
 
   /**
-   * Load available products from App Store
+   * Load available products from App Store (via RevenueCat offerings)
    */
-  async loadProducts(productIds: string[]): Promise<PurchaseProduct[]> {
+  async loadProducts(): Promise<PurchaseProduct[]> {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
       const plugin = await getPurchasesPlugin();
-      const result = await plugin.getProducts({ productIdentifiers: productIds });
-      console.log('TivlyPurchaseService: Products loaded:', result.products);
-      return result.products || [];
+      const result = await plugin.getOfferings();
+      
+      const products: PurchaseProduct[] = [];
+      
+      // Extract products from offerings
+      if (result.current?.availablePackages) {
+        for (const pkg of result.current.availablePackages) {
+          const product = pkg.product;
+          if (product) {
+            products.push({
+              identifier: product.identifier,
+              description: product.description || '',
+              title: product.title || product.identifier,
+              price: product.price,
+              priceString: product.priceString,
+              currency: product.currencyCode || 'SEK'
+            });
+          }
+        }
+      }
+      
+      console.log('TivlyPurchaseService: Products loaded:', products);
+      return products;
     } catch (error) {
       console.error('TivlyPurchaseService: Failed to load products:', error);
       throw error;
@@ -102,18 +122,41 @@ export class TivlyPurchaseService {
   }
 
   /**
-   * Purchase a product
+   * Purchase a product using RevenueCat package
    */
-  async purchaseProduct(productId: string): Promise<PurchaseResult> {
+  async purchaseProduct(productId: string): Promise<CustomerInfo> {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
       const plugin = await getPurchasesPlugin();
-      const result = await plugin.purchaseProduct({ identifier: productId });
+      
+      // Get offerings to find the package
+      const offerings = await plugin.getOfferings();
+      const currentOffering = offerings.current;
+      
+      if (!currentOffering) {
+        throw new Error('No offerings available');
+      }
+
+      // Find package by product identifier
+      const packageToPurchase = currentOffering.availablePackages?.find(
+        pkg => pkg.product.identifier === productId
+      );
+
+      if (!packageToPurchase) {
+        throw new Error(`Product ${productId} not found in offerings`);
+      }
+
+      // Make purchase
+      const result = await plugin.purchasePackage({ 
+        aPackage: packageToPurchase,
+        upgradeInfo: undefined
+      });
+      
       console.log('TivlyPurchaseService: Purchase completed:', result);
-      return result;
+      return result.customerInfo;
     } catch (error) {
       console.error('TivlyPurchaseService: Purchase failed:', error);
       throw error;
@@ -123,7 +166,7 @@ export class TivlyPurchaseService {
   /**
    * Restore previous purchases
    */
-  async restorePurchases(): Promise<PurchaseResult[]> {
+  async restorePurchases(): Promise<CustomerInfo> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -132,7 +175,7 @@ export class TivlyPurchaseService {
       const plugin = await getPurchasesPlugin();
       const result = await plugin.restorePurchases();
       console.log('TivlyPurchaseService: Purchases restored:', result);
-      return result.purchases || [];
+      return result.customerInfo;
     } catch (error) {
       console.error('TivlyPurchaseService: Restore failed:', error);
       throw error;
@@ -140,7 +183,7 @@ export class TivlyPurchaseService {
   }
 
   /**
-   * Get current subscription status
+   * Get current subscription status from customer info
    */
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
     if (!this.initialized) {
@@ -149,14 +192,33 @@ export class TivlyPurchaseService {
 
     try {
       const plugin = await getPurchasesPlugin();
-      const result = await plugin.getSubscriptionStatus();
-      console.log('TivlyPurchaseService: Subscription status:', result);
+      const result = await plugin.getCustomerInfo();
+      const customerInfo = result.customerInfo;
+      
+      // Check for active entitlements
+      const hasActiveSubscription = customerInfo.entitlements?.active 
+        && Object.keys(customerInfo.entitlements.active).length > 0;
+      
+      let productId: string | undefined;
+      let expirationDate: string | undefined;
+      
+      if (hasActiveSubscription && customerInfo.entitlements.active) {
+        const firstEntitlement = Object.values(customerInfo.entitlements.active)[0];
+        productId = firstEntitlement?.productIdentifier;
+        expirationDate = firstEntitlement?.expirationDate;
+      }
+      
+      console.log('TivlyPurchaseService: Subscription status:', {
+        isActive: hasActiveSubscription,
+        productId,
+        expirationDate
+      });
       
       return {
-        isActive: result.isActive || false,
-        productIdentifier: result.productIdentifier,
-        expirationDate: result.expirationDate,
-        willRenew: result.willRenew
+        isActive: hasActiveSubscription || false,
+        productIdentifier: productId,
+        expirationDate: expirationDate,
+        willRenew: customerInfo.entitlements?.active?.[productId || '']?.willRenew
       };
     } catch (error) {
       console.error('TivlyPurchaseService: Failed to get subscription status:', error);
@@ -165,19 +227,19 @@ export class TivlyPurchaseService {
   }
 
   /**
-   * Get App Store receipt (for backend verification)
+   * Get customer info (includes receipt data)
    */
-  async getReceipt(): Promise<string | null> {
+  async getCustomerInfo(): Promise<CustomerInfo | null> {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
       const plugin = await getPurchasesPlugin();
-      const result = await plugin.getReceipt();
-      return result.receipt || null;
+      const result = await plugin.getCustomerInfo();
+      return result.customerInfo;
     } catch (error) {
-      console.error('TivlyPurchaseService: Failed to get receipt:', error);
+      console.error('TivlyPurchaseService: Failed to get customer info:', error);
       return null;
     }
   }
