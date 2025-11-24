@@ -47,13 +47,21 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         setRequiresPayment(false);
       }
       
-      // Determine admin role from backend
+      // Determine admin role from backend - STRICT CHECK
       let admin = false;
+      const platform = window.location.hostname.includes('io.tivly.se') ? 'IOS' : 'WEB';
+      console.log(`[SubscriptionContext] 🔐 Checking admin role for ${user.email} on ${platform}`);
+      
       try {
         const roleData = await apiClient.getUserRole((user.email || '').toLowerCase());
         admin = !!roleData && (roleData.role === 'admin' || roleData.role === 'owner');
-      } catch {}
+        console.log(`[SubscriptionContext] ✅ Admin check result for ${user.email}:`, admin, roleData);
+      } catch (error) {
+        console.log(`[SubscriptionContext] ❌ Admin check failed (defaulting to false):`, error);
+        admin = false;
+      }
       setIsAdmin(admin);
+      console.log(`[SubscriptionContext] 📊 Admin status set to:`, admin);
       
       // TRUST THE BACKEND - use the plan data directly from the user object
       const backendPlanType = typeof user.plan === 'string' ? user.plan : user.plan?.plan;
@@ -90,6 +98,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             : ((validPlans as readonly string[]).includes(planStr)
                 ? (planStr as UserPlan['plan'])
                 : (aliasMap[planStr] ?? 'free')));
+      
+      console.log(`[SubscriptionContext] 📋 Plan normalization:`, {
+        platform,
+        email: user.email,
+        isAdmin: admin,
+        backendPlanType,
+        planStr,
+        enterpriseDetected,
+        normalizedPlan
+      });
       // For unlimited and enterprise plans, set no limits
       const isUnlimited = normalizedPlan === 'unlimited' || normalizedPlan === 'enterprise';
 
@@ -154,7 +172,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         planCancelledAt: (user as any)?.planCancelledAt || (user as any)?.plan?.planCancelledAt,
       };
       
-      console.log('📊 Plan loaded from backend user object:', plan);
+      console.log(`[SubscriptionContext] 📊 [${platform}] Final plan for ${user.email}:`, {
+        plan: plan.plan,
+        isAdmin: admin,
+        meetingsUsed: plan.meetingsUsed,
+        meetingsLimit: plan.meetingsLimit,
+        protocolsLimit: plan.protocolsLimit
+      });
       
       // Only update if plan data actually changed to prevent unnecessary re-renders
       setUserPlan(prevPlan => {
@@ -167,10 +191,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // Background verify with backend plan to avoid stale or 'test' flags
       try {
         if (user) {
+          console.log(`[SubscriptionContext] 🔄 Background plan refresh for ${user.email} (admin=${admin})`);
           const latest = await subscriptionService.getUserPlan(user.uid);
-          const latestPlan: UserPlan = isAdmin 
+          console.log(`[SubscriptionContext] 📥 Backend returned plan:`, latest);
+          
+          const latestPlan: UserPlan = admin 
             ? { ...latest, plan: 'unlimited' as const, meetingsLimit: null, protocolsLimit: 999999 } 
             : latest;
+          
+          console.log(`[SubscriptionContext] 🎯 Final background plan (admin=${admin}):`, latestPlan);
+          
           const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
           setUserPlan(prev => {
             if (!prev) return latestPlan;
@@ -181,7 +211,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           });
         }
       } catch (e) {
-        console.warn('Plan background refresh failed, using user payload plan.', e);
+        console.warn('[SubscriptionContext] ⚠️ Plan background refresh failed, using user payload plan.', e);
       }
     } catch (error) {
       console.error('❌ Failed to load subscription plan:', error);

@@ -19,18 +19,19 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
         return;
       }
 
-      console.log('🔐 AdminRoute: Checking admin access for:', user.email);
+      const platform = window.location.hostname.includes('io.tivly.se') ? 'IOS' : 'WEB';
+      console.log(`🔐 AdminRoute [${platform}]: Checking admin access for:`, user.email);
       console.log('🔑 AdminRoute: Auth token present:', !!localStorage.getItem('authToken'));
 
       try {
         const roleData = await apiClient.getUserRole(user.email.toLowerCase());
-        console.log('📊 AdminRoute: Role check result:', roleData);
+        console.log(`📊 AdminRoute [${platform}]: Role check result:`, roleData);
 
         const hasRole = roleData && (roleData.role === 'admin' || roleData.role === 'owner');
-        console.log(hasRole ? '✅ AdminRoute: Admin access granted' : '❌ AdminRoute: Not an admin');
+        console.log(hasRole ? `✅ AdminRoute [${platform}]: Admin access granted` : `❌ AdminRoute [${platform}]: Not an admin`);
         setIsAdmin(hasRole);
       } catch (err) {
-        console.error('❌ AdminRoute: Role check failed:', err);
+        console.error(`❌ AdminRoute [${platform}]: Role check failed:`, err);
         // On error (403, network, etc.), deny access
         setIsAdmin(false);
       }
