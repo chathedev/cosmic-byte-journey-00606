@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import StoreKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Initialize Capacitor plugins
+        CapacitorPlugins.registerPlugins(with: (self.window?.rootViewController as? CAPBridgeViewController)?.bridge ?? CAPBridge.shared())
+        
+        // Initialize TivlyStoreKitManager
+        let _ = TivlyStoreKitManager.shared
+        print("AppDelegate: StoreKit manager initialized")
+        
         return true
     }
 

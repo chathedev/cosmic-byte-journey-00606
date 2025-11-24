@@ -1,0 +1,109 @@
+{
+  "identifier" : "Tivly",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6504122891",
+    "_developerTeamID" : "YOUR_TEAM_ID",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 754435260.08997095,
+    "_locale" : "en_US",
+    "_storefront" : "SWE",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21497372",
+      "localizations" : [
+
+      ],
+      "name" : "Tivly Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "99.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6737211408",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited meetings, protocols, and advanced features",
+              "displayName" : "Tivly Pro Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Obegränsade möten, protokoll och avancerade funktioner",
+              "displayName" : "Tivly Pro Månadsvis",
+              "locale" : "sv"
+            }
+          ],
+          "productID" : "tivly_pro_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Tivly Pro Monthly",
+          "subscriptionGroupID" : "21497372",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

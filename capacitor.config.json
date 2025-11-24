@@ -29,6 +29,10 @@
       "spinnerColor": "#FFFFFF",
       "splashFullScreen": true,
       "splashImmersive": true
+    },
+    "CapacitorPurchases": {
+      "usesStoreKit2IfAvailable": true,
+      "enablePendingPurchases": true
     }
   }
 }

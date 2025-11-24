@@ -45,5 +45,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>SKStoreKitConfigurationName</key>
+	<string>Tivly</string>
+	<key>SKReceiptRefreshRequest</key>
+	<true/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>We use this to provide you with personalized recommendations and improve your experience.</string>
 </dict>
 </plist>
