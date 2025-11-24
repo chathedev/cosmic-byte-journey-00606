@@ -29,10 +29,16 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
         return;
       }
       
+      const platform = window.location.hostname.includes('io.tivly.se') ? 'IOS' : 'WEB';
+      console.log(`[PlanBadge] 🔐 [${platform}] Checking admin for: ${user.email}`);
+      
       try {
         const roleData = await apiClient.getUserRole(user.email.toLowerCase());
-        setIsAdmin(roleData && (roleData.role === 'admin' || roleData.role === 'owner'));
-      } catch {
+        const adminStatus = roleData && (roleData.role === 'admin' || roleData.role === 'owner');
+        console.log(`[PlanBadge] ✅ [${platform}] Admin result for ${user.email}:`, adminStatus, roleData);
+        setIsAdmin(adminStatus);
+      } catch (error) {
+        console.log(`[PlanBadge] ❌ [${platform}] Admin check failed:`, error);
         setIsAdmin(false);
       }
     };
@@ -58,6 +64,16 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
     userPlan.plan === 'unlimited' || 
     userPlan.plan === 'enterprise';
   const progress = isUnlimited ? 0 : Math.min((used / limit) * 100, 100);
+
+  const platform = window.location.hostname.includes('io.tivly.se') ? 'IOS' : 'WEB';
+  console.log(`[PlanBadge] 📊 [${platform}] Display state:`, {
+    email: user?.email,
+    isAdmin,
+    plan: userPlan.plan,
+    used,
+    limit,
+    isUnlimited
+  });
 
   const getPlanTitle = () => {
     if (isAdmin) return 'Admin';
