@@ -46,7 +46,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     if (!open) {
       // Cleanup on close
       if (cardElementRef.current) {
-        try { cardElementRef.current.unmount(); cardElementRef.current.destroy?.(); } catch {}
+        try { cardElementRef.current.unmount(); cardElementRef.current.destroy?.(); } catch { }
         cardElementRef.current = null;
       }
       elementsRef.current = null;
@@ -61,13 +61,13 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     console.log('🍎 [SubscribeDialog] handleIosPurchase called');
     console.log('🍎 [SubscribeDialog] isIos:', isIos);
     console.log('🍎 [SubscribeDialog] isLoading:', isLoading);
-    
+
     setIsLoading(true);
     try {
       console.log('🍎 [SubscribeDialog] Starting iOS purchase for PRO monthly');
       const success = await buyIosSubscription(PRODUCT_IDS.PRO_MONTHLY);
       console.log('🍎 [SubscribeDialog] Purchase result:', success);
-      
+
       if (success) {
         console.log('🍎 [SubscribeDialog] Purchase successful, refreshing plan...');
         await refreshPlan();
@@ -101,13 +101,14 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
     console.log('🔘 [SubscribeDialog] isIos:', isIos);
     console.log('🔘 [SubscribeDialog] Platform check:', { isIos, hostname: window.location.hostname });
-    
-    if (isIos) {
-      console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP');
-      return handleIosPurchase();
-    }
-    
-    console.log('🌐 [SubscribeDialog] User is on web browser, using Stripe');
+
+    // TEMPORARY: Disable iOS IAP, use Stripe for all platforms
+    // if (isIos) {
+    //   console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP');
+    //   return handleIosPurchase();
+    // }
+
+    console.log('🌐 [SubscribeDialog] Using Stripe for payment');
     if (!user) return;
 
     setIsLoading(true);
@@ -146,13 +147,13 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       stripeRef.current = stripe;
 
       if (cardElementRef.current) {
-        try { cardElementRef.current.unmount(); cardElementRef.current.destroy?.(); } catch {}
+        try { cardElementRef.current.unmount(); cardElementRef.current.destroy?.(); } catch { }
         cardElementRef.current = null;
       }
 
       const elements = stripe.elements({ clientSecret: normalizedClientSecret });
       elementsRef.current = elements;
-      
+
       const paymentElement = elements.create('payment', {
         layout: 'tabs',
         wallets: {
@@ -207,11 +208,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
       // Payment succeeded - wait a moment for webhook to process, then refresh plan
       toast({ title: 'Klart!', description: 'Din prenumeration är nu aktiv.' });
-      
+
       // Wait for webhook to update backend
       await new Promise(resolve => setTimeout(resolve, 2000));
       await refreshPlan();
-      
+
       onOpenChange(false);
       window.location.reload();
     } catch (error: any) {
@@ -316,7 +317,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               <Button
                 variant="outline"
                 onClick={() => {
-                  try { cardElementRef.current?.unmount(); cardElementRef.current?.destroy?.(); } catch {}
+                  try { cardElementRef.current?.unmount(); cardElementRef.current?.destroy?.(); } catch { }
                   cardElementRef.current = null;
                   setSelectedPlan(null);
                 }}
@@ -324,9 +325,9 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               >
                 Tillbaka
               </Button>
-              <Button 
-                onClick={handleConfirmPayment} 
-                disabled={isLoading || !clientSecret} 
+              <Button
+                onClick={handleConfirmPayment}
+                disabled={isLoading || !clientSecret}
                 className="flex-1 transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
               >
                 {isLoading ? (
@@ -359,8 +360,8 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
           {plans.map((plan, index) => (
-            <Card 
-              key={plan.name} 
+            <Card
+              key={plan.name}
               className={cn(
                 "relative overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg",
                 'highlight' in plan && plan.highlight && "border-primary shadow-lg scale-[1.02] md:scale-105"
@@ -384,14 +385,14 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               <CardContent className="flex-1 flex flex-col pt-4">
                 <ul className="space-y-3 mb-6 flex-1">
                   {plan.features.map((feature, i) => (
-                    <li 
-                      key={i} 
+                    <li
+                      key={i}
                       className="flex items-start gap-3 text-sm transition-all duration-200 hover:translate-x-1"
                     >
                       <span className={cn(
                         "mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all",
-                        feature.included 
-                          ? "bg-primary/10 text-primary" 
+                        feature.included
+                          ? "bg-primary/10 text-primary"
                           : "bg-muted text-muted-foreground"
                       )}>
                         {feature.included ? '✓' : '−'}
@@ -423,18 +424,18 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                     {plan.cta}
                   </Button>
                 ) : plan.name === 'Enterprise' ? (
-                  <Button 
+                  <Button
                     onClick={() => window.open('mailto:kontakt@tivly.se', '_blank')}
-                    variant={plan.variant} 
-                    className="w-full transition-all duration-300 hover:scale-105" 
+                    variant={plan.variant}
+                    className="w-full transition-all duration-300 hover:scale-105"
                     size="lg"
                   >
                     {plan.cta}
                   </Button>
                 ) : (
-                  <Button 
-                    variant={plan.variant} 
-                    className="w-full" 
+                  <Button
+                    variant={plan.variant}
+                    className="w-full"
                     size="lg"
                     disabled
                   >
