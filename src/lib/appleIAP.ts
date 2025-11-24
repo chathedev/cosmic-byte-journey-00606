@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { isIosApp } from "@/utils/environment";
 import { apiClient } from "./api";
-import { CapacitorPurchases } from "@capgo/capacitor-purchases";
+import { NativePurchases, PURCHASE_TYPE } from "@capgo/native-purchases";
 
 /**
  * Apple In-App Purchase Integration
@@ -39,9 +39,15 @@ export async function initializeIAP() {
   }
 
   try {
-    console.log("🍎 IAP: Initializing @capgo/capacitor-purchases");
-    await CapacitorPurchases.setup({});
-    console.log("🍎 IAP: Initialization successful");
+    console.log("🍎 IAP: Checking billing support");
+    const { isBillingSupported } = await NativePurchases.isBillingSupported();
+    
+    if (!isBillingSupported) {
+      console.error("🍎 IAP: ❌ Billing not supported on this device");
+      return;
+    }
+    
+    console.log("🍎 IAP: ✅ Billing supported, initialization successful");
   } catch (error) {
     console.error("🍎 IAP: ❌ Failed to initialize:", error);
   }
@@ -56,17 +62,18 @@ export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
   }
 
   try {
-    const { products } = await CapacitorPurchases.getProducts({
+    const { products } = await NativePurchases.getProducts({
       productIdentifiers: Object.values(PRODUCT_IDS),
+      productType: PURCHASE_TYPE.SUBS,
     });
 
     return products.map((p: any) => ({
       identifier: p.productIdentifier,
-      title: p.localizedTitle,
-      description: p.localizedDescription,
-      price: p.localizedPrice,
+      title: p.title,
+      description: p.description,
+      price: p.priceString,
       priceAmount: p.price,
-      currency: p.currencyCode,
+      currency: p.currency,
     }));
   } catch (error) {
     console.error("🍎 IAP: Failed to load products:", error);
@@ -86,30 +93,31 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
     return false;
   }
 
-  // Check if CapacitorPurchases is available
-  if (typeof CapacitorPurchases === 'undefined') {
-    console.error("🍎 [appleIAP] ❌ CapacitorPurchases is not defined! Plugin not loaded.");
-    console.error("🍎 [appleIAP] window.CapacitorPurchases:", typeof (window as any).CapacitorPurchases);
+  // Check if NativePurchases is available
+  if (typeof NativePurchases === 'undefined') {
+    console.error("🍎 [appleIAP] ❌ NativePurchases is not defined! Plugin not loaded.");
+    console.error("🍎 [appleIAP] window.NativePurchases:", typeof (window as any).NativePurchases);
     console.error("🍎 [appleIAP] window.Capacitor:", typeof (window as any).Capacitor);
     toast.error("IAP plugin inte tillgängligt. Appen behöver uppdateras.");
     return false;
   }
 
-  console.log("🍎 [appleIAP] CapacitorPurchases available");
+  console.log("🍎 [appleIAP] NativePurchases available");
 
   try {
     console.log("🍎 [appleIAP] Starting purchase for:", productId);
     toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
 
-    const result = await CapacitorPurchases.purchase({
+    const transaction = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
+      productType: PURCHASE_TYPE.SUBS,
     });
 
-    console.log("🍎 [appleIAP] Purchase result:", result);
+    console.log("🍎 [appleIAP] Purchase result:", transaction);
 
-    if (result.transaction?.appStoreReceipt) {
+    if (transaction.receipt) {
       toast.loading("Verifierar köp...", { id: 'iap-purchase' });
-      const verified = await verifyReceiptWithBackend(result.transaction.appStoreReceipt);
+      const verified = await verifyReceiptWithBackend(transaction.receipt);
 
       if (verified) {
         toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
@@ -162,8 +170,8 @@ export async function restorePurchases(): Promise<boolean> {
     console.log("🍎 IAP: Restoring purchases...");
     toast.loading("Återställer köp...", { id: 'iap-restore' });
 
-    const result = await CapacitorPurchases.restorePurchases();
-    console.log("🍎 IAP: Restore result:", result);
+    await NativePurchases.restorePurchases();
+    console.log("🍎 IAP: ✅ Restore successful");
 
     toast.success("Köp återställda", { id: 'iap-restore' });
     return true;
