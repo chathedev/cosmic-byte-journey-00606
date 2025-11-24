@@ -62,6 +62,11 @@ class ApiClient {
     this.setToken(token);
   }
 
+  // Expose method to get auth token for external use (e.g., IAP verification)
+  public getAuthToken(): string | null {
+    return this.getToken();
+  }
+
   private getOrCreateBrowserId(): string {
     const stored = localStorage.getItem('browserId');
     if (stored) return stored;

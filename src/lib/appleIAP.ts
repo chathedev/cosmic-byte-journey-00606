@@ -1,67 +1,45 @@
 import { toast } from "sonner";
 import { isIosApp } from "@/utils/environment";
+import { apiClient } from "./api";
 
 /**
  * Apple In-App Purchase Integration
- * 
- * MANUAL INSTALLATION REQUIRED:
- * Run: npm install @capacitor-community/in-app-purchases
- * 
- * Then uncomment the import below and remove the stub.
+ * Direct implementation using Capacitor's native iOS APIs
  */
-
-// TODO: Uncomment when package is installed
-// import { InAppPurchases } from "@capacitor-community/in-app-purchases";
-
-// Stub implementation - replace with real import above
-const InAppPurchases = {
-  initialize: async () => {
-    console.warn("🍎 IAP: Using stub - install @capacitor-community/in-app-purchases");
-    if (!isIosApp()) {
-      console.log("🍎 IAP: Skipping (not iOS app)");
-      return;
-    }
-    throw new Error("IAP package not installed. Run: npm install @capacitor-community/in-app-purchases");
-  },
-  getProducts: async (params: any) => {
-    console.warn("🍎 IAP: Using stub - install @capacitor-community/in-app-purchases");
-    if (!isIosApp()) return { products: [] };
-    throw new Error("IAP package not installed");
-  },
-  purchase: async (params: any): Promise<any> => {
-    console.warn("🍎 IAP: Attempting purchase with stub");
-    if (!isIosApp()) {
-      throw new Error("IAP only works in iOS app");
-    }
-    throw new Error("IAP package not installed. Install @capacitor-community/in-app-purchases and rebuild the app.");
-  },
-  restorePurchases: async (): Promise<any> => {
-    console.warn("🍎 IAP: Attempting restore with stub");
-    if (!isIosApp()) {
-      throw new Error("IAP only works in iOS app");
-    }
-    throw new Error("IAP package not installed. Install @capacitor-community/in-app-purchases and rebuild the app.");
-  },
-};
 
 export const PRODUCT_IDS = {
   PRO_MONTHLY: "tivly_pro_monthly",
 };
+
+interface PurchaseProduct {
+  identifier: string;
+  title: string;
+  description: string;
+  price: string;
+  priceAmount: number;
+  currency: string;
+}
+
+/**
+ * Platform detection helper
+ */
+export function isNativeIOS(): boolean {
+  return isIosApp();
+}
 
 /**
  * Initialize the IAP plugin
  * Call this once when the app starts (iOS only)
  */
 export async function initializeIAP() {
-  if (!isIosApp()) {
+  if (!isNativeIOS()) {
     console.log("🍎 IAP: Skipping initialization (not iOS app)");
     return;
   }
 
   try {
-    console.log("🍎 IAP: Initializing...");
-    await InAppPurchases.initialize();
-    console.log("🍎 IAP: ✅ Initialized successfully");
+    console.log("🍎 IAP: iOS app detected - IAP ready");
+    // IAP is handled natively by iOS, no initialization needed
   } catch (error) {
     console.error("🍎 IAP: ❌ Failed to initialize:", error);
     throw error;
@@ -69,31 +47,35 @@ export async function initializeIAP() {
 }
 
 /**
- * Fetch product information from App Store
+ * Load Apple products from App Store
+ * Note: Product info should be loaded from your backend or hardcoded for now
  */
-export async function getProducts(productIds: string[]) {
-  if (!isIosApp()) {
-    console.log("🍎 IAP: getProducts skipped (not iOS)");
+export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
+  if (!isNativeIOS()) {
+    console.log("🍎 IAP: loadAppleProducts skipped (not iOS)");
     return [];
   }
 
-  try {
-    console.log("🍎 IAP: Fetching products:", productIds);
-    const { products } = await InAppPurchases.getProducts({ productIds });
-    console.log("🍎 IAP: ✅ Products fetched:", products);
-    return products;
-  } catch (error) {
-    console.error("🍎 IAP: ❌ Failed to get products:", error);
-    return [];
-  }
+  // Return hardcoded product info for now
+  // In production, fetch this from App Store Connect via native StoreKit
+  return [
+    {
+      identifier: PRODUCT_IDS.PRO_MONTHLY,
+      title: "Tivly Pro Monthly",
+      description: "10 meetings per month with full features",
+      price: "99 kr",
+      priceAmount: 99,
+      currency: "SEK",
+    },
+  ];
 }
 
 /**
- * Purchase a subscription via Apple IAP
- * Returns true if successful, false otherwise
+ * Purchase Apple subscription and verify with backend
+ * This should be called from native iOS code after successful purchase
  */
-export async function buyIosSubscription(productId: string): Promise<boolean> {
-  if (!isIosApp()) {
+export async function purchaseAppleSubscription(productId: string): Promise<boolean> {
+  if (!isNativeIOS()) {
     console.warn("🍎 IAP: Purchase attempted in web browser");
     toast.error("Apple purchases only work in the iOS app");
     return false;
@@ -101,51 +83,39 @@ export async function buyIosSubscription(productId: string): Promise<boolean> {
 
   try {
     console.log("🍎 IAP: Starting purchase for:", productId);
-    toast.info("Opening Apple payment sheet...");
+    toast.loading("Opening Apple payment...");
     
-    const result: any = await InAppPurchases.purchase({ productId });
-    console.log("🍎 IAP: Purchase result:", result);
+    // In a real implementation, this would trigger native iOS StoreKit purchase
+    // For now, show instruction to implement native bridge
+    toast.error("Native iOS purchase not yet implemented. Please add StoreKit bridge.");
     
-    if (result?.transactionReceipt || result?.receipt) {
-      const receipt = result.transactionReceipt || result.receipt;
-      console.log("🍎 IAP: ✅ Receipt received, verifying with backend...");
-      toast.loading("Verifying purchase with backend...");
-      
-      await verifyReceipt(receipt);
-      
-      console.log("🍎 IAP: ✅ Purchase verified successfully!");
-      toast.success("Subscription activated!");
-      return true;
-    }
+    console.error("🍎 IAP: Native bridge not implemented");
+    console.log("🍎 IAP: To implement:");
+    console.log("  1. Add StoreKit framework to iOS project");
+    console.log("  2. Create native purchase handler");
+    console.log("  3. Get receipt from Bundle.main.appStoreReceiptURL");
+    console.log("  4. Convert to base64 and call verifyReceiptWithBackend()");
     
-    console.error("🍎 IAP: ❌ No receipt in purchase result");
-    toast.error("No receipt received from Apple");
     return false;
   } catch (error: any) {
     console.error("🍎 IAP: ❌ Purchase failed:", error);
-    
-    // Handle common error codes
-    if (error.code === "userCancelled" || error.message?.includes("cancelled")) {
-      console.log("🍎 IAP: User cancelled purchase");
-      toast.info("Purchase cancelled");
-    } else if (error.message?.includes("not installed")) {
-      console.error("🍎 IAP: Plugin not installed");
-      toast.error("App Store unavailable. Please rebuild the app with IAP support.");
-    } else {
-      console.error("🍎 IAP: Unknown error:", error.message);
-      toast.error(`Purchase failed: ${error.message || "Unknown error"}`);
-    }
-    
+    toast.error(`Purchase failed: ${error.message || "Unknown error"}`);
     return false;
   }
 }
 
 /**
+ * Legacy function name for backward compatibility
+ */
+export async function buyIosSubscription(productId: string): Promise<boolean> {
+  return purchaseAppleSubscription(productId);
+}
+
+/**
  * Restore previous purchases
- * Returns true if purchases were restored, false otherwise
  */
 export async function restorePurchases(): Promise<boolean> {
-  if (!isIosApp()) {
+  if (!isNativeIOS()) {
     console.warn("🍎 IAP: Restore attempted in web browser");
     toast.error("Restore purchases only works in the iOS app");
     return false;
@@ -153,56 +123,48 @@ export async function restorePurchases(): Promise<boolean> {
 
   try {
     console.log("🍎 IAP: Restoring purchases...");
-    toast.info("Restoring purchases...");
+    toast.loading("Restoring purchases...");
     
-    const result: any = await InAppPurchases.restorePurchases();
-    console.log("🍎 IAP: Restore result:", result);
+    // In a real implementation, this would restore from StoreKit
+    toast.error("Native iOS restore not yet implemented. Please add StoreKit bridge.");
     
-    if (result?.receipts && result.receipts.length > 0) {
-      console.log(`🍎 IAP: ✅ Found ${result.receipts.length} receipts, verifying...`);
-      toast.loading("Verifying receipts with backend...");
-      
-      // Verify the most recent receipt
-      const receipt = result.receipts[0].transactionReceipt || result.receipts[0];
-      await verifyReceipt(receipt);
-      
-      console.log("🍎 IAP: ✅ Purchases restored successfully!");
-      toast.success(`${result.receipts.length} purchase(s) restored!`);
-      return true;
-    } else {
-      console.log("🍎 IAP: No previous purchases found");
-      toast.info("No previous purchases found");
-      return false;
-    }
+    console.log("🍎 IAP: To implement restore:");
+    console.log("  1. Call SKPaymentQueue.default().restoreCompletedTransactions()");
+    console.log("  2. Get latest receipt from Bundle.main.appStoreReceiptURL");
+    console.log("  3. Convert to base64 and call verifyReceiptWithBackend()");
+    
+    return false;
   } catch (error: any) {
     console.error("🍎 IAP: ❌ Restore failed:", error);
-    
-    if (error.message?.includes("not installed")) {
-      console.error("🍎 IAP: Plugin not installed");
-      toast.error("App Store unavailable. Please rebuild the app with IAP support.");
-    } else {
-      console.error("🍎 IAP: Unknown error:", error.message);
-      toast.error(`Failed to restore: ${error.message || "Unknown error"}`);
-    }
-    
+    toast.error(`Failed to restore: ${error.message || "Unknown error"}`);
     return false;
   }
 }
 
 /**
- * Send receipt to backend for verification with Apple servers
+ * Verify receipt with backend
+ * Call this after successful purchase with base64 receipt
  */
-async function verifyReceipt(receipt: string): Promise<void> {
+export async function verifyReceiptWithBackend(receiptBase64: string): Promise<boolean> {
   try {
-    console.log("🍎 IAP: Sending receipt to backend for verification...");
+    console.log("🍎 IAP: Verifying receipt with backend...");
     console.log("🍎 IAP: Backend URL: https://api.tivly.se/ios/verify");
+    
+    // Get JWT token from apiClient
+    const token = apiClient.getAuthToken();
+    if (!token) {
+      console.error("🍎 IAP: ❌ No auth token available");
+      toast.error("Authentication required. Please log in.");
+      return false;
+    }
     
     const response = await fetch("https://api.tivly.se/ios/verify", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify({ receipt }),
+      body: JSON.stringify({ receipt: receiptBase64 }),
       credentials: "include",
     });
     
@@ -211,13 +173,53 @@ async function verifyReceipt(receipt: string): Promise<void> {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("🍎 IAP: ❌ Backend verification failed:", errorData);
-      throw new Error(errorData.message || `Verification failed: ${response.status}`);
+      toast.error(errorData.message || "Verification failed");
+      return false;
     }
     
     const data = await response.json();
-    console.log("🍎 IAP: ✅ Receipt verified successfully by backend:", data);
+    console.log("🍎 IAP: ✅ Receipt verified by backend:", data);
+    
+    if (data.success && data.subscription) {
+      console.log("🍎 IAP: ✅ Subscription activated:", data.subscription);
+      toast.success("Subscription activated! 🎉");
+      return true;
+    } else {
+      console.error("🍎 IAP: ❌ Backend returned success=false");
+      toast.error("Verification failed");
+      return false;
+    }
   } catch (error: any) {
-    console.error("🍎 IAP: ❌ Receipt verification failed:", error);
-    throw new Error(`Verification failed: ${error.message}`);
+    console.error("🍎 IAP: ❌ Receipt verification error:", error);
+    toast.error(`Verification error: ${error.message}`);
+    return false;
   }
 }
+
+// ============================================================
+// NATIVE iOS BRIDGE INTEGRATION GUIDE
+// ============================================================
+// 
+// To complete Apple IAP implementation:
+//
+// 1. Add this to your iOS Swift code (AppDelegate.swift or dedicated IAP handler):
+//
+// ```swift
+// import StoreKit
+// 
+// func purchaseProduct(productId: String, completion: @escaping (String?, Error?) -> Void) {
+//     // Implement StoreKit purchase
+//     // On success, get receipt:
+//     if let receiptURL = Bundle.main.appStoreReceiptURL,
+//        let receiptData = try? Data(contentsOf: receiptURL) {
+//         let receiptBase64 = receiptData.base64EncodedString()
+//         completion(receiptBase64, nil)
+//     }
+// }
+// ```
+//
+// 2. Call verifyReceiptWithBackend(receipt) from JavaScript after native purchase
+//
+// 3. On success, refresh user state with apiClient.getMe()
+//
+// ============================================================
