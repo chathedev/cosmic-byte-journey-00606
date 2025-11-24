@@ -7,7 +7,10 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
 import { toast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { apiClient } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Bug } from "lucide-react";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -18,7 +21,6 @@ import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
@@ -201,6 +203,39 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Global Dev Button Component
+const GlobalDevButton = () => {
+  const { userPlan } = useSubscription();
+  
+  const handleDevClick = () => {
+    const isIos = isIosApp();
+    const info = {
+      platform: isIos ? 'iOS App (io.tivly.se)' : 'Web (app.tivly.se)',
+      hostname: window.location.hostname,
+      userPlan: userPlan?.plan || 'unknown',
+      meetingsUsed: userPlan?.meetingsUsed || 0,
+      meetingsLimit: userPlan?.meetingsLimit || 0,
+      capacitor: typeof (window as any).Capacitor !== 'undefined',
+    };
+    
+    console.log('🔧 DEV INFO:', info);
+    sonnerToast.info(`Platform: ${info.platform} | Plan: ${info.userPlan} | Meetings: ${info.meetingsUsed}/${info.meetingsLimit}`, {
+      duration: 5000,
+    });
+  };
+
+  return (
+    <Button
+      onClick={handleDevClick}
+      size="icon"
+      variant="outline"
+      className="fixed bottom-4 left-4 z-[9999] h-12 w-12 rounded-full shadow-lg bg-background/80 backdrop-blur-sm border-2 hover:scale-110 transition-transform"
+    >
+      <Bug className="h-5 w-5" />
+    </Button>
+  );
+};
+
 
 const App = () => {
   // Block web browser access to io.tivly.se domain
@@ -257,6 +292,7 @@ const App = () => {
                     <ScrollToTop />
                     <PreserveAppParam />
                     <AuthRedirectHandler />
+                    <GlobalDevButton />
                     <WelcomeGate>
                       <AppLayout>
                         <Suspense
