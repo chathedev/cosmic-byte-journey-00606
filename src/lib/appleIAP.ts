@@ -107,7 +107,7 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
 
   try {
     console.log("🍎 [appleIAP] Showing native RevenueCat paywall...");
-    toast.loading("Öppnar prenumerationer...", { id: 'iap-purchase' });
+    toast.loading("Öppnar Apple-betalning...", { id: 'iap-purchase' });
     
     // Show native SwiftUI paywall
     await RevenueCatManager.showPaywall();
@@ -141,11 +141,10 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
     // Handle UNIMPLEMENTED error (native plugin not installed in Xcode yet)
     if (purchaseError.code === 'UNIMPLEMENTED') {
       console.error("❌ RevenueCat native plugin not installed in Xcode");
-      toast.error("RevenueCat SDK krävs. Följ installationsinstruktioner i Xcode.", { 
-        id: 'iap-purchase',
-        duration: 5000 
-      });
-      return false;
+      toast.dismiss('iap-purchase');
+      
+      // Re-throw with UNIMPLEMENTED code so SubscribeDialog can show setup instructions
+      throw { code: 'UNIMPLEMENTED', message: 'RevenueCat SDK not installed' };
     }
 
     if (purchaseError.code === 1 || purchaseError.message?.includes("cancel")) {
