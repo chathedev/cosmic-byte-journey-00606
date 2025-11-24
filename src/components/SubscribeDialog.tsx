@@ -102,13 +102,12 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     console.log('🔘 [SubscribeDialog] isIos:', isIos);
     console.log('🔘 [SubscribeDialog] Platform check:', { isIos, hostname: window.location.hostname });
 
-    // TEMPORARY: Disable iOS IAP, use Stripe for all platforms
-    // if (isIos) {
-    //   console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP');
-    //   return handleIosPurchase();
-    // }
+    if (isIos) {
+      console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP');
+      return handleIosPurchase();
+    }
 
-    console.log('🌐 [SubscribeDialog] Using Stripe for payment');
+    console.log('🌐 [SubscribeDialog] User is on web browser, using Stripe');
     if (!user) return;
 
     setIsLoading(true);
