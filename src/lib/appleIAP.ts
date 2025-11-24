@@ -5,7 +5,10 @@ import { NativePurchases, PURCHASE_TYPE } from "@capgo/native-purchases";
 
 /**
  * Apple In-App Purchase Integration
- * Using @capgo/capacitor-purchases
+ * Using @capgo/native-purchases (native plugin, not web mock)
+ * 
+ * IMPORTANT: This requires the native iOS plugin to be installed via:
+ * npx cap sync ios
  */
 
 export const PRODUCT_IDS = {
