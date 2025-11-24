@@ -114,98 +114,114 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
   console.log("🍎 [appleIAP] purchaseAppleSubscription called with:", productId);
 
   if (!isNativeIOS()) {
+    console.error("🍎 [appleIAP] Not iOS, aborting");
     toast.error("Apple purchases only work in the iOS app");
     return false;
   }
 
+  // Check if CdvPurchase is available
+  if (typeof CdvPurchase === 'undefined') {
+    console.error("🍎 [appleIAP] ❌ CdvPurchase is not defined! Plugin not loaded.");
+    console.error("🍎 [appleIAP] window.CdvPurchase:", typeof (window as any).CdvPurchase);
+    console.error("🍎 [appleIAP] window.cordova:", typeof (window as any).cordova);
+    toast.error("IAP plugin inte tillgängligt. Kontakta support.");
+    return false;
+  }
+
+  console.log("🍎 [appleIAP] CdvPurchase available");
+
   return new Promise((resolve) => {
-    const { store, Platform } = CdvPurchase;
-    const product = store.get(productId, Platform.APPLE_APPSTORE);
+    try {
+      const { store, Platform } = CdvPurchase;
+      console.log("🍎 [appleIAP] Store:", !!store, "Platform:", !!Platform);
 
-    if (!product) {
-      toast.error("Produkt hittades inte");
-      resolve(false);
-      return;
-    }
+      const product = store.get(productId, Platform.APPLE_APPSTORE);
+      console.log("🍎 [appleIAP] Product found:", !!product);
 
-    const offer = product.getOffer();
-    if (!offer) {
-      toast.error("Erbjudande hittades inte");
-      resolve(false);
-      return;
-    }
-
-    toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
-
-    // We need to listen for the result of THIS purchase.
-
-    const onApproved = (transaction: CdvPurchase.Transaction) => {
-      if (transaction.products.find(p => p.id === productId)) {
-        console.log("🍎 [appleIAP] Purchase approved, verifying...");
-        toast.loading("Verifierar köp...", { id: 'iap-purchase' });
-        transaction.verify();
+      if (!product) {
+        console.error("🍎 [appleIAP] Product not found:", productId);
+        console.error("🍎 [appleIAP] Registered products:", store.products.map((p: any) => p.id));
+        toast.error("Produkt hittades inte");
+        resolve(false);
+        return;
       }
-    };
 
-    const onVerified = (receipt: CdvPurchase.VerifiedReceipt) => {
-      // Check if our product is in the receipt
-      // receipt.collection is VerifiedPurchase[]
-      const hasProduct = receipt.collection.some(p => p.id === productId);
+      const offer = product.getOffer();
+      console.log("🍎 [appleIAP] Offer found:", !!offer);
 
-      if (hasProduct) {
-        console.log("🍎 [appleIAP] Purchase verified!");
-        receipt.finish();
-        toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
-        resolve(true);
-        off();
+      if (!offer) {
+        console.error("🍎 [appleIAP] No offer for product:", productId);
+        toast.error("Erbjudande hittades inte");
+        resolve(false);
+        return;
       }
-    };
 
-    const onFailed = (transaction: CdvPurchase.Transaction) => {
-      if (transaction.products.find(p => p.id === productId)) {
-        console.error("🍎 [appleIAP] Purchase failed:", (transaction as any).error);
-        toast.error("Köpet misslyckades", { id: 'iap-purchase' });
+      toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
+      console.log("🍎 [appleIAP] Setting up listeners...");
+
+      // We need to listen for the result of THIS purchase.
+
+      const onApproved = (transaction: CdvPurchase.Transaction) => {
+        if (transaction.products.find(p => p.id === productId)) {
+          console.log("🍎 [appleIAP] Purchase approved, verifying...");
+          toast.loading("Verifierar köp...", { id: 'iap-purchase' });
+          transaction.verify();
+        }
+      };
+
+      const onVerified = (receipt: CdvPurchase.VerifiedReceipt) => {
+        // Check if our product is in the receipt
+        const hasProduct = receipt.collection.some(p => p.id === productId);
+
+        if (hasProduct) {
+          console.log("🍎 [appleIAP] Purchase verified!");
+          receipt.finish();
+          toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
+          resolve(true);
+          off();
+        }
+      };
+
+      const onFailed = (transaction: CdvPurchase.Transaction) => {
+        if (transaction.products.find(p => p.id === productId)) {
+          console.error("🍎 [appleIAP] Purchase failed:", (transaction as any).error);
+          toast.error("Köpet misslyckades", { id: 'iap-purchase' });
+          resolve(false);
+          off();
+        }
+      };
+
+      const onCancelled = () => {
+        toast.dismiss('iap-purchase');
         resolve(false);
         off();
       }
-    };
 
-    const onCancelled = () => {
-      toast.dismiss('iap-purchase');
+      const off = () => {
+        // Remove listeners - CdvPurchase doesn't make this easy for specific transactions
+        // We might leak listeners if we are not careful, but for this task it's okay.
+      };
+
+      store.when().approved(onApproved).verified(onVerified).finished((t) => { });
+      console.log("🍎 [appleIAP] Listeners registered");
+
+      console.log("🍎 [appleIAP] Initiating order...");
+      offer.order().then(result => {
+        console.log("🍎 [appleIAP] Order result:", result);
+        if (result) {
+          console.log("🍎 [appleIAP] Order initiated successfully");
+        }
+      }).catch(err => {
+        console.error("🍎 [appleIAP] Order failed:", err);
+        toast.error("Kunde inte starta köp", { id: 'iap-purchase' });
+        resolve(false);
+      });
+    } catch (error: any) {
+      console.error("🍎 [appleIAP] ❌ Exception in purchaseAppleSubscription:", error);
+      console.error("🍎 [appleIAP] Error stack:", error.stack);
+      toast.error(`Oväntat fel: ${error.message}`, { id: 'iap-purchase' });
       resolve(false);
-      off();
     }
-
-    const off = () => {
-      // Remove listeners - CdvPurchase doesn't make this easy for specific transactions
-      // We might leak listeners if we are not careful, but for this task it's okay.
-    };
-
-    // We rely on the global listeners set in initializeIAP for the general flow,
-    // but here we want to resolve the promise.
-    // Actually, adding duplicate listeners is bad.
-    // We should probably use a global event bus or just rely on the global listeners to update state?
-    // But the UI waits for this promise.
-    // Let's add specific listeners here and hope CdvPurchase handles multiple listeners well (it does).
-
-    store.when().approved(onApproved).verified(onVerified).finished((t) => { });
-
-    // Handle errors? store.when().failed(onFailed) ?
-    // store.when() returns a query.
-
-    // Let's try to hook into the specific product
-    // store.when(productId) is not supported in types, relying on global listeners with filtering
-    store.when().approved(onApproved).verified(onVerified);
-
-    offer.order().then(result => {
-      if (result) {
-        console.log("🍎 [appleIAP] Order initiated");
-      }
-    }).catch(err => {
-      console.error("🍎 [appleIAP] Order failed:", err);
-      toast.error("Kunde inte starta köp", { id: 'iap-purchase' });
-      resolve(false);
-    });
   });
 }
 
