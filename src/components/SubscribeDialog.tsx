@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Check, Loader2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -60,17 +61,25 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     setIsLoading(true);
     try {
       console.log('🍎 Starting iOS purchase flow for PRO monthly');
-      const success = await buyIosSubscription(PRODUCT_IDS.PRO_MONTHLY);
+      sonnerToast.info('Apple IAP requires native iOS implementation');
+      sonnerToast.error('Please implement StoreKit bridge in your iOS app to enable purchases');
       
-      if (success) {
-        console.log('🍎 Purchase successful, refreshing plan...');
-        await refreshPlan();
-        onOpenChange(false);
-        window.location.reload();
-      }
+      // Guide user to implement native bridge
+      console.log('');
+      console.log('📱 TO ENABLE APPLE IAP:');
+      console.log('1. Add StoreKit framework to your iOS project');
+      console.log('2. Implement native purchase handler in Swift');
+      console.log('3. Get receipt from Bundle.main.appStoreReceiptURL');
+      console.log('4. Convert to base64 and send to JavaScript');
+      console.log('5. Call verifyReceiptWithBackend() with the receipt');
+      console.log('');
+      console.log('See src/lib/appleIAP.ts for complete integration guide');
+      console.log('');
+      
+      // For now, show the user can't purchase yet
+      setIsLoading(false);
     } catch (error) {
       console.error('🍎 iOS purchase error:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -78,15 +87,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const handleRestorePurchases = async () => {
     setIsLoading(true);
     try {
-      const success = await restorePurchases();
-      if (success) {
-        await refreshPlan();
-        onOpenChange(false);
-        window.location.reload();
-      }
+      sonnerToast.info('Apple IAP restore requires native iOS implementation');
+      console.log('📱 Native iOS StoreKit bridge required for restore purchases');
+      setIsLoading(false);
     } catch (error) {
       console.error('Restore purchases error:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -245,7 +250,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Inga teamfunktioner', included: false },
         { text: 'Ingen prioriterad support', included: false },
       ],
-      cta: isIos ? 'Köp med Apple' : 'Välj Pro',
+      cta: isIos ? '🍎 Apple IAP (Coming Soon)' : 'Välj Pro',
       variant: 'default' as const,
       planId: 'pro' as const,
       highlight: true,
@@ -426,7 +431,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         </div>
 
         {isIos && (
-          <div className="flex justify-center pb-4">
+          <div className="flex flex-col gap-3 items-center pb-4">
             <Button
               variant="outline"
               onClick={handleRestorePurchases}
@@ -435,6 +440,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             >
               Återställ köp
             </Button>
+            <div className="text-xs text-muted-foreground text-center max-w-md">
+              <p className="font-medium text-foreground mb-1">🍎 Apple IAP Implementation Needed</p>
+              <p>Native StoreKit bridge required. Check console for setup guide.</p>
+            </div>
           </div>
         )}
 
