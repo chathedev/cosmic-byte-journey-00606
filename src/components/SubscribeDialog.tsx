@@ -69,13 +69,17 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       console.log('🍎 [SubscribeDialog] Purchase result:', success);
 
       if (success) {
-        console.log('🍎 [SubscribeDialog] Purchase successful, refreshing plan...');
+        console.log('✅ [SubscribeDialog] Purchase successful!');
+        sonnerToast.success("Välkommen till Tivly Pro! 🎉");
         await refreshPlan();
         onOpenChange(false);
-        window.location.reload();
+        // Page reload handled in appleIAP.ts
+      } else {
+        console.log('⚠️ [SubscribeDialog] Purchase cancelled or failed');
       }
     } catch (error) {
-      console.error('🍎 [SubscribeDialog] iOS purchase error:', error);
+      console.error('❌ [SubscribeDialog] iOS purchase error:', error);
+      sonnerToast.error("Köpet misslyckades. Försök igen.");
     } finally {
       setIsLoading(false);
     }
@@ -84,14 +88,20 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const handleRestorePurchases = async () => {
     setIsLoading(true);
     try {
+      console.log('🔄 [SubscribeDialog] Restoring purchases...');
       const success = await restorePurchases();
+      
       if (success) {
+        console.log('✅ [SubscribeDialog] Restore successful!');
         await refreshPlan();
         onOpenChange(false);
-        window.location.reload();
+        // Page reload handled in appleIAP.ts
+      } else {
+        console.log('⚠️ [SubscribeDialog] No purchases found to restore');
       }
     } catch (error) {
-      console.error('Restore purchases error:', error);
+      console.error('❌ [SubscribeDialog] Restore purchases error:', error);
+      sonnerToast.error("Återställning misslyckades. Försök igen.");
     } finally {
       setIsLoading(false);
     }

@@ -3,6 +3,15 @@ import { useAuth } from './AuthContext';
 import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
+import { isIosApp } from '@/utils/environment';
+import { registerPlugin } from '@capacitor/core';
+
+// RevenueCat plugin interface for iOS subscription checking
+interface RevenueCatPlugin {
+  getCustomerInfo(): Promise<{ isPro: boolean }>;
+}
+
+const RevenueCatManager = registerPlugin<RevenueCatPlugin>('RevenueCatManager');
 
 interface SubscriptionContextType {
   userPlan: UserPlan | null;
@@ -35,6 +44,32 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Don't block UI on initial load
       if (!background && userPlan !== null) setIsLoading(true);
+      
+      // For iOS app, check RevenueCat first
+      if (isIosApp()) {
+        console.log('🍎 [SubscriptionContext] iOS app detected - checking RevenueCat subscription');
+        try {
+          const customerInfo = await RevenueCatManager.getCustomerInfo();
+          if (customerInfo.isPro) {
+            console.log('✅ [SubscriptionContext] User has active Tivly Pro via RevenueCat');
+            const proPlan: UserPlan = {
+              plan: 'pro',
+              meetingsUsed: 0,
+              meetingsLimit: 10,
+              protocolsUsed: 0,
+              protocolsLimit: 999999,
+            };
+            setUserPlan(proPlan);
+            setRequiresPayment(false);
+            if (!background) setIsLoading(false);
+            return;
+          } else {
+            console.log('⚠️ [SubscriptionContext] No active RevenueCat subscription');
+          }
+        } catch (error) {
+          console.error('❌ [SubscriptionContext] Failed to check RevenueCat:', error);
+        }
+      }
       
       // Check payment status
       const exemptedEmails = ['roynewr@gmail.com', 'magisktboendevidhavet@gmail.com'];
