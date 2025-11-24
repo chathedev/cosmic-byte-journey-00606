@@ -1,7 +1,23 @@
 import { toast } from "sonner";
 import { isIosApp } from "@/utils/environment";
 import { apiClient } from "./api";
-import { CapacitorPurchases } from "@capgo/capacitor-purchases";
+import { registerPlugin } from "@capacitor/core";
+
+/**
+ * Apple In-App Purchase Integration
+ * Using RevenueCat SDK via native Swift bridge
+ */
+
+interface RevenueCatPlugin {
+  getOfferings(): Promise<{ current: { identifier: string; packages: any[] } }>;
+  purchasePackage(options: { identifier: string; offeringIdentifier: string }): Promise<{ isPro: boolean }>;
+  restorePurchases(): Promise<{ isPro: boolean }>;
+  getCustomerInfo(): Promise<{ isPro: boolean }>;
+  showPaywall(): Promise<void>;
+  showCustomerCenter(): Promise<void>;
+}
+
+const RevenueCatManager = registerPlugin<RevenueCatPlugin>('RevenueCatManager');
 
 /**
  * Apple In-App Purchase Integration
@@ -38,7 +54,7 @@ export async function initializeIAP() {
     return;
   }
 
-  console.log("🍎 IAP: RevenueCat initialized via native AppDelegate");
+  console.log("🍎 IAP: RevenueCat initialized via native AppDelegate with test API key");
 }
 
 /**
@@ -51,18 +67,19 @@ export async function loadAppleProducts(): Promise<PurchaseProduct[]> {
 
   try {
     console.log("🍎 IAP: Fetching offerings...");
-    const { offerings } = await CapacitorPurchases.getOfferings();
     
-    if (!offerings.current) {
+    const result = await RevenueCatManager.getOfferings();
+    
+    if (!result.current) {
       console.warn("🍎 IAP: No current offering available");
       return [];
     }
 
-    const packages = offerings.current.availablePackages || [];
+    const packages = result.current.packages || [];
     console.log("🍎 IAP: Found packages:", packages.length);
 
     return packages.map((pkg: any) => ({
-      identifier: pkg.product.identifier,
+      identifier: pkg.identifier,
       title: pkg.product.title || pkg.product.identifier,
       description: pkg.product.description || "",
       price: pkg.product.priceString || "99 SEK",
@@ -88,56 +105,21 @@ export async function purchaseAppleSubscription(productId: string): Promise<bool
   }
 
   try {
-    console.log("🍎 [appleIAP] Fetching offerings...");
-    toast.loading("Öppnar Apple betalning...", { id: 'iap-purchase' });
-
-    // Get offerings
-    const { offerings } = await CapacitorPurchases.getOfferings();
+    console.log("🍎 [appleIAP] Showing native paywall...");
     
-    if (!offerings.current) {
-      toast.error("Inga produkter tillgängliga", { id: 'iap-purchase' });
-      return false;
-    }
-
-    // Find the package matching the product ID
-    const packages = offerings.current.availablePackages || [];
-    const targetPackage = packages.find((pkg: any) => pkg.product.identifier === productId);
+    // Show native SwiftUI paywall
+    await RevenueCatManager.showPaywall();
     
-    if (!targetPackage) {
-      console.error("🍎 [appleIAP] Product not found:", productId);
-      toast.error("Produkt hittades inte", { id: 'iap-purchase' });
-      return false;
-    }
-
-    console.log("🍎 [appleIAP] Purchasing package:", targetPackage.identifier);
+    // Check subscription status after paywall closes
+    const customerInfo = await RevenueCatManager.getCustomerInfo();
+    const isPro = customerInfo.isPro || false;
     
-    // Make the purchase through RevenueCat
-    const { customerInfo } = await CapacitorPurchases.purchasePackage({ 
-      identifier: targetPackage.identifier,
-      offeringIdentifier: offerings.current.identifier
-    });
-
-    console.log("🍎 [appleIAP] Purchase successful, customer info:", customerInfo);
-    
-    // Get receipt from native TivlyStoreKitManager and verify
-    toast.loading("Verifierar köp...", { id: 'iap-purchase' });
-    
-    const receiptData = await getReceiptFromNative();
-    if (receiptData) {
-      const verified = await verifyReceiptWithBackend(receiptData);
-
-      if (verified) {
-        toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
-        return true;
-      } else {
-        toast.error("Kunde inte verifiera kvittot", { id: 'iap-purchase' });
-        return false;
-      }
-    } else {
-      console.warn("🍎 [appleIAP] No receipt available");
-      toast.success("Köp genomfört! 🎉", { id: 'iap-purchase' });
+    if (isPro) {
+      toast.success("Köp genomfört! 🎉");
       return true;
     }
+    
+    return false;
 
   } catch (purchaseError: any) {
     console.error("🍎 [appleIAP] Purchase error:", purchaseError);
@@ -173,6 +155,24 @@ export async function buyIosSubscription(productId: string): Promise<boolean> {
 }
 
 /**
+ * Show Customer Center for subscription management
+ */
+export async function showCustomerCenter(): Promise<void> {
+  if (!isNativeIOS()) {
+    toast.error("Customer Center fungerar endast i iOS-appen");
+    return;
+  }
+
+  try {
+    console.log("🍎 IAP: Showing customer center...");
+    await RevenueCatManager.showCustomerCenter();
+  } catch (error: any) {
+    console.error("🍎 IAP: Failed to show customer center:", error);
+    toast.error("Kunde inte öppna kontoinställningar");
+  }
+}
+
+/**
  * Restore previous purchases via RevenueCat
  */
 export async function restorePurchases(): Promise<boolean> {
@@ -185,17 +185,18 @@ export async function restorePurchases(): Promise<boolean> {
     console.log("🍎 IAP: Restoring purchases...");
     toast.loading("Återställer köp...", { id: 'iap-restore' });
 
-    const { customerInfo } = await CapacitorPurchases.restorePurchases();
-    console.log("🍎 IAP: Restore result:", customerInfo);
+    const result = await RevenueCatManager.restorePurchases();
+    console.log("🍎 IAP: Restore result:", result);
 
-    // Get receipt and verify with backend if available
-    const receiptData = await getReceiptFromNative();
-    if (receiptData) {
-      await verifyReceiptWithBackend(receiptData);
+    const isPro = result.isPro || false;
+    
+    if (isPro) {
+      toast.success("Köp återställda! Du har Tivly Pro", { id: 'iap-restore' });
+    } else {
+      toast.info("Inga tidigare köp hittades", { id: 'iap-restore' });
     }
 
-    toast.success("Köp återställda", { id: 'iap-restore' });
-    return true;
+    return isPro;
 
   } catch (error: any) {
     console.error("🍎 IAP: Restore failed:", error);
