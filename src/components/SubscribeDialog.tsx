@@ -41,13 +41,17 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
   
-  // Check for native iOS app with TivlyNative bridge
-  // This MUST be true when: TivlyNative exists AND hostname is io.tivly.se
-  const isIos = typeof window !== 'undefined'
-    && !!window.TivlyNative
-    && window.location.hostname === 'io.tivly.se';
+  // Check if we're on the iOS app domain (io.tivly.se)
+  // On this domain, we ALWAYS use Apple IAP, never Stripe
+  const isIosDomain = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
+  
+  // Check if TivlyNative bridge is available
+  const hasTivlyNative = typeof window !== 'undefined' && !!window.TivlyNative;
+  
+  // For iOS detection: on io.tivly.se domain, we're in iOS mode (never load Stripe)
+  const isIos = isIosDomain;
 
-  console.log('[Tivly] SubscribeDialog - isIos:', isIos, 'hostname:', window.location.hostname, 'TivlyNative:', !!window.TivlyNative);
+  console.log('[Tivly] SubscribeDialog mount - isIosDomain:', isIosDomain, 'hasTivlyNative:', hasTivlyNative, 'hostname:', window.location.hostname);
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -70,12 +74,21 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   // Handle iOS native purchase - calls TivlyNative.showPaywall() directly
   const handleIosPurchase = async () => {
-    console.log('[Tivly] Trigger paywall (iOS):', isIos);
+    console.log('[Tivly] Trigger paywall (iOS) - isIosDomain:', isIosDomain, 'hasTivlyNative:', hasTivlyNative);
     console.log('🍎 [SubscribeDialog] handleIosPurchase called');
     
-    if (!isIos || !window.TivlyNative) {
-      console.log('🍎 [SubscribeDialog] Not iOS native or TivlyNative missing');
-      sonnerToast.error("In-app purchase is not available right now.");
+    // Must be on io.tivly.se domain
+    if (!isIosDomain) {
+      console.log('🍎 [SubscribeDialog] Not on iOS domain, cannot use Apple IAP');
+      sonnerToast.error("Apple-köp fungerar endast i iOS-appen");
+      return;
+    }
+    
+    // Check if TivlyNative is available
+    if (!window.TivlyNative?.showPaywall) {
+      console.error('🍎 [SubscribeDialog] TivlyNative.showPaywall not available!');
+      console.log('🍎 [SubscribeDialog] window.TivlyNative:', window.TivlyNative);
+      sonnerToast.error("Vänligen uppdatera appen för att köpa prenumeration.");
       return;
     }
     
@@ -83,10 +96,13 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     
     try {
       console.log('🍎 [SubscribeDialog] Calling window.TivlyNative.showPaywall()...');
-      window.TivlyNative.showPaywall();
-      console.log('🍎 [SubscribeDialog] Native paywall triggered successfully');
       
-      // Close dialog - native app handles the rest
+      // Call the native bridge
+      window.TivlyNative.showPaywall();
+      
+      console.log('🍎 [SubscribeDialog] Native paywall call completed');
+      
+      // Close dialog - native app handles the purchase flow from here
       onOpenChange(false);
     } catch (error: any) {
       console.error('❌ [SubscribeDialog] iOS purchase error:', error);
@@ -97,10 +113,16 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   };
 
   const handleRestorePurchases = async () => {
-    console.log('[Tivly] Restore purchases (iOS):', isIos);
+    console.log('[Tivly] Restore purchases - isIosDomain:', isIosDomain, 'hasTivlyNative:', hasTivlyNative);
     
-    if (!isIos || !window.TivlyNative) {
+    if (!isIosDomain) {
       sonnerToast.error("Återställning fungerar endast i iOS-appen");
+      return;
+    }
+    
+    if (!window.TivlyNative) {
+      console.error('🍎 [SubscribeDialog] TivlyNative not available for restore');
+      sonnerToast.error("Vänligen uppdatera appen för att återställa köp.");
       return;
     }
     
@@ -127,12 +149,12 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   const handleSubscribe = async (planName: 'pro') => {
     console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
-    console.log('🔘 [SubscribeDialog] isIos:', isIos);
-    console.log('🔘 [SubscribeDialog] Platform check:', { isIos, hostname: window.location.hostname, hasTivlyNative: !!window.TivlyNative });
+    console.log('🔘 [SubscribeDialog] isIos:', isIos, 'isIosDomain:', isIosDomain);
+    console.log('🔘 [SubscribeDialog] Platform check:', { isIosDomain, hasTivlyNative, hostname: window.location.hostname });
 
-    // iOS app: ALWAYS use native paywall, NEVER load Stripe
+    // iOS app domain: ALWAYS use native paywall, NEVER load Stripe
     if (isIos) {
-      console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP - NOT loading Stripe');
+      console.log('🍎 [SubscribeDialog] User is on iOS app domain - using Apple IAP, NOT loading Stripe');
       return handleIosPurchase();
     }
 

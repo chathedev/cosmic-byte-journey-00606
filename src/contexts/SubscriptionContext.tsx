@@ -4,14 +4,9 @@ import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
 import { isIosApp } from '@/utils/environment';
-import { registerPlugin } from '@capacitor/core';
 
-// RevenueCat plugin interface for iOS subscription checking
-interface RevenueCatPlugin {
-  getCustomerInfo(): Promise<{ isPro: boolean }>;
-}
-
-const RevenueCatManager = registerPlugin<RevenueCatPlugin>('RevenueCatManager');
+// Note: iOS subscription purchases are handled via window.TivlyNative.showPaywall()
+// The backend is the source of truth for subscription status
 
 interface SubscriptionContextType {
   userPlan: UserPlan | null;
@@ -45,37 +40,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // Don't block UI on initial load
       if (!background && userPlan !== null) setIsLoading(true);
       
-      // For iOS app, check RevenueCat first
+      // iOS subscription purchases are handled via window.TivlyNative.showPaywall()
+      // Backend is the single source of truth for subscription status
       if (isIosApp()) {
-        console.log('🍎 [SubscriptionContext] iOS app detected - checking RevenueCat subscription');
-        try {
-          const customerInfo = await RevenueCatManager.getCustomerInfo();
-          if (customerInfo.isPro) {
-            console.log('✅ [SubscriptionContext] User has active Tivly Pro via RevenueCat');
-            const proPlan: UserPlan = {
-              plan: 'pro',
-              meetingsUsed: 0,
-              meetingsLimit: 10,
-              protocolsUsed: 0,
-              protocolsLimit: 999999,
-            };
-            setUserPlan(proPlan);
-            setRequiresPayment(false);
-            if (!background) setIsLoading(false);
-            return;
-          } else {
-            console.log('⚠️ [SubscriptionContext] No active RevenueCat subscription');
-          }
-        } catch (error: any) {
-          console.error('❌ [SubscriptionContext] Failed to check RevenueCat:', error);
-          
-          // Don't show error toast on UNIMPLEMENTED - just log it
-          if (error.code !== 'UNIMPLEMENTED') {
-            console.error('RevenueCat error (not UNIMPLEMENTED):', error);
-          } else {
-            console.log('ℹ️ RevenueCat SDK not installed in Xcode yet - using backend plan');
-          }
-        }
+        console.log('🍎 [SubscriptionContext] iOS app detected - using backend for subscription status');
       }
       
       // Check payment status
