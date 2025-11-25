@@ -3,15 +3,16 @@ import { useAuth } from './AuthContext';
 import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
-import { isIosApp } from '@/utils/environment';
+import { Capacitor } from '@capacitor/core';
 
-// Note: iOS subscription purchases are handled via window.TivlyNative.showPaywall()
+// Note: iOS subscription purchases are handled via native RevenueCat flow
 // The backend is the source of truth for subscription status
 
 interface SubscriptionContextType {
   userPlan: UserPlan | null;
   isLoading: boolean;
   requiresPayment: boolean;
+  isNativePlatform: boolean;
   refreshPlan: () => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
   canGenerateProtocol: (meetingId: string, protocolCount: number) => Promise<{ allowed: boolean; reason?: string }>;
@@ -27,6 +28,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Use Capacitor to detect native platform
+  const isNativePlatform = Capacitor.isNativePlatform();
+  
+  console.log('[SubscriptionContext] 📱 Platform detection:', {
+    isNativePlatform,
+    platform: Capacitor.getPlatform(),
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'N/A'
+  });
+  
   const loadPlan = useCallback(async (opts?: { background?: boolean }) => {
     const background = !!opts?.background;
     if (!user) {
@@ -40,10 +51,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // Don't block UI on initial load
       if (!background && userPlan !== null) setIsLoading(true);
       
-      // iOS subscription purchases are handled via window.TivlyNative.showPaywall()
+      // Native app subscription purchases are handled via RevenueCat
       // Backend is the single source of truth for subscription status
-      if (isIosApp()) {
-        console.log('🍎 [SubscriptionContext] iOS app detected - using backend for subscription status');
+      if (isNativePlatform) {
+        console.log('🍎 [SubscriptionContext] Native platform detected - using backend for subscription status');
       }
       
       // Check payment status
@@ -397,7 +408,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, isNativePlatform, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );

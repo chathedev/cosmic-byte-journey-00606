@@ -10,8 +10,9 @@ import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { CapacitorPurchases } from '@capgo/capacitor-purchases';
 
-// Type declaration for native iOS bridge
+// Type declaration for native iOS bridge (fallback)
 declare global {
   interface Window {
     TivlyNative?: {
@@ -31,7 +32,7 @@ interface SubscribeDialogProps {
 export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { refreshPlan, userPlan } = useSubscription();
+  const { refreshPlan, userPlan, isNativePlatform } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'plus' | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -41,10 +42,13 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
   
-  // Check if TivlyNative bridge is available - this is the primary check for native paywall
+  // Check if TivlyNative bridge is available (fallback for older native builds)
   const hasTivlyNative = typeof window !== 'undefined' && !!window.TivlyNative;
+  
+  // Primary native detection: use Capacitor.isNativePlatform() from context
+  const isNative = isNativePlatform;
 
-  console.log('[Tivly] SubscribeDialog mount - hasTivlyNative:', hasTivlyNative, 'hostname:', window.location.hostname);
+  console.log('[Tivly] SubscribeDialog mount - isNative:', isNative, 'hasTivlyNative:', hasTivlyNative, 'hostname:', window.location.hostname);
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -65,64 +69,94 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     }
   }, [open]);
 
-  // Handle iOS native purchase - calls TivlyNative.showPaywall() directly
-  const handleIosPurchase = async () => {
-    console.log('[Tivly] Trigger paywall - hasTivlyNative:', hasTivlyNative);
-    console.log('🍎 [SubscribeDialog] handleIosPurchase called');
-    
-    // Check if TivlyNative is available
-    if (!window.TivlyNative?.showPaywall) {
-      console.error('🍎 [SubscribeDialog] TivlyNative.showPaywall not available!');
-      console.log('🍎 [SubscribeDialog] window.TivlyNative:', window.TivlyNative);
-      sonnerToast.error("Vänligen uppdatera appen för att köpa prenumeration.");
-      return;
-    }
+  // Handle native purchase - uses RevenueCat Capacitor plugin
+  const handleNativePurchase = async () => {
+    console.log('[Tivly] Trigger native paywall - isNative:', isNative, 'hasTivlyNative:', hasTivlyNative);
+    console.log('🍎 [SubscribeDialog] handleNativePurchase called');
     
     setIsLoading(true);
     
     try {
-      console.log('🍎 [SubscribeDialog] Calling window.TivlyNative.showPaywall()...');
+      // Try RevenueCat Capacitor plugin first
+      console.log('🍎 [SubscribeDialog] Attempting RevenueCat purchase...');
       
-      // Call the native bridge
-      window.TivlyNative.showPaywall();
+      // Get available packages from RevenueCat
+      const offeringsResponse = await CapacitorPurchases.getOfferings();
+      console.log('🍎 [SubscribeDialog] RevenueCat offerings:', offeringsResponse);
       
-      console.log('🍎 [SubscribeDialog] Native paywall call completed');
-      
-      // Close dialog - native app handles the purchase flow from here
-      onOpenChange(false);
+      const currentOffering = offeringsResponse.offerings?.current;
+      if (currentOffering && currentOffering.availablePackages.length > 0) {
+        // Purchase the first available package (usually the default/monthly)
+        const packageToPurchase = currentOffering.availablePackages[0];
+        console.log('🍎 [SubscribeDialog] Purchasing package:', packageToPurchase);
+        
+        const purchaseResult = await CapacitorPurchases.purchasePackage({
+          identifier: packageToPurchase.identifier,
+          offeringIdentifier: packageToPurchase.offeringIdentifier,
+        });
+        console.log('🍎 [SubscribeDialog] Purchase result:', purchaseResult);
+        
+        // Refresh plan after successful purchase
+        await refreshPlan();
+        sonnerToast.success("Prenumerationen är nu aktiv!");
+        onOpenChange(false);
+      } else {
+        console.error('🍎 [SubscribeDialog] No packages available');
+        sonnerToast.error("Inga prenumerationspaket tillgängliga.");
+      }
     } catch (error: any) {
-      console.error('❌ [SubscribeDialog] iOS purchase error:', error);
-      sonnerToast.error("In-app purchase is not available right now.");
+      console.error('❌ [SubscribeDialog] RevenueCat purchase error:', error);
+      
+      // Fallback to TivlyNative bridge if RevenueCat fails
+      if (window.TivlyNative?.showPaywall) {
+        console.log('🍎 [SubscribeDialog] Falling back to TivlyNative.showPaywall()');
+        try {
+          window.TivlyNative.showPaywall();
+          onOpenChange(false);
+          return;
+        } catch (bridgeError) {
+          console.error('❌ [SubscribeDialog] TivlyNative fallback also failed:', bridgeError);
+        }
+      }
+      
+      sonnerToast.error("Köpet kunde inte genomföras. Försök igen.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRestorePurchases = async () => {
-    console.log('[Tivly] Restore purchases - hasTivlyNative:', hasTivlyNative);
+    console.log('[Tivly] Restore purchases - isNative:', isNative, 'hasTivlyNative:', hasTivlyNative);
     
-    if (!window.TivlyNative) {
-      console.error('🍎 [SubscribeDialog] TivlyNative not available for restore');
-      sonnerToast.error("Vänligen uppdatera appen för att återställa köp.");
+    if (!isNative) {
+      sonnerToast.error("Återställning fungerar endast i appen.");
       return;
     }
     
     setIsLoading(true);
     try {
-      console.log('🔄 [SubscribeDialog] Calling TivlyNative for restore...');
+      console.log('🔄 [SubscribeDialog] Restoring purchases via RevenueCat...');
       
-      if (window.TivlyNative.restorePurchases) {
-        window.TivlyNative.restorePurchases();
-      } else {
-        // Fallback to showing paywall
-        window.TivlyNative.showPaywall();
-      }
+      const customerInfo = await CapacitorPurchases.restorePurchases();
+      console.log('✅ [SubscribeDialog] Restore result:', customerInfo);
       
-      console.log('✅ [SubscribeDialog] Native restore triggered');
+      // Refresh plan after restore
+      await refreshPlan();
+      sonnerToast.success("Köp återställda!");
       onOpenChange(false);
     } catch (error) {
       console.error('❌ [SubscribeDialog] Restore purchases error:', error);
-      sonnerToast.error("In-app purchase is not available right now.");
+      
+      // Fallback to TivlyNative bridge
+      if (window.TivlyNative?.restorePurchases) {
+        try {
+          window.TivlyNative.restorePurchases();
+          onOpenChange(false);
+          return;
+        } catch {}
+      }
+      
+      sonnerToast.error("Kunde inte återställa köp. Försök igen.");
     } finally {
       setIsLoading(false);
     }
@@ -130,12 +164,12 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   const handleSubscribe = async (planName: 'pro') => {
     console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
-    console.log('🔘 [SubscribeDialog] hasTivlyNative:', hasTivlyNative);
+    console.log('🔘 [SubscribeDialog] isNative:', isNative, 'hasTivlyNative:', hasTivlyNative);
 
-    // If TivlyNative is available, use native paywall instead of Stripe
-    if (hasTivlyNative) {
-      console.log('🍎 [SubscribeDialog] TivlyNative available - using native paywall');
-      return handleIosPurchase();
+    // Native platform: use RevenueCat, NEVER Stripe
+    if (isNative) {
+      console.log('🍎 [SubscribeDialog] Native platform detected - using RevenueCat');
+      return handleNativePurchase();
     }
 
     // Web browser: Use Stripe
@@ -314,7 +348,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   ];
 
   // Native app should never show the payment details screen - it goes straight to native paywall
-  if (selectedPlan && !hasTivlyNative) {
+  if (selectedPlan && !isNative) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -489,7 +523,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           ))}
         </div>
 
-        {hasTivlyNative && (
+        {isNative && (
           <div className="flex justify-center pb-4 animate-fade-in">
             <Button
               variant="ghost"
