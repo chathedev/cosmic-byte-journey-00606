@@ -4,13 +4,11 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { subscriptionService } from '@/lib/subscription';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 // Type declaration for native iOS bridge
@@ -37,7 +35,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'plus' | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const stripeRef = useRef<Stripe | null>(null);
@@ -45,9 +42,12 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const cardElementRef = useRef<any>(null);
   
   // Check for native iOS app with TivlyNative bridge
+  // This MUST be true when: TivlyNative exists AND hostname is io.tivly.se
   const isIos = typeof window !== 'undefined'
     && !!window.TivlyNative
     && window.location.hostname === 'io.tivly.se';
+
+  console.log('[Tivly] SubscribeDialog - isIos:', isIos, 'hostname:', window.location.hostname, 'TivlyNative:', !!window.TivlyNative);
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -65,30 +65,26 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       stripeRef.current = null;
       setSelectedPlan(null);
       setClientSecret(null);
-      setPublishableKey(null);
     }
   }, [open]);
 
+  // Handle iOS native purchase - calls TivlyNative.showPaywall() directly
   const handleIosPurchase = async () => {
-    // Check for native iOS bridge
-    const isIosNative = typeof window !== 'undefined'
-      && !!window.TivlyNative
-      && window.location.hostname === 'io.tivly.se';
-    
-    console.log('[Tivly] Trigger paywall (iOS):', isIosNative);
+    console.log('[Tivly] Trigger paywall (iOS):', isIos);
     console.log('🍎 [SubscribeDialog] handleIosPurchase called');
     
-    if (!isIosNative) {
-      console.log('🍎 [SubscribeDialog] Not iOS native, falling back to Stripe');
-      return handleSubscribe('pro');
+    if (!isIos || !window.TivlyNative) {
+      console.log('🍎 [SubscribeDialog] Not iOS native or TivlyNative missing');
+      sonnerToast.error("In-app purchase is not available right now.");
+      return;
     }
     
     setIsLoading(true);
     
     try {
       console.log('🍎 [SubscribeDialog] Calling window.TivlyNative.showPaywall()...');
-      window.TivlyNative!.showPaywall();
-      console.log('🍎 [SubscribeDialog] Native paywall triggered');
+      window.TivlyNative.showPaywall();
+      console.log('🍎 [SubscribeDialog] Native paywall triggered successfully');
       
       // Close dialog - native app handles the rest
       onOpenChange(false);
@@ -103,7 +99,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const handleRestorePurchases = async () => {
     console.log('[Tivly] Restore purchases (iOS):', isIos);
     
-    if (!isIos) {
+    if (!isIos || !window.TivlyNative) {
       sonnerToast.error("Återställning fungerar endast i iOS-appen");
       return;
     }
@@ -112,11 +108,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     try {
       console.log('🔄 [SubscribeDialog] Calling TivlyNative for restore...');
       
-      if (window.TivlyNative?.restorePurchases) {
+      if (window.TivlyNative.restorePurchases) {
         window.TivlyNative.restorePurchases();
       } else {
         // Fallback to showing paywall
-        window.TivlyNative!.showPaywall();
+        window.TivlyNative.showPaywall();
       }
       
       console.log('✅ [SubscribeDialog] Native restore triggered');
@@ -132,13 +128,15 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const handleSubscribe = async (planName: 'pro') => {
     console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
     console.log('🔘 [SubscribeDialog] isIos:', isIos);
-    console.log('🔘 [SubscribeDialog] Platform check:', { isIos, hostname: window.location.hostname });
+    console.log('🔘 [SubscribeDialog] Platform check:', { isIos, hostname: window.location.hostname, hasTivlyNative: !!window.TivlyNative });
 
+    // iOS app: ALWAYS use native paywall, NEVER load Stripe
     if (isIos) {
-      console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP');
+      console.log('🍎 [SubscribeDialog] User is on iOS app, using Apple IAP - NOT loading Stripe');
       return handleIosPurchase();
     }
 
+    // Web browser: Use Stripe
     console.log('🌐 [SubscribeDialog] User is on web browser, using Stripe');
     if (!user) return;
 
@@ -171,7 +169,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       }
 
       setClientSecret(normalizedClientSecret);
-      setPublishableKey(STRIPE_PUBLISHABLE_KEY);
 
       const stripe = await loadStripe(STRIPE_PUBLISHABLE_KEY);
       if (!stripe) throw new Error('Stripe kunde inte laddas');
@@ -287,7 +284,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Inga teamfunktioner', included: false },
         { text: 'Ingen prioriterad support', included: false },
       ],
-      cta: isIos ? 'Välj Pro' : 'Välj Pro',
+      cta: 'Välj Pro',
       variant: 'default' as const,
       planId: 'pro' as const,
       highlight: true,
