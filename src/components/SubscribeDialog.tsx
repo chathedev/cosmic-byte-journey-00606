@@ -12,8 +12,16 @@ import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { isIosApp } from '@/utils/environment';
-import { buyIosSubscription, restorePurchases, PRODUCT_IDS } from '@/lib/appleIAP';
+
+// Type declaration for native iOS bridge
+declare global {
+  interface Window {
+    TivlyNative?: {
+      showPaywall: () => void;
+      restorePurchases?: () => void;
+    };
+  }
+}
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
 
@@ -35,7 +43,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const stripeRef = useRef<Stripe | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
-  const isIos = isIosApp();
+  
+  // Check for native iOS app with TivlyNative bridge
+  const isIos = typeof window !== 'undefined'
+    && !!window.TivlyNative
+    && window.location.hostname === 'io.tivly.se';
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -58,45 +70,60 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   }, [open]);
 
   const handleIosPurchase = async () => {
+    // Check for native iOS bridge
+    const isIosNative = typeof window !== 'undefined'
+      && !!window.TivlyNative
+      && window.location.hostname === 'io.tivly.se';
+    
+    console.log('[Tivly] Trigger paywall (iOS):', isIosNative);
     console.log('🍎 [SubscribeDialog] handleIosPurchase called');
+    
+    if (!isIosNative) {
+      console.log('🍎 [SubscribeDialog] Not iOS native, falling back to Stripe');
+      return handleSubscribe('pro');
+    }
+    
     setIsLoading(true);
     
     try {
-      console.log('🍎 [SubscribeDialog] Starting iOS purchase for PRO monthly');
-      const success = await buyIosSubscription(PRODUCT_IDS.PRO_MONTHLY);
-      console.log('🍎 [SubscribeDialog] Purchase result:', success);
-
-      if (success) {
-        console.log('✅ [SubscribeDialog] Purchase successful!');
-        sonnerToast.success("Välkommen till Tivly Pro! 🎉");
-        await refreshPlan();
-        onOpenChange(false);
-      }
+      console.log('🍎 [SubscribeDialog] Calling window.TivlyNative.showPaywall()...');
+      window.TivlyNative!.showPaywall();
+      console.log('🍎 [SubscribeDialog] Native paywall triggered');
+      
+      // Close dialog - native app handles the rest
+      onOpenChange(false);
     } catch (error: any) {
       console.error('❌ [SubscribeDialog] iOS purchase error:', error);
-      sonnerToast.error("Köpet misslyckades. Försök igen.");
+      sonnerToast.error("In-app purchase is not available right now.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRestorePurchases = async () => {
+    console.log('[Tivly] Restore purchases (iOS):', isIos);
+    
+    if (!isIos) {
+      sonnerToast.error("Återställning fungerar endast i iOS-appen");
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      console.log('🔄 [SubscribeDialog] Restoring purchases...');
-      const success = await restorePurchases();
+      console.log('🔄 [SubscribeDialog] Calling TivlyNative for restore...');
       
-      if (success) {
-        console.log('✅ [SubscribeDialog] Restore successful!');
-        await refreshPlan();
-        onOpenChange(false);
-        // Page reload handled in appleIAP.ts
+      if (window.TivlyNative?.restorePurchases) {
+        window.TivlyNative.restorePurchases();
       } else {
-        console.log('⚠️ [SubscribeDialog] No purchases found to restore');
+        // Fallback to showing paywall
+        window.TivlyNative!.showPaywall();
       }
+      
+      console.log('✅ [SubscribeDialog] Native restore triggered');
+      onOpenChange(false);
     } catch (error) {
       console.error('❌ [SubscribeDialog] Restore purchases error:', error);
-      sonnerToast.error("Återställning misslyckades. Försök igen.");
+      sonnerToast.error("In-app purchase is not available right now.");
     } finally {
       setIsLoading(false);
     }
