@@ -41,17 +41,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
   
-  // Check if we're on the iOS app domain (io.tivly.se)
-  // On this domain, we ALWAYS use Apple IAP, never Stripe
-  const isIosDomain = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
-  
-  // Check if TivlyNative bridge is available
+  // Check if TivlyNative bridge is available - this is the primary check for native paywall
   const hasTivlyNative = typeof window !== 'undefined' && !!window.TivlyNative;
-  
-  // For iOS detection: on io.tivly.se domain, we're in iOS mode (never load Stripe)
-  const isIos = isIosDomain;
 
-  console.log('[Tivly] SubscribeDialog mount - isIosDomain:', isIosDomain, 'hasTivlyNative:', hasTivlyNative, 'hostname:', window.location.hostname);
+  console.log('[Tivly] SubscribeDialog mount - hasTivlyNative:', hasTivlyNative, 'hostname:', window.location.hostname);
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -74,15 +67,8 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   // Handle iOS native purchase - calls TivlyNative.showPaywall() directly
   const handleIosPurchase = async () => {
-    console.log('[Tivly] Trigger paywall (iOS) - isIosDomain:', isIosDomain, 'hasTivlyNative:', hasTivlyNative);
+    console.log('[Tivly] Trigger paywall - hasTivlyNative:', hasTivlyNative);
     console.log('🍎 [SubscribeDialog] handleIosPurchase called');
-    
-    // Must be on io.tivly.se domain
-    if (!isIosDomain) {
-      console.log('🍎 [SubscribeDialog] Not on iOS domain, cannot use Apple IAP');
-      sonnerToast.error("Apple-köp fungerar endast i iOS-appen");
-      return;
-    }
     
     // Check if TivlyNative is available
     if (!window.TivlyNative?.showPaywall) {
@@ -113,12 +99,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   };
 
   const handleRestorePurchases = async () => {
-    console.log('[Tivly] Restore purchases - isIosDomain:', isIosDomain, 'hasTivlyNative:', hasTivlyNative);
-    
-    if (!isIosDomain) {
-      sonnerToast.error("Återställning fungerar endast i iOS-appen");
-      return;
-    }
+    console.log('[Tivly] Restore purchases - hasTivlyNative:', hasTivlyNative);
     
     if (!window.TivlyNative) {
       console.error('🍎 [SubscribeDialog] TivlyNative not available for restore');
@@ -149,12 +130,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   const handleSubscribe = async (planName: 'pro') => {
     console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
-    console.log('🔘 [SubscribeDialog] isIos:', isIos, 'isIosDomain:', isIosDomain);
-    console.log('🔘 [SubscribeDialog] Platform check:', { isIosDomain, hasTivlyNative, hostname: window.location.hostname });
+    console.log('🔘 [SubscribeDialog] hasTivlyNative:', hasTivlyNative);
 
-    // iOS app domain: ALWAYS use native paywall, NEVER load Stripe
-    if (isIos) {
-      console.log('🍎 [SubscribeDialog] User is on iOS app domain - using Apple IAP, NOT loading Stripe');
+    // If TivlyNative is available, use native paywall instead of Stripe
+    if (hasTivlyNative) {
+      console.log('🍎 [SubscribeDialog] TivlyNative available - using native paywall');
       return handleIosPurchase();
     }
 
@@ -333,8 +313,8 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     },
   ];
 
-  // iOS should never show the payment details screen - it goes straight to Apple IAP
-  if (selectedPlan && !isIos) {
+  // Native app should never show the payment details screen - it goes straight to native paywall
+  if (selectedPlan && !hasTivlyNative) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -509,7 +489,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           ))}
         </div>
 
-        {isIos && (
+        {hasTivlyNative && (
           <div className="flex justify-center pb-4 animate-fade-in">
             <Button
               variant="ghost"
