@@ -32,7 +32,7 @@ interface SubscribeDialogProps {
 export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { refreshPlan, userPlan, isNativePlatform } = useSubscription();
+  const { refreshPlan, userPlan, isIOSNative } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'plus' | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -45,10 +45,20 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   // Check if TivlyNative bridge is available (fallback for older native builds)
   const hasTivlyNative = typeof window !== 'undefined' && !!window.TivlyNative;
   
-  // Primary native detection: use Capacitor.isNativePlatform() from context
-  const isNative = isNativePlatform;
+  // Domain-based safety check - io.tivly.se should ALWAYS use Apple IAP
+  const isIosDomain = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
+  
+  // iOS Native: use isIOSNative from context OR domain check (belt and suspenders)
+  // This ensures we NEVER open Stripe on iOS app
+  const shouldUseAppleIAP = isIOSNative || isIosDomain;
 
-  console.log('[Tivly] SubscribeDialog mount - isNative:', isNative, 'hasTivlyNative:', hasTivlyNative, 'hostname:', window.location.hostname);
+  console.log('[SubscribeDialog] 🍎 Platform detection:', {
+    isIOSNative,
+    isIosDomain,
+    shouldUseAppleIAP,
+    hasTivlyNative,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'N/A'
+  });
 
   useEffect(() => {
     setFullName(user?.displayName || '');
@@ -71,8 +81,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   // Handle native purchase - uses RevenueCat Capacitor plugin
   const handleNativePurchase = async () => {
-    console.log('[Tivly] Trigger native paywall - isNative:', isNative, 'hasTivlyNative:', hasTivlyNative);
-    console.log('🍎 [SubscribeDialog] handleNativePurchase called');
+    console.log('[SubscribeDialog] 🍎 handleNativePurchase - shouldUseAppleIAP:', shouldUseAppleIAP, 'hasTivlyNative:', hasTivlyNative);
     
     setIsLoading(true);
     
@@ -102,7 +111,8 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         onOpenChange(false);
       } else {
         console.error('🍎 [SubscribeDialog] No packages available');
-        sonnerToast.error("Inga prenumerationspaket tillgängliga.");
+        // Show clear error for no packages
+        sonnerToast.error("Apple-köp är inte tillgängligt just nu.");
       }
     } catch (error: any) {
       console.error('❌ [SubscribeDialog] RevenueCat purchase error:', error);
@@ -119,17 +129,18 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         }
       }
       
-      sonnerToast.error("Köpet kunde inte genomföras. Försök igen.");
+      // NEVER open Stripe on iOS - show clear error message instead
+      sonnerToast.error("Apple-köp är inte tillgängligt just nu.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRestorePurchases = async () => {
-    console.log('[Tivly] Restore purchases - isNative:', isNative, 'hasTivlyNative:', hasTivlyNative);
+    console.log('[SubscribeDialog] 🔄 Restore purchases - shouldUseAppleIAP:', shouldUseAppleIAP, 'hasTivlyNative:', hasTivlyNative);
     
-    if (!isNative) {
-      sonnerToast.error("Återställning fungerar endast i appen.");
+    if (!shouldUseAppleIAP) {
+      sonnerToast.error("Återställning fungerar endast i iOS-appen.");
       return;
     }
     
@@ -164,16 +175,16 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   const handleSubscribe = async (planName: 'pro') => {
     console.log('🔘 [SubscribeDialog] handleSubscribe called with plan:', planName);
-    console.log('🔘 [SubscribeDialog] isNative:', isNative, 'hasTivlyNative:', hasTivlyNative);
+    console.log('🔘 [SubscribeDialog] shouldUseAppleIAP:', shouldUseAppleIAP, 'hasTivlyNative:', hasTivlyNative);
 
-    // Native platform: use RevenueCat, NEVER Stripe
-    if (isNative) {
-      console.log('🍎 [SubscribeDialog] Native platform detected - using RevenueCat');
+    // iOS platform: use RevenueCat/Apple IAP, NEVER Stripe
+    if (shouldUseAppleIAP) {
+      console.log('🍎 [SubscribeDialog] iOS detected - using Apple In-App Purchase (NEVER Stripe)');
       return handleNativePurchase();
     }
 
     // Web browser: Use Stripe
-    console.log('🌐 [SubscribeDialog] User is on web browser, using Stripe');
+    console.log('🌐 [SubscribeDialog] Web browser detected - using Stripe');
     if (!user) return;
 
     setIsLoading(true);
@@ -348,7 +359,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   ];
 
   // Native app should never show the payment details screen - it goes straight to native paywall
-  if (selectedPlan && !isNative) {
+  if (selectedPlan && !shouldUseAppleIAP) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md sm:max-w-lg">
@@ -495,7 +506,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           ))}
         </div>
 
-        {isNative && (
+        {shouldUseAppleIAP && (
           <div className="flex justify-center pb-4 animate-fade-in">
             <Button
               variant="ghost"
