@@ -62,8 +62,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   
   // PURE DOMAIN-BASED payment routing - no Capacitor detection
   const paymentDomain = useMemo(() => getPaymentDomain(), []);
-  
-  console.log('[SubscriptionContext] 💳 Payment domain:', paymentDomain, '| hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+
+  // Log payment domain (in useEffect to avoid render-phase warnings)
+  useEffect(() => {
+    console.log('[SubscriptionContext] 💳 Payment domain:', paymentDomain, '| hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+  }, [paymentDomain]);
   
   const loadPlan = useCallback(async (opts?: { background?: boolean }) => {
     const background = !!opts?.background;
