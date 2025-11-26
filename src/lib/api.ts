@@ -865,6 +865,39 @@ class ApiClient {
 
   // ==================== ENTERPRISE API ====================
 
+  // Get current user's enterprise membership (non-admin endpoint)
+  async getMyEnterpriseMembership(): Promise<{
+    isMember: boolean;
+    company?: {
+      id: string;
+      name: string;
+      slug: string;
+      status: string;
+      planTier: string;
+    };
+    membership?: {
+      role: string;
+      status: string;
+      title?: string;
+      joinedAt?: string;
+    };
+  }> {
+    try {
+      const response = await this.fetchWithAuth('/enterprise/me', { suppressAuthRedirect: true });
+      if (!response.ok) {
+        // User is not an enterprise member - return empty result
+        if (response.status === 404) {
+          return { isMember: false };
+        }
+        throw new Error('Failed to fetch enterprise membership');
+      }
+      return response.json();
+    } catch (error) {
+      console.log('[API] Enterprise membership check:', error);
+      return { isMember: false };
+    }
+  }
+
   async getEnterpriseCompanies(): Promise<any> {
     const response = await this.fetchWithAuth('/admin/enterprise/companies');
     if (!response.ok) throw new Error('Failed to fetch enterprise companies');

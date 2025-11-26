@@ -8,7 +8,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { Trash2, CreditCard, CheckCircle, XCircle, LogOut } from "lucide-react";
+import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "./SubscribeDialog";
@@ -43,7 +43,7 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const { user, logout } = useAuth();
-  const { userPlan, isLoading: planLoading, refreshPlan } = useSubscription();
+  const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership } = useSubscription();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -211,25 +211,70 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
           {userPlan?.plan === 'unlimited' || userPlan?.plan === 'enterprise' ? (
             <div className="space-y-4 pt-4">
               {userPlan?.plan === 'enterprise' && (
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      Enterprise-plan
-                    </CardTitle>
-                    <CardDescription>
-                      Du har en Enterprise-plan som hanteras av din organisation.
-                    </CardDescription>
+                <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Building2 className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {enterpriseMembership?.company?.name || 'Enterprise'}
+                          <Badge variant="secondary" className="bg-primary/20 text-primary text-[10px]">
+                            Enterprise
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="mt-0.5">
+                          {enterpriseMembership?.membership?.role === 'admin' ? 'Företagsadmin' :
+                           enterpriseMembership?.membership?.role === 'owner' ? 'Företagsägare' : 
+                           'Teammedlem'}
+                          {enterpriseMembership?.membership?.title && ` • ${enterpriseMembership.membership.title}`}
+                        </CardDescription>
+                      </div>
+                    </div>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      För ändringar av din prenumeration eller fakturering, kontakta din administratör.
+                  <CardContent className="space-y-4">
+                    {enterpriseMembership?.isMember && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-background/50 rounded-lg border border-border/50">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <Shield className="w-3 h-3" />
+                            Status
+                          </div>
+                          <div className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            {enterpriseMembership.membership?.status === 'active' ? 'Aktiv' : 
+                             enterpriseMembership.membership?.status || 'Aktiv'}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-background/50 rounded-lg border border-border/50">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <Users className="w-3 h-3" />
+                            Roll
+                          </div>
+                          <div className="text-sm font-medium text-foreground">
+                            {enterpriseMembership.membership?.role === 'admin' ? 'Admin' :
+                             enterpriseMembership.membership?.role === 'owner' ? 'Ägare' : 'Medlem'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {enterpriseMembership?.membership?.joinedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Medlem sedan {formatSwedishDate(enterpriseMembership.membership.joinedAt)}
+                      </p>
+                    )}
+                    
+                    <p className="text-sm text-muted-foreground">
+                      Din Enterprise-plan hanteras av din organisation. För ändringar av din prenumeration eller fakturering, kontakta din administratör.
                     </p>
                     <Button 
                       onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
                       variant="outline"
                       className="w-full"
                     >
-                      Kontakta administratör
+                      Kontakta support
                     </Button>
                   </CardContent>
                 </Card>

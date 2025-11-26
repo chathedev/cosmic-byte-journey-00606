@@ -47,7 +47,7 @@ export function AppSidebar() {
   
   const scrollYRef = useRef(0);
   const { user, logout } = useAuth();
-  const { userPlan, isLoading: planLoading, refreshPlan } = useSubscription();
+  const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -266,12 +266,30 @@ export function AppSidebar() {
                   </div>
                 ) : (
                   <>
-                    <div className="text-sm font-semibold text-foreground truncate">Tivly</div>
+                    <div className="text-sm font-semibold text-foreground truncate">
+                      {enterpriseMembership?.isMember && enterpriseMembership.company?.name 
+                        ? enterpriseMembership.company.name 
+                        : 'Tivly'}
+                    </div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {userPlan?.plan === 'enterprise' ? 'Enterprise' : 
-                       userPlan?.plan === 'unlimited' ? 'Unlimited' : 
-                       userPlan?.plan === 'plus' ? 'Plus' : 
-                       userPlan?.plan === 'pro' ? 'Pro' : 'Free'}
+                      {enterpriseMembership?.isMember ? (
+                        <span className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 border-primary/20 text-primary">
+                            Enterprise
+                          </Badge>
+                          {enterpriseMembership.membership?.role && (
+                            <span className="text-muted-foreground/70">
+                              {enterpriseMembership.membership.role === 'admin' ? 'Admin' : 
+                               enterpriseMembership.membership.role === 'owner' ? 'Ägare' : 'Medlem'}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        userPlan?.plan === 'enterprise' ? 'Enterprise' : 
+                        userPlan?.plan === 'unlimited' ? 'Unlimited' : 
+                        userPlan?.plan === 'plus' ? 'Plus' : 
+                        userPlan?.plan === 'pro' ? 'Pro' : 'Free'
+                      )}
                     </div>
                   </>
                 )}
