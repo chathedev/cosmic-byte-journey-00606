@@ -10,7 +10,7 @@ import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { CapacitorPurchases } from '@capgo/capacitor-purchases';
+import { Purchases, PurchasesPackage } from '@revenuecat/purchases-capacitor';
 
 // Type declaration for native iOS bridge (fallback)
 declare global {
@@ -79,29 +79,28 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     }
   }, [open]);
 
-  // Handle native purchase - uses RevenueCat Capacitor plugin
+  // Handle native purchase - uses official RevenueCat Capacitor plugin
   const handleNativePurchase = async () => {
     console.log('[SubscribeDialog] 🍎 handleNativePurchase - shouldUseAppleIAP:', shouldUseAppleIAP, 'hasTivlyNative:', hasTivlyNative);
     
     setIsLoading(true);
     
     try {
-      // Try RevenueCat Capacitor plugin first
-      console.log('🍎 [SubscribeDialog] Attempting RevenueCat purchase...');
+      // Use official RevenueCat SDK
+      console.log('🍎 [SubscribeDialog] Calling Purchases.getOfferings()...');
       
-      // Get available packages from RevenueCat
-      const offeringsResponse = await CapacitorPurchases.getOfferings();
-      console.log('🍎 [SubscribeDialog] RevenueCat offerings:', offeringsResponse);
+      const offerings = await Purchases.getOfferings();
+      console.log('🍎 [SubscribeDialog] RevenueCat offerings:', offerings);
       
-      const currentOffering = offeringsResponse.offerings?.current;
-      if (currentOffering && currentOffering.availablePackages.length > 0) {
-        // Purchase the first available package (usually the default/monthly)
-        const packageToPurchase = currentOffering.availablePackages[0];
+      const currentOffering = offerings.current;
+      if (currentOffering && currentOffering.availablePackages && currentOffering.availablePackages.length > 0) {
+        // Get the first available package (usually monthly)
+        const packageToPurchase: PurchasesPackage = currentOffering.availablePackages[0];
         console.log('🍎 [SubscribeDialog] Purchasing package:', packageToPurchase);
         
-        const purchaseResult = await CapacitorPurchases.purchasePackage({
-          identifier: packageToPurchase.identifier,
-          offeringIdentifier: packageToPurchase.offeringIdentifier,
+        // Use the official purchasePackage API with aPackage parameter
+        const purchaseResult = await Purchases.purchasePackage({
+          aPackage: packageToPurchase,
         });
         console.log('🍎 [SubscribeDialog] Purchase result:', purchaseResult);
         
@@ -110,12 +109,17 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         sonnerToast.success("Prenumerationen är nu aktiv!");
         onOpenChange(false);
       } else {
-        console.error('🍎 [SubscribeDialog] No packages available');
-        // Show clear error for no packages
+        console.error('🍎 [SubscribeDialog] No packages available in current offering');
         sonnerToast.error("Apple-köp är inte tillgängligt just nu.");
       }
     } catch (error: any) {
       console.error('❌ [SubscribeDialog] RevenueCat purchase error:', error);
+      
+      // Check if user cancelled
+      if (error?.userCancelled) {
+        console.log('🍎 [SubscribeDialog] User cancelled purchase');
+        return;
+      }
       
       // Fallback to TivlyNative bridge if RevenueCat fails
       if (window.TivlyNative?.showPaywall) {
@@ -146,10 +150,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     
     setIsLoading(true);
     try {
-      console.log('🔄 [SubscribeDialog] Restoring purchases via RevenueCat...');
+      console.log('🔄 [SubscribeDialog] Calling Purchases.restorePurchases()...');
       
-      const customerInfo = await CapacitorPurchases.restorePurchases();
-      console.log('✅ [SubscribeDialog] Restore result:', customerInfo);
+      // Use official RevenueCat SDK
+      const result = await Purchases.restorePurchases();
+      console.log('✅ [SubscribeDialog] Restore result:', result);
       
       // Refresh plan after restore
       await refreshPlan();
