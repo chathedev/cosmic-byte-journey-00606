@@ -30,6 +30,7 @@ interface SubscriptionContextType {
   isLoading: boolean;
   requiresPayment: boolean;
   isNativePlatform: boolean;
+  isIOSNative: boolean; // Specifically iOS native (Capacitor + iOS platform OR io.tivly.se domain)
   enterpriseMembership: EnterpriseMembership | null;
   refreshPlan: () => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
@@ -51,8 +52,17 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   // Use Capacitor to detect native platform
   const isNativePlatform = Capacitor.isNativePlatform();
   
+  // Specifically detect iOS native: either via Capacitor or io.tivly.se domain
+  // This ensures we NEVER show Stripe on iOS app
+  const isIOSNative = useMemo(() => {
+    const capacitorIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+    const ioDomain = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
+    return capacitorIOS || ioDomain;
+  }, []);
+  
   console.log('[SubscriptionContext] 📱 Platform detection:', {
     isNativePlatform,
+    isIOSNative,
     platform: Capacitor.getPlatform(),
     hostname: typeof window !== 'undefined' ? window.location.hostname : 'N/A'
   });
@@ -496,7 +506,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, isNativePlatform, enterpriseMembership, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, isNativePlatform, isIOSNative, enterpriseMembership, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );
