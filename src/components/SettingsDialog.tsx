@@ -203,28 +203,28 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Inställningar</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">Inställningar</DialogTitle>
           </DialogHeader>
 
           {userPlan?.plan === 'unlimited' || userPlan?.plan === 'enterprise' ? (
-            <div className="space-y-4 pt-4">
+            <div className="space-y-3">
               {userPlan?.plan === 'enterprise' && (
                 <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-primary" />
+                  <CardHeader className="p-3 sm:p-4 pb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                       </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          {enterpriseMembership?.company?.name || 'Enterprise'}
-                          <Badge variant="secondary" className="bg-primary/20 text-primary text-[10px]">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2 flex-wrap">
+                          <span className="truncate">{enterpriseMembership?.company?.name || 'Enterprise'}</span>
+                          <Badge variant="secondary" className="bg-primary/20 text-primary text-[10px] shrink-0">
                             Enterprise
                           </Badge>
                         </CardTitle>
-                        <CardDescription className="mt-0.5">
+                        <CardDescription className="text-xs mt-0.5 truncate">
                           {enterpriseMembership?.membership?.role === 'admin' ? 'Företagsadmin' :
                            enterpriseMembership?.membership?.role === 'owner' ? 'Företagsägare' : 
                            'Teammedlem'}
@@ -233,26 +233,26 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-3 sm:p-4 pt-2 space-y-2.5">
                     {enterpriseMembership?.isMember && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-background/50 rounded-lg border border-border/50">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                            <Shield className="w-3 h-3" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                            <Shield className="w-2.5 h-2.5" />
                             Status
                           </div>
-                          <div className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          <div className="text-xs font-medium text-foreground flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                             {enterpriseMembership.membership?.status === 'active' ? 'Aktiv' : 
                              enterpriseMembership.membership?.status || 'Aktiv'}
                           </div>
                         </div>
-                        <div className="p-3 bg-background/50 rounded-lg border border-border/50">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                            <Users className="w-3 h-3" />
+                        <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                            <Users className="w-2.5 h-2.5" />
                             Roll
                           </div>
-                          <div className="text-sm font-medium text-foreground">
+                          <div className="text-xs font-medium text-foreground">
                             {enterpriseMembership.membership?.role === 'admin' ? 'Admin' :
                              enterpriseMembership.membership?.role === 'owner' ? 'Ägare' : 'Medlem'}
                           </div>
@@ -261,183 +261,139 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                     )}
                     
                     {enterpriseMembership?.membership?.joinedAt && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] text-muted-foreground">
                         Medlem sedan {formatSwedishDate(enterpriseMembership.membership.joinedAt)}
                       </p>
                     )}
                     
-                    <p className="text-sm text-muted-foreground">
-                      Din Enterprise-plan hanteras av din organisation. För ändringar av din prenumeration eller fakturering, kontakta din administratör.
+                    <p className="text-xs text-muted-foreground">
+                      Din Enterprise-plan hanteras av din organisation.
                     </p>
                     <Button 
                       onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
                       variant="outline"
-                      className="w-full"
+                      size="sm"
+                      className="w-full text-xs"
                     >
                       Kontakta support
                     </Button>
                   </CardContent>
                 </Card>
               )}
-              <div className="p-4 border border-border rounded-lg bg-muted/30">
-                <div className="flex-1">
-                  <h3 className="font-medium flex items-center gap-2">
-                    <LogOut className="w-4 h-4" />
+              <div className="p-3 border border-border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <LogOut className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Logga ut</span>
+                  </div>
+                  <Button onClick={handleLogout} variant="outline" size="sm">
                     Logga ut
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Logga ut från ditt konto
-                  </p>
+                  </Button>
                 </div>
-                <Button 
-                  onClick={handleLogout}
-                  variant="outline"
-                  className="w-full mt-3"
-                >
-                  Logga ut
-                </Button>
               </div>
-              <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg bg-destructive/5">
-                <div className="flex-1">
-                  <h3 className="font-medium flex items-center gap-2 text-destructive">
-                    <Trash2 className="w-4 h-4" />
-                    Radera konto permanent
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Detta raderar ditt konto, avslutar alla prenumerationer, och tar bort all din data permanent. Denna åtgärd kan inte ångras.
-                  </p>
+              <div className="p-3 border border-destructive/50 rounded-lg bg-destructive/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                    <span className="text-sm font-medium text-destructive">Radera konto</span>
+                  </div>
+                  <Button onClick={() => setShowDeleteAccountConfirm(true)} variant="destructive" size="sm">
+                    Radera
+                  </Button>
                 </div>
-                <Button 
-                  onClick={() => setShowDeleteAccountConfirm(true)} 
-                  variant="destructive"
-                >
-                  Radera konto
-                </Button>
               </div>
             </div>
           ) : (
             <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="general">Generellt</TabsTrigger>
-                <TabsTrigger value="billing">Fakturering</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 h-9">
+                <TabsTrigger value="general" className="text-xs sm:text-sm">Generellt</TabsTrigger>
+                <TabsTrigger value="billing" className="text-xs sm:text-sm">Fakturering</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="general" className="space-y-4 pt-4">
-                <div className="space-y-4">
-                  <div className="p-4 border border-border rounded-lg bg-muted/30">
-                    <div className="flex-1">
-                      <h3 className="font-medium flex items-center gap-2">
-                        <LogOut className="w-4 h-4" />
+              <TabsContent value="general" className="space-y-3 pt-3">
+                <div className="space-y-3">
+                  <div className="p-3 border border-border rounded-lg bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <LogOut className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Logga ut</span>
+                      </div>
+                      <Button onClick={handleLogout} variant="outline" size="sm">
                         Logga ut
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Logga ut från ditt konto
-                      </p>
+                      </Button>
                     </div>
-                    <Button 
-                      onClick={handleLogout}
-                      variant="outline"
-                      className="w-full mt-3"
-                    >
-                      Logga ut
-                    </Button>
                   </div>
-                  <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg bg-destructive/5">
-                    <div className="flex-1">
-                      <h3 className="font-medium flex items-center gap-2 text-destructive">
-                        <Trash2 className="w-4 h-4" />
-                        Radera konto permanent
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Detta raderar ditt konto, avslutar alla prenumerationer, och tar bort all din data permanent. Denna åtgärd kan inte ångras.
-                      </p>
+                  <div className="p-3 border border-destructive/50 rounded-lg bg-destructive/5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <span className="text-sm font-medium text-destructive">Radera konto</span>
+                      </div>
+                      <Button onClick={() => setShowDeleteAccountConfirm(true)} variant="destructive" size="sm">
+                        Radera
+                      </Button>
                     </div>
-                    <Button 
-                      onClick={() => setShowDeleteAccountConfirm(true)} 
-                      variant="destructive"
-                    >
-                      Radera konto
-                    </Button>
                   </div>
                 </div>
               </TabsContent>
 
 
-              <TabsContent value="billing" className="pt-4">
-                <div className="space-y-4">
+              <TabsContent value="billing" className="pt-3">
+                <div className="space-y-3">
                   <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <CreditCard className="w-5 h-5" />
-                            Din Plan
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            Hantera din prenumeration och fakturering
-                          </CardDescription>
+                    <CardHeader className="p-3 sm:p-4 pb-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CreditCard className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium truncate">Din Plan</span>
                         </div>
-                        <Badge variant={userPlan?.plan === 'free' ? 'secondary' : 'default'}>
+                        <Badge variant={userPlan?.plan === 'free' ? 'secondary' : 'default'} className="shrink-0 text-xs">
                           {getPlanDisplayName(userPlan?.plan || 'free')}
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="p-3 sm:p-4 pt-0 space-y-3">
                       {planLoading ? (
-                        <div className="text-center py-4 text-muted-foreground">
+                        <div className="text-center py-3 text-muted-foreground text-sm">
                           Laddar...
                         </div>
                       ) : (
                           <>
                             {(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (userPlan?.cancelAt || userPlan?.planCancelledAt) && new Date(userPlan.planCancelledAt || userPlan.cancelAt!) > new Date() && (
-                              <div className="p-4 border-2 border-orange-500/50 rounded-lg bg-gradient-to-br from-orange-500/10 to-orange-500/5 mb-4">
-                                <div className="flex items-start gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                                    <XCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-semibold text-orange-900 dark:text-orange-100 mb-1">
-                                      Prenumeration avslutas
-                                    </h4>
-                                    <p className="text-sm text-orange-800 dark:text-orange-200">
-                                      Din prenumeration avslutas den{' '}
-                                      <strong className="font-bold">
-                                        {formatSwedishDate(userPlan.planCancelledAt || userPlan.cancelAt)}
-                                      </strong>
-                                    </p>
-                                    <p className="text-xs text-orange-700 dark:text-orange-300 mt-2">
-                                      Du behåller full tillgång till alla funktioner fram till detta datum.
+                              <div className="p-2.5 border border-orange-500/50 rounded-lg bg-gradient-to-br from-orange-500/10 to-orange-500/5">
+                                <div className="flex items-center gap-2">
+                                  <XCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs text-orange-800 dark:text-orange-200">
+                                      Avslutas <strong>{formatSwedishDate(userPlan.planCancelledAt || userPlan.cancelAt)}</strong>
                                     </p>
                                   </div>
                                 </div>
                               </div>
                             )}
 
-                            <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/30">
+                            <div className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-muted/30">
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1">Möten denna månad</p>
-                                <p className="text-lg font-bold">
+                                <p className="text-[10px] text-muted-foreground">Möten</p>
+                                <p className="text-sm font-semibold">
                                   {userPlan?.meetingsLimit === null
-                                    ? 'Obegränsad'
-                                    : `${userPlan?.meetingsUsed || 0} / ${userPlan?.meetingsLimit || 1}`}
+                                    ? '∞'
+                                    : `${userPlan?.meetingsUsed || 0}/${userPlan?.meetingsLimit || 1}`}
                                 </p>
                               </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">Status</p>
-                                <div className="flex items-center gap-1.5">
+                              <div className="text-right">
+                                <p className="text-[10px] text-muted-foreground">Status</p>
+                                <div className="flex items-center gap-1">
                                   {userPlan?.plan === 'free' ? (
-                                    <>
-                                      <XCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                                      <span className="text-xs font-medium">Gratis</span>
-                                    </>
+                                    <span className="text-xs font-medium text-muted-foreground">Gratis</span>
                                   ) : (userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) ? (
                                     <>
-                                      <XCircle className="w-3.5 h-3.5 text-orange-500" />
-                                      <span className="text-xs font-medium text-orange-500">Avslutas snart</span>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                                      <span className="text-xs font-medium text-orange-500">Avslutas</span>
                                     </>
                                   ) : (
                                     <>
-                                      <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                                       <span className="text-xs font-medium">Aktiv</span>
                                     </>
                                   )}
@@ -446,32 +402,31 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                             </div>
 
                             {userPlan?.renewDate && !(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (
-                              <div className="text-sm text-muted-foreground">
-                                Nästa förnyelse: {formatSwedishDate(userPlan.renewDate)}
-                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Förnyas: {formatSwedishDate(userPlan.renewDate)}
+                              </p>
                             )}
 
-                            <div className="flex gap-2 pt-2">
+                            <div className="flex gap-2">
                               {userPlan?.plan !== 'free' && (
                                 <Button 
                                   onClick={handleCancelClick}
                                   variant="outline"
-                                  className="flex-1"
+                                  size="sm"
+                                  className="flex-1 text-xs"
                                   disabled={!!(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt)}
                                 >
-                                  {(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (userPlan?.cancelAt || userPlan?.planCancelledAt)
-                                    ? `Avslutas ${formatSwedishDate(userPlan.planCancelledAt || userPlan.cancelAt)}`
-                                    : 'Avsluta prenumeration'
-                                  }
+                                  {(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) ? 'Schemalagd' : 'Avsluta'}
                                 </Button>
                               )}
                               {!(userPlan?.cancelAtPeriodEnd || userPlan?.planCancelledAt) && (
                                 <Button 
                                   onClick={() => setShowSubscribeDialog(true)}
-                                  className="flex-1"
+                                  size="sm"
+                                  className="flex-1 text-xs"
                                   variant={userPlan?.plan === 'free' ? 'default' : 'outline'}
                                 >
-                                  {userPlan?.plan === 'free' ? 'Uppgradera plan' : 'Byt plan'}
+                                  {userPlan?.plan === 'free' ? 'Uppgradera' : 'Byt plan'}
                                 </Button>
                               )}
                             </div>

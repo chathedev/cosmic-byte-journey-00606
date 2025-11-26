@@ -351,52 +351,52 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   if (selectedPlan && !isNative) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Betalningsuppgifter</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Betalningsuppgifter</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Slutför din Tivly Pro prenumeration
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4 animate-fade-in">
+          <div className="space-y-4 animate-fade-in">
             {/* Total Amount */}
-            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-5 border border-primary/20 shadow-sm transition-all duration-300 hover:shadow-md">
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-3 sm:p-4 border border-primary/20">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Totalt att betala</span>
+                <span className="text-xs sm:text-sm font-medium text-muted-foreground">Totalt</span>
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-foreground">99 kr</div>
-                  <div className="text-sm text-muted-foreground">per månad</div>
+                  <div className="text-xl sm:text-2xl font-bold text-foreground">99 kr</div>
+                  <div className="text-xs text-muted-foreground">per månad</div>
                 </div>
               </div>
             </div>
 
             {/* Payment Element */}
-            <div className="transition-all duration-300">
-              <div id="payment-element-dialog" className="min-h-[200px] animate-scale-in" />
-            </div>
+            <div id="payment-element-dialog" className="min-h-[180px]" />
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => {
                   try { cardElementRef.current?.unmount(); cardElementRef.current?.destroy?.(); } catch { }
                   cardElementRef.current = null;
                   setSelectedPlan(null);
                 }}
-                className="flex-1 transition-all duration-200 hover:scale-105"
+                className="flex-1"
               >
                 Tillbaka
               </Button>
               <Button
                 onClick={handleConfirmPayment}
                 disabled={isLoading || !clientSecret}
-                className="flex-1 transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
+                size="sm"
+                className="flex-1"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
                     Bearbetar...
                   </>
                 ) : (
@@ -412,109 +412,81 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-sm sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Välj din plan</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Välj din plan</DialogTitle>
           {userPlan && (
-            <DialogDescription className="text-sm">
+            <DialogDescription className="text-xs">
               Aktiv plan: <span className="font-medium capitalize text-foreground">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
             </DialogDescription>
           )}
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 py-3">
           {plans.map((plan, index) => (
             <Card
               key={plan.name}
               className={cn(
-                "relative overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg",
-                'highlight' in plan && plan.highlight && "border-primary shadow-lg scale-[1.02] md:scale-105"
+                "relative overflow-hidden flex flex-col",
+                'highlight' in plan && plan.highlight && "border-primary shadow-md sm:scale-[1.02]"
               )}
-              style={{
-                animationDelay: `${index * 100}ms`,
-              }}
             >
               {'highlight' in plan && plan.highlight && (
-                <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-xs font-medium text-center py-1.5 animate-fade-in">
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-[10px] font-medium text-center py-1">
                   Mest populär
                 </div>
               )}
-              <CardHeader className={cn("space-y-3", 'highlight' in plan && plan.highlight && "pt-10")}>
-                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                <div className="space-y-1">
-                  <div className="text-3xl font-bold text-foreground">{plan.price}</div>
-                  {plan.period && <div className="text-sm text-muted-foreground">{plan.period}</div>}
+              <CardHeader className={cn("p-3 sm:p-4 space-y-1", 'highlight' in plan && plan.highlight && "pt-7 sm:pt-8")}>
+                <CardTitle className="text-base sm:text-lg font-bold">{plan.name}</CardTitle>
+                <div>
+                  <span className="text-xl sm:text-2xl font-bold text-foreground">{plan.price}</span>
+                  {plan.period && <span className="text-xs text-muted-foreground">{plan.period}</span>}
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col pt-4">
-                <ul className="space-y-3 mb-6 flex-1">
-                  {plan.features.map((feature, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-3 text-sm transition-all duration-200 hover:translate-x-1"
-                    >
+              <CardContent className="flex-1 flex flex-col p-3 sm:p-4 pt-0">
+                <ul className="space-y-1.5 mb-3 flex-1 text-xs">
+                  {plan.features.slice(0, 6).map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
                       <span className={cn(
-                        "mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all",
-                        feature.included
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
+                        "mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold",
+                        feature.included ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                       )}>
                         {feature.included ? '✓' : '−'}
                       </span>
                       <span className={cn(
-                        "leading-relaxed",
                         feature.included ? "text-foreground" : "text-muted-foreground"
                       )}>
                         {feature.text}
                       </span>
                     </li>
                   ))}
+                  {plan.features.length > 6 && (
+                    <li className="text-[10px] text-muted-foreground pl-6">
+                      +{plan.features.length - 6} fler
+                    </li>
+                  )}
                 </ul>
                 {'planId' in plan ? (
                   <Button
-                    onClick={() => {
-                      console.log('🔘 [SubscribeDialog] Button clicked for plan:', plan.planId);
-                      handleSubscribe(plan.planId);
-                    }}
+                    onClick={() => handleSubscribe(plan.planId)}
                     disabled={isLoading}
                     variant={plan.variant}
-                    className={cn(
-                      "w-full transition-all duration-300 hover:scale-105 relative overflow-hidden group",
-                      'highlight' in plan && plan.highlight && "shadow-md hover:shadow-lg",
-                      isLoading && "animate-pulse"
-                    )}
-                    size="lg"
+                    className={cn("w-full", 'highlight' in plan && plan.highlight && "shadow-sm")}
+                    size="sm"
                   >
-                    {isLoading && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 animate-shimmer" />
-                    )}
-                    <span className="relative z-10 flex items-center justify-center gap-2">
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="animate-fade-in">Öppnar...</span>
-                        </>
-                      ) : (
-                        plan.cta
-                      )}
-                    </span>
+                    {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : plan.cta}
                   </Button>
                 ) : plan.name === 'Enterprise' ? (
                   <Button
                     onClick={() => window.open('mailto:kontakt@tivly.se', '_blank')}
                     variant={plan.variant}
-                    className="w-full transition-all duration-300 hover:scale-105"
-                    size="lg"
+                    className="w-full"
+                    size="sm"
                   >
                     {plan.cta}
                   </Button>
                 ) : (
-                  <Button
-                    variant={plan.variant}
-                    className="w-full"
-                    size="lg"
-                    disabled
-                  >
+                  <Button variant={plan.variant} className="w-full" size="sm" disabled>
                     {plan.cta}
                   </Button>
                 )}
