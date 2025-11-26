@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
-import { ArrowLeft, Shield, KeyRound, AlertCircle, Sparkles, Mail, Loader2, Clock } from 'lucide-react';
+import { ArrowLeft, Shield, AlertCircle, Sparkles, Mail, Loader2, Clock, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import tivlyLogo from '@/assets/tivly-logo.png';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,13 +24,7 @@ declare global {
   }
 }
 
-type ViewMode = 'welcome' | 'email' | 'verify-code' | 'new-user' | 'awaiting-code';
-
-interface AuthCheckResponse {
-  authMethods: {
-    totp: boolean;
-  };
-}
+type ViewMode = 'welcome' | 'email' | 'code-entry';
 
 // Email sanitization
 function sanitizeEmail(email: string | undefined): string | null {
@@ -53,8 +46,6 @@ function isIoDomain(): boolean {
 }
 
 // Determine which base URL to use for auth-related backend calls
-// For iOS app shell (io.tivly.se) the backend is still api.tivly.se –
-// we only vary the Origin header, not the server URL.
 function getAuthBaseUrl(): string {
   return 'https://api.tivly.se';
 }
@@ -66,22 +57,20 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    // Check if user has already seen welcome screen
     const hasSeenWelcome = localStorage.getItem('tivly_seen_welcome') === 'true';
-    
-    // App domain or already seen welcome -> go straight to email
     if (isAppDomain() || hasSeenWelcome) {
       return 'email';
     }
-    
     return 'welcome';
   });
   const [authError, setAuthError] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [codeExpiry, setCodeExpiry] = useState<number>(600); // 10 minutes in seconds
+  const [codeExpiry, setCodeExpiry] = useState<number>(600);
   const [platform, setPlatform] = useState<'ios' | 'web'>('web');
-
+  const [codeSent, setCodeSent] = useState(false);
+  const verifyingRef = useRef(false);
 
   // Detect platform on mount
   useEffect(() => {
@@ -101,7 +90,7 @@ export default function Auth() {
 
   // Countdown timer for code expiry
   useEffect(() => {
-    if (viewMode !== 'awaiting-code' && viewMode !== 'verify-code') return;
+    if (viewMode !== 'code-entry' || !codeSent) return;
 
     const timer = setInterval(() => {
       setCodeExpiry((prev) => {
@@ -114,7 +103,14 @@ export default function Auth() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [viewMode]);
+  }, [viewMode, codeSent]);
+
+  // Auto-verify when 6 digits are entered
+  useEffect(() => {
+    if (pinCode.length === 6 && /^\d{6}$/.test(pinCode) && !verifyingRef.current && !verifying) {
+      handleVerifyPin();
+    }
+  }, [pinCode]);
 
   const handleRequestCode = async () => {
     const sanitized = sanitizeEmail(email);
@@ -122,10 +118,9 @@ export default function Auth() {
     
     if (!sanitized) {
       console.error(`[Auth] ❌ Invalid email on ${platform} platform:`, email);
-      const errorMsg = platform === 'ios' 
+      setAuthError(platform === 'ios' 
         ? 'Ange en giltig e-postadress'
-        : 'Ogiltig e-postadress. Kontrollera och försök igen.';
-      setAuthError(errorMsg);
+        : 'Ogiltig e-postadress. Kontrollera och försök igen.');
       return;
     }
 
@@ -157,41 +152,44 @@ export default function Auth() {
       console.log(`[Auth] 📊 /auth/totp/setup status: ${response.status} ${response.statusText} (${platform})`);
 
       if (response.ok) {
-        const responseText = await response.text();
-        console.log(`[Auth] 📥 Code request successful for ${platform}, showing verification screen`);
-        
-        // Reset expiry timer
-        setCodeExpiry(600); // 10 minutes
-        setViewMode('awaiting-code');
+        console.log(`[Auth] 📥 Code request successful for ${platform}, showing code entry`);
+        setCodeExpiry(600);
+        setCodeSent(true);
+        setViewMode('code-entry');
         setPinCode('');
       } else {
         const errorText = await response.text().catch(() => '');
         console.error(`[Auth] ❌ Code request failed (${platform}):`, response.status, response.statusText);
-        const errorMsg = platform === 'ios'
+        setAuthError(platform === 'ios'
           ? 'Kunde inte skicka kod. Försök igen.'
-          : 'Kunde inte skicka verifieringskod. Försök igen.';
-        setAuthError(errorMsg);
+          : 'Kunde inte skicka verifieringskod. Försök igen.');
       }
     } catch (error) {
       console.error(`[Auth] 💥 Error requesting code (${platform}):`, error);
-      const errorMsg = platform === 'ios'
+      setAuthError(platform === 'ios'
         ? 'Anslutningen misslyckades. Kontrollera din internetanslutning.'
-        : 'Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.';
-      setAuthError(errorMsg);
+        : 'Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleResendCode = async () => {
+    setAuthError(null);
+    setPinCode('');
+    await handleRequestCode();
+  };
+
   const handleVerifyPin = async () => {
-    if (pinCode.length !== 6 || !/^\d{6}$/.test(pinCode)) {
+    if (pinCode.length !== 6 || !/^\d{6}$/.test(pinCode) || verifyingRef.current) {
       return;
     }
 
     const sanitized = sanitizeEmail(email);
     if (!sanitized) return;
 
-    setLoading(true);
+    verifyingRef.current = true;
+    setVerifying(true);
     setAuthError(null);
 
     try {
@@ -221,114 +219,73 @@ export default function Auth() {
       const responseText = await response.text().catch(() => '');
       console.log(`[Auth] 📥 /auth/totp/login raw response length: ${responseText?.length || 0} (${platform})`);
 
-      if (isIoDomain()) {
-        if (response.ok) {
-          console.log(`[Auth] ✅ iOS login successful (${platform}), processing response...`);
-
-          if (responseText && responseText.trim().length > 0) {
-            try {
-              const data = JSON.parse(responseText);
-              console.log('[Auth] 📊 Parsed login response:', { hasToken: !!data.token, hasUser: !!data.user });
-              
-              if (data.token) {
-                console.log('[Auth] 🔑 Applying JWT token from response');
-                apiClient.applyAuthToken(data.token);
-              }
-            } catch (parseError) {
-              console.warn('[Auth] ⚠️ JSON parse failed, using cookie-based auth:', parseError);
-            }
-          } else {
-            console.log('[Auth] 🍪 Empty response body, using cookie-based authentication');
-          }
-
-          console.log('[Auth] 🚀 Redirecting to dashboard...');
-          setIsNavigating(true);
-          await refreshUser();
-          setTimeout(() => {
-            navigate('/', { replace: true });
-          }, 500);
-          return;
-        }
-
-        // iOS error handling - parse backend error
-        console.error(`[Auth] ❌ iOS login failed (${platform}):`, response.status, response.statusText);
-        console.log(`[Auth] 📥 iOS error response body:`, responseText);
-        
-        if (!responseText || responseText.trim() === '') {
-          console.error('[Auth] Empty error response from backend (iOS)');
-          setAuthError('Servern returnerade ett tomt svar. Försök igen.');
-        } else {
-          try {
-            const error = JSON.parse(responseText);
-            console.error('[Auth] iOS parsed error:', error);
-            setAuthError(error.error || error.message || 'Fel kod. Försök igen eller begär en ny kod.');
-          } catch (parseError) {
-            console.error('[Auth] Non-JSON iOS error response:', responseText, parseError);
-            setAuthError('Fel kod. Försök igen eller begär en ny kod.');
-          }
-        }
-        setPinCode('');
-        return;
-      }
-
-      // STANDARD WEB FLOW
       if (response.ok) {
-        if (!responseText || responseText.trim() === '') {
-          console.error('[Auth] /auth/totp/login returned empty body on success (web)');
-          setAuthError('Servern returnerade ett tomt svar. Försök igen.');
-          setPinCode('');
-          return;
+        console.log(`[Auth] ✅ Login successful (${platform}), processing response...`);
+
+        if (responseText && responseText.trim().length > 0) {
+          try {
+            const data = JSON.parse(responseText);
+            console.log('[Auth] 📊 Parsed login response:', { hasToken: !!data.token, hasUser: !!data.user });
+            
+            if (data.token) {
+              console.log('[Auth] 🔑 Applying JWT token from response');
+              apiClient.applyAuthToken(data.token);
+            }
+          } catch (parseError) {
+            console.warn('[Auth] ⚠️ JSON parse failed, using cookie-based auth:', parseError);
+          }
+        } else {
+          console.log('[Auth] 🍪 Empty response body, using cookie-based authentication');
         }
 
-        let data: { token: string };
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('[Auth] Failed to parse login response:', parseError);
-          setAuthError('Ogiltigt svar från servern. Försök igen.');
-          setPinCode('');
-          return;
-        }
-
-        console.log('[Auth] Email + PIN login successful, applying auth token');
-        apiClient.applyAuthToken(data.token);
+        console.log('[Auth] 🚀 Redirecting to dashboard...');
         setIsNavigating(true);
         await refreshUser();
         setTimeout(() => {
           navigate('/', { replace: true });
-        }, 500);
-      } else {
-        if (!responseText || responseText.trim() === '') {
-          console.error('[Auth] /auth/totp/login returned empty error body (web)');
-          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din e-post.');
-          setPinCode('');
-          return;
-        }
+        }, 300);
+        return;
+      }
 
+      // Handle errors
+      console.error(`[Auth] ❌ Login failed (${platform}):`, response.status, response.statusText);
+      
+      if (!responseText || responseText.trim() === '') {
+        setAuthError('Fel kod. Försök igen.');
+      } else {
         try {
           const error = JSON.parse(responseText);
-          console.error('[Auth] Login error:', error);
-          setAuthError(error.error || error.message || 'Ogiltig kod. Försök igen.');
+          setAuthError(error.error || error.message || 'Fel kod. Försök igen.');
         } catch {
-          console.error('[Auth] Non-JSON error response:', responseText);
-          setAuthError('Ogiltig kod. Kontrollera att du angav rätt 6-siffrig kod från din e-post.');
+          setAuthError('Fel kod. Försök igen.');
         }
-        setPinCode('');
       }
+      setPinCode('');
     } catch (error: any) {
       console.error('[Auth] PIN verification failed:', error);
-      setAuthError('Ett nätverksfel uppstod. Kontrollera din uppkoppling och försök igen.');
+      setAuthError('Ett nätverksfel uppstod. Försök igen.');
       setPinCode('');
     } finally {
-      setLoading(false);
+      setVerifying(false);
+      verifyingRef.current = false;
     }
   };
 
   const handleStartOver = () => {
+    setViewMode('email');
+    setPinCode('');
+    setCodeExpiry(600);
+    setCodeSent(false);
+    setAuthError(null);
+  };
+
+  const handleBackToWelcome = () => {
     setViewMode('welcome');
     setEmail('');
     setPinCode('');
     setCodeExpiry(600);
+    setCodeSent(false);
+    setAuthError(null);
   };
 
   const handleGetStarted = () => {
@@ -336,9 +293,15 @@ export default function Auth() {
     setViewMode('email');
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Animated background with gradient orbs */}
+      {/* Animated background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
         <motion.div 
           className="absolute top-20 -left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl"
@@ -358,22 +321,22 @@ export default function Auth() {
         />
       </div>
       
-      <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-xl bg-card/98 hover:shadow-primary/10 hover:shadow-3xl transition-all duration-300">
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-xl bg-card/98">
         <AnimatePresence mode="wait">
-          {viewMode === 'welcome' ? (
+          {viewMode === 'welcome' && (
             <motion.div
               key="welcome"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
             >
               <CardHeader className="space-y-6 text-center pb-8 pt-12">
                 <motion.div 
                   className="mx-auto w-32 h-32"
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, duration: 0.4 }}
+                  transition={{ delay: 0.1, duration: 0.3 }}
                 >
                   <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
                 </motion.div>
@@ -382,422 +345,330 @@ export default function Auth() {
                   className="space-y-3"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.4 }}
+                  transition={{ delay: 0.15, duration: 0.3 }}
                 >
                   <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    {platform === 'ios' ? 'Välkommen till Tivly' : 'Välkommen till Tivly'}
+                    Välkommen till Tivly
                   </CardTitle>
                   <CardDescription className="text-lg">
-                    {platform === 'ios' 
-                      ? 'Din smarta mötesassistent med AI - optimerad för iOS'
-                      : 'Säker och enkel inloggning med e-postkod'}
+                    Säker och enkel inloggning med e-postkod
                   </CardDescription>
                 </motion.div>
               </CardHeader>
 
               <CardContent className="pb-12 space-y-6">
-              <div className="space-y-4">
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <div className="flex items-start gap-3">
-                    <Mail className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Kod via e-post</p>
-                      <p className="text-xs text-muted-foreground">
-                        Få en 6-siffrig kod direkt i din inkorg
-                      </p>
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <Mail className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Kod via e-post</p>
+                        <p className="text-xs text-muted-foreground">
+                          Få en 6-siffrig kod direkt i din inkorg
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <Shield className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Banksäker säkerhet</p>
+                        <p className="text-xs text-muted-foreground">
+                          Krypterad autentisering som skyddar dina uppgifter
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <Sparkles className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Snabbt och smidigt</p>
+                        <p className="text-xs text-muted-foreground">
+                          Logga in på sekunder utan att komma ihåg lösenord
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <div className="flex items-start gap-3">
-                    <Shield className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Banksäker säkerhet</p>
-                      <p className="text-xs text-muted-foreground">
-                        Krypterad autentisering som skyddar dina uppgifter
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Snabbt och smidigt</p>
-                      <p className="text-xs text-muted-foreground">
-                        Logga in på sekunder utan att komma ihåg lösenord
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Button 
-                onClick={handleGetStarted}
-                className="w-full h-12 text-base font-medium"
-                size="lg"
-              >
-                Kom igång
-              </Button>
-            </CardContent>
-          </motion.div>
-        ) : (
-          <motion.div
-            key={viewMode}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25 }}
-          >
-            <CardHeader className="space-y-4 text-center pb-8">
-              <motion.div 
-                className="mx-auto w-24 h-24"
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              >
-                <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-              </motion.div>
-              
-              <motion.div 
-                className="space-y-2"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.3 }}
-              >
-                 <CardTitle className="text-3xl font-bold">
-                   {viewMode === 'verify-code' ? (platform === 'ios' ? 'Verifiera din kod' : 'Ange verifieringskod') : 
-                   viewMode === 'awaiting-code' ? 'Kolla din e-post' :
-                   viewMode === 'new-user' ? 'Välkommen!' :
-                   (platform === 'ios' ? 'Logga in i Tivly' : 'Logga in')}
-                 </CardTitle>
-                 <CardDescription className="text-base">
-                   {viewMode === 'verify-code' ? (
-                     platform === 'ios' 
-                       ? `Ange den 6-siffriga koden från ditt e-postmeddelande`
-                       : 'Ange koden från din e-post'
-                   ) :
-                   viewMode === 'awaiting-code' ? 'Vi har skickat en 6-siffrig kod till din e-post' :
-                   viewMode === 'new-user' ? 'Inget konto hittades med denna e-postadress' :
-                   (platform === 'ios' 
-                     ? 'Ange din e-postadress så skickar vi en 6-siffrig kod'
-                     : 'Ange din e-post för att fortsätta')}
-                 </CardDescription>
-                 
-                 {/* Progress indicator */}
-                 {(viewMode === 'email' || viewMode === 'awaiting-code' || viewMode === 'verify-code') && (
-                   <motion.div 
-                     className="flex gap-1.5 justify-center pt-3"
-                     initial={{ opacity: 0 }}
-                     animate={{ opacity: 1 }}
-                     transition={{ delay: 0.2 }}
-                   >
-                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'email' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
-                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'awaiting-code' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
-                     <div className={`h-1.5 rounded-full transition-all duration-300 ${viewMode === 'verify-code' ? 'w-8 bg-primary' : 'w-1.5 bg-primary/30'}`} />
-                   </motion.div>
-                 )}
-              </motion.div>
-            </CardHeader>
-
-            <CardContent className="pb-8">
-              <AnimatePresence mode="wait">
-                {viewMode === 'verify-code' ? (
-              <motion.div 
-                key="verify-code-view"
-                className="space-y-6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <div className="flex items-start gap-3">
-                  <KeyRound className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">E-postadress:</p>
-                    <p className="text-sm text-muted-foreground">{email}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label htmlFor="pin" className="text-center block font-medium">
-                  Ange 6-siffrig kod från din e-post
-                </Label>
-                <motion.div 
-                  className="flex justify-center"
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1 }}
+                <Button 
+                  onClick={handleGetStarted}
+                  className="w-full h-12 text-base font-medium"
+                  size="lg"
                 >
-                  <InputOTP
-                    maxLength={6}
-                    value={pinCode}
-                    onChange={(value) => setPinCode(value)}
+                  Kom igång
+                </Button>
+              </CardContent>
+            </motion.div>
+          )}
+
+          {viewMode === 'email' && (
+            <motion.div
+              key="email"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              <CardHeader className="space-y-4 text-center pb-6">
+                <motion.div 
+                  className="mx-auto w-20 h-20"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
+                </motion.div>
+                
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl font-bold">
+                    {platform === 'ios' ? 'Logga in i Tivly' : 'Logga in'}
+                  </CardTitle>
+                  <CardDescription>
+                    {platform === 'ios' 
+                      ? 'Ange din e-postadress så skickar vi en 6-siffrig kod'
+                      : 'Ange din e-post för att fortsätta'}
+                  </CardDescription>
+                </div>
+
+                {/* Progress indicator */}
+                <div className="flex gap-1.5 justify-center pt-2">
+                  <div className="h-1.5 w-8 rounded-full bg-primary" />
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary/30" />
+                </div>
+              </CardHeader>
+
+              <CardContent className="pb-8 space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-postadress</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="din@email.se"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && pinCode.length === 6) {
+                      if (e.key === 'Enter') {
                         e.preventDefault();
-                        handleVerifyPin();
+                        handleRequestCode();
                       }
                     }}
                     disabled={loading}
+                    autoComplete="email"
                     autoFocus
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </motion.div>
-                <div className="text-center space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    Kolla din inkorg efter koden
-                  </p>
-                  {codeExpiry > 0 && (
-                    <p className="text-xs text-primary font-medium flex items-center justify-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Giltig i {Math.floor(codeExpiry / 60)}:{String(codeExpiry % 60).padStart(2, '0')}
-                    </p>
-                  )}
-                  {loading && (
-                    <p className="text-xs text-primary font-medium animate-pulse">
-                      Verifierar kod...
-                    </p>
-                  )}
+                    className="h-12"
+                  />
                 </div>
-              </div>
 
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={handleStartOver}
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Tillbaka
-                </Button>
-                <Button
-                  onClick={handleVerifyPin}
-                  disabled={loading || pinCode.length !== 6}
-                  className="flex-1"
-                >
-                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {loading ? 'Verifierar...' : 'Verifiera'}
-                </Button>
-              </div>
-              </motion.div>
-            ) : viewMode === 'new-user' ? (
-              <motion.div 
-                key="new-user-view"
-                className="space-y-6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Inget konto finns med e-postadressen: <strong>{email}</strong>
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground text-center">
-                  Kontakta administratören för att få tillgång till systemet.
-                </p>
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={handleStartOver}
-                className="w-full"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Tillbaka
-              </Button>
-              </motion.div>
-            ) : viewMode === 'awaiting-code' ? (
-              <motion.div 
-                key="awaiting-code-view"
-                className="space-y-6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-              <motion.div 
-                className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-center"
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-                >
-                  <Mail className="h-12 w-12 mx-auto text-primary" />
-                </motion.div>
-                <motion.div 
-                  className="space-y-2"
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <p className="font-medium">E-post skickad!</p>
-                  <p className="text-sm text-muted-foreground">
-                    Vi har skickat en 6-siffrig verifieringskod till:
-                  </p>
-                  <p className="text-sm font-medium">{email}</p>
-                </motion.div>
-              </motion.div>
-
-              <Alert>
-                <Clock className="h-4 w-4" />
-                <AlertDescription className="space-y-1">
-                  <p className="font-medium">Koden är giltig i 10 minuter</p>
-                  <p className="text-xs">
-                    Hittar du inte e-posten? Kolla i skräpposten också.
-                  </p>
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-3">
-                <Label htmlFor="pin-await" className="text-center block font-medium">
-                  Ange 6-siffrig kod från din e-post
-                </Label>
-                <motion.div 
-                  className="flex justify-center"
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <InputOTP
-                    maxLength={6}
-                    value={pinCode}
-                    onChange={(value) => {
-                      setPinCode(value);
-                      if (value.length === 6) {
-                        setViewMode('verify-code');
-                      }
-                    }}
-                    disabled={loading}
-                    autoFocus
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </motion.div>
-                {codeExpiry > 0 && (
-                  <p className="text-xs text-center text-primary font-medium flex items-center justify-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Giltig i {Math.floor(codeExpiry / 60)}:{String(codeExpiry % 60).padStart(2, '0')}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={handleStartOver}
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Avbryt
-                </Button>
                 <Button
                   onClick={handleRequestCode}
-                  variant="ghost"
-                  disabled={loading}
-                  className="flex-1"
+                  disabled={loading || !email.trim()}
+                  className="w-full h-12 relative"
+                  type="button"
                 >
                   {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Skicka ny kod
+                  {loading ? 'Skickar kod...' : 'Skicka verifieringskod'}
                 </Button>
-              </div>
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="email-view"
-                className="space-y-6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-              <div className="space-y-2">
-                <Label htmlFor="email">E-postadress</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="din@email.se"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleRequestCode();
-                    }
-                  }}
-                  disabled={loading}
-                  autoComplete="email"
-                  autoFocus
-                  className="h-12"
-                />
-              </div>
 
-              <Button
-                onClick={handleRequestCode}
-                disabled={loading || !email.trim()}
-                className="w-full h-12 relative"
-                type="button"
-              >
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {loading ? 'Skickar kod...' : 'Skicka verifieringskod'}
-              </Button>
+                <AnimatePresence>
+                  {authError && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+                    >
+                      <p className="text-sm text-destructive text-center font-medium">
+                        {authError}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-              {authError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+                {!isAppDomain() && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleBackToWelcome}
+                    className="w-full"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Tillbaka
+                  </Button>
+                )}
+              </CardContent>
+            </motion.div>
+          )}
+
+          {viewMode === 'code-entry' && (
+            <motion.div
+              key="code-entry"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              <CardHeader className="space-y-4 text-center pb-4">
+                <motion.div 
+                  className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 >
-                  <p className="text-sm text-destructive text-center font-medium">
-                    {authError}
-                  </p>
+                  {verifying ? (
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  ) : isNavigating ? (
+                    <CheckCircle2 className="w-8 h-8 text-green-500" />
+                  ) : (
+                    <Mail className="w-8 h-8 text-primary" />
+                  )}
                 </motion.div>
-              )}
+                
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl font-bold">
+                    {isNavigating ? 'Inloggad!' : verifying ? 'Verifierar...' : 'Ange kod'}
+                  </CardTitle>
+                  <CardDescription>
+                    {isNavigating 
+                      ? 'Du loggas in...'
+                      : verifying 
+                        ? 'Vänta medan vi verifierar din kod'
+                        : `Koden skickades till ${email}`
+                    }
+                  </CardDescription>
+                </div>
 
-              <Button
-                variant="ghost"
-                onClick={handleStartOver}
-                className="w-full"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Tillbaka
-              </Button>
-              </motion.div>
-            )}
-              </AnimatePresence>
-            </CardContent>
-          </motion.div>
-        )}
+                {/* Progress indicator */}
+                <div className="flex gap-1.5 justify-center pt-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary/30" />
+                  <div className="h-1.5 w-8 rounded-full bg-primary" />
+                </div>
+              </CardHeader>
+
+              <CardContent className="pb-8 space-y-5">
+                {/* Code input */}
+                <div className="space-y-4">
+                  <motion.div 
+                    className="flex justify-center"
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <InputOTP
+                      maxLength={6}
+                      value={pinCode}
+                      onChange={(value) => {
+                        if (!verifying && !isNavigating) {
+                          setPinCode(value);
+                          setAuthError(null);
+                        }
+                      }}
+                      disabled={verifying || isNavigating}
+                      autoFocus
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </motion.div>
+
+                  {/* Status message */}
+                  <div className="text-center space-y-2">
+                    {verifying && (
+                      <motion.p 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-sm text-primary font-medium"
+                      >
+                        Verifierar din kod...
+                      </motion.p>
+                    )}
+                    
+                    {isNavigating && (
+                      <motion.p 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-sm text-green-600 font-medium"
+                      >
+                        Inloggning lyckades!
+                      </motion.p>
+                    )}
+
+                    {!verifying && !isNavigating && codeExpiry > 0 && (
+                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Koden giltig i {formatTime(codeExpiry)}
+                      </p>
+                    )}
+
+                    {!verifying && !isNavigating && codeExpiry === 0 && (
+                      <p className="text-xs text-destructive font-medium">
+                        Koden har gått ut. Begär en ny kod.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Error message */}
+                <AnimatePresence>
+                  {authError && !verifying && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+                    >
+                      <div className="flex items-center gap-2 justify-center">
+                        <AlertCircle className="w-4 h-4 text-destructive" />
+                        <p className="text-sm text-destructive font-medium">
+                          {authError}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Action buttons */}
+                {!isNavigating && (
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleStartOver}
+                      disabled={verifying}
+                      className="flex-1"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Ändra e-post
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleResendCode}
+                      disabled={verifying || loading}
+                      className="flex-1"
+                    >
+                      {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Skicka ny kod
+                    </Button>
+                  </div>
+                )}
+
+                {/* Help text */}
+                {!verifying && !isNavigating && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Hittar du inte koden? Kolla i skräpposten.
+                  </p>
+                )}
+              </CardContent>
+            </motion.div>
+          )}
         </AnimatePresence>
       </Card>
     </div>
