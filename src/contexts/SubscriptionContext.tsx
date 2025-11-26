@@ -8,11 +8,29 @@ import { Capacitor } from '@capacitor/core';
 // Note: iOS subscription purchases are handled via native RevenueCat flow
 // The backend is the source of truth for subscription status
 
+export interface EnterpriseMembership {
+  isMember: boolean;
+  company?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    planTier: string;
+  };
+  membership?: {
+    role: string;
+    status: string;
+    title?: string;
+    joinedAt?: string;
+  };
+}
+
 interface SubscriptionContextType {
   userPlan: UserPlan | null;
   isLoading: boolean;
   requiresPayment: boolean;
   isNativePlatform: boolean;
+  enterpriseMembership: EnterpriseMembership | null;
   refreshPlan: () => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
   canGenerateProtocol: (meetingId: string, protocolCount: number) => Promise<{ allowed: boolean; reason?: string }>;
@@ -28,6 +46,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [enterpriseMembership, setEnterpriseMembership] = useState<EnterpriseMembership | null>(null);
   
   // Use Capacitor to detect native platform
   const isNativePlatform = Capacitor.isNativePlatform();
@@ -250,9 +269,25 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  // Load enterprise membership
+  const loadEnterpriseMembership = useCallback(async () => {
+    if (!user) {
+      setEnterpriseMembership(null);
+      return;
+    }
+    try {
+      const membership = await apiClient.getMyEnterpriseMembership();
+      setEnterpriseMembership(membership);
+    } catch (error) {
+      console.log('[SubscriptionContext] Enterprise membership check failed:', error);
+      setEnterpriseMembership({ isMember: false });
+    }
+  }, [user]);
+
   useEffect(() => {
     loadPlan();
-  }, [loadPlan]);
+    loadEnterpriseMembership();
+  }, [loadPlan, loadEnterpriseMembership]);
 
   const refreshPlan = useCallback(async () => {
     if (!user) {
@@ -408,7 +443,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, isNativePlatform, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, isNativePlatform, enterpriseMembership, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );
