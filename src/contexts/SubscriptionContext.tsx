@@ -3,10 +3,10 @@ import { useAuth } from './AuthContext';
 import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
-import { Capacitor } from '@capacitor/core';
 
-// Note: iOS subscription purchases are handled via native RevenueCat flow
-// The backend is the source of truth for subscription status
+// Payment routing is PURELY domain-based:
+// - io.tivly.se = Apple IAP via RevenueCat
+// - app.tivly.se = Stripe checkout
 
 export interface EnterpriseMembership {
   isMember: boolean;
@@ -25,12 +25,23 @@ export interface EnterpriseMembership {
   };
 }
 
+// Domain-based payment detection
+export type PaymentDomain = 'ios' | 'web' | 'unknown';
+
+export const getPaymentDomain = (): PaymentDomain => {
+  if (typeof window === 'undefined') return 'unknown';
+  const hostname = window.location.hostname;
+  if (hostname === 'io.tivly.se') return 'ios';
+  if (hostname === 'app.tivly.se') return 'web';
+  // Development/preview environments default to web behavior
+  return 'web';
+};
+
 interface SubscriptionContextType {
   userPlan: UserPlan | null;
   isLoading: boolean;
   requiresPayment: boolean;
-  isNativePlatform: boolean;
-  isIOSNative: boolean; // Specifically iOS native (Capacitor + iOS platform OR io.tivly.se domain)
+  paymentDomain: PaymentDomain;
   enterpriseMembership: EnterpriseMembership | null;
   refreshPlan: () => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
@@ -49,23 +60,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [enterpriseMembership, setEnterpriseMembership] = useState<EnterpriseMembership | null>(null);
   
-  // Use Capacitor to detect native platform
-  const isNativePlatform = Capacitor.isNativePlatform();
+  // PURE DOMAIN-BASED payment routing - no Capacitor detection
+  const paymentDomain = useMemo(() => getPaymentDomain(), []);
   
-  // Specifically detect iOS native: either via Capacitor or io.tivly.se domain
-  // This ensures we NEVER show Stripe on iOS app
-  const isIOSNative = useMemo(() => {
-    const capacitorIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
-    const ioDomain = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
-    return capacitorIOS || ioDomain;
-  }, []);
-  
-  console.log('[SubscriptionContext] 📱 Platform detection:', {
-    isNativePlatform,
-    isIOSNative,
-    platform: Capacitor.getPlatform(),
-    hostname: typeof window !== 'undefined' ? window.location.hostname : 'N/A'
-  });
+  console.log('[SubscriptionContext] 💳 Payment domain:', paymentDomain, '| hostname:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
   
   const loadPlan = useCallback(async (opts?: { background?: boolean }) => {
     const background = !!opts?.background;
@@ -80,10 +78,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // Don't block UI on initial load
       if (!background && userPlan !== null) setIsLoading(true);
       
-      // Native app subscription purchases are handled via RevenueCat
+      // iOS app (io.tivly.se) subscription purchases are handled via RevenueCat
       // Backend is the single source of truth for subscription status
-      if (isNativePlatform) {
-        console.log('🍎 [SubscriptionContext] Native platform detected - using backend for subscription status');
+      if (paymentDomain === 'ios') {
+        console.log('🍎 [SubscriptionContext] iOS domain detected - using backend for subscription status');
       }
       
       // Check payment status
@@ -506,7 +504,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, isNativePlatform, isIOSNative, enterpriseMembership, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );
