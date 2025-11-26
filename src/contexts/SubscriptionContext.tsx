@@ -275,12 +275,65 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setEnterpriseMembership(null);
       return;
     }
+    
+    console.log('[SubscriptionContext] 🏢 Loading enterprise membership for:', user.email);
+    
     try {
       const membership = await apiClient.getMyEnterpriseMembership();
-      setEnterpriseMembership(membership);
-    } catch (error) {
-      console.log('[SubscriptionContext] Enterprise membership check failed:', error);
+      console.log('[SubscriptionContext] 🏢 Enterprise API response:', membership);
+      
+      if (membership?.isMember) {
+        setEnterpriseMembership(membership);
+        return;
+      }
+      
+      // Fallback: check user object for enterprise data
+      const u: any = user;
+      if (u?.enterprise?.companyName || u?.company?.name) {
+        console.log('[SubscriptionContext] 🏢 Using fallback enterprise data from user object');
+        setEnterpriseMembership({
+          isMember: true,
+          company: {
+            id: u.enterprise?.companyId || u.company?.id || '',
+            name: u.enterprise?.companyName || u.company?.name || 'Enterprise',
+            slug: u.enterprise?.companySlug || u.company?.slug || '',
+            status: 'active',
+            planTier: 'enterprise',
+          },
+          membership: {
+            role: u.enterprise?.role || u.companyRole || 'member',
+            status: 'active',
+            title: u.enterprise?.title || u.jobTitle,
+            joinedAt: u.enterprise?.joinedAt || u.createdAt,
+          },
+        });
+        return;
+      }
+      
       setEnterpriseMembership({ isMember: false });
+    } catch (error) {
+      console.log('[SubscriptionContext] 🏢 Enterprise membership check failed:', error);
+      
+      // Fallback: check user object even on API failure
+      const u: any = user;
+      if (u?.enterprise?.companyName || u?.company?.name) {
+        setEnterpriseMembership({
+          isMember: true,
+          company: {
+            id: u.enterprise?.companyId || u.company?.id || '',
+            name: u.enterprise?.companyName || u.company?.name || 'Enterprise',
+            slug: u.enterprise?.companySlug || u.company?.slug || '',
+            status: 'active',
+            planTier: 'enterprise',
+          },
+          membership: {
+            role: u.enterprise?.role || u.companyRole || 'member',
+            status: 'active',
+          },
+        });
+      } else {
+        setEnterpriseMembership({ isMember: false });
+      }
     }
   }, [user]);
 
