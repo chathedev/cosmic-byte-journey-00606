@@ -203,11 +203,16 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Global Dev Button Component
+// Global Dev Button Component - only for charlie.wretling@icloud.com
 const GlobalDevButton = () => {
+  const { user } = useAuth();
   const { userPlan } = useSubscription();
   const [logs, setLogs] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+
+  // Only show for specific email
+  const allowedEmail = 'charlie.wretling@icloud.com';
+  const isAllowed = user?.email?.toLowerCase() === allowedEmail.toLowerCase();
 
   // Capture console logs and errors
   useEffect(() => {
@@ -317,6 +322,11 @@ ${JSON.stringify(debugInfo, null, 2)}
       console.log('📋 FORMATTED OUTPUT:', formattedOutput);
     }
   };
+
+  // Don't render if not allowed user
+  if (!isAllowed) {
+    return null;
+  }
 
   return (
     <Button
