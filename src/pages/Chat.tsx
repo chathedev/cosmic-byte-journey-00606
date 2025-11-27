@@ -25,22 +25,42 @@ interface Message {
 const TypewriterText = ({ text }: { text: string }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (currentIndex < text.length) {
+    // Initial loading animation
+    const loadingTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 400);
+
+    return () => clearTimeout(loadingTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && currentIndex < text.length) {
       const timeout = setTimeout(() => {
         setDisplayedText(text.slice(0, currentIndex + 1));
         setCurrentIndex(currentIndex + 1);
-      }, 12);
+      }, 20);
       return () => clearTimeout(timeout);
     }
-  }, [text, currentIndex]);
+  }, [text, currentIndex, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="flex gap-1.5">
+        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+      </div>
+    );
+  }
 
   return (
     <span className="whitespace-pre-wrap">
       {displayedText}
       {currentIndex < text.length && (
-        <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 animate-pulse" />
+        <span className="inline-block w-0.5 h-5 bg-primary ml-1 animate-pulse" />
       )}
     </span>
   );
@@ -273,13 +293,18 @@ export const Chat = () => {
     <div className="flex flex-col lg:flex-row h-screen bg-background">
       {/* Desktop: Takes remaining space, Mobile: Full screen */}
       <div className="flex-1 flex flex-col">
-        {/* Simple Header */}
-        <div className="border-b bg-background px-4 py-3 flex-shrink-0">
+        {/* Header */}
+        <div className="border-b bg-background px-5 py-4 flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-sm font-medium text-foreground">AI Chat</h1>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-primary" />
+              </div>
+              <h1 className="text-base font-semibold text-foreground">AI Möteschatt</h1>
+            </div>
             <div className="flex items-center gap-2">
               <Select value={selectedMeetingId} onValueChange={setSelectedMeetingId}>
-                <SelectTrigger className="w-[160px] h-8 text-xs bg-background">
+                <SelectTrigger className="w-[180px] h-9 text-sm bg-background border-border/50">
                   <SelectValue placeholder="Välj möte" />
                 </SelectTrigger>
                 <SelectContent>
@@ -296,7 +321,7 @@ export const Chat = () => {
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setMessages([])}
-                  className="h-8 text-xs"
+                  className="h-9 text-sm"
                 >
                   Rensa
                 </Button>
@@ -307,14 +332,16 @@ export const Chat = () => {
 
         {/* Chat Messages */}
         <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4 max-w-3xl mx-auto w-full">
+          <div className="p-5 space-y-5 max-w-3xl mx-auto w-full">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-                <MessageCircle className="w-10 h-10 text-muted-foreground/40 mb-3" />
-                <p className="text-sm text-muted-foreground mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                  <MessageCircle className="w-8 h-8 text-primary" />
+                </div>
+                <p className="text-base text-muted-foreground mb-8">
                   Ställ frågor om dina möten
                 </p>
-                <div className="grid grid-cols-1 gap-2 w-full max-w-md">
+                <div className="grid grid-cols-1 gap-3 w-full max-w-md">
                   {[
                     "Sammanfatta senaste mötet",
                     "Vilka beslut togs?",
@@ -324,7 +351,7 @@ export const Chat = () => {
                       key={text} 
                       variant="outline" 
                       onClick={() => setInput(text)}
-                      className="h-auto py-2 text-xs justify-start"
+                      className="h-auto py-3 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
                     >
                       {text}
                     </Button>
@@ -335,19 +362,19 @@ export const Chat = () => {
               messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {msg.role === "assistant" && (
-                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <MessageCircle className="w-3 h-3 text-muted-foreground" />
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <MessageCircle className="w-4 h-4 text-primary" />
                     </div>
                   )}
                   
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                    className={`max-w-[80%] rounded-xl px-4 py-3 text-base ${
                       msg.role === "user"
-                        ? "bg-foreground text-background"
-                        : "bg-muted text-foreground"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/50 text-foreground border border-border/50"
                     }`}
                   >
                     {msg.role === "assistant" && streamingIndex === idx ? (
@@ -359,10 +386,10 @@ export const Chat = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="mt-2 w-full text-xs h-7"
+                        className="mt-2 w-full text-sm h-8 hover:bg-primary/10 hover:text-primary"
                         onClick={() => navigate(`/library?highlight=${msg.meetingReference?.meetingId}`)}
                       >
-                        <ExternalLink className="w-3 h-3 mr-1" />
+                        <ExternalLink className="w-3 h-3 mr-1.5" />
                         {msg.meetingReference.meetingTitle}
                       </Button>
                     )}
@@ -374,33 +401,33 @@ export const Chat = () => {
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="border-t bg-background p-3 flex-shrink-0">
-          <div className="flex gap-2 max-w-3xl mx-auto w-full">
+        <div className="border-t bg-background p-4 flex-shrink-0">
+          <div className="flex gap-3 max-w-3xl mx-auto w-full">
             <Input
               placeholder="Skriv din fråga..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
               disabled={isLoading}
-              className="flex-1 h-9 text-sm"
+              className="flex-1 h-11 text-base border-border/50 focus-visible:ring-primary"
             />
             {isLoading ? (
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={handleStop}
-                className="h-9 px-3"
+                className="h-11 px-4 hover:bg-destructive/10 hover:text-destructive"
               >
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               </Button>
             ) : (
               <Button 
                 onClick={handleSend} 
                 disabled={!input.trim()}
                 size="sm"
-                className="h-9 px-3"
+                className="h-11 px-4 bg-primary hover:bg-primary/90"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-5 h-5" />
               </Button>
             )}
           </div>
