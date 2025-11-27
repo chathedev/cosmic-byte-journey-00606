@@ -305,6 +305,13 @@ export const Chat = () => {
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-background">
+      {/* Loading bar */}
+      {isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-gradient-to-r from-primary via-primary/60 to-primary animate-pulse">
+          <div className="h-full w-full bg-gradient-to-r from-transparent via-background/20 to-transparent animate-[slide-in-right_1s_ease-in-out_infinite]" />
+        </div>
+      )}
+      
       {/* Desktop: Takes remaining space, Mobile: Full screen */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
