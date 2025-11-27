@@ -28,10 +28,9 @@ const TypewriterText = ({ text }: { text: string }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initial loading animation
     const loadingTimer = setTimeout(() => {
       setIsLoading(false);
-    }, 400);
+    }, 600);
 
     return () => clearTimeout(loadingTimer);
   }, []);
@@ -41,18 +40,14 @@ const TypewriterText = ({ text }: { text: string }) => {
       const timeout = setTimeout(() => {
         setDisplayedText(text.slice(0, currentIndex + 1));
         setCurrentIndex(currentIndex + 1);
-      }, 20);
+      }, 25);
       return () => clearTimeout(timeout);
     }
   }, [text, currentIndex, isLoading]);
 
   if (isLoading) {
     return (
-      <div className="flex gap-1.5">
-        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-      </div>
+      <span className="inline-block min-w-[40px] h-5 rounded animate-pulse bg-muted" />
     );
   }
 
