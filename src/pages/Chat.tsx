@@ -59,12 +59,17 @@ const TypewriterText = ({ text }: { text: string }) => {
   }
 
   return (
-    <span className="whitespace-pre-wrap">
-      {displayedText}
-      {currentIndex < text.length && (
-        <span className="inline-block w-0.5 h-5 bg-primary ml-1 animate-pulse" />
-      )}
-    </span>
+    <div 
+      className="whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert inline"
+      dangerouslySetInnerHTML={{ 
+        __html: displayedText
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/`(.*?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm">$1</code>')
+          .replace(/\n/g, '<br>') + 
+          (currentIndex < text.length ? '<span class="inline-block w-0.5 h-5 bg-primary ml-1 animate-pulse"></span>' : '')
+      }}
+    />
   );
 };
 
@@ -389,7 +394,16 @@ export const Chat = () => {
                     {msg.role === "assistant" && streamingIndex === idx ? (
                       <TypewriterText text={msg.content} />
                     ) : (
-                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      <div 
+                        className="whitespace-pre-wrap leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+                        dangerouslySetInnerHTML={{ 
+                          __html: msg.content
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                            .replace(/`(.*?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm">$1</code>')
+                            .replace(/\n/g, '<br>')
+                        }}
+                      />
                     )}
                     {msg.meetingReference && (
                       <Button
