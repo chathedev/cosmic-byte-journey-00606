@@ -55,7 +55,7 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start as loading to prevent flash
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [enterpriseMembership, setEnterpriseMembership] = useState<EnterpriseMembership | null>(null);
@@ -73,13 +73,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (!user) {
       setUserPlan(null);
       setRequiresPayment(false);
-      if (!background) setIsLoading(false);
+      setIsLoading(false); // Set to false when no user
       return;
     }
 
     try {
-      // Don't block UI on initial load
-      if (!background && userPlan !== null) setIsLoading(true);
+      // Set loading state immediately
+      if (!background) setIsLoading(true);
       
       // iOS app (io.tivly.se) subscription purchases are handled via RevenueCat
       // Backend is the single source of truth for subscription status
