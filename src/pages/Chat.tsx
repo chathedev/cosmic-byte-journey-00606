@@ -347,7 +347,25 @@ export const Chat = () => {
         {/* Chat Messages */}
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-5 max-w-3xl mx-auto w-full">
-            {messages.length === 0 ? (
+            {meetings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                  <MessageCircle className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">Inga möten att chatta om</h2>
+                <p className="text-base text-muted-foreground mb-6 max-w-md">
+                  För att kunna chatta med AI om dina möten behöver du först spela in och spara ett möte.
+                </p>
+                <Button 
+                  size="lg"
+                  onClick={() => navigate('/recording')}
+                  className="gap-2"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Spela in ett möte
+                </Button>
+              </div>
+            ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
                   <MessageCircle className="w-8 h-8 text-primary" />
