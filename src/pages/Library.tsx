@@ -310,6 +310,17 @@ const Library = () => {
     ? meetings 
     : meetings.filter(m => m.folder === selectedFolder);
 
+  // Show loading state while plan is being fetched to prevent flash
+  if (planLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Laddar...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If showing protocol, display the protocol generator
   if (selectedProtocol) {

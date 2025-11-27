@@ -6,9 +6,10 @@ import { SubscribeDialog } from './SubscribeDialog';
 
 export const UpgradeBanner = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { userPlan } = useSubscription();
+  const { userPlan, isLoading } = useSubscription();
 
-  if (!userPlan) return null;
+  // Don't render until we have loaded the plan data
+  if (isLoading || !userPlan) return null;
 
   // Enterprise and Unlimited plans have unlimited access, but Pro (standard) has 10 meetings limit
   const isUnlimited = userPlan.meetingsLimit === null || 
