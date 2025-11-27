@@ -28,26 +28,33 @@ const TypewriterText = ({ text }: { text: string }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Longer initial loading animation for more natural feel
     const loadingTimer = setTimeout(() => {
       setIsLoading(false);
-    }, 600);
+    }, 1200);
 
     return () => clearTimeout(loadingTimer);
   }, []);
 
   useEffect(() => {
     if (!isLoading && currentIndex < text.length) {
+      // Slower typing speed for smooth, readable animation
       const timeout = setTimeout(() => {
         setDisplayedText(text.slice(0, currentIndex + 1));
         setCurrentIndex(currentIndex + 1);
-      }, 25);
+      }, 35);
       return () => clearTimeout(timeout);
     }
   }, [text, currentIndex, isLoading]);
 
   if (isLoading) {
     return (
-      <span className="inline-block min-w-[40px] h-5 rounded animate-pulse bg-muted" />
+      <span className="inline-block min-w-[60px] h-5 rounded-md bg-muted/60 animate-pulse" 
+        style={{ 
+          animationDuration: '1.5s',
+          animationTimingFunction: 'ease-in-out'
+        }} 
+      />
     );
   }
 
