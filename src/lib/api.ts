@@ -1320,6 +1320,7 @@ class ApiClient {
       billingType: 'one_time' | 'monthly' | 'yearly';
       amountSek: number;
       oneTimeAmountSek?: number;
+      combineOneTime?: boolean;
     }
   ): Promise<{
     success: boolean;
@@ -1328,8 +1329,10 @@ class ApiClient {
     invoiceUrl: string;
     portalUrl?: string;
     subscriptionId?: string;
+    oneTimeInvoiceUrl?: string;
+    oneTimeInvoiceId?: string;
   }> {
-    // Build payload with optional oneTimeAmountSek
+    // Build payload with optional oneTimeAmountSek and combineOneTime
     const payload: any = {
       billingType: data.billingType,
       amountSek: data.amountSek
@@ -1338,6 +1341,10 @@ class ApiClient {
     // Only include oneTimeAmountSek if it's provided and greater than 0
     if (data.oneTimeAmountSek && data.oneTimeAmountSek > 0) {
       payload.oneTimeAmountSek = data.oneTimeAmountSek;
+      // Include combineOneTime flag if provided
+      if (data.combineOneTime !== undefined) {
+        payload.combineOneTime = data.combineOneTime;
+      }
     }
     
     console.log('🔵 Creating billing:', { companyId, payload });

@@ -22,6 +22,8 @@ interface BillingSuccessDialogProps {
   invoiceUrl: string;
   portalUrl?: string;
   companyName: string;
+  oneTimeInvoiceUrl?: string;
+  oneTimeInvoiceId?: string;
 }
 
 export default function BillingSuccessDialog({
@@ -33,6 +35,8 @@ export default function BillingSuccessDialog({
   invoiceUrl,
   portalUrl,
   companyName,
+  oneTimeInvoiceUrl,
+  oneTimeInvoiceId,
 }: BillingSuccessDialogProps) {
   const [emailTo, setEmailTo] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -189,6 +193,45 @@ Vänliga hälsningar
               Dela denna länk med företaget för att visa fakturan
             </p>
           </div>
+
+          {/* Separate One-Time Invoice Link (if exists) */}
+          {oneTimeInvoiceUrl && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-foreground">
+                <FileText className="h-4 w-4" />
+                Separat Engångsfaktura
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={oneTimeInvoiceUrl}
+                  readOnly
+                  className="flex-1 font-mono text-xs bg-background"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(oneTimeInvoiceUrl);
+                    toast.success("Engångsfakturalänk kopierad!");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => window.open(oneTimeInvoiceUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Den engångsavgiften skapades som en separat faktura
+              </p>
+            </div>
+          )}
 
           {/* Portal Link (for subscriptions) */}
           {portalUrl && (
