@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Company {
@@ -44,7 +44,7 @@ export default function AdminEnterpriseBilling() {
       setCompanies(data.companies || []);
     } catch (error: any) {
       console.error('Failed to load companies:', error);
-      toast.error('Failed to load companies');
+      toast.error('Kunde inte ladda företag');
     } finally {
       setIsLoading(false);
     }
@@ -54,13 +54,13 @@ export default function AdminEnterpriseBilling() {
     e.preventDefault();
     
     if (!selectedCompanyId) {
-      toast.error('Please select a company');
+      toast.error('Vänligen välj ett företag');
       return;
     }
     
     const amount = parseFloat(amountSek);
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount');
+      toast.error('Vänligen ange ett giltigt belopp');
       return;
     }
 
@@ -71,7 +71,7 @@ export default function AdminEnterpriseBilling() {
         amountSek: amount,
       });
 
-      toast.success(`${billingType === 'one_time' ? 'Invoice' : 'Subscription'} created successfully!`);
+      toast.success(`${billingType === 'one_time' ? 'Faktura' : 'Prenumeration'} skapades!`);
       setResult({
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
@@ -79,7 +79,7 @@ export default function AdminEnterpriseBilling() {
       });
     } catch (error: any) {
       console.error('Failed to create billing:', error);
-      toast.error(error.message || 'Failed to create billing');
+      toast.error(error.message || 'Kunde inte skapa fakturering');
     } finally {
       setIsSubmitting(false);
     }
@@ -100,6 +100,9 @@ export default function AdminEnterpriseBilling() {
         <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-gradient-to-r from-primary via-primary/60 to-primary animate-pulse">
           <div className="h-full w-full bg-gradient-to-r from-transparent via-background/20 to-transparent animate-[slide-in-right_1s_ease-in-out_infinite]" />
         </div>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
@@ -116,15 +119,15 @@ export default function AdminEnterpriseBilling() {
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Enterprise
+            Tillbaka till Enterprise
           </Button>
         </div>
 
         <div className="flex items-center gap-3">
           <Receipt className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Enterprise Billing</h1>
-            <p className="text-muted-foreground">Create invoices and subscriptions for enterprise companies</p>
+            <h1 className="text-3xl font-bold">Enterprise Fakturering</h1>
+            <p className="text-muted-foreground">Skapa fakturor och prenumerationer för företag</p>
           </div>
         </div>
 
@@ -134,40 +137,40 @@ export default function AdminEnterpriseBilling() {
             <AlertDescription className="space-y-3">
               <div className="flex items-center gap-2 font-semibold text-primary">
                 <Receipt className="h-4 w-4" />
-                Billing Created Successfully!
+                Fakturering skapad!
               </div>
               
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-muted-foreground">Invoice URL:</span>
+                  <span className="text-sm text-muted-foreground">Faktura URL:</span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => window.open(result.invoiceUrl, '_blank')}
                     className="gap-2"
                   >
-                    Open Invoice <ExternalLink className="h-3 w-3" />
+                    Öppna Faktura <ExternalLink className="h-3 w-3" />
                   </Button>
                 </div>
 
                 {result.portalUrl && (
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">Billing Portal:</span>
+                    <span className="text-sm text-muted-foreground">Faktureringsportal:</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(result.portalUrl, '_blank')}
                       className="gap-2"
                     >
-                      Open Portal <ExternalLink className="h-3 w-3" />
+                      Öppna Portal <ExternalLink className="h-3 w-3" />
                     </Button>
                   </div>
                 )}
 
                 {result.subscriptionId && (
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">Subscription ID:</span>
-                    <code className="text-xs bg-background/50 px-2 py-1 rounded">
+                    <span className="text-sm text-muted-foreground">Prenumerations-ID:</span>
+                    <code className="text-xs bg-background/50 px-2 py-1 rounded text-foreground">
                       {result.subscriptionId}
                     </code>
                   </div>
@@ -180,7 +183,7 @@ export default function AdminEnterpriseBilling() {
                 onClick={handleReset}
                 className="w-full mt-2"
               >
-                Create Another Billing
+                Skapa Ny Fakturering
               </Button>
             </AlertDescription>
           </Alert>
@@ -190,29 +193,33 @@ export default function AdminEnterpriseBilling() {
         {!result && (
           <Card>
             <CardHeader>
-              <CardTitle>Create Billing</CardTitle>
+              <CardTitle>Skapa Fakturering</CardTitle>
               <CardDescription>
-                Select a company and configure billing details. The backend will create the necessary Stripe objects automatically.
+                Välj ett företag och konfigurera faktureringsuppgifter. Backend skapar nödvändiga Stripe-objekt automatiskt.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Company Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="company">Company *</Label>
+                  <Label htmlFor="company" className="text-foreground">Företag *</Label>
                   <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                    <SelectTrigger id="company">
-                      <SelectValue placeholder="Select a company" />
+                    <SelectTrigger id="company" className="bg-background border-border">
+                      <SelectValue placeholder="Välj ett företag" className="text-foreground" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-popover border-border z-50">
                       {companies.map((company) => (
-                        <SelectItem key={company.companyId} value={company.companyId}>
+                        <SelectItem 
+                          key={company.companyId} 
+                          value={company.companyId}
+                          className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer"
+                        >
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span>{company.companyName}</span>
+                            <span className="text-foreground">{company.companyName}</span>
                             {company.memberCount !== undefined && (
                               <span className="text-xs text-muted-foreground">
-                                ({company.memberCount} members)
+                                ({company.memberCount} medlemmar)
                               </span>
                             )}
                           </div>
@@ -229,36 +236,36 @@ export default function AdminEnterpriseBilling() {
 
                 {/* Billing Type */}
                 <div className="space-y-2">
-                  <Label htmlFor="billingType">Billing Type *</Label>
+                  <Label htmlFor="billingType" className="text-foreground">Faktureringstyp *</Label>
                   <Select
                     value={billingType}
                     onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')}
                   >
-                    <SelectTrigger id="billingType">
-                      <SelectValue />
+                    <SelectTrigger id="billingType" className="bg-background border-border">
+                      <SelectValue className="text-foreground" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="one_time">
+                    <SelectContent className="bg-popover border-border z-50">
+                      <SelectItem value="one_time" className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer">
                         <div className="space-y-1">
-                          <div className="font-medium">One-time Invoice</div>
+                          <div className="font-medium text-foreground">Engångsfaktura</div>
                           <div className="text-xs text-muted-foreground">
-                            Creates a single invoice, no recurring charges
+                            Skapar en enskild faktura, inga återkommande avgifter
                           </div>
                         </div>
                       </SelectItem>
-                      <SelectItem value="monthly">
+                      <SelectItem value="monthly" className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer">
                         <div className="space-y-1">
-                          <div className="font-medium">Monthly Subscription</div>
+                          <div className="font-medium text-foreground">Månadsprenumeration</div>
                           <div className="text-xs text-muted-foreground">
-                            Recurring monthly charges
+                            Återkommande månatliga avgifter
                           </div>
                         </div>
                       </SelectItem>
-                      <SelectItem value="yearly">
+                      <SelectItem value="yearly" className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer">
                         <div className="space-y-1">
-                          <div className="font-medium">Yearly Subscription</div>
+                          <div className="font-medium text-foreground">Årsprenumeration</div>
                           <div className="text-xs text-muted-foreground">
-                            Recurring yearly charges
+                            Återkommande årliga avgifter
                           </div>
                         </div>
                       </SelectItem>
@@ -268,7 +275,7 @@ export default function AdminEnterpriseBilling() {
 
                 {/* Amount */}
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (SEK) *</Label>
+                  <Label htmlFor="amount" className="text-foreground">Belopp (SEK) *</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -278,9 +285,10 @@ export default function AdminEnterpriseBilling() {
                     value={amountSek}
                     onChange={(e) => setAmountSek(e.target.value)}
                     required
+                    className="bg-background border-border text-foreground"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Enter the amount in Swedish Kronor (SEK)
+                    Ange beloppet i svenska kronor (SEK)
                   </p>
                 </div>
 
@@ -293,13 +301,13 @@ export default function AdminEnterpriseBilling() {
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="h-4 w-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
-                      Creating...
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Skapar...
                     </>
                   ) : (
                     <>
                       <Receipt className="h-4 w-4 mr-2" />
-                      Create {billingType === 'one_time' ? 'Invoice' : 'Subscription'}
+                      Skapa {billingType === 'one_time' ? 'Faktura' : 'Prenumeration'}
                     </>
                   )}
                 </Button>
@@ -311,13 +319,13 @@ export default function AdminEnterpriseBilling() {
         {/* Info Card */}
         <Card className="border-muted">
           <CardHeader>
-            <CardTitle className="text-base">How it works</CardTitle>
+            <CardTitle className="text-base text-foreground">Så här fungerar det</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• <strong>One-time:</strong> Creates an invoice for the specified amount, finalizes it, and returns a hosted invoice URL</p>
-            <p>• <strong>Monthly/Yearly:</strong> Creates a recurring Stripe subscription with the specified amount and returns both invoice URL and billing portal link</p>
-            <p>• The backend automatically creates/updates the Stripe customer for the company</p>
-            <p>• All billing records are stored per enterprise workspace</p>
+            <p>• <strong className="text-foreground">Engångsfaktura:</strong> Skapar en faktura för angivet belopp, slutför den och returnerar en länk till fakturan</p>
+            <p>• <strong className="text-foreground">Månad/År:</strong> Skapar en återkommande Stripe-prenumeration med angivet belopp och returnerar både fakturalänk och länk till faktureringsportal</p>
+            <p>• Backend skapar/uppdaterar automatiskt Stripe-kunden för företaget</p>
+            <p>• Alla faktureringsposter lagras per enterprise workspace</p>
           </CardContent>
         </Card>
       </div>
