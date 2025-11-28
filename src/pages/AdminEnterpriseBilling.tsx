@@ -94,7 +94,8 @@ export default function AdminEnterpriseBilling() {
       setBillingHistory(data.billingHistory || []);
     } catch (error: any) {
       console.error('Failed to load billing history:', error);
-      if (!error.message?.includes('404')) {
+      // Only show error toast for non-404 errors
+      if (error.message && !error.message.includes('404') && !error.message.includes('not found')) {
         toast.error('Kunde inte ladda faktureringshistorik');
       }
       setBillingHistory([]);
@@ -160,21 +161,37 @@ export default function AdminEnterpriseBilling() {
 
     const totalAmount = getTotalAmount();
 
+    if (totalAmount <= 0) {
+      toast.error('Totalsumman måste vara större än 0');
+      return;
+    }
+
     setIsSubmitting(true);
+    const toastId = toast.loading(`Skapar ${billingType === 'one_time' ? 'faktura' : 'prenumeration'}...`);
+    
     try {
       const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, {
         billingType,
         amountSek: totalAmount,
       });
 
-      toast.success(`${billingType === 'one_time' ? 'Faktura' : 'Prenumeration'} skapades med ${lineItems.length} rad${lineItems.length > 1 ? 'er' : ''}!`);
+      toast.success(
+        `${billingType === 'one_time' ? 'Faktura' : 'Prenumeration'} skapades! Total: ${totalAmount.toLocaleString('sv-SE')} SEK (${lineItems.length} rad${lineItems.length > 1 ? 'er' : ''})`,
+        { id: toastId }
+      );
       
       // Refresh history
       await loadBillingHistory(selectedCompanyId);
       
-      // Open invoice in new tab
+      // Open invoice and portal URLs in new tabs
       if (response.invoiceUrl) {
-        window.open(response.invoiceUrl, '_blank');
+        window.open(response.invoiceUrl, '_blank', 'noopener,noreferrer');
+      }
+      if (response.portalUrl && billingType !== 'one_time') {
+        // Small delay before opening second window
+        setTimeout(() => {
+          window.open(response.portalUrl, '_blank', 'noopener,noreferrer');
+        }, 500);
       }
       
       // Reset form
@@ -185,7 +202,8 @@ export default function AdminEnterpriseBilling() {
       
     } catch (error: any) {
       console.error('Failed to create billing:', error);
-      toast.error(error.message || 'Kunde inte skapa fakturering');
+      const errorMsg = error.message || 'Kunde inte skapa fakturering';
+      toast.error(errorMsg, { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
@@ -567,19 +585,30 @@ export default function AdminEnterpriseBilling() {
                     {/* Submit Button */}
                     <Button
                       type="submit"
-                      disabled={isSubmitting || lineItems.length === 0}
+                      disabled={isSubmitting || lineItems.length === 0 || getTotalAmount() <= 0}
                       className="w-full"
                       size="lg"
                     >
                       {isSubmitting ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Skapar...
+                          Skapar {billingType === 'one_time' ? 'faktura' : 'prenumeration'}...
                         </>
                       ) : (
                         <>
                           <Receipt className="h-4 w-4 mr-2" />
-                          Skapa {getBillingTypeLabel(billingType)} ({lineItems.length} rad{lineItems.length !== 1 ? 'er' : ''}, {getTotalAmount().toLocaleString('sv-SE')} SEK)
+                          Skapa {getBillingTypeLabel(billingType)}
+                          {lineItems.length > 0 && (
+                            <>
+                              <span className="ml-2">—</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {lineItems.length} rad{lineItems.length !== 1 ? 'er' : ''}
+                              </Badge>
+                              <span className="ml-2 font-bold">
+                                {getTotalAmount().toLocaleString('sv-SE')} SEK
+                              </span>
+                            </>
+                          )}
                         </>
                       )}
                     </Button>
