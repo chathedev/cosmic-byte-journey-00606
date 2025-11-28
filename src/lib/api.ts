@@ -874,6 +874,8 @@ class ApiClient {
       slug: string;
       status: string;
       planTier: string;
+      billingStatus?: string;
+      billingHistory?: any[];
     };
     membership?: {
       role: string;
@@ -885,15 +887,20 @@ class ApiClient {
     try {
       const response = await this.fetchWithAuth('/enterprise/me', { suppressAuthRedirect: true });
       if (!response.ok) {
-        // User is not an enterprise member - return empty result
+        // User is not an enterprise member - return empty result (expected 404)
         if (response.status === 404) {
           return { isMember: false };
         }
-        throw new Error('Failed to fetch enterprise membership');
+        // Only log non-404 errors
+        console.error('[API] Unexpected enterprise membership error:', response.status);
+        return { isMember: false };
       }
       return response.json();
     } catch (error) {
-      console.log('[API] Enterprise membership check:', error);
+      // Silently return false for expected cases, only log unexpected errors
+      if (error instanceof Error && !error.message.includes('404')) {
+        console.error('[API] Enterprise membership error:', error);
+      }
       return { isMember: false };
     }
   }
@@ -1321,11 +1328,32 @@ class ApiClient {
     return response.json();
   }
 
-  async getEnterpriseCompanyBillingHistory(companyId: string): Promise<any> {
+  async getEnterpriseCompanyBillingHistory(companyId: string): Promise<{
+    billingHistory: Array<{
+      id: string;
+      billingType: 'one_time' | 'monthly' | 'yearly';
+      amountSek: number;
+      status: string;
+      invoiceUrl: string;
+      portalUrl?: string;
+      subscriptionId?: string;
+      createdAt: string;
+      createdBy: string;
+    }>;
+    summary?: {
+      activeSubscriptions: number;
+      totalInvoices: number;
+      totalRevenue: number;
+    };
+  }> {
     const response = await this.fetchWithAuth(
       `/admin/enterprise/companies/${companyId}/billing`
     );
     if (!response.ok) {
+      // 404 is expected if no billing history exists yet
+      if (response.status === 404) {
+        return { billingHistory: [] };
+      }
       const error = await response.json().catch(() => ({ error: 'Failed to fetch billing history' }));
       throw new Error(error.error || 'Failed to fetch company billing history');
     }
