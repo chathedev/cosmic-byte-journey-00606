@@ -67,11 +67,15 @@ export default function AdminEnterpriseBilling() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-  const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('one_time');
+  const [recurringInterval, setRecurringInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
   
-  const [lineItems, setLineItems] = useState<Array<{ description: string; amount: string }>>([
-    { description: '', amount: '' }
+  const [lineItems, setLineItems] = useState<Array<{ 
+    description: string; 
+    amount: string; 
+    type: 'one_time' | 'recurring' 
+  }>>([
+    { description: '', amount: '', type: 'one_time' }
   ]);
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
@@ -130,7 +134,7 @@ export default function AdminEnterpriseBilling() {
   };
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { description: '', amount: '' }]);
+    setLineItems([...lineItems, { description: '', amount: '', type: 'one_time' }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -138,17 +142,36 @@ export default function AdminEnterpriseBilling() {
     setLineItems(lineItems.filter((_, i) => i !== index));
   };
 
-  const updateLineItem = (index: number, field: 'description' | 'amount', value: string) => {
+  const updateLineItem = (index: number, field: 'description' | 'amount' | 'type', value: string) => {
     const updated = [...lineItems];
-    updated[index][field] = value;
+    updated[index][field as keyof typeof updated[0]] = value as any;
     setLineItems(updated);
   };
 
-  const getTotalAmount = () => {
+  const getOneTimeTotal = () => {
     return lineItems.reduce((sum, item) => {
-      const amount = parseFloat(item.amount) || 0;
-      return sum + amount;
+      if (item.type === 'one_time') {
+        return sum + (parseFloat(item.amount) || 0);
+      }
+      return sum;
     }, 0);
+  };
+
+  const getRecurringTotal = () => {
+    return lineItems.reduce((sum, item) => {
+      if (item.type === 'recurring') {
+        return sum + (parseFloat(item.amount) || 0);
+      }
+      return sum;
+    }, 0);
+  };
+
+  const hasRecurringItems = () => {
+    return lineItems.some(item => item.type === 'recurring' && parseFloat(item.amount) > 0);
+  };
+
+  const getTotalAmount = () => {
+    return getOneTimeTotal() + getRecurringTotal();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,8 +182,10 @@ export default function AdminEnterpriseBilling() {
       return;
     }
 
-    const total = getTotalAmount();
-    if (total <= 0) {
+    const oneTimeTotal = getOneTimeTotal();
+    const recurringTotal = getRecurringTotal();
+    
+    if (oneTimeTotal <= 0 && recurringTotal <= 0) {
       toast.error('Vänligen ange minst ett belopp');
       return;
     }
@@ -175,10 +200,31 @@ export default function AdminEnterpriseBilling() {
     const toastId = toast.loading('Skapar fakturering...');
     
     try {
-      const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, {
-        billingType,
-        amountSek: total,
-      });
+      let billingType: 'one_time' | 'monthly' | 'yearly';
+      let requestData: any;
+
+      if (recurringTotal > 0) {
+        // Has recurring items, use monthly/yearly with optional one-time add-on
+        billingType = recurringInterval;
+        requestData = {
+          billingType,
+          amountSek: recurringTotal,
+        };
+        
+        if (oneTimeTotal > 0) {
+          requestData.oneTimeAmountSek = oneTimeTotal;
+          requestData.combineOneTime = true;
+        }
+      } else {
+        // Only one-time items
+        billingType = 'one_time';
+        requestData = {
+          billingType,
+          amountSek: oneTimeTotal,
+        };
+      }
+
+      const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, requestData);
       
       toast.success('Fakturering skapad', { id: toastId });
       
@@ -186,14 +232,14 @@ export default function AdminEnterpriseBilling() {
       
       setSuccessDialogData({
         billingType,
-        amountSek: total,
+        amountSek: recurringTotal > 0 ? recurringTotal : oneTimeTotal,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
       });
       setSuccessDialogOpen(true);
       
-      setLineItems([{ description: '', amount: '' }]);
+      setLineItems([{ description: '', amount: '', type: 'one_time' }]);
       
     } catch (error: any) {
       console.error('Failed to create billing:', error);
@@ -411,45 +457,10 @@ export default function AdminEnterpriseBilling() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base font-medium">Lägg till betalning</CardTitle>
-                  <CardDescription>Skapa en faktura eller prenumeration med flera poster</CardDescription>
+                  <CardDescription>Lägg till poster och välj om de är engångsbetalningar eller återkommande</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>Typ</Label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          type="button"
-                          variant={billingType === 'one_time' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setBillingType('one_time')}
-                        >
-                          Engång
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={billingType === 'monthly' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setBillingType('monthly')}
-                        >
-                          Per månad
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={billingType === 'yearly' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setBillingType('yearly')}
-                        >
-                          Per år
-                        </Button>
-                      </div>
-                      {billingType !== 'one_time' && (
-                        <p className="text-xs text-muted-foreground">
-                          Alla poster faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
-                        </p>
-                      )}
-                    </div>
-
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Poster</Label>
@@ -465,13 +476,27 @@ export default function AdminEnterpriseBilling() {
 
                       <div className="space-y-3">
                         {lineItems.map((item, index) => (
-                          <div key={index} className="flex gap-2 items-start">
-                            <div className="flex-1 space-y-2">
+                          <div key={index} className="p-3 rounded-lg border space-y-2">
+                            <div className="flex gap-2">
                               <Input
-                                placeholder="Beskrivning (valfritt)"
+                                placeholder="Beskrivning (t.ex. Månadsavgift, Setup)"
                                 value={item.description}
                                 onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                                className="flex-1"
                               />
+                              {lineItems.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeLineItem(index)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            
+                            <div className="flex gap-2">
                               <Input
                                 type="number"
                                 step="0.01"
@@ -480,36 +505,85 @@ export default function AdminEnterpriseBilling() {
                                 value={item.amount}
                                 onChange={(e) => updateLineItem(index, 'amount', e.target.value)}
                                 required
+                                className="flex-1"
                               />
+                              <div className="flex rounded-md border">
+                                <Button
+                                  type="button"
+                                  variant={item.type === 'one_time' ? 'default' : 'ghost'}
+                                  size="sm"
+                                  onClick={() => updateLineItem(index, 'type', 'one_time')}
+                                  className="rounded-r-none border-r"
+                                >
+                                  Engång
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant={item.type === 'recurring' ? 'default' : 'ghost'}
+                                  size="sm"
+                                  onClick={() => updateLineItem(index, 'type', 'recurring')}
+                                  className="rounded-l-none"
+                                >
+                                  Återkommande
+                                </Button>
+                              </div>
                             </div>
-                            {lineItems.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeLineItem(index)}
-                                className="mt-1"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    {getTotalAmount() > 0 && (
-                      <div className="p-4 rounded-lg border bg-muted/30">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">Totalt belopp</span>
-                          <span className="text-lg font-semibold">
-                            {getTotalAmount().toLocaleString('sv-SE')} kr
-                          </span>
+                    {hasRecurringItems() && (
+                      <div className="space-y-2">
+                        <Label>Återkommande intervall</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            type="button"
+                            variant={recurringInterval === 'monthly' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setRecurringInterval('monthly')}
+                          >
+                            Per månad
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={recurringInterval === 'yearly' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setRecurringInterval('yearly')}
+                          >
+                            Per år
+                          </Button>
                         </div>
-                        {billingType !== 'one_time' && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
-                          </p>
+                      </div>
+                    )}
+
+                    {getTotalAmount() > 0 && (
+                      <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
+                        {getOneTimeTotal() > 0 && (
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Engångsbelopp</span>
+                            <span className="font-medium">{getOneTimeTotal().toLocaleString('sv-SE')} kr</span>
+                          </div>
+                        )}
+                        {getRecurringTotal() > 0 && (
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">
+                              Återkommande ({recurringInterval === 'monthly' ? 'månad' : 'år'})
+                            </span>
+                            <span className="font-medium">{getRecurringTotal().toLocaleString('sv-SE')} kr</span>
+                          </div>
+                        )}
+                        {getOneTimeTotal() > 0 && getRecurringTotal() > 0 && (
+                          <>
+                            <div className="border-t pt-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium">Första fakturan</span>
+                                <span className="text-lg font-semibold">
+                                  {getTotalAmount().toLocaleString('sv-SE')} kr
+                                </span>
+                              </div>
+                            </div>
+                          </>
                         )}
                       </div>
                     )}
