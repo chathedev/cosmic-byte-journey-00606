@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical, Plus } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -70,7 +70,9 @@ export default function AdminEnterpriseBilling() {
   const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('one_time');
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
   
-  const [amount, setAmount] = useState("");
+  const [lineItems, setLineItems] = useState<Array<{ description: string; amount: string }>>([
+    { description: '', amount: '' }
+  ]);
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   
@@ -127,6 +129,28 @@ export default function AdminEnterpriseBilling() {
     }
   };
 
+  const addLineItem = () => {
+    setLineItems([...lineItems, { description: '', amount: '' }]);
+  };
+
+  const removeLineItem = (index: number) => {
+    if (lineItems.length === 1) return;
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const updateLineItem = (index: number, field: 'description' | 'amount', value: string) => {
+    const updated = [...lineItems];
+    updated[index][field] = value;
+    setLineItems(updated);
+  };
+
+  const getTotalAmount = () => {
+    return lineItems.reduce((sum, item) => {
+      const amount = parseFloat(item.amount) || 0;
+      return sum + amount;
+    }, 0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -135,9 +159,15 @@ export default function AdminEnterpriseBilling() {
       return;
     }
 
-    const amountValue = parseFloat(amount);
-    if (!amountValue || amountValue <= 0) {
-      toast.error('Vänligen ange ett giltigt belopp');
+    const total = getTotalAmount();
+    if (total <= 0) {
+      toast.error('Vänligen ange minst ett belopp');
+      return;
+    }
+
+    const validItems = lineItems.filter(item => parseFloat(item.amount) > 0);
+    if (validItems.length === 0) {
+      toast.error('Vänligen ange minst ett belopp');
       return;
     }
 
@@ -147,7 +177,7 @@ export default function AdminEnterpriseBilling() {
     try {
       const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, {
         billingType,
-        amountSek: amountValue,
+        amountSek: total,
       });
       
       toast.success('Fakturering skapad', { id: toastId });
@@ -156,14 +186,14 @@ export default function AdminEnterpriseBilling() {
       
       setSuccessDialogData({
         billingType,
-        amountSek: amountValue,
+        amountSek: total,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
       });
       setSuccessDialogOpen(true);
       
-      setAmount("");
+      setLineItems([{ description: '', amount: '' }]);
       
     } catch (error: any) {
       console.error('Failed to create billing:', error);
@@ -381,10 +411,10 @@ export default function AdminEnterpriseBilling() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base font-medium">Lägg till betalning</CardTitle>
-                  <CardDescription>Skapa en faktura eller prenumeration</CardDescription>
+                  <CardDescription>Skapa en faktura eller prenumeration med flera poster</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-5">
+                  <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">
                       <Label>Typ</Label>
                       <div className="grid grid-cols-3 gap-2">
@@ -402,7 +432,7 @@ export default function AdminEnterpriseBilling() {
                           size="sm"
                           onClick={() => setBillingType('monthly')}
                         >
-                          Månad
+                          Per månad
                         </Button>
                         <Button
                           type="button"
@@ -410,34 +440,84 @@ export default function AdminEnterpriseBilling() {
                           size="sm"
                           onClick={() => setBillingType('yearly')}
                         >
-                          År
+                          Per år
                         </Button>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="amount">Belopp (SEK)</Label>
-                      <Input
-                        id="amount"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="15000"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        required
-                      />
                       {billingType !== 'one_time' && (
                         <p className="text-xs text-muted-foreground">
-                          Faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
+                          Alla poster faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
                         </p>
                       )}
                     </div>
 
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Poster</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addLineItem}
+                        >
+                          + Lägg till post
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {lineItems.map((item, index) => (
+                          <div key={index} className="flex gap-2 items-start">
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                placeholder="Beskrivning (valfritt)"
+                                value={item.description}
+                                onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                              />
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Belopp (SEK)"
+                                value={item.amount}
+                                onChange={(e) => updateLineItem(index, 'amount', e.target.value)}
+                                required
+                              />
+                            </div>
+                            {lineItems.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeLineItem(index)}
+                                className="mt-1"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {getTotalAmount() > 0 && (
+                      <div className="p-4 rounded-lg border bg-muted/30">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Totalt belopp</span>
+                          <span className="text-lg font-semibold">
+                            {getTotalAmount().toLocaleString('sv-SE')} kr
+                          </span>
+                        </div>
+                        {billingType !== 'one_time' && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <Button 
                       type="submit" 
                       className="w-full"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || getTotalAmount() <= 0}
                     >
                       {isSubmitting ? (
                         <>
@@ -445,7 +525,7 @@ export default function AdminEnterpriseBilling() {
                           Skapar...
                         </>
                       ) : (
-                        'Skapa'
+                        'Skapa fakturering'
                       )}
                     </Button>
                   </form>
