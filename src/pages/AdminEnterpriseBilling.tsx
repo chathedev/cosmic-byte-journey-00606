@@ -460,6 +460,19 @@ export default function AdminEnterpriseBilling() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Feature Highlight for Subscriptions */}
+                  {(billingType === 'monthly' || billingType === 'yearly') && (
+                    <Alert className="mb-6 border-primary bg-primary/10">
+                      <CreditCard className="h-4 w-4 text-primary" />
+                      <AlertDescription className="text-foreground">
+                        <strong>💡 Kombinera prenumeration + engångsavgift!</strong>
+                        <br />
+                        Du kan lägga till både ett återkommande belopp OCH en engångsavgift (t.ex. installationsavgift) på samma gång.
+                        <br />
+                        <span className="text-sm text-muted-foreground">Exempel: 5000 SEK/månad + 15000 SEK engång → första fakturan blir 20000 SEK, sedan 5000 SEK/månad</span>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Billing Type Tabs */}
                     <div className="space-y-3">
@@ -515,31 +528,44 @@ export default function AdminEnterpriseBilling() {
                         </div>
                       ) : (
                         /* Subscription - recurring + optional one-time */
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="recurringAmount" className="text-foreground">
-                              Återkommande Belopp ({billingType === 'monthly' ? 'per månad' : 'per år'}) (SEK) *
-                            </Label>
+                        <div className="space-y-6">
+                          {/* Recurring Amount */}
+                          <div className="space-y-2 p-4 border-2 border-primary/30 rounded-lg bg-primary/5">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                1
+                              </div>
+                              <Label htmlFor="recurringAmount" className="text-foreground font-bold text-base">
+                                Återkommande Belopp ({billingType === 'monthly' ? 'per månad' : 'per år'}) *
+                              </Label>
+                            </div>
                             <Input
                               id="recurringAmount"
                               type="number"
                               step="0.01"
                               min="0.01"
-                              placeholder="5000.00"
+                              placeholder={billingType === 'monthly' ? '5000.00' : '50000.00'}
                               value={recurringAmount}
                               onChange={(e) => setRecurringAmount(e.target.value)}
-                              className="bg-background border-border text-foreground text-lg font-semibold"
+                              className="bg-background border-2 border-primary/50 text-foreground text-xl font-bold h-14"
                               required
                             />
                             <p className="text-sm text-muted-foreground">
-                              Belopp som faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
+                              💳 Detta belopp faktureras automatiskt {billingType === 'monthly' ? 'varje månad' : 'varje år'}
                             </p>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label htmlFor="oneTimeAmount" className="text-foreground">
-                              Engångsavgift (SEK) <span className="text-muted-foreground">(Valfritt)</span>
-                            </Label>
+                          {/* One-Time Amount - Highlighted as optional add-on */}
+                          <div className="space-y-2 p-4 border-2 border-dashed border-secondary/30 rounded-lg bg-secondary/5">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center font-bold text-sm">
+                                2
+                              </div>
+                              <Label htmlFor="oneTimeAmount" className="text-foreground font-bold text-base">
+                                Engångsavgift 
+                                <span className="text-muted-foreground font-normal ml-2">(Valfritt - lägg till om du vill)</span>
+                              </Label>
+                            </div>
                             <Input
                               id="oneTimeAmount"
                               type="number"
@@ -548,49 +574,68 @@ export default function AdminEnterpriseBilling() {
                               placeholder="15000.00"
                               value={oneTimeAmount}
                               onChange={(e) => setOneTimeAmount(e.target.value)}
-                              className="bg-background border-border text-foreground text-lg font-semibold"
+                              className="bg-background border-2 border-secondary/50 text-foreground text-xl font-bold h-14"
                             />
                             <p className="text-sm text-muted-foreground">
-                              Extra engångsavgift (t.ex. installationsavgift, onboarding)
+                              ⚡ Valfri engångsavgift som läggs till (t.ex. installation, setup, onboarding)
                             </p>
+                            {parseFloat(oneTimeAmount || '0') > 0 && (
+                              <div className="mt-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-sm text-green-700 dark:text-green-400">
+                                ✅ Perfekt! Engångsavgiften kommer att läggas till i faktureringen
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Summary */}
+                    {/* Enhanced Summary with visual breakdown */}
                     {(parseFloat(recurringAmount) > 0 || parseFloat(oneTimeAmount) > 0) && (
-                      <Card className="border-primary/20 bg-primary/5">
+                      <Card className="border-2 border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10">
                         <CardContent className="pt-6">
-                          <div className="space-y-2">
-                            <h4 className="font-semibold text-foreground">Sammanfattning:</h4>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Receipt className="h-5 w-5 text-primary" />
+                              <h4 className="font-bold text-foreground text-lg">Faktureringssammanfattning</h4>
+                            </div>
                             {billingType === 'one_time' ? (
-                              <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Total:</span>
-                                <span className="text-2xl font-bold text-primary">
+                              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+                                <span className="text-muted-foreground font-medium">Total:</span>
+                                <span className="text-3xl font-bold text-primary">
                                   {parseFloat(recurringAmount || '0').toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
                                 </span>
                               </div>
                             ) : (
                               <>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-muted-foreground">Återkommande ({billingType === 'monthly' ? 'månad' : 'år'}):</span>
-                                  <span className="text-xl font-bold text-primary">
+                                <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-primary" />
+                                    <span className="text-muted-foreground font-medium">Återkommande ({billingType === 'monthly' ? 'månad' : 'år'}):</span>
+                                  </div>
+                                  <span className="text-2xl font-bold text-primary">
                                     {parseFloat(recurringAmount || '0').toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
                                   </span>
                                 </div>
                                 {parseFloat(oneTimeAmount || '0') > 0 && (
                                   <>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-muted-foreground">Engångsavgift:</span>
-                                      <span className="text-lg font-semibold text-secondary-foreground">
+                                    <div className="flex justify-between items-center p-3 bg-background rounded-lg">
+                                      <div className="flex items-center gap-2">
+                                        <Plus className="h-4 w-4 text-secondary" />
+                                        <span className="text-muted-foreground font-medium">Engångsavgift:</span>
+                                      </div>
+                                      <span className="text-2xl font-bold text-secondary">
                                         {parseFloat(oneTimeAmount || '0').toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
                                       </span>
                                     </div>
-                                    <Separator />
-                                    <div className="flex justify-between items-center pt-2">
-                                      <span className="font-semibold text-foreground">Första fakturan:</span>
-                                      <span className="text-2xl font-bold">
+                                    <Separator className="my-2" />
+                                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-lg border-2 border-primary/30">
+                                      <div className="space-y-1">
+                                        <span className="font-bold text-foreground text-base">🎯 Första fakturan totalt:</span>
+                                        <p className="text-xs text-muted-foreground">
+                                          Sedan {parseFloat(recurringAmount || '0').toLocaleString('sv-SE')} SEK/{billingType === 'monthly' ? 'mån' : 'år'}
+                                        </p>
+                                      </div>
+                                      <span className="text-3xl font-bold text-foreground">
                                         {(parseFloat(recurringAmount || '0') + parseFloat(oneTimeAmount || '0')).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
                                       </span>
                                     </div>
@@ -605,24 +650,35 @@ export default function AdminEnterpriseBilling() {
 
                     {/* Combine One-Time Items Toggle - Show for subscriptions with one-time amount */}
                     {(billingType === 'monthly' || billingType === 'yearly') && parseFloat(oneTimeAmount || '0') > 0 && (
-                      <Card className="border-primary/20 bg-muted/30">
+                      <Card className="border-2 border-primary/30 bg-gradient-to-br from-accent/10 to-muted/30">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between space-x-4">
-                            <div className="flex-1 space-y-1">
-                              <Label htmlFor="combine-toggle" className="text-base font-semibold cursor-pointer">
-                                Kombinera engångsavgift med första fakturan
-                              </Label>
-                              <p className="text-sm text-muted-foreground">
-                                {combineOneTime 
-                                  ? "✅ Engångsavgiften kommer att inkluderas på samma faktura som första prenumerationsbetalningen."
-                                  : "📄 Engångsavgiften kommer att skapas som en separat faktura, följd av prenumerationsfakturan."
-                                }
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-sm">
+                                  3
+                                </div>
+                                <Label htmlFor="combine-toggle" className="text-base font-bold cursor-pointer">
+                                  📋 Faktureringsalternativ
+                                </Label>
+                              </div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Kombinera engångsavgift med första fakturan?
                               </p>
+                              <div className="p-3 bg-background rounded-lg border">
+                                <p className="text-sm text-muted-foreground">
+                                  {combineOneTime 
+                                    ? "✅ EN FAKTURA: Engångsavgiften inkluderas på samma faktura som första prenumerationsbetalningen (enklare för kunden)."
+                                    : "📄 TVÅ FAKTUROR: Engångsavgiften skickas som separat faktura först, sedan kommer prenumerationsfakturan."
+                                  }
+                                </p>
+                              </div>
                             </div>
                             <Switch
                               id="combine-toggle"
                               checked={combineOneTime}
                               onCheckedChange={setCombineOneTime}
+                              className="data-[state=checked]:bg-primary"
                             />
                           </div>
                         </CardContent>
