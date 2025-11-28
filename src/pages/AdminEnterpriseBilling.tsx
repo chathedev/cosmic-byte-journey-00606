@@ -20,10 +20,14 @@ import { sv } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
 
 interface Company {
-  companyId: string;
-  companyName: string;
-  description?: string;
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  contactEmail?: string;
   memberCount?: number;
+  domains?: string[];
+  notes?: string | null;
 }
 
 interface BillingRecord {
@@ -78,9 +82,11 @@ export default function AdminEnterpriseBilling() {
     setIsLoading(true);
     try {
       const data = await apiClient.getEnterpriseCompanies();
-      setCompanies(data.companies || []);
+      // API returns summaries with memberCount, use that instead of full companies list
+      const companiesList = data.summaries || data.companies || [];
+      setCompanies(companiesList);
     } catch (error: any) {
-      console.error('Failed to load companies:', error);
+      console.error('Failed to load companies');
       toast.error('Kunde inte ladda företag');
     } finally {
       setIsLoading(false);
@@ -209,7 +215,7 @@ export default function AdminEnterpriseBilling() {
     }
   };
 
-  const selectedCompany = companies.find(c => c.companyId === selectedCompanyId);
+  const selectedCompany = companies.find(c => c.id === selectedCompanyId);
 
   const getBillingTypeLabel = (type: string) => {
     switch (type) {
@@ -297,9 +303,9 @@ export default function AdminEnterpriseBilling() {
                     aria-expanded={companySearchOpen}
                     className="w-full justify-between bg-background text-foreground border-2 hover:bg-accent hover:text-accent-foreground h-11 font-medium"
                   >
-                    <span className="text-foreground">
+                    <span className="text-foreground font-medium">
                       {selectedCompanyId
-                        ? companies.find((company) => company.companyId === selectedCompanyId)?.companyName
+                        ? companies.find((company) => company.id === selectedCompanyId)?.name || "Välj ett företag..."
                         : "Välj ett företag..."}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -313,25 +319,25 @@ export default function AdminEnterpriseBilling() {
                       <CommandGroup>
                         {companies.map((company) => (
                           <CommandItem
-                            key={company.companyId}
-                            value={company.companyName}
+                            key={company.id}
+                            value={company.name}
                             onSelect={() => {
-                              setSelectedCompanyId(company.companyId);
+                              setSelectedCompanyId(company.id);
                               setCompanySearchOpen(false);
                             }}
                             className="cursor-pointer hover:bg-accent hover:text-accent-foreground py-3"
                           >
                             <Building2 className="mr-3 h-5 w-5 shrink-0 text-primary" />
-                            <span className="flex-1 text-foreground font-medium">{company.companyName}</span>
+                            <span className="flex-1 text-foreground font-medium">{company.name}</span>
                             {company.memberCount !== undefined && (
-                              <span className="text-xs text-muted-foreground ml-2 font-normal">
-                                ({company.memberCount} medlemmar)
-                              </span>
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                {company.memberCount} {company.memberCount === 1 ? 'medlem' : 'medlemmar'}
+                              </Badge>
                             )}
                             <Check
                               className={cn(
                                 "ml-3 h-5 w-5 shrink-0 text-primary",
-                                selectedCompanyId === company.companyId ? "opacity-100" : "opacity-0"
+                                selectedCompanyId === company.id ? "opacity-100" : "opacity-0"
                               )}
                             />
                           </CommandItem>
@@ -341,10 +347,23 @@ export default function AdminEnterpriseBilling() {
                   </Command>
                 </PopoverContent>
               </Popover>
-              {selectedCompany?.description && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {selectedCompany.description}
-                </p>
+              {selectedCompany && (
+                <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                  {selectedCompany.contactEmail && (
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium">Kontakt:</span>
+                      <span className="blur-sm hover:blur-none transition-all cursor-pointer" title="Klicka för att visa">
+                        {selectedCompany.contactEmail}
+                      </span>
+                    </p>
+                  )}
+                  {selectedCompany.domains && selectedCompany.domains.length > 0 && (
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium">Domäner:</span>
+                      <span>{selectedCompany.domains.join(', ')}</span>
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </CardContent>
