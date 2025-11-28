@@ -1293,6 +1293,34 @@ class ApiClient {
     return response.json();
   }
 
+  async createEnterpriseCompanyBilling(
+    companyId: string,
+    data: {
+      billingType: 'one_time' | 'monthly' | 'yearly';
+      amountSek: number;
+    }
+  ): Promise<{
+    success: boolean;
+    companyId: string;
+    billingType: string;
+    invoiceUrl: string;
+    portalUrl?: string;
+    subscriptionId?: string;
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/billing`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create billing' }));
+      throw new Error(error.error || 'Failed to create company billing');
+    }
+    return response.json();
+  }
+
   // Transcription API
   async transcribeAudio(audioFile: File, language: string = 'sv', modelSize: string = 'base'): Promise<string> {
     const token = this.getToken();

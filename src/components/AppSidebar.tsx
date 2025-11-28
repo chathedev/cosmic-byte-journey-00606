@@ -118,6 +118,7 @@ export function AppSidebar() {
       else if (path === "/admin/admins") setSelected("Admins");
       else if (path === "/admin/backend") setSelected("Backend");
       else if (path === "/admin/enterprise") setSelected("Enterprise");
+      else if (path === "/admin/enterprise/billing") setSelected("Enterprise Billing");
     }
   }, [location.pathname]);
 
