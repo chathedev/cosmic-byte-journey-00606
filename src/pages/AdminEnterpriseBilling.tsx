@@ -525,48 +525,33 @@ export default function AdminEnterpriseBilling() {
                 <CardHeader>
                   <CardTitle>Skapa Fakturering med Flera Rader</CardTitle>
                   <CardDescription>
-                    Lägg till produkter/tjänster rad för rad. Totalen beräknas automatiskt.
+                    Välj faktureringstyp och lägg till produkter/tjänster rad för rad
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Billing Type */}
-                    <div className="space-y-2">
-                      <Label htmlFor="billingType" className="text-foreground">Faktureringstyp *</Label>
-                      <Select
-                        value={billingType}
-                        onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')}
-                      >
-                        <SelectTrigger id="billingType">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="one_time">
-                            <div className="space-y-1">
-                              <div className="font-medium">Engångsfaktura</div>
-                              <div className="text-xs text-muted-foreground">
-                                Skapar en enskild faktura, inga återkommande avgifter
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="monthly">
-                            <div className="space-y-1">
-                              <div className="font-medium">Månadsprenumeration</div>
-                              <div className="text-xs text-muted-foreground">
-                                Återkommande månatliga avgifter
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="yearly">
-                            <div className="space-y-1">
-                              <div className="font-medium">Årsprenumeration</div>
-                              <div className="text-xs text-muted-foreground">
-                                Återkommande årliga avgifter
-                              </div>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                    {/* Billing Type Tabs */}
+                    <div className="space-y-3">
+                      <Label className="text-foreground text-base font-semibold">Välj Faktureringstyp</Label>
+                      <Tabs value={billingType} onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')} className="w-full">
+                        <TabsList className="grid w-full grid-cols-3 h-auto">
+                          <TabsTrigger value="one_time" className="flex flex-col gap-1 py-3">
+                            <Receipt className="h-5 w-5" />
+                            <span className="font-semibold">Engång</span>
+                            <span className="text-xs text-muted-foreground">En faktura</span>
+                          </TabsTrigger>
+                          <TabsTrigger value="monthly" className="flex flex-col gap-1 py-3">
+                            <Calendar className="h-5 w-5" />
+                            <span className="font-semibold">Månad</span>
+                            <span className="text-xs text-muted-foreground">Varje månad</span>
+                          </TabsTrigger>
+                          <TabsTrigger value="yearly" className="flex flex-col gap-1 py-3">
+                            <Calendar className="h-5 w-5" />
+                            <span className="font-semibold">År</span>
+                            <span className="text-xs text-muted-foreground">Varje år</span>
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
                     </div>
 
                     <Separator />
