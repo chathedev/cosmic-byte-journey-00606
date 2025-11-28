@@ -217,19 +217,18 @@ export default function AdminEnterpriseBilling() {
             <div className="space-y-2">
               <Label htmlFor="company" className="text-foreground">Företag</Label>
               <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                <SelectTrigger id="company" className="bg-background border-border">
-                  <SelectValue placeholder="Välj ett företag" className="text-foreground" />
+                <SelectTrigger id="company">
+                  <SelectValue placeholder="Välj ett företag" />
                 </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
+                <SelectContent>
                   {companies.map((company) => (
                     <SelectItem 
                       key={company.companyId} 
                       value={company.companyId}
-                      className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-foreground">{company.companyName}</span>
+                        <span>{company.companyName}</span>
                         {company.memberCount !== undefined && (
                           <span className="text-xs text-muted-foreground">
                             ({company.memberCount} medlemmar)
@@ -325,44 +324,43 @@ export default function AdminEnterpriseBilling() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Billing Type */}
-                    <div className="space-y-2">
-                      <Label htmlFor="billingType" className="text-foreground">Faktureringstyp *</Label>
-                      <Select
-                        value={billingType}
-                        onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')}
-                      >
-                        <SelectTrigger id="billingType" className="bg-background border-border">
-                          <SelectValue className="text-foreground" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover border-border z-50">
-                          <SelectItem value="one_time" className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer">
-                            <div className="space-y-1">
-                              <div className="font-medium text-foreground">Engångsfaktura</div>
-                              <div className="text-xs text-muted-foreground">
-                                Skapar en enskild faktura, inga återkommande avgifter
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="monthly" className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer">
-                            <div className="space-y-1">
-                              <div className="font-medium text-foreground">Månadsprenumeration</div>
-                              <div className="text-xs text-muted-foreground">
-                                Återkommande månatliga avgifter
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="yearly" className="text-foreground hover:bg-accent focus:bg-accent cursor-pointer">
-                            <div className="space-y-1">
-                              <div className="font-medium text-foreground">Årsprenumeration</div>
-                              <div className="text-xs text-muted-foreground">
-                                Återkommande årliga avgifter
-                              </div>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="billingType" className="text-foreground">Faktureringstyp *</Label>
+                  <Select
+                    value={billingType}
+                    onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')}
+                  >
+                    <SelectTrigger id="billingType">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="one_time">
+                        <div className="space-y-1">
+                          <div className="font-medium">Engångsfaktura</div>
+                          <div className="text-xs text-muted-foreground">
+                            Skapar en enskild faktura, inga återkommande avgifter
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="monthly">
+                        <div className="space-y-1">
+                          <div className="font-medium">Månadsprenumeration</div>
+                          <div className="text-xs text-muted-foreground">
+                            Återkommande månatliga avgifter
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="yearly">
+                        <div className="space-y-1">
+                          <div className="font-medium">Årsprenumeration</div>
+                          <div className="text-xs text-muted-foreground">
+                            Återkommande årliga avgifter
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
                     {/* Amount */}
                     <div className="space-y-2">
