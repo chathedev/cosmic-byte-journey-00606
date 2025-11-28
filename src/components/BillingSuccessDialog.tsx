@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -10,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Mail, ExternalLink, FileText, CreditCard } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface BillingSuccessDialogProps {
   open: boolean;
@@ -36,125 +36,80 @@ export default function BillingSuccessDialog({
   portalUrl,
   companyName,
   oneTimeInvoiceUrl,
-  oneTimeInvoiceId,
 }: BillingSuccessDialogProps) {
-  const [emailTo, setEmailTo] = useState("");
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
 
   const getBillingTypeLabel = (type: string) => {
     switch (type) {
-      case 'one_time': return 'Engångsfaktura';
-      case 'monthly': return 'Månadsprenumeration';
-      case 'yearly': return 'Årsprenumeration';
+      case 'one_time': return 'Engång';
+      case 'monthly': return 'Månad';
+      case 'yearly': return 'År';
       default: return type;
     }
   };
 
-  const handleCopyInvoiceLink = () => {
-    navigator.clipboard.writeText(invoiceUrl);
-    toast.success("Fakturalänk kopierad!");
-  };
-
-  const handleCopyPortalLink = () => {
-    if (portalUrl) {
-      navigator.clipboard.writeText(portalUrl);
-      toast.success("Portal-länk kopierad!");
-    }
-  };
-
-  const handleSendEmail = async () => {
-    if (!emailTo.trim()) {
-      toast.error("Vänligen ange en e-postadress");
-      return;
-    }
-
-    setIsSendingEmail(true);
+  const handleCopy = async (text: string, label: string) => {
+    setIsCopying(true);
     try {
-      // TODO: Implement actual email sending via backend
-      // For now, just copy to clipboard
-      const emailBody = `
-Hej!
-
-En ${getBillingTypeLabel(billingType).toLowerCase()} har skapats för ${companyName}.
-
-${billingType === 'one_time' 
-  ? `Belopp: ${amountSek.toLocaleString('sv-SE')} SEK`
-  : `Återkommande Belopp: ${amountSek.toLocaleString('sv-SE')} SEK${oneTimeAmountSek && oneTimeAmountSek > 0 ? `\nEngångsavgift: ${oneTimeAmountSek.toLocaleString('sv-SE')} SEK\nFörsta Faktura Total: ${(amountSek + oneTimeAmountSek).toLocaleString('sv-SE')} SEK` : ''}`
-}
-
-Faktura: ${invoiceUrl}
-${portalUrl ? `\nBilling Portal: ${portalUrl}` : ''}
-
-Vänliga hälsningar
-      `.trim();
-
-      await navigator.clipboard.writeText(emailBody);
-      toast.success("E-postinnehåll kopierat! Klistra in i din e-postklient.");
-      setEmailTo("");
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} kopierad`);
     } catch (error) {
-      toast.error("Kunde inte förbereda e-post");
+      toast.error('Kunde inte kopiera');
     } finally {
-      setIsSendingEmail(false);
+      setIsCopying(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="text-2xl">Fakturering Skapad!</DialogTitle>
-              <DialogDescription>
-                {getBillingTypeLabel(billingType)} för {companyName}
-              </DialogDescription>
-            </div>
+            <CheckCircle2 className="h-5 w-5" />
+            <DialogTitle>Fakturering skapad</DialogTitle>
           </div>
+          <p className="text-sm text-muted-foreground">{companyName}</p>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Summary */}
-          <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+          <div className="rounded-lg border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Typ</span>
-              <Badge variant={billingType === 'one_time' ? 'secondary' : 'default'}>
-                {getBillingTypeLabel(billingType)}
-              </Badge>
+              <span className="text-sm text-muted-foreground">Typ</span>
+              <Badge variant="outline">{getBillingTypeLabel(billingType)}</Badge>
             </div>
             
             {billingType === 'one_time' ? (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Belopp</span>
-                <span className="text-2xl font-bold text-primary">
+                <span className="text-sm text-muted-foreground">Belopp</span>
+                <span className="text-lg font-semibold">
                   {amountSek.toLocaleString('sv-SE')} SEK
                 </span>
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Återkommande Belopp</span>
-                  <span className="text-2xl font-bold text-primary">
+                  <span className="text-sm text-muted-foreground">Återkommande</span>
+                  <span className="font-medium">
                     {amountSek.toLocaleString('sv-SE')} SEK
                   </span>
                 </div>
                 {oneTimeAmountSek && oneTimeAmountSek > 0 && (
-                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                    <span className="text-sm font-medium text-muted-foreground">Engångsavgift</span>
-                    <span className="text-lg font-bold text-secondary-foreground">
-                      {oneTimeAmountSek.toLocaleString('sv-SE')} SEK
-                    </span>
-                  </div>
-                )}
-                {oneTimeAmountSek && oneTimeAmountSek > 0 && (
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs font-medium text-muted-foreground">Första Faktura Total</span>
-                    <span className="text-base font-semibold">
-                      {(amountSek + oneTimeAmountSek).toLocaleString('sv-SE')} SEK
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Engång</span>
+                      <span className="font-medium">
+                        {oneTimeAmountSek.toLocaleString('sv-SE')} SEK
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Första fakturan</span>
+                      <span className="text-lg font-semibold">
+                        {(amountSek + oneTimeAmountSek).toLocaleString('sv-SE')} SEK
+                      </span>
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -162,150 +117,93 @@ Vänliga hälsningar
 
           {/* Invoice Link */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-foreground">
-              <FileText className="h-4 w-4" />
-              Fakturalänk
-            </Label>
+            <Label className="text-sm">Fakturalänk</Label>
             <div className="flex gap-2">
               <Input
                 value={invoiceUrl}
                 readOnly
-                className="flex-1 font-mono text-xs bg-background"
+                className="flex-1 text-xs font-mono"
               />
               <Button
-                type="button"
                 variant="outline"
                 size="icon"
-                onClick={handleCopyInvoiceLink}
+                onClick={() => handleCopy(invoiceUrl, 'Länk')}
+                disabled={isCopying}
               >
                 <Copy className="h-4 w-4" />
               </Button>
               <Button
-                type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => window.open(invoiceUrl, '_blank', 'noopener,noreferrer')}
+                onClick={() => window.open(invoiceUrl, '_blank')}
               >
                 <ExternalLink className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Dela denna länk med företaget för att visa fakturan
-            </p>
           </div>
 
-          {/* Separate One-Time Invoice Link (if exists) */}
+          {/* One-Time Invoice Link */}
           {oneTimeInvoiceUrl && (
             <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-foreground">
-                <FileText className="h-4 w-4" />
-                Separat Engångsfaktura
-              </Label>
+              <Label className="text-sm">Separat engångsfaktura</Label>
               <div className="flex gap-2">
                 <Input
                   value={oneTimeInvoiceUrl}
                   readOnly
-                  className="flex-1 font-mono text-xs bg-background"
+                  className="flex-1 text-xs font-mono"
                 />
                 <Button
-                  type="button"
                   variant="outline"
                   size="icon"
-                  onClick={() => {
-                    navigator.clipboard.writeText(oneTimeInvoiceUrl);
-                    toast.success("Engångsfakturalänk kopierad!");
-                  }}
+                  onClick={() => handleCopy(oneTimeInvoiceUrl, 'Länk')}
+                  disabled={isCopying}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
                 <Button
-                  type="button"
                   variant="outline"
                   size="icon"
-                  onClick={() => window.open(oneTimeInvoiceUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(oneTimeInvoiceUrl, '_blank')}
                 >
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Den engångsavgiften skapades som en separat faktura
-              </p>
             </div>
           )}
 
-          {/* Portal Link (for subscriptions) */}
+          {/* Portal Link */}
           {portalUrl && (
             <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-foreground">
-                <CreditCard className="h-4 w-4" />
-                Billing Portal (Hantera Prenumeration)
-              </Label>
+              <Label className="text-sm">Billing Portal</Label>
               <div className="flex gap-2">
                 <Input
                   value={portalUrl}
                   readOnly
-                  className="flex-1 font-mono text-xs bg-background"
+                  className="flex-1 text-xs font-mono"
                 />
                 <Button
-                  type="button"
                   variant="outline"
                   size="icon"
-                  onClick={handleCopyPortalLink}
+                  onClick={() => handleCopy(portalUrl, 'Länk')}
+                  disabled={isCopying}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
                 <Button
-                  type="button"
                   variant="outline"
                   size="icon"
-                  onClick={() => window.open(portalUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(portalUrl, '_blank')}
                 >
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Låt företaget hantera sin prenumeration, uppdatera betalningsmetod, etc.
+                Företaget kan hantera sin prenumeration här
               </p>
             </div>
           )}
 
-          {/* Send via Email */}
-          <div className="space-y-2 pt-4 border-t">
-            <Label htmlFor="emailTo" className="flex items-center gap-2 text-foreground">
-              <Mail className="h-4 w-4" />
-              Skicka via E-post
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="emailTo"
-                type="email"
-                placeholder="mottagare@exempel.se"
-                value={emailTo}
-                onChange={(e) => setEmailTo(e.target.value)}
-                className="flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSendEmail();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                onClick={handleSendEmail}
-                disabled={isSendingEmail || !emailTo.trim()}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                {isSendingEmail ? "Förbereder..." : "Kopiera"}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Kopierar e-postinnehåll till urklipp så du kan klistra in det i din e-postklient
-            </p>
-          </div>
-
-          {/* Close Button */}
           <Button
-            type="button"
             variant="outline"
             className="w-full"
             onClick={() => onOpenChange(false)}
