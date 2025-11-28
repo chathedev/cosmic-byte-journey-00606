@@ -1328,16 +1328,28 @@ class ApiClient {
     portalUrl?: string;
     subscriptionId?: string;
   }> {
+    // Ensure we send exactly what the backend expects
+    const payload = {
+      billingType: data.billingType,
+      amountSek: data.amountSek
+    };
+    
+    console.log('🔵 Creating billing:', { companyId, payload });
+    
     const response = await this.fetchWithAuth(
       `/admin/enterprise/companies/${companyId}/billing`,
       {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       }
     );
+    
+    console.log('🔵 Billing response status:', response.status);
+    
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to create billing' }));
-      throw new Error(error.error || 'Failed to create company billing');
+      console.error('🔴 Billing error:', error);
+      throw new Error(error.error || error.message || 'Failed to create company billing');
     }
     return response.json();
   }
