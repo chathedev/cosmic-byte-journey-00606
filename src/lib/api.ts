@@ -866,7 +866,8 @@ class ApiClient {
   // ==================== ENTERPRISE API ====================
 
   // Get current user's enterprise membership (non-admin endpoint)
-  async getMyEnterpriseMembership(): Promise<{
+  // Admins can pass companyId to fetch specific company info
+  async getMyEnterpriseMembership(companyId?: string): Promise<{
     isMember: boolean;
     company?: {
       id: string;
@@ -885,17 +886,30 @@ class ApiClient {
     };
   }> {
     try {
-      const response = await this.fetchWithAuth('/enterprise/me', { suppressAuthRedirect: true });
+      const url = companyId ? `/enterprise/me?companyId=${companyId}` : '/enterprise/me';
+      const response = await this.fetchWithAuth(url, { suppressAuthRedirect: true });
+      
       if (!response.ok) {
-        // User is not an enterprise member - return empty result (expected 404)
+        // Legacy 404 handling for older backends
         if (response.status === 404) {
           return { isMember: false };
         }
-        // Only log non-404 errors
         console.error('[API] Unexpected enterprise membership error:', response.status);
         return { isMember: false };
       }
-      return response.json();
+      
+      const data = await response.json();
+      
+      // Handle new backend response format: { company: null, membership: null }
+      if (!data.company && !data.membership) {
+        return { isMember: false };
+      }
+      
+      return {
+        isMember: true,
+        company: data.company,
+        membership: data.membership
+      };
     } catch (error) {
       // Silently return false for expected cases, only log unexpected errors
       if (error instanceof Error && !error.message.includes('404')) {
