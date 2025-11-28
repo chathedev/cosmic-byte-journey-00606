@@ -84,6 +84,7 @@ export default function AdminEnterpriseBilling() {
   const [successDialogData, setSuccessDialogData] = useState<{
     billingType: 'one_time' | 'monthly' | 'yearly';
     amountSek: number;
+    oneTimeAmountSek?: number;
     invoiceUrl: string;
     portalUrl?: string;
     companyName: string;
@@ -233,6 +234,7 @@ export default function AdminEnterpriseBilling() {
       setSuccessDialogData({
         billingType,
         amountSek: recurringTotal > 0 ? recurringTotal : oneTimeTotal,
+        oneTimeAmountSek: recurringTotal > 0 && oneTimeTotal > 0 ? oneTimeTotal : undefined,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
