@@ -1319,6 +1319,7 @@ class ApiClient {
     data: {
       billingType: 'one_time' | 'monthly' | 'yearly';
       amountSek: number;
+      oneTimeAmountSek?: number;
     }
   ): Promise<{
     success: boolean;
@@ -1328,11 +1329,16 @@ class ApiClient {
     portalUrl?: string;
     subscriptionId?: string;
   }> {
-    // Ensure we send exactly what the backend expects
-    const payload = {
+    // Build payload with optional oneTimeAmountSek
+    const payload: any = {
       billingType: data.billingType,
       amountSek: data.amountSek
     };
+    
+    // Only include oneTimeAmountSek if it's provided and greater than 0
+    if (data.oneTimeAmountSek && data.oneTimeAmountSek > 0) {
+      payload.oneTimeAmountSek = data.oneTimeAmountSek;
+    }
     
     console.log('🔵 Creating billing:', { companyId, payload });
     

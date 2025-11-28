@@ -18,6 +18,7 @@ interface BillingSuccessDialogProps {
   onOpenChange: (open: boolean) => void;
   billingType: 'one_time' | 'monthly' | 'yearly';
   amountSek: number;
+  oneTimeAmountSek?: number;
   invoiceUrl: string;
   portalUrl?: string;
   companyName: string;
@@ -28,6 +29,7 @@ export default function BillingSuccessDialog({
   onOpenChange,
   billingType,
   amountSek,
+  oneTimeAmountSek,
   invoiceUrl,
   portalUrl,
   companyName,
@@ -71,7 +73,10 @@ Hej!
 
 En ${getBillingTypeLabel(billingType).toLowerCase()} har skapats för ${companyName}.
 
-Belopp: ${amountSek.toLocaleString('sv-SE')} SEK
+${billingType === 'one_time' 
+  ? `Belopp: ${amountSek.toLocaleString('sv-SE')} SEK`
+  : `Återkommande Belopp: ${amountSek.toLocaleString('sv-SE')} SEK${oneTimeAmountSek && oneTimeAmountSek > 0 ? `\nEngångsavgift: ${oneTimeAmountSek.toLocaleString('sv-SE')} SEK\nFörsta Faktura Total: ${(amountSek + oneTimeAmountSek).toLocaleString('sv-SE')} SEK` : ''}`
+}
 
 Faktura: ${invoiceUrl}
 ${portalUrl ? `\nBilling Portal: ${portalUrl}` : ''}
@@ -115,12 +120,40 @@ Vänliga hälsningar
                 {getBillingTypeLabel(billingType)}
               </Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Belopp</span>
-              <span className="text-2xl font-bold text-primary">
-                {amountSek.toLocaleString('sv-SE')} SEK
-              </span>
-            </div>
+            
+            {billingType === 'one_time' ? (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Belopp</span>
+                <span className="text-2xl font-bold text-primary">
+                  {amountSek.toLocaleString('sv-SE')} SEK
+                </span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Återkommande Belopp</span>
+                  <span className="text-2xl font-bold text-primary">
+                    {amountSek.toLocaleString('sv-SE')} SEK
+                  </span>
+                </div>
+                {oneTimeAmountSek && oneTimeAmountSek > 0 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                    <span className="text-sm font-medium text-muted-foreground">Engångsavgift</span>
+                    <span className="text-lg font-bold text-secondary-foreground">
+                      {oneTimeAmountSek.toLocaleString('sv-SE')} SEK
+                    </span>
+                  </div>
+                )}
+                {oneTimeAmountSek && oneTimeAmountSek > 0 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xs font-medium text-muted-foreground">Första Faktura Total</span>
+                    <span className="text-base font-semibold">
+                      {(amountSek + oneTimeAmountSek).toLocaleString('sv-SE')} SEK
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Invoice Link */}
