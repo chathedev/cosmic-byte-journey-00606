@@ -277,9 +277,9 @@ export default function AdminEnterpriseBilling() {
                       key={company.companyId} 
                       value={company.companyId}
                     >
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span>{company.companyName}</span>
+                      <div className="flex items-center gap-2 text-foreground">
+                        <Building2 className="h-4 w-4 shrink-0" />
+                        <span className="text-foreground font-medium">{company.companyName}</span>
                         {company.memberCount !== undefined && (
                           <span className="text-xs text-muted-foreground">
                             ({company.memberCount} medlemmar)
