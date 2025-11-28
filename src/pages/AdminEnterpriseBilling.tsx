@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, History, Plus, Calendar, CreditCard, Trash2, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, History, Plus, Calendar, CreditCard, Trash2, ShoppingCart, Check, ChevronsUpDown } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -51,6 +54,7 @@ export default function AdminEnterpriseBilling() {
   
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('one_time');
+  const [companySearchOpen, setCompanySearchOpen] = useState(false);
   
   // Line items state
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -266,30 +270,57 @@ export default function AdminEnterpriseBilling() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label htmlFor="company" className="text-foreground">Företag</Label>
-              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                <SelectTrigger id="company">
-                  <SelectValue placeholder="Välj ett företag" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem 
-                      key={company.companyId} 
-                      value={company.companyId}
-                    >
-                      <div className="flex items-center gap-2 text-foreground">
-                        <Building2 className="h-4 w-4 shrink-0" />
-                        <span className="text-foreground font-medium">{company.companyName}</span>
-                        {company.memberCount !== undefined && (
-                          <span className="text-xs text-muted-foreground">
-                            ({company.memberCount} medlemmar)
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-foreground">Företag</Label>
+              <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={companySearchOpen}
+                    className="w-full justify-between bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    {selectedCompanyId
+                      ? companies.find((company) => company.companyId === selectedCompanyId)?.companyName
+                      : "Välj ett företag..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Sök företag..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>Inget företag hittades.</CommandEmpty>
+                      <CommandGroup>
+                        {companies.map((company) => (
+                          <CommandItem
+                            key={company.companyId}
+                            value={company.companyName}
+                            onSelect={() => {
+                              setSelectedCompanyId(company.companyId);
+                              setCompanySearchOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <Building2 className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="flex-1">{company.companyName}</span>
+                            {company.memberCount !== undefined && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({company.memberCount} medlemmar)
+                              </span>
+                            )}
+                            <Check
+                              className={cn(
+                                "ml-2 h-4 w-4 shrink-0",
+                                selectedCompanyId === company.companyId ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {selectedCompany?.description && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {selectedCompany.description}
