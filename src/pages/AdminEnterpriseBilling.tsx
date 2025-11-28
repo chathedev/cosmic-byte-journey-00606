@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
+import BillingSuccessDialog from "@/components/BillingSuccessDialog";
 
 interface Company {
   id: string;
@@ -67,6 +68,16 @@ export default function AdminEnterpriseBilling() {
   const [currentAmount, setCurrentAmount] = useState("");
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
+  
+  // Success dialog state
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [successDialogData, setSuccessDialogData] = useState<{
+    billingType: 'one_time' | 'monthly' | 'yearly';
+    amountSek: number;
+    invoiceUrl: string;
+    portalUrl?: string;
+    companyName: string;
+  } | null>(null);
 
   useEffect(() => {
     loadCompanies();
@@ -192,16 +203,15 @@ export default function AdminEnterpriseBilling() {
       // Refresh history
       await loadBillingHistory(selectedCompanyId);
       
-      // Open invoice and portal URLs in new tabs
-      if (response.invoiceUrl) {
-        window.open(response.invoiceUrl, '_blank', 'noopener,noreferrer');
-      }
-      if (response.portalUrl && billingType !== 'one_time') {
-        // Small delay before opening second window
-        setTimeout(() => {
-          window.open(response.portalUrl, '_blank', 'noopener,noreferrer');
-        }, 500);
-      }
+      // Show success dialog instead of opening tabs
+      setSuccessDialogData({
+        billingType,
+        amountSek: totalAmount,
+        invoiceUrl: response.invoiceUrl,
+        portalUrl: response.portalUrl,
+        companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
+      });
+      setSuccessDialogOpen(true);
       
       // Reset form
       setLineItems([]);
@@ -656,16 +666,16 @@ export default function AdminEnterpriseBilling() {
               </Card>
 
               {/* Info Card */}
-              <Card className="border-muted">
+              <Card className="border-primary/20 bg-primary/5">
                 <CardHeader>
-                  <CardTitle className="text-base text-foreground">Så här fungerar det</CardTitle>
+                  <CardTitle className="text-base text-foreground">⚠️ Viktigt att veta</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p>• <strong className="text-foreground">Flera rader:</strong> Lägg till så många produkter/tjänster du vill innan du skapar fakturan</p>
-                  <p>• <strong className="text-foreground">Automatisk totalsumma:</strong> Totalen beräknas automatiskt från alla rader (antal × pris)</p>
-                  <p>• <strong className="text-foreground">Engångsfaktura:</strong> Skapar en faktura för totalsumman, inga återkommande avgifter</p>
-                  <p>• <strong className="text-foreground">Månad/År:</strong> Skapar en återkommande prenumeration med totalsumman</p>
-                  <p>• <strong className="text-foreground">Flera faktureringstyper:</strong> Du kan skapa både engångsfakturor och prenumerationer för samma företag</p>
+                  <p>• <strong className="text-foreground">En fakturering per inlämning:</strong> Varje gång du klickar "Skapa" skapas EN separat fakturering med vald typ och totalsumma</p>
+                  <p>• <strong className="text-foreground">Separata faktureringar:</strong> För att skapa både månadsvis och engångsfaktura, skapa dem separat efter varandra</p>
+                  <p>• <strong className="text-foreground">Flera rader:</strong> Lägg till produkter/tjänster innan du skapar - de summeras till EN fakturering</p>
+                  <p>• <strong className="text-foreground">Automatisk totalsumma:</strong> Totalen beräknas från alla rader (antal × pris)</p>
+                  <p>• <strong className="text-foreground">Exempel:</strong> För 5000 SEK månadsvis + 15000 SEK engång → Skapa först månadsvis med 5000 SEK, sedan engång med 15000 SEK</p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -839,6 +849,19 @@ export default function AdminEnterpriseBilling() {
           </Tabs>
         )}
       </div>
+
+      {/* Success Dialog */}
+      {successDialogData && (
+        <BillingSuccessDialog
+          open={successDialogOpen}
+          onOpenChange={setSuccessDialogOpen}
+          billingType={successDialogData.billingType}
+          amountSek={successDialogData.amountSek}
+          invoiceUrl={successDialogData.invoiceUrl}
+          portalUrl={successDialogData.portalUrl}
+          companyName={successDialogData.companyName}
+        />
+      )}
     </div>
   );
 }
