@@ -14,6 +14,7 @@ interface BillingSuccessDialogProps {
   onOpenChange: (open: boolean) => void;
   billingType: 'one_time' | 'monthly' | 'yearly';
   amountSek: number;
+  oneTimeAmountSek?: number;
   invoiceUrl: string;
   portalUrl?: string;
   companyName: string;
@@ -24,6 +25,7 @@ export default function BillingSuccessDialog({
   onOpenChange,
   billingType,
   amountSek,
+  oneTimeAmountSek,
   invoiceUrl,
   portalUrl,
   companyName,
@@ -35,6 +37,10 @@ export default function BillingSuccessDialog({
       case 'yearly': return 'Årsprenumeration';
       default: return type;
     }
+  };
+
+  const getTotalAmount = () => {
+    return amountSek + (oneTimeAmountSek || 0);
   };
 
   return (
@@ -56,14 +62,34 @@ export default function BillingSuccessDialog({
 
         <div className="space-y-4 py-4">
           <div className="space-y-2 p-4 rounded-lg border">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Typ</span>
-              <span className="text-sm font-medium">{getBillingTypeLabel(billingType)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Belopp</span>
-              <span className="text-sm font-medium">{amountSek.toLocaleString('sv-SE')} kr</span>
-            </div>
+            {billingType !== 'one_time' && (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Återkommande ({billingType === 'monthly' ? 'månad' : 'år'})</span>
+                  <span className="text-sm font-medium">{amountSek.toLocaleString('sv-SE')} kr</span>
+                </div>
+                {oneTimeAmountSek && oneTimeAmountSek > 0 && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Engångsavgift</span>
+                      <span className="text-sm font-medium">{oneTimeAmountSek.toLocaleString('sv-SE')} kr</span>
+                    </div>
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Första fakturan</span>
+                        <span className="text-base font-semibold">{getTotalAmount().toLocaleString('sv-SE')} kr</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+            {billingType === 'one_time' && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Engångsbelopp</span>
+                <span className="text-base font-semibold">{amountSek.toLocaleString('sv-SE')} kr</span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
