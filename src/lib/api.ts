@@ -1321,6 +1321,17 @@ class ApiClient {
     return response.json();
   }
 
+  async getEnterpriseCompanyBillingHistory(companyId: string): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/billing`
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch billing history' }));
+      throw new Error(error.error || 'Failed to fetch company billing history');
+    }
+    return response.json();
+  }
+
   // Transcription API
   async transcribeAudio(audioFile: File, language: string = 'sv', modelSize: string = 'base'): Promise<string> {
     const token = this.getToken();
