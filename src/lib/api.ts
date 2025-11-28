@@ -1374,6 +1374,7 @@ class ApiClient {
       amountSek: number;
       status: string;
       invoiceUrl: string;
+      invoiceId?: string;
       portalUrl?: string;
       subscriptionId?: string;
       createdAt: string;
@@ -1395,6 +1396,58 @@ class ApiClient {
       }
       const error = await response.json().catch(() => ({ error: 'Failed to fetch billing history' }));
       throw new Error(error.error || 'Failed to fetch company billing history');
+    }
+    return response.json();
+  }
+
+  async refreshInvoiceStatus(companyId: string, invoiceId: string): Promise<{
+    success: boolean;
+    invoice: {
+      id: string;
+      status: string;
+      invoiceUrl: string;
+      amountSek: number;
+    };
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/billing/${invoiceId}`
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to refresh invoice' }));
+      throw new Error(error.error || 'Failed to refresh invoice status');
+    }
+    return response.json();
+  }
+
+  async sendInvoiceEmail(companyId: string, invoiceId: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/billing/${invoiceId}/send`,
+      {
+        method: 'POST',
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to send invoice' }));
+      throw new Error(error.error || 'Failed to send invoice email');
+    }
+    return response.json();
+  }
+
+  async deleteInvoiceHistoryEntry(companyId: string, entryId: string): Promise<{
+    success: boolean;
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/billing/history/${entryId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to delete entry' }));
+      throw new Error(error.error || 'Failed to delete history entry');
     }
     return response.json();
   }

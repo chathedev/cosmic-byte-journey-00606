@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import BillingSuccessDialog from "@/components/BillingSuccessDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Company {
   id: string;
@@ -65,6 +82,10 @@ export default function AdminEnterpriseBilling() {
     portalUrl?: string;
     companyName: string;
   } | null>(null);
+
+  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCompanies();
@@ -194,6 +215,64 @@ export default function AdminEnterpriseBilling() {
       case 'incomplete_expired':
       case 'uncollectible': return 'destructive';
       default: return 'outline';
+    }
+  };
+
+  const handleRefreshInvoice = async (record: BillingRecord) => {
+    if (!record.invoiceId) {
+      toast.error('Inget faktura-ID');
+      return;
+    }
+
+    const loadingKey = `refresh-${record.id}`;
+    setActionLoading(prev => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      await apiClient.refreshInvoiceStatus(selectedCompanyId, record.invoiceId);
+      toast.success('Status uppdaterad');
+      await loadBillingHistory(selectedCompanyId);
+    } catch (error: any) {
+      console.error('Failed to refresh invoice:', error);
+      toast.error(error.message || 'Kunde inte uppdatera status');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [loadingKey]: false }));
+    }
+  };
+
+  const handleSendInvoice = async (record: BillingRecord) => {
+    if (!record.invoiceId) {
+      toast.error('Inget faktura-ID');
+      return;
+    }
+
+    const loadingKey = `send-${record.id}`;
+    setActionLoading(prev => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      await apiClient.sendInvoiceEmail(selectedCompanyId, record.invoiceId);
+      toast.success('Faktura skickad');
+      await loadBillingHistory(selectedCompanyId);
+    } catch (error: any) {
+      console.error('Failed to send invoice:', error);
+      toast.error(error.message || 'Kunde inte skicka faktura');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [loadingKey]: false }));
+    }
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!deleteEntryId) return;
+
+    try {
+      await apiClient.deleteInvoiceHistoryEntry(selectedCompanyId, deleteEntryId);
+      toast.success('Historikpost borttagen');
+      await loadBillingHistory(selectedCompanyId);
+    } catch (error: any) {
+      console.error('Failed to delete entry:', error);
+      toast.error(error.message || 'Kunde inte ta bort post');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteEntryId(null);
     }
   };
 
@@ -453,6 +532,53 @@ export default function AdminEnterpriseBilling() {
                                       <Building2 className="h-4 w-4" />
                                     </Button>
                                   )}
+                                  
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {record.invoiceId && (
+                                        <>
+                                          <DropdownMenuItem
+                                            onClick={() => handleRefreshInvoice(record)}
+                                            disabled={actionLoading[`refresh-${record.id}`]}
+                                          >
+                                            {actionLoading[`refresh-${record.id}`] ? (
+                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <RefreshCw className="mr-2 h-4 w-4" />
+                                            )}
+                                            Uppdatera status
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => handleSendInvoice(record)}
+                                            disabled={actionLoading[`send-${record.id}`]}
+                                          >
+                                            {actionLoading[`send-${record.id}`] ? (
+                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Send className="mr-2 h-4 w-4" />
+                                            )}
+                                            Skicka faktura
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                        </>
+                                      )}
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setDeleteEntryId(record.id);
+                                          setDeleteDialogOpen(true);
+                                        }}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Ta bort post
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -475,6 +601,23 @@ export default function AdminEnterpriseBilling() {
           {...successDialogData}
         />
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ta bort historikpost?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Detta tar bara bort posten från historiken. Fakturan i Stripe påverkas inte.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEntry} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Ta bort
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
