@@ -288,26 +288,28 @@ export default function AdminEnterpriseBilling() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label className="text-foreground">Företag</Label>
+              <Label className="text-foreground font-medium">Företag</Label>
               <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={companySearchOpen}
-                    className="w-full justify-between bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                    className="w-full justify-between bg-background text-foreground border-2 hover:bg-accent hover:text-accent-foreground h-11 font-medium"
                   >
-                    {selectedCompanyId
-                      ? companies.find((company) => company.companyId === selectedCompanyId)?.companyName
-                      : "Välj ett företag..."}
+                    <span className="text-foreground">
+                      {selectedCompanyId
+                        ? companies.find((company) => company.companyId === selectedCompanyId)?.companyName
+                        : "Välj ett företag..."}
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Sök företag..." className="h-9" />
-                    <CommandList>
-                      <CommandEmpty>Inget företag hittades.</CommandEmpty>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-popover border-2" align="start" sideOffset={8}>
+                  <Command className="bg-popover">
+                    <CommandInput placeholder="Sök företag..." className="h-11 text-foreground" />
+                    <CommandList className="max-h-[300px]">
+                      <CommandEmpty className="text-foreground py-6">Inget företag hittades.</CommandEmpty>
                       <CommandGroup>
                         {companies.map((company) => (
                           <CommandItem
@@ -317,18 +319,18 @@ export default function AdminEnterpriseBilling() {
                               setSelectedCompanyId(company.companyId);
                               setCompanySearchOpen(false);
                             }}
-                            className="cursor-pointer"
+                            className="cursor-pointer hover:bg-accent hover:text-accent-foreground py-3"
                           >
-                            <Building2 className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                            <span className="flex-1">{company.companyName}</span>
+                            <Building2 className="mr-3 h-5 w-5 shrink-0 text-primary" />
+                            <span className="flex-1 text-foreground font-medium">{company.companyName}</span>
                             {company.memberCount !== undefined && (
-                              <span className="text-xs text-muted-foreground ml-2">
+                              <span className="text-xs text-muted-foreground ml-2 font-normal">
                                 ({company.memberCount} medlemmar)
                               </span>
                             )}
                             <Check
                               className={cn(
-                                "ml-2 h-4 w-4 shrink-0",
+                                "ml-3 h-5 w-5 shrink-0 text-primary",
                                 selectedCompanyId === company.companyId ? "opacity-100" : "opacity-0"
                               )}
                             />
