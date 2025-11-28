@@ -82,11 +82,14 @@ export default function AdminEnterpriseBilling() {
     setIsLoading(true);
     try {
       const data = await apiClient.getEnterpriseCompanies();
+      console.log('🏢 Enterprise API response:', data);
       // API returns summaries with memberCount, use that instead of full companies list
       const companiesList = data.summaries || data.companies || [];
+      console.log('🏢 Companies list:', companiesList);
+      console.log('🏢 First company:', companiesList[0]);
       setCompanies(companiesList);
     } catch (error: any) {
-      console.error('Failed to load companies');
+      console.error('❌ Failed to load companies:', error);
       toast.error('Kunde inte ladda företag');
     } finally {
       setIsLoading(false);
@@ -305,7 +308,12 @@ export default function AdminEnterpriseBilling() {
                   >
                     <span className="text-foreground font-medium">
                       {selectedCompanyId
-                        ? companies.find((company) => company.id === selectedCompanyId)?.name || "Välj ett företag..."
+                        ? (() => {
+                            const found = companies.find((company) => company.id === selectedCompanyId);
+                            const displayName = found?.name || found?.slug || found?.id || "Välj ett företag...";
+                            console.log('🏢 Trigger display:', { selectedCompanyId, found, displayName });
+                            return displayName;
+                          })()
                         : "Välj ett företag..."}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -317,31 +325,41 @@ export default function AdminEnterpriseBilling() {
                     <CommandList className="max-h-[300px]">
                       <CommandEmpty className="text-foreground py-6">Inget företag hittades.</CommandEmpty>
                       <CommandGroup>
-                        {companies.map((company) => (
-                          <CommandItem
-                            key={company.id}
-                            value={company.name}
-                            onSelect={() => {
-                              setSelectedCompanyId(company.id);
-                              setCompanySearchOpen(false);
-                            }}
-                            className="cursor-pointer hover:bg-accent hover:text-accent-foreground py-3"
-                          >
-                            <Building2 className="mr-3 h-5 w-5 shrink-0 text-primary" />
-                            <span className="flex-1 text-foreground font-medium">{company.name}</span>
-                            {company.memberCount !== undefined && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
-                                {company.memberCount} {company.memberCount === 1 ? 'medlem' : 'medlemmar'}
-                              </Badge>
-                            )}
-                            <Check
-                              className={cn(
-                                "ml-3 h-5 w-5 shrink-0 text-primary",
-                                selectedCompanyId === company.id ? "opacity-100" : "opacity-0"
+                        {companies.length === 0 && (
+                          <div className="py-6 text-center text-sm text-foreground">
+                            Inga företag tillgängliga
+                          </div>
+                        )}
+                        {companies.map((company) => {
+                          const companyName = company.name || company.slug || company.id || 'Okänt företag';
+                          console.log('🏢 Rendering company:', { id: company.id, name: companyName, company });
+                          return (
+                            <CommandItem
+                              key={company.id}
+                              value={companyName}
+                              onSelect={() => {
+                                console.log('✅ Selected company:', company.id, companyName);
+                                setSelectedCompanyId(company.id);
+                                setCompanySearchOpen(false);
+                              }}
+                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground py-3"
+                            >
+                              <Building2 className="mr-3 h-5 w-5 shrink-0 text-primary" />
+                              <div className="flex-1 text-foreground font-medium">{companyName}</div>
+                              {company.memberCount !== undefined && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  {company.memberCount} {company.memberCount === 1 ? 'medlem' : 'medlemmar'}
+                                </Badge>
                               )}
-                            />
-                          </CommandItem>
-                        ))}
+                              <Check
+                                className={cn(
+                                  "ml-3 h-5 w-5 shrink-0 text-primary",
+                                  selectedCompanyId === company.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          );
+                        })}
                       </CommandGroup>
                     </CommandList>
                   </Command>
