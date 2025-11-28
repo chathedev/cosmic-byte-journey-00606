@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,6 +66,7 @@ interface CompanySummary {
 export default function AdminEnterprise() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [companies, setCompanies] = useState<Company[]>([]);
   const [summaries, setSummaries] = useState<CompanySummary[]>([]);
@@ -437,6 +439,13 @@ export default function AdminEnterprise() {
             <p className="text-muted-foreground mt-1">Hantera företag, medlemmar och möten</p>
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/admin/enterprise/billing')}
+            >
+              <Receipt className="h-4 w-4 mr-2" />
+              Billing
+            </Button>
             <Button 
               variant="outline" 
               onClick={loadAllCompanyMeetings}

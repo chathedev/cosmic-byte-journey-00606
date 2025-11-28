@@ -42,6 +42,7 @@ import AdminBackend from "./pages/AdminBackend";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminEmailCampaigns from "./pages/AdminEmailCampaigns";
 import AdminEnterprise from "./pages/AdminEnterprise";
+import AdminEnterpriseBilling from "./pages/AdminEnterpriseBilling";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -422,9 +423,10 @@ const App = () => {
                             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
                             <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
                             <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
-                            <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+                          <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
                           <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
                           <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                          <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
                           <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                           <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                           <Route path="*" element={<NotFound />} />
