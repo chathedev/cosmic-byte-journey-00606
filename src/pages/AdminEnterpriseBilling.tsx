@@ -44,13 +44,7 @@ interface BillingRecord {
   createdBy: string;
 }
 
-interface LineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  amountSek: number;
-  itemType: 'one_time' | 'recurring'; // For monthly/yearly billing, items can be one-time or recurring
-}
+// Removed LineItem interface - backend doesn't support line items, only total amounts
 
 export default function AdminEnterpriseBilling() {
   const navigate = useNavigate();
@@ -63,15 +57,12 @@ export default function AdminEnterpriseBilling() {
   const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('monthly');
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
   
-  // Line items state
-  const [lineItems, setLineItems] = useState<LineItem[]>([]);
-  const [currentDescription, setCurrentDescription] = useState("");
-  const [currentQuantity, setCurrentQuantity] = useState("1");
-  const [currentAmount, setCurrentAmount] = useState("");
-  const [currentItemType, setCurrentItemType] = useState<'one_time' | 'recurring'>('recurring');
+  // Amount state - simplified to match backend API
+  const [recurringAmount, setRecurringAmount] = useState("");
+  const [oneTimeAmount, setOneTimeAmount] = useState("");
   
   // Combine one-time items with first subscription invoice
-  const [combineOneTime, setCombineOneTime] = useState(false);
+  const [combineOneTime, setCombineOneTime] = useState(true);
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   
@@ -133,62 +124,6 @@ export default function AdminEnterpriseBilling() {
     }
   };
 
-  const handleAddLineItem = () => {
-    if (!currentDescription.trim()) {
-      toast.error('Vänligen ange en beskrivning');
-      return;
-    }
-
-    const quantity = parseFloat(currentQuantity);
-    const amount = parseFloat(currentAmount);
-
-    if (isNaN(quantity) || quantity <= 0) {
-      toast.error('Vänligen ange en giltig kvantitet');
-      return;
-    }
-
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Vänligen ange ett giltigt belopp');
-      return;
-    }
-
-    const newItem: LineItem = {
-      id: crypto.randomUUID(),
-      description: currentDescription.trim(),
-      quantity,
-      amountSek: amount,
-      itemType: billingType === 'one_time' ? 'one_time' : currentItemType,
-    };
-
-    setLineItems([...lineItems, newItem]);
-    setCurrentDescription("");
-    setCurrentQuantity("1");
-    setCurrentAmount("");
-    setCurrentItemType('recurring');
-    toast.success('Rad tillagd');
-  };
-
-  const handleRemoveLineItem = (id: string) => {
-    setLineItems(lineItems.filter(item => item.id !== id));
-    toast.success('Rad borttagen');
-  };
-
-  const getTotalAmount = () => {
-    return lineItems.reduce((sum, item) => sum + (item.quantity * item.amountSek), 0);
-  };
-
-  const getRecurringTotal = () => {
-    return lineItems
-      .filter(item => item.itemType === 'recurring')
-      .reduce((sum, item) => sum + (item.quantity * item.amountSek), 0);
-  };
-
-  const getOneTimeTotal = () => {
-    return lineItems
-      .filter(item => item.itemType === 'one_time')
-      .reduce((sum, item) => sum + (item.quantity * item.amountSek), 0);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -197,29 +132,26 @@ export default function AdminEnterpriseBilling() {
       return;
     }
 
-    if (lineItems.length === 0) {
-      toast.error('Vänligen lägg till minst en rad');
-      return;
-    }
-
-    const recurringTotal = getRecurringTotal();
-    const oneTimeTotal = getOneTimeTotal();
-    const totalAmount = getTotalAmount();
-
-    if (totalAmount <= 0) {
-      toast.error('Totalsumman måste vara större än 0');
-      return;
-    }
+    const recurring = parseFloat(recurringAmount) || 0;
+    const oneTime = parseFloat(oneTimeAmount) || 0;
 
     // Validate based on billing type
-    if (billingType === 'one_time' && recurringTotal > 0) {
-      toast.error('Engångsfakturor kan inte ha återkommande poster. Ändra alla poster till "Engång" eller välj månadsprenumeration.');
-      return;
-    }
-
-    if ((billingType === 'monthly' || billingType === 'yearly') && recurringTotal === 0) {
-      toast.error('Prenumerationer måste ha minst en återkommande post');
-      return;
+    if (billingType === 'one_time') {
+      if (recurring <= 0) {
+        toast.error('Vänligen ange ett belopp för engångsfakturan');
+        return;
+      }
+      if (oneTime > 0) {
+        toast.error('Engångsfakturor kan inte ha en separat engångsavgift');
+        return;
+      }
+    } else {
+      // monthly or yearly
+      if (recurring <= 0) {
+        toast.error('Vänligen ange ett återkommande belopp för prenumerationen');
+        return;
+      }
+      // oneTime is optional for subscriptions
     }
 
     setIsSubmitting(true);
@@ -229,25 +161,27 @@ export default function AdminEnterpriseBilling() {
       // Build the request based on billing type
       const requestData: any = {
         billingType,
-        amountSek: billingType === 'one_time' ? totalAmount : recurringTotal,
+        amountSek: recurring,
       };
 
       // Add one-time amount for subscriptions if present
-      if ((billingType === 'monthly' || billingType === 'yearly') && oneTimeTotal > 0) {
-        requestData.oneTimeAmountSek = oneTimeTotal;
+      if ((billingType === 'monthly' || billingType === 'yearly') && oneTime > 0) {
+        requestData.oneTimeAmountSek = oneTime;
         requestData.combineOneTime = combineOneTime;
       }
 
+      console.log('📤 Sending billing request:', requestData);
       const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, requestData);
+      console.log('✅ Billing response:', response);
 
       // Build success message
       let successMsg = `${billingType === 'one_time' ? 'Faktura' : 'Prenumeration'} skapades!`;
       if (billingType === 'one_time') {
-        successMsg += ` Total: ${totalAmount.toLocaleString('sv-SE')} SEK`;
+        successMsg += ` Belopp: ${recurring.toLocaleString('sv-SE')} SEK`;
       } else {
-        successMsg += ` Återkommande: ${recurringTotal.toLocaleString('sv-SE')} SEK`;
-        if (oneTimeTotal > 0) {
-          successMsg += `, Engång: ${oneTimeTotal.toLocaleString('sv-SE')} SEK`;
+        successMsg += ` Återkommande: ${recurring.toLocaleString('sv-SE')} SEK`;
+        if (oneTime > 0) {
+          successMsg += `, Engång: ${oneTime.toLocaleString('sv-SE')} SEK`;
         }
       }
       
@@ -259,8 +193,8 @@ export default function AdminEnterpriseBilling() {
       // Show success dialog
       setSuccessDialogData({
         billingType,
-        amountSek: billingType === 'one_time' ? totalAmount : recurringTotal,
-        oneTimeAmountSek: (billingType === 'monthly' || billingType === 'yearly') && oneTimeTotal > 0 ? oneTimeTotal : undefined,
+        amountSek: recurring,
+        oneTimeAmountSek: (billingType === 'monthly' || billingType === 'yearly') && oneTime > 0 ? oneTime : undefined,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
@@ -270,14 +204,11 @@ export default function AdminEnterpriseBilling() {
       setSuccessDialogOpen(true);
       
       // Reset form
-      setLineItems([]);
-      setCurrentDescription("");
-      setCurrentQuantity("1");
-      setCurrentAmount("");
-      setCurrentItemType('recurring');
+      setRecurringAmount("");
+      setOneTimeAmount("");
       
     } catch (error: any) {
-      console.error('Failed to create billing:', error);
+      console.error('❌ Failed to create billing:', error);
       const errorMsg = error.message || 'Kunde inte skapa fakturering';
       toast.error(errorMsg, { id: toastId });
     } finally {
@@ -523,9 +454,9 @@ export default function AdminEnterpriseBilling() {
               {/* Billing Form */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Skapa Fakturering med Flera Rader</CardTitle>
+                  <CardTitle>Skapa Fakturering</CardTitle>
                   <CardDescription>
-                    Välj faktureringstyp och lägg till produkter/tjänster rad för rad
+                    Välj faktureringstyp och ange belopp för att skapa faktura eller prenumeration
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -556,197 +487,124 @@ export default function AdminEnterpriseBilling() {
 
                     <Separator />
 
-                    {/* Add Line Item Section */}
+                    {/* Amount Inputs - Simplified to match backend API */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <ShoppingCart className="h-5 w-5" />
-                        Lägg till Produkter/Tjänster
+                        <CreditCard className="h-5 w-5" />
+                        Ange Belopp
                       </h3>
 
-                      <div className="grid gap-4 md:grid-cols-12">
-                        <div className="md:col-span-4 space-y-2">
-                          <Label htmlFor="description">Beskrivning *</Label>
+                      {billingType === 'one_time' ? (
+                        /* One-time invoice - single amount */
+                        <div className="space-y-2">
+                          <Label htmlFor="amount" className="text-foreground">Fakturabelopp (SEK) *</Label>
                           <Input
-                            id="description"
-                            placeholder="T.ex. Premium Support"
-                            value={currentDescription}
-                            onChange={(e) => setCurrentDescription(e.target.value)}
-                            className="bg-background border-border text-foreground"
-                          />
-                        </div>
-
-                        {/* Item Type - Only show for subscriptions */}
-                        {(billingType === 'monthly' || billingType === 'yearly') && (
-                          <div className="md:col-span-2 space-y-2">
-                            <Label htmlFor="itemType">Typ *</Label>
-                            <Select
-                              value={currentItemType}
-                              onValueChange={(value) => setCurrentItemType(value as 'one_time' | 'recurring')}
-                            >
-                              <SelectTrigger id="itemType">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="recurring">Återkommande</SelectItem>
-                                <SelectItem value="one_time">Engång</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-
-                        <div className={cn(
-                          "space-y-2",
-                          (billingType === 'monthly' || billingType === 'yearly') ? "md:col-span-2" : "md:col-span-2"
-                        )}>
-                          <Label htmlFor="quantity">Antal *</Label>
-                          <Input
-                            id="quantity"
-                            type="number"
-                            step="1"
-                            min="1"
-                            placeholder="1"
-                            value={currentQuantity}
-                            onChange={(e) => setCurrentQuantity(e.target.value)}
-                            className="bg-background border-border text-foreground"
-                          />
-                        </div>
-
-                        <div className={cn(
-                          "space-y-2",
-                          (billingType === 'monthly' || billingType === 'yearly') ? "md:col-span-2" : "md:col-span-3"
-                        )}>
-                          <Label htmlFor="lineAmount">Pris (SEK) *</Label>
-                          <Input
-                            id="lineAmount"
+                            id="amount"
                             type="number"
                             step="0.01"
                             min="0.01"
-                            placeholder="1000.00"
-                            value={currentAmount}
-                            onChange={(e) => setCurrentAmount(e.target.value)}
-                            className="bg-background border-border text-foreground"
+                            placeholder="15000.00"
+                            value={recurringAmount}
+                            onChange={(e) => setRecurringAmount(e.target.value)}
+                            className="bg-background border-border text-foreground text-lg font-semibold"
+                            required
                           />
+                          <p className="text-sm text-muted-foreground">
+                            Totalt belopp som ska faktureras engångsvis
+                          </p>
                         </div>
+                      ) : (
+                        /* Subscription - recurring + optional one-time */
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="recurringAmount" className="text-foreground">
+                              Återkommande Belopp ({billingType === 'monthly' ? 'per månad' : 'per år'}) (SEK) *
+                            </Label>
+                            <Input
+                              id="recurringAmount"
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              placeholder="5000.00"
+                              value={recurringAmount}
+                              onChange={(e) => setRecurringAmount(e.target.value)}
+                              className="bg-background border-border text-foreground text-lg font-semibold"
+                              required
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Belopp som faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
+                            </p>
+                          </div>
 
-                        <div className="md:col-span-2 space-y-2">
-                          <Label className="invisible">Lägg till</Label>
-                          <Button
-                            type="button"
-                            onClick={handleAddLineItem}
-                            variant="outline"
-                            className="w-full"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Lägg till
-                          </Button>
+                          <div className="space-y-2">
+                            <Label htmlFor="oneTimeAmount" className="text-foreground">
+                              Engångsavgift (SEK) <span className="text-muted-foreground">(Valfritt)</span>
+                            </Label>
+                            <Input
+                              id="oneTimeAmount"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="15000.00"
+                              value={oneTimeAmount}
+                              onChange={(e) => setOneTimeAmount(e.target.value)}
+                              className="bg-background border-border text-foreground text-lg font-semibold"
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Extra engångsavgift (t.ex. installationsavgift, onboarding)
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Line Items Table */}
-                    {lineItems.length > 0 && (
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Fakturarader ({lineItems.length})</h3>
-                        
-                        <div className="border rounded-lg overflow-hidden">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Beskrivning</TableHead>
-                                {(billingType === 'monthly' || billingType === 'yearly') && (
-                                  <TableHead>Typ</TableHead>
+                    {/* Summary */}
+                    {(parseFloat(recurringAmount) > 0 || parseFloat(oneTimeAmount) > 0) && (
+                      <Card className="border-primary/20 bg-primary/5">
+                        <CardContent className="pt-6">
+                          <div className="space-y-2">
+                            <h4 className="font-semibold text-foreground">Sammanfattning:</h4>
+                            {billingType === 'one_time' ? (
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Total:</span>
+                                <span className="text-2xl font-bold text-primary">
+                                  {parseFloat(recurringAmount || '0').toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
+                                </span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Återkommande ({billingType === 'monthly' ? 'månad' : 'år'}):</span>
+                                  <span className="text-xl font-bold text-primary">
+                                    {parseFloat(recurringAmount || '0').toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
+                                  </span>
+                                </div>
+                                {parseFloat(oneTimeAmount || '0') > 0 && (
+                                  <>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-muted-foreground">Engångsavgift:</span>
+                                      <span className="text-lg font-semibold text-secondary-foreground">
+                                        {parseFloat(oneTimeAmount || '0').toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
+                                      </span>
+                                    </div>
+                                    <Separator />
+                                    <div className="flex justify-between items-center pt-2">
+                                      <span className="font-semibold text-foreground">Första fakturan:</span>
+                                      <span className="text-2xl font-bold">
+                                        {(parseFloat(recurringAmount || '0') + parseFloat(oneTimeAmount || '0')).toLocaleString('sv-SE', { minimumFractionDigits: 2 })} SEK
+                                      </span>
+                                    </div>
+                                  </>
                                 )}
-                                <TableHead className="text-right">Antal</TableHead>
-                                <TableHead className="text-right">Pris</TableHead>
-                                <TableHead className="text-right">Totalt</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {lineItems.map((item) => (
-                                <TableRow key={item.id}>
-                                  <TableCell className="font-medium">{item.description}</TableCell>
-                                  {(billingType === 'monthly' || billingType === 'yearly') && (
-                                    <TableCell>
-                                      <Badge variant={item.itemType === 'recurring' ? 'default' : 'secondary'}>
-                                        {item.itemType === 'recurring' ? 'Återkommande' : 'Engång'}
-                                      </Badge>
-                                    </TableCell>
-                                  )}
-                                  <TableCell className="text-right">{item.quantity}</TableCell>
-                                  <TableCell className="text-right">
-                                    {item.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
-                                  </TableCell>
-                                  <TableCell className="text-right font-semibold">
-                                    {(item.quantity * item.amountSek).toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
-                                  </TableCell>
-                                  <TableCell>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRemoveLineItem(item.id)}
-                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                              {/* Show separate totals for subscriptions */}
-                              {(billingType === 'monthly' || billingType === 'yearly') ? (
-                                <>
-                                  {getRecurringTotal() > 0 && (
-                                    <TableRow className="bg-primary/5">
-                                      <TableCell colSpan={(billingType === 'monthly' || billingType === 'yearly') ? 4 : 3} className="text-right font-semibold">
-                                        Återkommande Total:
-                                      </TableCell>
-                                      <TableCell className="text-right font-bold text-lg text-primary">
-                                        {getRecurringTotal().toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
-                                      </TableCell>
-                                      <TableCell></TableCell>
-                                    </TableRow>
-                                  )}
-                                  {getOneTimeTotal() > 0 && (
-                                    <TableRow className="bg-secondary/5">
-                                      <TableCell colSpan={(billingType === 'monthly' || billingType === 'yearly') ? 4 : 3} className="text-right font-semibold">
-                                        Engångsavgift:
-                                      </TableCell>
-                                      <TableCell className="text-right font-bold text-lg text-secondary-foreground">
-                                        {getOneTimeTotal().toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
-                                      </TableCell>
-                                      <TableCell></TableCell>
-                                    </TableRow>
-                                  )}
-                                  <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={(billingType === 'monthly' || billingType === 'yearly') ? 4 : 3} className="text-right font-semibold">
-                                      Första Faktura Total:
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold text-lg">
-                                      {getTotalAmount().toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
-                                    </TableCell>
-                                    <TableCell></TableCell>
-                                  </TableRow>
-                                </>
-                              ) : (
-                                <TableRow className="bg-muted/50">
-                                  <TableCell colSpan={3} className="text-right font-semibold">
-                                    Total:
-                                  </TableCell>
-                                  <TableCell className="text-right font-bold text-lg text-primary">
-                                    {getTotalAmount().toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
-                                  </TableCell>
-                                  <TableCell></TableCell>
-                                </TableRow>
-                              )}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </div>
+                              </>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
 
-                    {/* Combine One-Time Items Toggle - Show for subscriptions with one-time items */}
-                    {(billingType === 'monthly' || billingType === 'yearly') && getOneTimeTotal() > 0 && (
+                    {/* Combine One-Time Items Toggle - Show for subscriptions with one-time amount */}
+                    {(billingType === 'monthly' || billingType === 'yearly') && parseFloat(oneTimeAmount || '0') > 0 && (
                       <Card className="border-primary/20 bg-muted/30">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between space-x-4">
@@ -774,7 +632,7 @@ export default function AdminEnterpriseBilling() {
                     {/* Submit Button */}
                     <Button
                       type="submit"
-                      disabled={isSubmitting || lineItems.length === 0 || getTotalAmount() <= 0}
+                      disabled={isSubmitting || parseFloat(recurringAmount || '0') <= 0}
                       className="w-full"
                       size="lg"
                     >
@@ -787,16 +645,10 @@ export default function AdminEnterpriseBilling() {
                         <>
                           <Receipt className="h-4 w-4 mr-2" />
                           Skapa {getBillingTypeLabel(billingType)}
-                          {lineItems.length > 0 && (
-                            <>
-                              <span className="ml-2">—</span>
-                              <Badge variant="secondary" className="ml-2">
-                                {lineItems.length} rad{lineItems.length !== 1 ? 'er' : ''}
-                              </Badge>
-                              <span className="ml-2 font-bold">
-                                {getTotalAmount().toLocaleString('sv-SE')} SEK
-                              </span>
-                            </>
+                          {parseFloat(recurringAmount || '0') > 0 && (
+                            <span className="ml-2 font-bold">
+                              {parseFloat(recurringAmount || '0').toLocaleString('sv-SE')} SEK
+                            </span>
                           )}
                         </>
                       )}
@@ -811,11 +663,11 @@ export default function AdminEnterpriseBilling() {
                   <CardTitle className="text-base text-foreground">⚠️ Viktigt att veta</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p>• <strong className="text-foreground">Engångsfakturor:</strong> Alla rader måste vara "Engång"-typ. Skapar en enskild faktura.</p>
-                  <p>• <strong className="text-foreground">Prenumerationer:</strong> Måste ha minst en "Återkommande"-rad. Kan även inkludera "Engång"-rader.</p>
+                  <p>• <strong className="text-foreground">Engångsfakturor:</strong> Ange totalt belopp som ska faktureras en gång.</p>
+                  <p>• <strong className="text-foreground">Prenumerationer:</strong> Ange återkommande belopp som faktureras varje period. Du kan även lägga till en engångsavgift.</p>
                   <p>• <strong className="text-foreground">Kombinerad fakturering:</strong> Välj om engångsavgifter ska kombineras med första prenumerationsfakturan eller skickas separat.</p>
-                  <p>• <strong className="text-foreground">Byte mellan månad och år:</strong> Du kan när som helst byta faktureringstyp genom att välja en annan typ från rullgardinsmenyn ovan.</p>
-                  <p>• <strong className="text-foreground">Exempel:</strong> Månadsprenumeration 5000 SEK + 15000 SEK installationsavgift → Kombinerat: 20000 SEK första månaden, sedan 5000 SEK/månad. Separat: Två fakturor skickas.</p>
+                  <p>• <strong className="text-foreground">Byte mellan månad och år:</strong> Klicka på flikarna ovan för att enkelt byta mellan engång, månad eller år.</p>
+                  <p>• <strong className="text-foreground">Exempel:</strong> Månadsprenumeration 5000 SEK + 15000 SEK installationsavgift → Kombinerat: 20000 SEK första månaden, sedan 5000 SEK/månad.</p>
                 </CardContent>
               </Card>
             </TabsContent>
