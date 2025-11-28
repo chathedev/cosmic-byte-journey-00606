@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Calendar, Check, ChevronsUpDown, AlertCircle } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import BillingSuccessDialog from "@/components/BillingSuccessDialog";
 
 interface Company {
@@ -34,13 +32,14 @@ interface BillingRecord {
   id: string;
   billingType: 'one_time' | 'monthly' | 'yearly';
   amountSek: number;
+  oneTimeAmountSek?: number;
   status: string;
   invoiceUrl: string;
+  invoiceId?: string;
   portalUrl?: string;
   subscriptionId?: string;
   createdAt: string;
-  createdBy: string;
-  invoiceStatus?: 'draft' | 'open' | 'paid' | 'void' | 'uncollectible';
+  createdBy?: string;
 }
 
 export default function AdminEnterpriseBilling() {
@@ -51,12 +50,10 @@ export default function AdminEnterpriseBilling() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-  const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('monthly');
+  const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('one_time');
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
   
-  const [recurringAmount, setRecurringAmount] = useState("");
-  const [oneTimeAmount, setOneTimeAmount] = useState("");
-  const [combineOneTime, setCombineOneTime] = useState(true);
+  const [amount, setAmount] = useState("");
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   
@@ -64,12 +61,9 @@ export default function AdminEnterpriseBilling() {
   const [successDialogData, setSuccessDialogData] = useState<{
     billingType: 'one_time' | 'monthly' | 'yearly';
     amountSek: number;
-    oneTimeAmountSek?: number;
     invoiceUrl: string;
     portalUrl?: string;
     companyName: string;
-    oneTimeInvoiceUrl?: string;
-    oneTimeInvoiceId?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -120,40 +114,20 @@ export default function AdminEnterpriseBilling() {
       return;
     }
 
-    const recurring = parseFloat(recurringAmount) || 0;
-    const oneTime = parseFloat(oneTimeAmount) || 0;
-
-    if (billingType === 'one_time') {
-      if (recurring <= 0) {
-        toast.error('Vänligen ange ett belopp');
-        return;
-      }
-      if (oneTime > 0) {
-        toast.error('Engångsfakturor kan inte ha en separat engångsavgift');
-        return;
-      }
-    } else {
-      if (recurring <= 0) {
-        toast.error('Vänligen ange ett återkommande belopp');
-        return;
-      }
+    const amountValue = parseFloat(amount);
+    if (!amountValue || amountValue <= 0) {
+      toast.error('Vänligen ange ett giltigt belopp');
+      return;
     }
 
     setIsSubmitting(true);
     const toastId = toast.loading('Skapar fakturering...');
     
     try {
-      const requestData: any = {
+      const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, {
         billingType,
-        amountSek: recurring,
-      };
-
-      if ((billingType === 'monthly' || billingType === 'yearly') && oneTime > 0) {
-        requestData.oneTimeAmountSek = oneTime;
-        requestData.combineOneTime = combineOneTime;
-      }
-
-      const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, requestData);
+        amountSek: amountValue,
+      });
       
       toast.success('Fakturering skapad', { id: toastId });
       
@@ -161,18 +135,14 @@ export default function AdminEnterpriseBilling() {
       
       setSuccessDialogData({
         billingType,
-        amountSek: recurring,
-        oneTimeAmountSek: (billingType === 'monthly' || billingType === 'yearly') && oneTime > 0 ? oneTime : undefined,
+        amountSek: amountValue,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
-        oneTimeInvoiceUrl: response.oneTimeInvoiceUrl,
-        oneTimeInvoiceId: response.oneTimeInvoiceId,
       });
       setSuccessDialogOpen(true);
       
-      setRecurringAmount("");
-      setOneTimeAmount("");
+      setAmount("");
       
     } catch (error: any) {
       console.error('Failed to create billing:', error);
@@ -194,33 +164,37 @@ export default function AdminEnterpriseBilling() {
     }
   };
 
-  const getInvoiceStatusLabel = (status?: string) => {
+  const getStatusLabel = (status?: string) => {
     switch (status) {
       case 'draft': return 'Utkast';
       case 'open': return 'Skickad';
       case 'paid': return 'Betald';
-      case 'void': return 'Annullerad';
+      case 'void': return 'Makulerad';
       case 'uncollectible': return 'Ej inkasserbar';
-      default: return status || 'Okänd';
+      case 'active': return 'Aktiv';
+      case 'canceled': return 'Avbruten';
+      case 'incomplete': return 'Ofullständig';
+      case 'incomplete_expired': return 'Utgången';
+      case 'past_due': return 'Förfallen';
+      case 'trialing': return 'Provperiod';
+      case 'unpaid': return 'Obetald';
+      default: return status || '—';
     }
   };
 
-  const getInvoiceStatusVariant = (status?: string): "default" | "secondary" | "outline" | "destructive" => {
+  const getStatusVariant = (status?: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
-      case 'paid': return 'default';
+      case 'paid':
+      case 'active': return 'default';
       case 'open': return 'secondary';
-      case 'draft': return 'outline';
+      case 'draft':
+      case 'trialing': return 'outline';
       case 'void':
+      case 'canceled':
+      case 'incomplete_expired':
       case 'uncollectible': return 'destructive';
       default: return 'outline';
     }
-  };
-
-  const getActiveSubscriptions = () => {
-    return billingHistory.filter(record => 
-      (record.billingType === 'monthly' || record.billingType === 'yearly') && 
-      record.status === 'active'
-    );
   };
 
   if (isLoading) {
@@ -325,179 +299,74 @@ export default function AdminEnterpriseBilling() {
 
             {/* Create Tab */}
             <TabsContent value="create" className="space-y-6 mt-6">
-              {getActiveSubscriptions().length > 0 && (
-                <div className="flex items-start gap-3 p-4 rounded-lg border bg-muted/30">
-                  <AlertCircle className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                  <div className="text-sm">
-                    <p className="font-medium">Aktiva prenumerationer: {getActiveSubscriptions().length}</p>
-                    <p className="text-muted-foreground mt-1">Du kan skapa ytterligare fakturor</p>
-                  </div>
-                </div>
-              )}
-
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base font-medium">Ny Fakturering</CardTitle>
+                  <CardTitle className="text-base font-medium">Lägg till betalning</CardTitle>
+                  <CardDescription>Skapa en faktura eller prenumeration</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Billing Type */}
-                    <div className="space-y-3">
+                  <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="space-y-2">
                       <Label>Typ</Label>
                       <div className="grid grid-cols-3 gap-2">
                         <Button
                           type="button"
                           variant={billingType === 'one_time' ? 'default' : 'outline'}
-                          className="h-auto py-3"
+                          size="sm"
                           onClick={() => setBillingType('one_time')}
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <Receipt className="h-4 w-4" />
-                            <span className="text-xs">Engång</span>
-                          </div>
+                          Engång
                         </Button>
                         <Button
                           type="button"
                           variant={billingType === 'monthly' ? 'default' : 'outline'}
-                          className="h-auto py-3"
+                          size="sm"
                           onClick={() => setBillingType('monthly')}
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span className="text-xs">Månad</span>
-                          </div>
+                          Månad
                         </Button>
                         <Button
                           type="button"
                           variant={billingType === 'yearly' ? 'default' : 'outline'}
-                          className="h-auto py-3"
+                          size="sm"
                           onClick={() => setBillingType('yearly')}
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span className="text-xs">År</span>
-                          </div>
+                          År
                         </Button>
                       </div>
                     </div>
 
-                    <Separator />
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Belopp (SEK)</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="15000"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        required
+                      />
+                      {billingType !== 'one_time' && (
+                        <p className="text-xs text-muted-foreground">
+                          Faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
+                        </p>
+                      )}
+                    </div>
 
-                    {/* Amounts */}
-                    {billingType === 'one_time' ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="amount">Belopp (SEK)</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          placeholder="15000"
-                          value={recurringAmount}
-                          onChange={(e) => setRecurringAmount(e.target.value)}
-                          required
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="recurring">Återkommande belopp (SEK)</Label>
-                          <Input
-                            id="recurring"
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            placeholder="5000"
-                            value={recurringAmount}
-                            onChange={(e) => setRecurringAmount(e.target.value)}
-                            required
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Faktureras {billingType === 'monthly' ? 'varje månad' : 'varje år'}
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="onetime">Engångsavgift (valfritt)</Label>
-                          <Input
-                            id="onetime"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="15000"
-                            value={oneTimeAmount}
-                            onChange={(e) => setOneTimeAmount(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            T.ex. setup eller installation
-                          </p>
-                        </div>
-
-                        {parseFloat(oneTimeAmount || '0') > 0 && (
-                          <div className="flex items-center justify-between p-3 rounded-lg border">
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium">Kombinera på första fakturan</p>
-                              <p className="text-xs text-muted-foreground">
-                                {combineOneTime 
-                                  ? 'En faktura med allt' 
-                                  : 'Separata fakturor'}
-                              </p>
-                            </div>
-                            <Switch
-                              checked={combineOneTime}
-                              onCheckedChange={setCombineOneTime}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Summary */}
-                    {parseFloat(recurringAmount || '0') > 0 && (
-                      <div className="p-4 rounded-lg border space-y-2">
-                        <p className="text-sm font-medium">Sammanfattning</p>
-                        {billingType === 'one_time' ? (
-                          <p className="text-2xl font-semibold">
-                            {parseFloat(recurringAmount).toLocaleString('sv-SE')} SEK
-                          </p>
-                        ) : (
-                          <>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Återkommande</span>
-                              <span className="font-medium">{parseFloat(recurringAmount).toLocaleString('sv-SE')} SEK</span>
-                            </div>
-                            {parseFloat(oneTimeAmount || '0') > 0 && (
-                              <>
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-muted-foreground">Engång</span>
-                                  <span className="font-medium">{parseFloat(oneTimeAmount).toLocaleString('sv-SE')} SEK</span>
-                                </div>
-                                <Separator />
-                                <div className="flex justify-between">
-                                  <span className="text-sm font-medium">Första fakturan</span>
-                                  <span className="text-lg font-semibold">
-                                    {(parseFloat(recurringAmount) + parseFloat(oneTimeAmount)).toLocaleString('sv-SE')} SEK
-                                  </span>
-                                </div>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || parseFloat(recurringAmount || '0') <= 0}
+                    <Button 
+                      type="submit" 
                       className="w-full"
+                      disabled={isSubmitting}
                     >
                       {isSubmitting ? (
                         <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Skapar...
                         </>
                       ) : (
-                        'Skapa fakturering'
+                        'Skapa'
                       )}
                     </Button>
                   </form>
@@ -506,80 +375,94 @@ export default function AdminEnterpriseBilling() {
             </TabsContent>
 
             {/* History Tab */}
-            <TabsContent value="history" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-medium">Faktureringshistorik</CardTitle>
-                  <CardDescription>
-                    {billingHistory.length} {billingHistory.length === 1 ? 'post' : 'poster'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingHistory ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <TabsContent value="history" className="space-y-6 mt-6">
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : billingHistory.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Receipt className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p>Ingen faktureringshistorik</p>
                     </div>
-                  ) : billingHistory.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Ingen historik ännu
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Datum</TableHead>
-                          <TableHead>Typ</TableHead>
-                          <TableHead>Belopp</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Åtgärder</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {billingHistory.map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell className="text-sm">
-                              {format(new Date(record.createdAt), 'PPP', { locale: sv })}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {getBillingTypeLabel(record.billingType)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {record.amountSek.toLocaleString('sv-SE')} SEK
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getInvoiceStatusVariant(record.invoiceStatus)} className="text-xs">
-                                {getInvoiceStatusLabel(record.invoiceStatus)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(record.invoiceUrl, '_blank')}
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </Button>
-                                {record.portalUrl && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => window.open(record.portalUrl, '_blank')}
-                                  >
-                                    <Building2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base font-medium">Fakturor & Prenumerationer</CardTitle>
+                    <CardDescription>{billingHistory.length} poster</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Skapad</TableHead>
+                            <TableHead>Typ</TableHead>
+                            <TableHead className="text-right">Belopp</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Länkar</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {billingHistory.map((record) => (
+                            <TableRow key={record.id}>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {format(new Date(record.createdAt), 'PP', { locale: sv })}
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm">
+                                  {getBillingTypeLabel(record.billingType)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {record.amountSek.toLocaleString('sv-SE')} kr
+                                {record.oneTimeAmountSek && record.oneTimeAmountSek > 0 && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    +{record.oneTimeAmountSek.toLocaleString('sv-SE')} kr engång
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={getStatusVariant(record.status)}>
+                                  {getStatusLabel(record.status)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {record.invoiceUrl && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => window.open(record.invoiceUrl, '_blank')}
+                                      title="Visa faktura"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {record.portalUrl && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => window.open(record.portalUrl, '_blank')}
+                                      title="Öppna portal"
+                                    >
+                                      <Building2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         )}
