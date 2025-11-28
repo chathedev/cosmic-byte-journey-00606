@@ -7,13 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, History, Plus, Calendar, CreditCard } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, History, Plus, Calendar, CreditCard, Trash2, ShoppingCart } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import { Separator } from "@/components/ui/separator";
 
 interface Company {
   companyId: string;
@@ -34,6 +35,13 @@ interface BillingRecord {
   createdBy: string;
 }
 
+interface LineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  amountSek: number;
+}
+
 export default function AdminEnterpriseBilling() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -43,10 +51,14 @@ export default function AdminEnterpriseBilling() {
   
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('one_time');
-  const [amountSek, setAmountSek] = useState<string>("");
+  
+  // Line items state
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [currentDescription, setCurrentDescription] = useState("");
+  const [currentQuantity, setCurrentQuantity] = useState("1");
+  const [currentAmount, setCurrentAmount] = useState("");
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(true);
 
   useEffect(() => {
     loadCompanies();
@@ -78,7 +90,6 @@ export default function AdminEnterpriseBilling() {
       setBillingHistory(data.billingHistory || []);
     } catch (error: any) {
       console.error('Failed to load billing history:', error);
-      // Don't show error toast for 404 - just means no history yet
       if (!error.message?.includes('404')) {
         toast.error('Kunde inte ladda faktureringshistorik');
       }
@@ -88,6 +99,48 @@ export default function AdminEnterpriseBilling() {
     }
   };
 
+  const handleAddLineItem = () => {
+    if (!currentDescription.trim()) {
+      toast.error('Vänligen ange en beskrivning');
+      return;
+    }
+
+    const quantity = parseFloat(currentQuantity);
+    const amount = parseFloat(currentAmount);
+
+    if (isNaN(quantity) || quantity <= 0) {
+      toast.error('Vänligen ange en giltig kvantitet');
+      return;
+    }
+
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Vänligen ange ett giltigt belopp');
+      return;
+    }
+
+    const newItem: LineItem = {
+      id: crypto.randomUUID(),
+      description: currentDescription.trim(),
+      quantity,
+      amountSek: amount,
+    };
+
+    setLineItems([...lineItems, newItem]);
+    setCurrentDescription("");
+    setCurrentQuantity("1");
+    setCurrentAmount("");
+    toast.success('Rad tillagd');
+  };
+
+  const handleRemoveLineItem = (id: string) => {
+    setLineItems(lineItems.filter(item => item.id !== id));
+    toast.success('Rad borttagen');
+  };
+
+  const getTotalAmount = () => {
+    return lineItems.reduce((sum, item) => sum + (item.quantity * item.amountSek), 0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -95,23 +148,24 @@ export default function AdminEnterpriseBilling() {
       toast.error('Vänligen välj ett företag');
       return;
     }
-    
-    const amount = parseFloat(amountSek);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Vänligen ange ett giltigt belopp');
+
+    if (lineItems.length === 0) {
+      toast.error('Vänligen lägg till minst en rad');
       return;
     }
+
+    const totalAmount = getTotalAmount();
 
     setIsSubmitting(true);
     try {
       const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, {
         billingType,
-        amountSek: amount,
+        amountSek: totalAmount,
       });
 
-      toast.success(`${billingType === 'one_time' ? 'Faktura' : 'Prenumeration'} skapades!`);
+      toast.success(`${billingType === 'one_time' ? 'Faktura' : 'Prenumeration'} skapades med ${lineItems.length} rad${lineItems.length > 1 ? 'er' : ''}!`);
       
-      // Show the result and refresh history
+      // Refresh history
       await loadBillingHistory(selectedCompanyId);
       
       // Open invoice in new tab
@@ -120,8 +174,10 @@ export default function AdminEnterpriseBilling() {
       }
       
       // Reset form
-      setAmountSek("");
-      setShowCreateForm(false);
+      setLineItems([]);
+      setCurrentDescription("");
+      setCurrentQuantity("1");
+      setCurrentAmount("");
       
     } catch (error: any) {
       console.error('Failed to create billing:', error);
@@ -129,11 +185,6 @@ export default function AdminEnterpriseBilling() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleNewBilling = () => {
-    setShowCreateForm(true);
-    setAmountSek("");
   };
 
   const selectedCompany = companies.find(c => c.companyId === selectedCompanyId);
@@ -200,7 +251,7 @@ export default function AdminEnterpriseBilling() {
           <Receipt className="h-8 w-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold">Enterprise Fakturering</h1>
-            <p className="text-muted-foreground">Skapa fakturor och prenumerationer för företag</p>
+            <p className="text-muted-foreground">Skapa fakturor och prenumerationer med flera rader</p>
           </div>
         </div>
 
@@ -253,7 +304,7 @@ export default function AdminEnterpriseBilling() {
           <Tabs defaultValue="create" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="create" className="gap-2">
-                <Plus className="h-4 w-4" />
+                <ShoppingCart className="h-4 w-4" />
                 Skapa Fakturering
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-2">
@@ -317,74 +368,175 @@ export default function AdminEnterpriseBilling() {
               {/* Billing Form */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Skapa Ny Fakturering</CardTitle>
+                  <CardTitle>Skapa Fakturering med Flera Rader</CardTitle>
                   <CardDescription>
-                    Konfigurera faktureringsuppgifter. Du kan skapa flera fakturor och prenumerationer för samma företag.
+                    Lägg till produkter/tjänster rad för rad. Totalen beräknas automatiskt.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="billingType" className="text-foreground">Faktureringstyp *</Label>
-                  <Select
-                    value={billingType}
-                    onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')}
-                  >
-                    <SelectTrigger id="billingType">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="one_time">
-                        <div className="space-y-1">
-                          <div className="font-medium">Engångsfaktura</div>
-                          <div className="text-xs text-muted-foreground">
-                            Skapar en enskild faktura, inga återkommande avgifter
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="monthly">
-                        <div className="space-y-1">
-                          <div className="font-medium">Månadsprenumeration</div>
-                          <div className="text-xs text-muted-foreground">
-                            Återkommande månatliga avgifter
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="yearly">
-                        <div className="space-y-1">
-                          <div className="font-medium">Årsprenumeration</div>
-                          <div className="text-xs text-muted-foreground">
-                            Återkommande årliga avgifter
-                          </div>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                    {/* Amount */}
+                    {/* Billing Type */}
                     <div className="space-y-2">
-                      <Label htmlFor="amount" className="text-foreground">Belopp (SEK) *</Label>
-                      <Input
-                        id="amount"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="12345.00"
-                        value={amountSek}
-                        onChange={(e) => setAmountSek(e.target.value)}
-                        required
-                        className="bg-background border-border text-foreground"
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Ange beloppet i svenska kronor (SEK)
-                      </p>
+                      <Label htmlFor="billingType" className="text-foreground">Faktureringstyp *</Label>
+                      <Select
+                        value={billingType}
+                        onValueChange={(value) => setBillingType(value as 'one_time' | 'monthly' | 'yearly')}
+                      >
+                        <SelectTrigger id="billingType">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="one_time">
+                            <div className="space-y-1">
+                              <div className="font-medium">Engångsfaktura</div>
+                              <div className="text-xs text-muted-foreground">
+                                Skapar en enskild faktura, inga återkommande avgifter
+                              </div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="monthly">
+                            <div className="space-y-1">
+                              <div className="font-medium">Månadsprenumeration</div>
+                              <div className="text-xs text-muted-foreground">
+                                Återkommande månatliga avgifter
+                              </div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="yearly">
+                            <div className="space-y-1">
+                              <div className="font-medium">Årsprenumeration</div>
+                              <div className="text-xs text-muted-foreground">
+                                Återkommande årliga avgifter
+                              </div>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    <Separator />
+
+                    {/* Add Line Item Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <ShoppingCart className="h-5 w-5" />
+                        Lägg till Produkter/Tjänster
+                      </h3>
+
+                      <div className="grid gap-4 md:grid-cols-12">
+                        <div className="md:col-span-5 space-y-2">
+                          <Label htmlFor="description">Beskrivning *</Label>
+                          <Input
+                            id="description"
+                            placeholder="T.ex. Premium Support"
+                            value={currentDescription}
+                            onChange={(e) => setCurrentDescription(e.target.value)}
+                            className="bg-background border-border text-foreground"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <Label htmlFor="quantity">Antal *</Label>
+                          <Input
+                            id="quantity"
+                            type="number"
+                            step="1"
+                            min="1"
+                            placeholder="1"
+                            value={currentQuantity}
+                            onChange={(e) => setCurrentQuantity(e.target.value)}
+                            className="bg-background border-border text-foreground"
+                          />
+                        </div>
+
+                        <div className="md:col-span-3 space-y-2">
+                          <Label htmlFor="lineAmount">Pris (SEK) *</Label>
+                          <Input
+                            id="lineAmount"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="1000.00"
+                            value={currentAmount}
+                            onChange={(e) => setCurrentAmount(e.target.value)}
+                            className="bg-background border-border text-foreground"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className="invisible">Lägg till</Label>
+                          <Button
+                            type="button"
+                            onClick={handleAddLineItem}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Lägg till
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Line Items Table */}
+                    {lineItems.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Fakturarader ({lineItems.length})</h3>
+                        
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Beskrivning</TableHead>
+                                <TableHead className="text-right">Antal</TableHead>
+                                <TableHead className="text-right">Pris</TableHead>
+                                <TableHead className="text-right">Totalt</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {lineItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="font-medium">{item.description}</TableCell>
+                                  <TableCell className="text-right">{item.quantity}</TableCell>
+                                  <TableCell className="text-right">
+                                    {item.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold">
+                                    {(item.quantity * item.amountSek).toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveLineItem(item.id)}
+                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-muted/50">
+                                <TableCell colSpan={3} className="text-right font-semibold">
+                                  Total:
+                                </TableCell>
+                                <TableCell className="text-right font-bold text-lg text-primary">
+                                  {getTotalAmount().toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SEK
+                                </TableCell>
+                                <TableCell></TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Submit Button */}
                     <Button
                       type="submit"
-                      disabled={isSubmitting || !amountSek}
+                      disabled={isSubmitting || lineItems.length === 0}
                       className="w-full"
                       size="lg"
                     >
@@ -396,7 +548,7 @@ export default function AdminEnterpriseBilling() {
                       ) : (
                         <>
                           <Receipt className="h-4 w-4 mr-2" />
-                          Skapa {getBillingTypeLabel(billingType)}
+                          Skapa {getBillingTypeLabel(billingType)} ({lineItems.length} rad{lineItems.length !== 1 ? 'er' : ''}, {getTotalAmount().toLocaleString('sv-SE')} SEK)
                         </>
                       )}
                     </Button>
@@ -410,10 +562,11 @@ export default function AdminEnterpriseBilling() {
                   <CardTitle className="text-base text-foreground">Så här fungerar det</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p>• <strong className="text-foreground">Engångsfaktura:</strong> Skapar en faktura för angivet belopp, slutför den och returnerar en länk till fakturan</p>
-                  <p>• <strong className="text-foreground">Månad/År:</strong> Skapar en återkommande Stripe-prenumeration med angivet belopp och returnerar både fakturalänk och länk till faktureringsportal</p>
+                  <p>• <strong className="text-foreground">Flera rader:</strong> Lägg till så många produkter/tjänster du vill innan du skapar fakturan</p>
+                  <p>• <strong className="text-foreground">Automatisk totalsumma:</strong> Totalen beräknas automatiskt från alla rader (antal × pris)</p>
+                  <p>• <strong className="text-foreground">Engångsfaktura:</strong> Skapar en faktura för totalsumman, inga återkommande avgifter</p>
+                  <p>• <strong className="text-foreground">Månad/År:</strong> Skapar en återkommande prenumeration med totalsumman</p>
                   <p>• <strong className="text-foreground">Flera faktureringstyper:</strong> Du kan skapa både engångsfakturor och prenumerationer för samma företag</p>
-                  <p>• Backend skapar/uppdaterar automatiskt Stripe-kunden för företaget</p>
                 </CardContent>
               </Card>
             </TabsContent>
