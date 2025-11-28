@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import BillingSuccessDialog from "@/components/BillingSuccessDialog";
 
 interface Company {
@@ -59,7 +60,7 @@ export default function AdminEnterpriseBilling() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-  const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('one_time');
+  const [billingType, setBillingType] = useState<'one_time' | 'monthly' | 'yearly'>('monthly');
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
   
   // Line items state
@@ -68,6 +69,9 @@ export default function AdminEnterpriseBilling() {
   const [currentQuantity, setCurrentQuantity] = useState("1");
   const [currentAmount, setCurrentAmount] = useState("");
   const [currentItemType, setCurrentItemType] = useState<'one_time' | 'recurring'>('recurring');
+  
+  // Combine one-time items with first subscription invoice
+  const [combineOneTime, setCombineOneTime] = useState(false);
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   
@@ -80,6 +84,8 @@ export default function AdminEnterpriseBilling() {
     invoiceUrl: string;
     portalUrl?: string;
     companyName: string;
+    oneTimeInvoiceUrl?: string;
+    oneTimeInvoiceId?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -229,6 +235,7 @@ export default function AdminEnterpriseBilling() {
       // Add one-time amount for subscriptions if present
       if ((billingType === 'monthly' || billingType === 'yearly') && oneTimeTotal > 0) {
         requestData.oneTimeAmountSek = oneTimeTotal;
+        requestData.combineOneTime = combineOneTime;
       }
 
       const response = await apiClient.createEnterpriseCompanyBilling(selectedCompanyId, requestData);
@@ -257,6 +264,8 @@ export default function AdminEnterpriseBilling() {
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
+        oneTimeInvoiceUrl: response.oneTimeInvoiceUrl,
+        oneTimeInvoiceId: response.oneTimeInvoiceId,
       });
       setSuccessDialogOpen(true);
       
@@ -751,6 +760,32 @@ export default function AdminEnterpriseBilling() {
                       </div>
                     )}
 
+                    {/* Combine One-Time Items Toggle - Show for subscriptions with one-time items */}
+                    {(billingType === 'monthly' || billingType === 'yearly') && getOneTimeTotal() > 0 && (
+                      <Card className="border-primary/20 bg-muted/30">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between space-x-4">
+                            <div className="flex-1 space-y-1">
+                              <Label htmlFor="combine-toggle" className="text-base font-semibold cursor-pointer">
+                                Kombinera engångsavgift med första fakturan
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                {combineOneTime 
+                                  ? "✅ Engångsavgiften kommer att inkluderas på samma faktura som första prenumerationsbetalningen."
+                                  : "📄 Engångsavgiften kommer att skapas som en separat faktura, följd av prenumerationsfakturan."
+                                }
+                              </p>
+                            </div>
+                            <Switch
+                              id="combine-toggle"
+                              checked={combineOneTime}
+                              onCheckedChange={setCombineOneTime}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Submit Button */}
                     <Button
                       type="submit"
@@ -792,10 +827,10 @@ export default function AdminEnterpriseBilling() {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <p>• <strong className="text-foreground">Engångsfakturor:</strong> Alla rader måste vara "Engång"-typ. Skapar en enskild faktura.</p>
-                  <p>• <strong className="text-foreground">Prenumerationer:</strong> Måste ha minst en "Återkommande"-rad. Kan även inkludera "Engång"-rader för första fakturan.</p>
-                  <p>• <strong className="text-foreground">Kombinerad fakturering:</strong> För prenumerationer kan du lägga till både återkommande och engångsavgifter i SAMMA inlämning!</p>
-                  <p>• <strong className="text-foreground">Automatisk uppdelning:</strong> Återkommande rader läggs på varje månad/år, engångsrader läggs bara på första fakturan.</p>
-                  <p>• <strong className="text-foreground">Exempel:</strong> Månadsprenumeration med 5000 SEK (Återkommande) + 15000 SEK installationsavgift (Engång) → Första fakturan: 20000 SEK, därefter: 5000 SEK/månad</p>
+                  <p>• <strong className="text-foreground">Prenumerationer:</strong> Måste ha minst en "Återkommande"-rad. Kan även inkludera "Engång"-rader.</p>
+                  <p>• <strong className="text-foreground">Kombinerad fakturering:</strong> Välj om engångsavgifter ska kombineras med första prenumerationsfakturan eller skickas separat.</p>
+                  <p>• <strong className="text-foreground">Byte mellan månad och år:</strong> Du kan när som helst byta faktureringstyp genom att välja en annan typ från rullgardinsmenyn ovan.</p>
+                  <p>• <strong className="text-foreground">Exempel:</strong> Månadsprenumeration 5000 SEK + 15000 SEK installationsavgift → Kombinerat: 20000 SEK första månaden, sedan 5000 SEK/månad. Separat: Två fakturor skickas.</p>
                 </CardContent>
               </Card>
             </TabsContent>
