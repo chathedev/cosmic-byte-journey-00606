@@ -128,6 +128,29 @@ export interface CleanupResponse {
   freedSpace: { bytes: number; formatted: string };
 }
 
+export interface VisitorAnalytics {
+  timestamp: string;
+  windowDays: number;
+  totalRecorded: number;
+  entriesLastWindow: number;
+  uniqueVisitorsLastWindow: number;
+  uniqueIpsLastWindow: number;
+  timeline: Array<{
+    date: string;
+    visits: number;
+    uniqueVisitors: number;
+  }>;
+  recentEntries: Array<{
+    id: string;
+    visitorKey: string;
+    label: string;
+    page: string;
+    ip: string;
+    visitedAt: string;
+    date: string;
+  }>;
+}
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('authToken');
   return {
@@ -324,6 +347,20 @@ export const backendApi = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Det gick inte att återställa auth-data' }));
       throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  // Visitor Analytics
+  async getVisitorAnalytics(windowDays: number = 30): Promise<VisitorAnalytics> {
+    const response = await fetch(`${BACKEND_URL}/admin/analytics/visitors?windowDays=${windowDays}`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     return response.json();
