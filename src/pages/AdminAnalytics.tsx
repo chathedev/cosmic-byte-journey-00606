@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart2, Activity, Users, Sparkles, TrendingUp, TrendingDown, DollarSign, Loader2, Eye, Globe } from "lucide-react";
+import { BarChart2, Activity, Users, Sparkles, TrendingUp, TrendingDown, DollarSign, Loader2, Eye, Globe, Cloud } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { backendApi, VisitorAnalytics } from "@/lib/backendApi";
+import { backendApi, VisitorAnalytics, CloudflareAnalytics } from "@/lib/backendApi";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface AnalyticsData {
   timestamp: string;
@@ -63,6 +64,7 @@ const AdminAnalytics = () => {
   const { toast } = useToast();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [visitorData, setVisitorData] = useState<VisitorAnalytics | null>(null);
+  const [cloudflareData, setCloudflareData] = useState<CloudflareAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [windowDays, setWindowDays] = useState("30");
 
@@ -70,7 +72,7 @@ const AdminAnalytics = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const [analyticsResponse, visitorResponse] = await Promise.all([
+      const [analyticsResponse, visitorResponse, cloudflareResponse] = await Promise.all([
         fetch(`https://api.tivly.se/admin/analytics?windowDays=${days}`, {
           credentials: 'include',
           headers: {
@@ -81,6 +83,10 @@ const AdminAnalytics = () => {
         backendApi.getVisitorAnalytics(parseInt(days)).catch(err => {
           console.warn("Visitor analytics not available:", err);
           return null;
+        }),
+        backendApi.getDailyAnalytics().catch(err => {
+          console.warn("Cloudflare analytics not available:", err);
+          return null;
         })
       ]);
       
@@ -89,6 +95,7 @@ const AdminAnalytics = () => {
       const analyticsData = await analyticsResponse.json();
       setData(analyticsData);
       setVisitorData(visitorResponse);
+      setCloudflareData(cloudflareResponse);
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
       toast({
@@ -420,6 +427,47 @@ const AdminAnalytics = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Cloudflare Analytics */}
+        {cloudflareData && cloudflareData.ok && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Cloud className="w-4 h-4" />
+                Cloudflare Analytics (Last 30 Days)
+              </CardTitle>
+              <CardDescription>Visitors and pageviews from Cloudflare</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Datum</TableHead>
+                      <TableHead className="text-right">Besökare</TableHead>
+                      <TableHead className="text-right">Sidvisningar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cloudflareData.days.map((day, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">
+                          {new Date(day.dimensions.date).toLocaleDateString('sv-SE', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </TableCell>
+                        <TableCell className="text-right">{day.sum.visits}</TableCell>
+                        <TableCell className="text-right">{day.sum.pageviews}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Insights */}
         <div className="grid gap-4 md:grid-cols-2">

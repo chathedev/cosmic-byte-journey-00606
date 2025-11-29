@@ -151,6 +151,19 @@ export interface VisitorAnalytics {
   }>;
 }
 
+export interface CloudflareAnalytics {
+  ok: boolean;
+  days: Array<{
+    dimensions: {
+      date: string;
+    };
+    sum: {
+      visits: number;
+      pageviews: number;
+    };
+  }>;
+}
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('authToken');
   return {
@@ -355,6 +368,20 @@ export const backendApi = {
   // Visitor Analytics
   async getVisitorAnalytics(windowDays: number = 30): Promise<VisitorAnalytics> {
     const response = await fetch(`${BACKEND_URL}/admin/analytics/visitors?windowDays=${windowDays}`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  // Cloudflare Analytics
+  async getDailyAnalytics(): Promise<CloudflareAnalytics> {
+    const response = await fetch(`${BACKEND_URL}/admin/analytics/daily`, {
       credentials: 'include',
       headers: getAuthHeaders(),
     });
