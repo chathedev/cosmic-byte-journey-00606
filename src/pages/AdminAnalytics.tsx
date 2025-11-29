@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart2, Activity, Users, Sparkles, TrendingUp, TrendingDown, DollarSign, Loader2 } from "lucide-react";
+import { BarChart2, Activity, Users, Sparkles, TrendingUp, TrendingDown, DollarSign, Loader2, Eye, Globe } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { backendApi, VisitorAnalytics } from "@/lib/backendApi";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AnalyticsData {
   timestamp: string;
@@ -60,6 +62,7 @@ interface AnalyticsData {
 const AdminAnalytics = () => {
   const { toast } = useToast();
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [visitorData, setVisitorData] = useState<VisitorAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [windowDays, setWindowDays] = useState("30");
 
@@ -67,18 +70,25 @@ const AdminAnalytics = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`https://api.tivly.se/admin/analytics?windowDays=${days}`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const [analyticsResponse, visitorResponse] = await Promise.all([
+        fetch(`https://api.tivly.se/admin/analytics?windowDays=${days}`, {
+          credentials: 'include',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        backendApi.getVisitorAnalytics(parseInt(days)).catch(err => {
+          console.warn("Visitor analytics not available:", err);
+          return null;
+        })
+      ]);
       
-      if (!response.ok) throw new Error('Failed to fetch analytics');
+      if (!analyticsResponse.ok) throw new Error('Failed to fetch analytics');
       
-      const analyticsData = await response.json();
+      const analyticsData = await analyticsResponse.json();
       setData(analyticsData);
+      setVisitorData(visitorResponse);
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
       toast({
@@ -217,6 +227,122 @@ const AdminAnalytics = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Visitor Analytics Section */}
+        {visitorData && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="hover-scale">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  Total besök
+                </CardDescription>
+                <CardTitle className="text-3xl">{visitorData.totalRecorded}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  All-time registrerade besök
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-scale">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Besök senaste perioden
+                </CardDescription>
+                <CardTitle className="text-3xl">{visitorData.entriesLastWindow}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Senaste {windowDays} dagarna
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-scale">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Unika besökare
+                </CardDescription>
+                <CardTitle className="text-3xl">{visitorData.uniqueVisitorsLastWindow}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  {visitorData.uniqueIpsLastWindow} unika IPs
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-scale">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Activity className="w-4 h-4" />
+                  Genomsnitt/dag
+                </CardDescription>
+                <CardTitle className="text-3xl">
+                  {(visitorData.entriesLastWindow / visitorData.windowDays).toFixed(1)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Besök per dag
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Recent Visitors */}
+        {visitorData && visitorData.recentEntries.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                Senaste besök
+              </CardTitle>
+              <CardDescription>De senaste besökarna på sajten</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px] pr-4">
+                <div className="space-y-2">
+                  {visitorData.recentEntries.map((entry) => (
+                    <div 
+                      key={entry.id} 
+                      className="flex items-center justify-between p-3 rounded-md bg-muted/40 hover:bg-muted/60 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs">
+                            {entry.label || 'unknown'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {entry.page}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-mono">{entry.ip}</span>
+                          <span>•</span>
+                          <span>{entry.visitorKey}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground whitespace-nowrap ml-4">
+                        {new Date(entry.visitedAt).toLocaleString('sv-SE', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stripe Section */}
         {data.stripe?.enabled && (
