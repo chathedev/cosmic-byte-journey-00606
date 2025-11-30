@@ -86,7 +86,7 @@ const AdminAnalytics = () => {
         }),
         backendApi.getCloudflareVisitors(parseInt(days)).catch(err => {
           console.warn("Cloudflare analytics not available:", err);
-          return null;
+          return { ok: false, error: "Failed to fetch analytics" };
         })
       ]);
       
@@ -446,7 +446,7 @@ const AdminAnalytics = () => {
             <CardContent>
               {cloudflareData.ok ? (
                 <>
-                  {cloudflareData.totalRequests !== undefined && cloudflareData.totalPageViews !== undefined && (
+                  {typeof cloudflareData.totalRequests === 'number' && typeof cloudflareData.totalPageViews === 'number' && (
                     <div className="grid gap-4 md:grid-cols-2 mb-4">
                       <div className="p-4 rounded-md bg-muted/40">
                         <p className="text-sm text-muted-foreground mb-1">Total Requests</p>
@@ -458,38 +458,41 @@ const AdminAnalytics = () => {
                       </div>
                     </div>
                   )}
-                  {Array.isArray(cloudflareData.days) && cloudflareData.days.length > 0 ? (
-                    <ScrollArea className="h-[400px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Datum</TableHead>
-                            <TableHead className="text-right">Requests</TableHead>
-                            <TableHead className="text-right">Pageviews</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {cloudflareData.days.map((day, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-medium">
-                                {new Date(day.dimensions.date).toLocaleDateString('sv-SE', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">{day.sum.requests.toLocaleString()}</TableCell>
-                              <TableCell className="text-right font-mono">{day.sum.pageViews.toLocaleString()}</TableCell>
+                  {(() => {
+                    const days = Array.isArray(cloudflareData.days) ? cloudflareData.days : [];
+                    return days.length > 0 ? (
+                      <ScrollArea className="h-[400px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Datum</TableHead>
+                              <TableHead className="text-right">Requests</TableHead>
+                              <TableHead className="text-right">Pageviews</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Ingen data tillgänglig för vald period
-                    </p>
-                  )}
+                          </TableHeader>
+                          <TableBody>
+                            {days.map((day, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium">
+                                  {new Date(day.dimensions.date).toLocaleDateString('sv-SE', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">{day.sum.requests.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-mono">{day.sum.pageViews.toLocaleString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Ingen data tillgänglig för vald period
+                      </p>
+                    );
+                  })()}
                 </>
               ) : (
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-4 text-center">
