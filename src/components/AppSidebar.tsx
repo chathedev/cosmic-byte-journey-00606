@@ -7,7 +7,6 @@ import {
   FiMessageSquare,
   FiMessageCircle,
   FiUsers,
-  FiBarChart,
   FiMail,
   FiUserCheck,
   FiSettings,
@@ -113,7 +112,6 @@ export function AppSidebar() {
     else if (path === "/feedback") setSelected("Feedback");
     else if (path.startsWith("/admin")) {
       if (path === "/admin/users") setSelected("Användare");
-      else if (path === "/admin/analytics") setSelected("Analys");
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
       else if (path === "/admin/admins") setSelected("Admins");
       else if (path === "/admin/backend") setSelected("Backend");
@@ -157,7 +155,6 @@ export function AppSidebar() {
 
   const adminItems = [
     { Icon: FiUsers, title: "Användare", path: "/admin/users" },
-    { Icon: FiBarChart, title: "Analys", path: "/admin/analytics" },
     { Icon: FiMail, title: "E-postkampanjer", path: "/admin/email-campaigns" },
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
