@@ -4,16 +4,13 @@ import { useSubscription, getPaymentDomain } from '@/contexts/SubscriptionContex
 import { subscriptionService } from '@/lib/subscription';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Check, Loader2, AlertTriangle, Smartphone, Globe } from 'lucide-react';
+import { Check, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-// RevenueCat is only used on io.tivly.se - dynamically imported to avoid errors on web
-type PurchasesModule = typeof import('@revenuecat/purchases-capacitor');
-let PurchasesSDK: PurchasesModule | null = null;
+import { getProducts, purchaseProduct, restorePurchases as nativeRestore } from '@/lib/nativeStoreKit';
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
 
@@ -31,13 +28,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [revenueCatError, setRevenueCatError] = useState<string | null>(null);
-  const [domainBlocked, setDomainBlocked] = useState<'ios-required' | 'web-only' | null>(null);
+  const [storeKitError, setStoreKitError] = useState<string | null>(null);
   const stripeRef = useRef<Stripe | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const cardElementRef = useRef<any>(null);
   
-  // PURE DOMAIN-BASED payment routing - NO Capacitor, NO userAgent
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isIOSDomain = hostname === 'io.tivly.se';
   const isWebDomain = hostname === 'app.tivly.se';
@@ -47,20 +42,9 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     setEmail(user?.email || '');
   }, [user]);
 
-  // Log payment routing and load RevenueCat only on iOS domain
   useEffect(() => {
     if (isIOSDomain) {
-      console.log('[Paywall] Using Apple IAP (io.tivly.se)');
-      // Dynamically import RevenueCat only when on iOS domain
-      import('@revenuecat/purchases-capacitor')
-        .then((module) => {
-          PurchasesSDK = module;
-          console.log('[Paywall] RevenueCat SDK loaded');
-        })
-        .catch((err) => {
-          console.error('[Paywall] Failed to load RevenueCat:', err);
-          setRevenueCatError('Apple-köp kunde inte laddas.');
-        });
+      console.log('[Paywall] Using Native Apple StoreKit (io.tivly.se)');
     } else if (isWebDomain) {
       console.log('[Paywall] Using Stripe (app.tivly.se)');
     } else {
@@ -70,7 +54,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   useEffect(() => {
     if (!open) {
-      // Cleanup on close
       if (cardElementRef.current) {
         try { cardElementRef.current.unmount(); cardElementRef.current.destroy?.(); } catch { }
         cardElementRef.current = null;
@@ -79,61 +62,43 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       stripeRef.current = null;
       setSelectedPlan(null);
       setClientSecret(null);
-      setRevenueCatError(null);
+      setStoreKitError(null);
     }
   }, [open]);
 
-  // Handle Apple IAP purchase via RevenueCat (io.tivly.se ONLY)
+  // Handle Native Apple StoreKit purchase (io.tivly.se ONLY)
   const handleAppleIAPPurchase = async () => {
     if (!isIOSDomain) {
-      console.warn('[Paywall] Blocked: handleAppleIAPPurchase called on non-iOS domain');
+      console.warn('[Paywall] Blocked: purchase called on non-iOS domain');
       return;
     }
     
-    console.log('[Paywall] 🍎 handleAppleIAPPurchase triggered on io.tivly.se');
-    
-    if (!PurchasesSDK) {
-      console.error('[Paywall] RevenueCat SDK not loaded');
-      setRevenueCatError('Apple-köp är inte tillgängligt. Försök igen.');
-      return;
-    }
-    
+    console.log('[Paywall] 🍎 Native StoreKit purchase triggered');
     setIsLoading(true);
-    setRevenueCatError(null);
+    setStoreKitError(null);
     
     try {
-      console.log('[Paywall] 🍎 Calling Purchases.getOfferings()...');
+      const result = await purchaseProduct();
       
-      const offerings = await PurchasesSDK.Purchases.getOfferings();
-      console.log('[Paywall] 🍎 RevenueCat offerings:', offerings);
-      
-      const currentOffering = offerings.current;
-      if (currentOffering && currentOffering.availablePackages && currentOffering.availablePackages.length > 0) {
-        const packageToPurchase = currentOffering.availablePackages[0];
-        console.log('[Paywall] 🍎 Purchasing package:', packageToPurchase);
-        
-        const purchaseResult = await PurchasesSDK.Purchases.purchasePackage({
-          aPackage: packageToPurchase,
-        });
-        console.log('[Paywall] 🍎 Purchase result:', purchaseResult);
-        
-        await refreshPlan();
-        sonnerToast.success("Prenumerationen är nu aktiv!");
-        onOpenChange(false);
-      } else {
-        console.error('[Paywall] 🍎 No packages available in current offering');
-        setRevenueCatError("Inga prenumerationspaket tillgängliga just nu.");
-      }
-    } catch (error: any) {
-      console.error('[Paywall] ❌ RevenueCat purchase error:', error);
-      
-      if (error?.userCancelled) {
-        console.log('[Paywall] 🍎 User cancelled purchase');
+      if (result.cancelled) {
+        console.log('[Paywall] User cancelled purchase');
         return;
       }
       
-      // Show error - NEVER open Stripe on io.tivly.se
-      setRevenueCatError("Apple-köp misslyckades. Försök igen senare.");
+      if (result.pending) {
+        sonnerToast.info("Köpet väntar på godkännande");
+        return;
+      }
+      
+      if (result.success) {
+        console.log('[Paywall] ✅ Purchase successful');
+        await refreshPlan();
+        sonnerToast.success("Prenumerationen är nu aktiv!");
+        onOpenChange(false);
+      }
+    } catch (error: any) {
+      console.error('[Paywall] ❌ StoreKit purchase error:', error);
+      setStoreKitError("Apple-köp misslyckades. Försök igen senare.");
     } finally {
       setIsLoading(false);
     }
@@ -142,28 +107,23 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   // Handle restore purchases (io.tivly.se ONLY)
   const handleRestorePurchases = async () => {
     if (!isIOSDomain) {
-      console.warn('[Paywall] Blocked: handleRestorePurchases called on non-iOS domain');
+      console.warn('[Paywall] Blocked: restore called on non-iOS domain');
       sonnerToast.error("Återställning fungerar endast i iOS-appen.");
       return;
     }
     
-    if (!PurchasesSDK) {
-      setRevenueCatError('Apple-köp är inte tillgängligt.');
-      return;
-    }
-    
-    console.log('[Paywall] 🔄 Restore purchases on io.tivly.se');
+    console.log('[Paywall] 🔄 Restore purchases via StoreKit');
     setIsLoading(true);
     
     try {
-      const result = await PurchasesSDK.Purchases.restorePurchases();
+      const result = await nativeRestore();
       console.log('[Paywall] ✅ Restore result:', result);
       
       await refreshPlan();
       sonnerToast.success("Köp återställda!");
       onOpenChange(false);
     } catch (error) {
-      console.error('[Paywall] ❌ Restore purchases error:', error);
+      console.error('[Paywall] ❌ Restore error:', error);
       sonnerToast.error("Kunde inte återställa köp. Försök igen.");
     } finally {
       setIsLoading(false);
@@ -430,6 +390,16 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           )}
         </DialogHeader>
 
+        {/* iOS error display */}
+        {isIOSDomain && storeKitError && (
+          <div className="mb-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <div className="flex items-center gap-2 text-destructive text-xs">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{storeKitError}</span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 py-3">
           {plans.map((plan, index) => (
             <Card
@@ -503,13 +473,13 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           ))}
         </div>
 
-        {/* RevenueCat Error Display for io.tivly.se */}
-        {isIOSDomain && revenueCatError && (
+        {/* StoreKit Error Display for io.tivly.se */}
+        {isIOSDomain && storeKitError && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4 mb-4 animate-fade-in">
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
               <div>
-                <p className="text-sm font-medium text-destructive">{revenueCatError}</p>
+                <p className="text-sm font-medium text-destructive">{storeKitError}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Kontakta support om problemet kvarstår.
                 </p>
