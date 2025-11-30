@@ -429,7 +429,7 @@ const AdminAnalytics = () => {
         </Card>
 
         {/* Cloudflare Analytics */}
-        {cloudflareData && cloudflareData.ok && (
+        {cloudflareData && cloudflareData.ok && cloudflareData.days && cloudflareData.days.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
