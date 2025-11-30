@@ -84,7 +84,7 @@ const AdminAnalytics = () => {
           console.warn("Visitor analytics not available:", err);
           return null;
         }),
-        backendApi.getDailyAnalytics().catch(err => {
+        backendApi.getCloudflareVisitors(parseInt(days)).catch(err => {
           console.warn("Cloudflare analytics not available:", err);
           return null;
         })
@@ -429,42 +429,75 @@ const AdminAnalytics = () => {
         </Card>
 
         {/* Cloudflare Analytics */}
-        {cloudflareData && cloudflareData.ok && cloudflareData.days && cloudflareData.days.length > 0 && (
+        {cloudflareData && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Cloud className="w-4 h-4" />
-                Cloudflare Analytics (Last 30 Days)
+                Cloudflare Analytics
               </CardTitle>
-              <CardDescription>Visitors and pageviews from Cloudflare</CardDescription>
+              <CardDescription>
+                {cloudflareData.ok 
+                  ? `Requests and pageviews (last ${cloudflareData.windowDays || windowDays} days)`
+                  : 'Cloudflare analytics unavailable'
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Datum</TableHead>
-                      <TableHead className="text-right">Besökare</TableHead>
-                      <TableHead className="text-right">Sidvisningar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cloudflareData.days.map((day, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">
-                          {new Date(day.dimensions.date).toLocaleDateString('sv-SE', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">{day.sum.visits}</TableCell>
-                        <TableCell className="text-right">{day.sum.pageviews}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+              {cloudflareData.ok ? (
+                <>
+                  {cloudflareData.totalRequests !== undefined && cloudflareData.totalPageViews !== undefined && (
+                    <div className="grid gap-4 md:grid-cols-2 mb-4">
+                      <div className="p-4 rounded-md bg-muted/40">
+                        <p className="text-sm text-muted-foreground mb-1">Total Requests</p>
+                        <p className="text-2xl font-semibold">{cloudflareData.totalRequests.toLocaleString()}</p>
+                      </div>
+                      <div className="p-4 rounded-md bg-muted/40">
+                        <p className="text-sm text-muted-foreground mb-1">Total Pageviews</p>
+                        <p className="text-2xl font-semibold">{cloudflareData.totalPageViews.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  )}
+                  {Array.isArray(cloudflareData.days) && cloudflareData.days.length > 0 ? (
+                    <ScrollArea className="h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Datum</TableHead>
+                            <TableHead className="text-right">Requests</TableHead>
+                            <TableHead className="text-right">Pageviews</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cloudflareData.days.map((day, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">
+                                {new Date(day.dimensions.date).toLocaleDateString('sv-SE', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">{day.sum.requests.toLocaleString()}</TableCell>
+                              <TableCell className="text-right font-mono">{day.sum.pageViews.toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Ingen data tillgänglig för vald period
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {cloudflareData.error || 'Cloudflare analytics unavailable. This may be due to rate limits or quota restrictions.'}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
