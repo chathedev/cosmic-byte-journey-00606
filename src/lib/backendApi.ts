@@ -153,15 +153,19 @@ export interface VisitorAnalytics {
 
 export interface CloudflareAnalytics {
   ok: boolean;
-  days: Array<{
+  windowDays?: number;
+  totalRequests?: number;
+  totalPageViews?: number;
+  days?: Array<{
     dimensions: {
       date: string;
     };
     sum: {
-      visits: number;
-      pageviews: number;
+      requests: number;
+      pageViews: number;
     };
   }>;
+  error?: string;
 }
 
 const getAuthHeaders = () => {
@@ -380,8 +384,8 @@ export const backendApi = {
   },
 
   // Cloudflare Analytics
-  async getDailyAnalytics(): Promise<CloudflareAnalytics> {
-    const response = await fetch(`${BACKEND_URL}/admin/analytics/daily`, {
+  async getCloudflareVisitors(windowDays: number = 30): Promise<CloudflareAnalytics> {
+    const response = await fetch(`${BACKEND_URL}/admin/analytics/visitors?windowDays=${windowDays}`, {
       credentials: 'include',
       headers: getAuthHeaders(),
     });
