@@ -24,6 +24,9 @@ export interface EnterpriseMembership {
       daysRemaining: number;
       expired: boolean;
       configuredBy: string;
+      manuallyDisabled: boolean;
+      disabledAt: string | null;
+      disabledBy: string | null;
     };
   };
   membership?: {

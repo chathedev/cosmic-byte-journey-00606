@@ -1047,8 +1047,9 @@ class ApiClient {
   }
 
   async createEnterpriseCompanyTrial(companyId: string, data: {
-    days: number;
+    days?: number;
     startsAt?: string;
+    enable?: boolean;
   }): Promise<any> {
     const response = await this.fetchWithAuth(
       `/admin/enterprise/companies/${companyId}/trial`,
@@ -1075,6 +1076,21 @@ class ApiClient {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to disable trial' }));
       throw new Error(error.error || 'Failed to disable trial');
+    }
+    return response.json();
+  }
+
+  async resumeEnterpriseCompanyTrial(companyId: string, days?: number): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/trial`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ enable: true, days }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to resume trial' }));
+      throw new Error(error.error || 'Failed to resume trial');
     }
     return response.json();
   }
