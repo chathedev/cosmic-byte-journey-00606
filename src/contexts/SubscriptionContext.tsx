@@ -21,7 +21,7 @@ export interface EnterpriseMembership {
       startsAt: string;
       endsAt: string;
       daysTotal: number;
-      daysRemaining: number;
+      daysRemaining: number | null;
       expired: boolean;
       configuredBy: string;
       manuallyDisabled: boolean;

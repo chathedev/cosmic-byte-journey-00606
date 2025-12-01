@@ -47,7 +47,7 @@ interface Company {
     startsAt: string;
     endsAt: string;
     daysTotal: number;
-    daysRemaining: number;
+    daysRemaining: number | null;
     expired: boolean;
     configuredBy: string;
     manuallyDisabled: boolean;
@@ -426,21 +426,21 @@ export default function AdminEnterprise() {
   const handleCreateTrial = async () => {
     if (!selectedCompany) return;
 
-    const isResuming = selectedCompany.trial?.manuallyDisabled;
+    const isRestoring = selectedCompany.trial?.manuallyDisabled;
 
     try {
       setIsSubmitting(true);
       
-      if (isResuming) {
-        // Resuming a manually disabled trial - days is optional
+      if (isRestoring) {
+        // Restoring a manually disabled trial - days is optional
         await apiClient.resumeEnterpriseCompanyTrial(
           selectedCompany.id,
           trialDays && trialDays > 0 ? Math.floor(trialDays) : undefined
         );
         
         toast({
-          title: 'Testperiod återaktiverad',
-          description: `Testperioden har återaktiverats för ${selectedCompany.name}`,
+          title: 'Testperiod återställd',
+          description: `Testperioden har återställts för ${selectedCompany.name}`,
         });
       } else {
         // Creating a new trial
@@ -462,10 +462,10 @@ export default function AdminEnterprise() {
       setSelectedCompany(updated.company);
       loadCompanies();
     } catch (error) {
-      console.error('Failed to create/resume trial:', error);
+      console.error('Failed to create/restore trial:', error);
       toast({
         title: 'Fel',
-        description: isResuming ? 'Kunde inte återaktivera testperiod' : 'Kunde inte skapa testperiod',
+        description: isRestoring ? 'Kunde inte återställa testperiod' : 'Kunde inte skapa testperiod',
         variant: 'destructive',
       });
     } finally {
@@ -481,8 +481,8 @@ export default function AdminEnterprise() {
       await apiClient.disableEnterpriseCompanyTrial(selectedCompany.id);
       
       toast({
-        title: 'Testperiod pausad',
-        description: `Testperioden för ${selectedCompany.name} har pausats manuellt`,
+        title: 'Testperiod borttagen',
+        description: `Testperioden har tagits bort och full tillgång har aktiverats för ${selectedCompany.name}`,
       });
       
       const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
@@ -492,7 +492,7 @@ export default function AdminEnterprise() {
       console.error('Failed to disable trial:', error);
       toast({
         title: 'Fel',
-        description: 'Kunde inte pausa testperiod',
+        description: 'Kunde inte ta bort testperiod',
         variant: 'destructive',
       });
     } finally {
@@ -782,7 +782,7 @@ export default function AdminEnterprise() {
                         disabled={isSubmitting}
                       >
                         {isSubmitting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                        Pause Trial
+                        Remove Trial & Enable Access
                       </Button>
                     ) : selectedCompany.trial?.manuallyDisabled ? (
                       <Button
@@ -792,7 +792,7 @@ export default function AdminEnterprise() {
                         disabled={isSubmitting}
                       >
                         <Plus className="h-4 w-4 mr-1" />
-                        Resume Trial
+                        Restore Trial
                       </Button>
                     ) : (
                       <Button
@@ -811,24 +811,32 @@ export default function AdminEnterprise() {
                         <Label className="text-xs text-muted-foreground">Status</Label>
                         <p className="text-sm">
                           <Badge variant={
-                            selectedCompany.trial.manuallyDisabled ? 'secondary' :
+                            selectedCompany.trial.manuallyDisabled ? 'default' :
                             selectedCompany.trial.expired ? 'destructive' : 
                             'default'
                           }>
-                            {selectedCompany.trial.manuallyDisabled ? 'Paused' :
+                            {selectedCompany.trial.manuallyDisabled ? 'Full Access (Trial Removed)' :
                              selectedCompany.trial.expired ? 'Expired' : 
-                             'Active'}
+                             'Active Trial'}
                           </Badge>
                         </p>
                       </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Days Remaining</Label>
-                        <p className="text-sm font-semibold">{selectedCompany.trial.daysRemaining} / {selectedCompany.trial.daysTotal}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Ends At</Label>
-                        <p className="text-sm">{new Date(selectedCompany.trial.endsAt).toLocaleDateString()}</p>
-                      </div>
+                      {!selectedCompany.trial.manuallyDisabled && (
+                        <>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Days Remaining</Label>
+                            <p className="text-sm font-semibold">
+                              {selectedCompany.trial.daysRemaining !== null 
+                                ? `${selectedCompany.trial.daysRemaining} / ${selectedCompany.trial.daysTotal}`
+                                : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Ends At</Label>
+                            <p className="text-sm">{new Date(selectedCompany.trial.endsAt).toLocaleDateString()}</p>
+                          </div>
+                        </>
+                      )}
                       <div>
                         <Label className="text-xs text-muted-foreground">Started At</Label>
                         <p className="text-sm">{new Date(selectedCompany.trial.startsAt).toLocaleDateString()}</p>
@@ -840,12 +848,17 @@ export default function AdminEnterprise() {
                       {selectedCompany.trial.manuallyDisabled && selectedCompany.trial.disabledAt && (
                         <>
                           <div>
-                            <Label className="text-xs text-muted-foreground">Paused At</Label>
+                            <Label className="text-xs text-muted-foreground">Access Granted At</Label>
                             <p className="text-sm">{new Date(selectedCompany.trial.disabledAt).toLocaleDateString()}</p>
                           </div>
                           <div>
-                            <Label className="text-xs text-muted-foreground">Paused By</Label>
+                            <Label className="text-xs text-muted-foreground">Granted By</Label>
                             <p className="text-sm text-xs">{selectedCompany.trial.disabledBy}</p>
+                          </div>
+                          <div className="md:col-span-3">
+                            <p className="text-sm text-muted-foreground italic">
+                              Trial removed - company has full access without time restrictions
+                            </p>
                           </div>
                         </>
                       )}
@@ -1860,11 +1873,11 @@ export default function AdminEnterprise() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedCompany?.trial?.manuallyDisabled ? 'Resume Trial Period' : 'Start Trial Period'}
+              {selectedCompany?.trial?.manuallyDisabled ? 'Restore Trial Period' : 'Start Trial Period'}
             </DialogTitle>
             <DialogDescription>
               {selectedCompany?.trial?.manuallyDisabled 
-                ? `Resume the trial period for ${selectedCompany?.name}. Members will regain full access.`
+                ? `Restore the trial countdown for ${selectedCompany?.name}. This will re-enable time restrictions.`
                 : `Configure a trial period for ${selectedCompany?.name}. Members will have full access during the trial.`
               }
             </DialogDescription>
@@ -1888,7 +1901,7 @@ export default function AdminEnterprise() {
               />
               <p className="text-sm text-muted-foreground mt-1">
                 {selectedCompany?.trial?.manuallyDisabled
-                  ? 'Leave empty to resume with previous duration. Or set new duration.'
+                  ? 'Leave empty to restore with previous duration. Or set new duration.'
                   : `The trial will start immediately and last for ${trialDays} days.`
                 }
               </p>
@@ -1903,7 +1916,7 @@ export default function AdminEnterprise() {
               disabled={isSubmitting || (!selectedCompany?.trial?.manuallyDisabled && (!trialDays || trialDays < 1))}
             >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {selectedCompany?.trial?.manuallyDisabled ? 'Resume Trial' : 'Start Trial'}
+              {selectedCompany?.trial?.manuallyDisabled ? 'Restore Trial' : 'Start Trial'}
             </Button>
           </DialogFooter>
         </DialogContent>
