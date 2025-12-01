@@ -361,6 +361,7 @@ const EnterpriseTrialCheck = () => {
       companyName={enterpriseMembership.company.name}
       daysRemaining={trial.daysRemaining}
       expired={trial.expired}
+      manuallyDisabled={trial.manuallyDisabled}
     />
   );
 };

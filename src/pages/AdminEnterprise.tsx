@@ -50,6 +50,9 @@ interface Company {
     daysRemaining: number;
     expired: boolean;
     configuredBy: string;
+    manuallyDisabled: boolean;
+    disabledAt: string | null;
+    disabledBy: string | null;
   };
   preferences?: {
     meetingCreatorVisibility?: 'shared_only' | 'always' | 'hidden';
@@ -421,18 +424,37 @@ export default function AdminEnterprise() {
   };
 
   const handleCreateTrial = async () => {
-    if (!selectedCompany || !trialDays || trialDays < 1) return;
+    if (!selectedCompany) return;
+
+    const isResuming = selectedCompany.trial?.manuallyDisabled;
 
     try {
       setIsSubmitting(true);
-      await apiClient.createEnterpriseCompanyTrial(selectedCompany.id, {
-        days: Math.floor(trialDays),
-      });
       
-      toast({
-        title: 'Testperiod skapad',
-        description: `${trialDays} dagars testperiod har startats för ${selectedCompany.name}`,
-      });
+      if (isResuming) {
+        // Resuming a manually disabled trial - days is optional
+        await apiClient.resumeEnterpriseCompanyTrial(
+          selectedCompany.id,
+          trialDays && trialDays > 0 ? Math.floor(trialDays) : undefined
+        );
+        
+        toast({
+          title: 'Testperiod återaktiverad',
+          description: `Testperioden har återaktiverats för ${selectedCompany.name}`,
+        });
+      } else {
+        // Creating a new trial
+        if (!trialDays || trialDays < 1) return;
+        
+        await apiClient.createEnterpriseCompanyTrial(selectedCompany.id, {
+          days: Math.floor(trialDays),
+        });
+        
+        toast({
+          title: 'Testperiod skapad',
+          description: `${trialDays} dagars testperiod har startats för ${selectedCompany.name}`,
+        });
+      }
       
       setShowTrialDialog(false);
       setTrialDays(7);
@@ -440,10 +462,10 @@ export default function AdminEnterprise() {
       setSelectedCompany(updated.company);
       loadCompanies();
     } catch (error) {
-      console.error('Failed to create trial:', error);
+      console.error('Failed to create/resume trial:', error);
       toast({
         title: 'Fel',
-        description: 'Kunde inte skapa testperiod',
+        description: isResuming ? 'Kunde inte återaktivera testperiod' : 'Kunde inte skapa testperiod',
         variant: 'destructive',
       });
     } finally {
@@ -459,8 +481,8 @@ export default function AdminEnterprise() {
       await apiClient.disableEnterpriseCompanyTrial(selectedCompany.id);
       
       toast({
-        title: 'Testperiod avslutad',
-        description: `Testperioden för ${selectedCompany.name} har avslutats`,
+        title: 'Testperiod pausad',
+        description: `Testperioden för ${selectedCompany.name} har pausats manuellt`,
       });
       
       const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
@@ -470,12 +492,17 @@ export default function AdminEnterprise() {
       console.error('Failed to disable trial:', error);
       toast({
         title: 'Fel',
-        description: 'Kunde inte avsluta testperiod',
+        description: 'Kunde inte pausa testperiod',
         variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResumeTrial = async () => {
+    if (!selectedCompany) return;
+    setShowTrialDialog(true);
   };
 
   const viewCompanyDetails = async (companyId: string) => {
@@ -747,7 +774,7 @@ export default function AdminEnterprise() {
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-sm font-semibold">Trial Status</Label>
-                    {selectedCompany.trial?.enabled ? (
+                    {selectedCompany.trial?.enabled && !selectedCompany.trial?.manuallyDisabled ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -755,7 +782,17 @@ export default function AdminEnterprise() {
                         disabled={isSubmitting}
                       >
                         {isSubmitting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                        End Trial
+                        Pause Trial
+                      </Button>
+                    ) : selectedCompany.trial?.manuallyDisabled ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResumeTrial}
+                        disabled={isSubmitting}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Resume Trial
                       </Button>
                     ) : (
                       <Button
@@ -773,8 +810,14 @@ export default function AdminEnterprise() {
                       <div>
                         <Label className="text-xs text-muted-foreground">Status</Label>
                         <p className="text-sm">
-                          <Badge variant={selectedCompany.trial.expired ? 'destructive' : 'default'}>
-                            {selectedCompany.trial.expired ? 'Expired' : 'Active'}
+                          <Badge variant={
+                            selectedCompany.trial.manuallyDisabled ? 'secondary' :
+                            selectedCompany.trial.expired ? 'destructive' : 
+                            'default'
+                          }>
+                            {selectedCompany.trial.manuallyDisabled ? 'Paused' :
+                             selectedCompany.trial.expired ? 'Expired' : 
+                             'Active'}
                           </Badge>
                         </p>
                       </div>
@@ -794,6 +837,18 @@ export default function AdminEnterprise() {
                         <Label className="text-xs text-muted-foreground">Configured By</Label>
                         <p className="text-sm text-xs">{selectedCompany.trial.configuredBy}</p>
                       </div>
+                      {selectedCompany.trial.manuallyDisabled && selectedCompany.trial.disabledAt && (
+                        <>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Paused At</Label>
+                            <p className="text-sm">{new Date(selectedCompany.trial.disabledAt).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Paused By</Label>
+                            <p className="text-sm text-xs">{selectedCompany.trial.disabledBy}</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No active trial</p>
@@ -1804,14 +1859,24 @@ export default function AdminEnterprise() {
       <Dialog open={showTrialDialog} onOpenChange={setShowTrialDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Start Trial Period</DialogTitle>
+            <DialogTitle>
+              {selectedCompany?.trial?.manuallyDisabled ? 'Resume Trial Period' : 'Start Trial Period'}
+            </DialogTitle>
             <DialogDescription>
-              Configure a trial period for {selectedCompany?.name}. Members will have full access during the trial.
+              {selectedCompany?.trial?.manuallyDisabled 
+                ? `Resume the trial period for ${selectedCompany?.name}. Members will regain full access.`
+                : `Configure a trial period for ${selectedCompany?.name}. Members will have full access during the trial.`
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="trialDays">Trial Duration (days)</Label>
+              <Label htmlFor="trialDays">
+                {selectedCompany?.trial?.manuallyDisabled 
+                  ? 'Trial Duration (days) - Optional'
+                  : 'Trial Duration (days)'
+                }
+              </Label>
               <Input
                 id="trialDays"
                 type="number"
@@ -1822,7 +1887,10 @@ export default function AdminEnterprise() {
                 placeholder="7"
               />
               <p className="text-sm text-muted-foreground mt-1">
-                The trial will start immediately and last for {trialDays} days.
+                {selectedCompany?.trial?.manuallyDisabled
+                  ? 'Leave empty to resume with previous duration. Or set new duration.'
+                  : `The trial will start immediately and last for ${trialDays} days.`
+                }
               </p>
             </div>
           </div>
@@ -1832,10 +1900,10 @@ export default function AdminEnterprise() {
             </Button>
             <Button 
               onClick={handleCreateTrial}
-              disabled={isSubmitting || !trialDays || trialDays < 1}
+              disabled={isSubmitting || (!selectedCompany?.trial?.manuallyDisabled && (!trialDays || trialDays < 1))}
             >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Start Trial
+              {selectedCompany?.trial?.manuallyDisabled ? 'Resume Trial' : 'Start Trial'}
             </Button>
           </DialogFooter>
         </DialogContent>
