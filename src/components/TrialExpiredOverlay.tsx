@@ -57,16 +57,28 @@ export const TrialExpiredOverlay = ({ companyName, daysRemaining, expired, manua
       return 'bg-primary/90 border-primary';
     };
 
+    // Calculate trial end date
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + daysRemaining!);
+    const formattedEndDate = trialEndDate.toLocaleDateString('sv-SE', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
+      <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none">
         <div className={`${getBannerColor()} border-b-2 px-6 py-3 shadow-lg pointer-events-auto`}>
-          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 flex-wrap">
             <AlertTriangle className="h-5 w-5 text-white flex-shrink-0" />
             <p className="text-white font-semibold text-center">
               {daysRemaining === 1 
                 ? `Sista dagen av testperioden för ${companyName}` 
                 : `${daysRemaining} dagar kvar av testperioden för ${companyName}`}
             </p>
+            <span className="text-white/80 text-sm">
+              (Slutar {formattedEndDate})
+            </span>
           </div>
         </div>
       </div>
