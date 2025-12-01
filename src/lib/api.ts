@@ -1046,6 +1046,39 @@ class ApiClient {
     return response.json();
   }
 
+  async createEnterpriseCompanyTrial(companyId: string, data: {
+    days: number;
+    startsAt?: string;
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/trial`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create trial' }));
+      throw new Error(error.error || 'Failed to create trial');
+    }
+    return response.json();
+  }
+
+  async disableEnterpriseCompanyTrial(companyId: string): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/trial`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ disable: true }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to disable trial' }));
+      throw new Error(error.error || 'Failed to disable trial');
+    }
+    return response.json();
+  }
+
   // Admin operations
   async getAdminUsers(): Promise<any> {
     const response = await this.fetchWithAuth('/admin/users');

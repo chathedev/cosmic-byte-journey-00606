@@ -16,6 +16,15 @@ export interface EnterpriseMembership {
     slug: string;
     status: string;
     planTier: string;
+    trial?: {
+      enabled: boolean;
+      startsAt: string;
+      endsAt: string;
+      daysTotal: number;
+      daysRemaining: number;
+      expired: boolean;
+      configuredBy: string;
+    };
   };
   membership?: {
     role: string;
