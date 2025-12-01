@@ -42,6 +42,15 @@ interface Company {
   metadata?: any;
   dataAccessMode?: 'shared' | 'individual';
   adminFullAccessEnabled?: boolean;
+  trial?: {
+    enabled: boolean;
+    startsAt: string;
+    endsAt: string;
+    daysTotal: number;
+    daysRemaining: number;
+    expired: boolean;
+    configuredBy: string;
+  };
   preferences?: {
     meetingCreatorVisibility?: 'shared_only' | 'always' | 'hidden';
     storageRegion?: 'eu' | 'us' | 'auto';
@@ -96,6 +105,10 @@ export default function AdminEnterprise() {
   const [showCombinedMeetings, setShowCombinedMeetings] = useState(false);
   const [allCompanyMeetings, setAllCompanyMeetings] = useState<any[]>([]);
   const [loadingAllMeetings, setLoadingAllMeetings] = useState(false);
+  
+  // Trial management
+  const [showTrialDialog, setShowTrialDialog] = useState(false);
+  const [trialDays, setTrialDays] = useState<number>(7);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -407,6 +420,64 @@ export default function AdminEnterprise() {
     }
   };
 
+  const handleCreateTrial = async () => {
+    if (!selectedCompany || !trialDays || trialDays < 1) return;
+
+    try {
+      setIsSubmitting(true);
+      await apiClient.createEnterpriseCompanyTrial(selectedCompany.id, {
+        days: Math.floor(trialDays),
+      });
+      
+      toast({
+        title: 'Testperiod skapad',
+        description: `${trialDays} dagars testperiod har startats för ${selectedCompany.name}`,
+      });
+      
+      setShowTrialDialog(false);
+      setTrialDays(7);
+      const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
+      setSelectedCompany(updated.company);
+      loadCompanies();
+    } catch (error) {
+      console.error('Failed to create trial:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte skapa testperiod',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDisableTrial = async () => {
+    if (!selectedCompany) return;
+
+    try {
+      setIsSubmitting(true);
+      await apiClient.disableEnterpriseCompanyTrial(selectedCompany.id);
+      
+      toast({
+        title: 'Testperiod avslutad',
+        description: `Testperioden för ${selectedCompany.name} har avslutats`,
+      });
+      
+      const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
+      setSelectedCompany(updated.company);
+      loadCompanies();
+    } catch (error) {
+      console.error('Failed to disable trial:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte avsluta testperiod',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const viewCompanyDetails = async (companyId: string) => {
     try {
       const data = await apiClient.getEnterpriseCompany(companyId);
@@ -671,6 +742,63 @@ export default function AdminEnterprise() {
                     </div>
                   </div>
                 )}
+                
+                {/* Trial Section */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-semibold">Trial Status</Label>
+                    {selectedCompany.trial?.enabled ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDisableTrial}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                        End Trial
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowTrialDialog(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Start Trial
+                      </Button>
+                    )}
+                  </div>
+                  {selectedCompany.trial?.enabled ? (
+                    <div className="grid gap-4 md:grid-cols-3 bg-muted/30 p-4 rounded-lg">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Status</Label>
+                        <p className="text-sm">
+                          <Badge variant={selectedCompany.trial.expired ? 'destructive' : 'default'}>
+                            {selectedCompany.trial.expired ? 'Expired' : 'Active'}
+                          </Badge>
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Days Remaining</Label>
+                        <p className="text-sm font-semibold">{selectedCompany.trial.daysRemaining} / {selectedCompany.trial.daysTotal}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Ends At</Label>
+                        <p className="text-sm">{new Date(selectedCompany.trial.endsAt).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Started At</Label>
+                        <p className="text-sm">{new Date(selectedCompany.trial.startsAt).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Configured By</Label>
+                        <p className="text-sm text-xs">{selectedCompany.trial.configuredBy}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No active trial</p>
+                  )}
+                </div>
                 
                 {selectedCompany.notes && (
                   <div>
@@ -1669,6 +1797,47 @@ export default function AdminEnterprise() {
               </ScrollArea>
             </TabsContent>
           </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* Trial Dialog */}
+      <Dialog open={showTrialDialog} onOpenChange={setShowTrialDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Trial Period</DialogTitle>
+            <DialogDescription>
+              Configure a trial period for {selectedCompany?.name}. Members will have full access during the trial.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="trialDays">Trial Duration (days)</Label>
+              <Input
+                id="trialDays"
+                type="number"
+                min="1"
+                max="365"
+                value={trialDays}
+                onChange={(e) => setTrialDays(parseInt(e.target.value) || 7)}
+                placeholder="7"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                The trial will start immediately and last for {trialDays} days.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowTrialDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateTrial}
+              disabled={isSubmitting || !trialDays || trialDays < 1}
+            >
+              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Start Trial
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

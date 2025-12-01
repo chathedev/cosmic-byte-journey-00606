@@ -21,6 +21,7 @@ import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
@@ -342,6 +343,29 @@ ${JSON.stringify(debugInfo, null, 2)}
 };
 
 
+// Trial Overlay Component - checks enterprise trial status
+const EnterpriseTrialCheck = () => {
+  const { enterpriseMembership } = useSubscription();
+  
+  if (!enterpriseMembership?.isMember || !enterpriseMembership.company) {
+    return null;
+  }
+
+  const trial = enterpriseMembership.company.trial;
+  if (!trial?.enabled) {
+    return null;
+  }
+
+  return (
+    <TrialExpiredOverlay
+      companyName={enterpriseMembership.company.name}
+      daysRemaining={trial.daysRemaining}
+      expired={trial.expired}
+    />
+  );
+};
+
+
 const App = () => {
   // Block web browser access to io.tivly.se domain
   if (isWebBrowserOnAppDomain()) {
@@ -398,6 +422,7 @@ const App = () => {
                     <PreserveAppParam />
                     <AuthRedirectHandler />
                     <GlobalDevButton />
+                    <EnterpriseTrialCheck />
                     <WelcomeGate>
                       <AppLayout>
                         <Suspense
