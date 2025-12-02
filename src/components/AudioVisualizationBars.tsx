@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 
 interface AudioVisualizationBarsProps {
   stream: MediaStream | null;
@@ -6,14 +7,14 @@ interface AudioVisualizationBarsProps {
 }
 
 export const AudioVisualizationBars = ({ stream, isActive }: AudioVisualizationBarsProps) => {
-  const [bars, setBars] = useState<number[]>(Array(12).fill(0.1));
+  const [bars, setBars] = useState<number[]>(Array(5).fill(0.15));
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (!stream || !isActive) {
-      setBars(Array(12).fill(0.1));
+      setBars(Array(5).fill(0.15));
       return;
     }
 
@@ -21,7 +22,8 @@ export const AudioVisualizationBars = ({ stream, isActive }: AudioVisualizationB
       const audioContext = new AudioContext();
       audioContextRef.current = audioContext;
       const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 64;
+      analyser.fftSize = 32;
+      analyser.smoothingTimeConstant = 0.8;
       analyserRef.current = analyser;
 
       const source = audioContext.createMediaStreamSource(stream);
@@ -34,13 +36,13 @@ export const AudioVisualizationBars = ({ stream, isActive }: AudioVisualizationB
         
         analyserRef.current.getByteFrequencyData(dataArray);
         
-        // Sample 12 frequency bands
+        // Sample 5 frequency bands with smoothing
         const newBars = [];
-        const step = Math.floor(dataArray.length / 12);
-        for (let i = 0; i < 12; i++) {
-          const value = dataArray[i * step] / 255;
-          // Add some minimum height and smoothing
-          newBars.push(Math.max(0.1, value * 0.8 + 0.1));
+        const bands = [2, 4, 6, 8, 10];
+        for (let i = 0; i < 5; i++) {
+          const value = dataArray[bands[i]] / 255;
+          // Smooth curve with minimum height
+          newBars.push(Math.max(0.15, Math.pow(value, 0.7) * 0.85 + 0.15));
         }
         
         setBars(newBars);
@@ -63,14 +65,21 @@ export const AudioVisualizationBars = ({ stream, isActive }: AudioVisualizationB
   }, [stream, isActive]);
 
   return (
-    <div className="flex items-end justify-center gap-1.5 h-24 md:h-32">
+    <div className="flex items-center justify-center gap-1 h-16">
       {bars.map((height, index) => (
-        <div
+        <motion.div
           key={index}
-          className="w-3 md:w-4 rounded-full bg-primary transition-all duration-75 ease-out"
-          style={{
+          className="w-1 rounded-full bg-primary"
+          initial={{ height: "15%" }}
+          animate={{ 
             height: `${height * 100}%`,
-            opacity: isActive ? 0.6 + height * 0.4 : 0.3,
+            opacity: isActive ? 0.4 + height * 0.6 : 0.2,
+          }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 20,
+            mass: 0.5,
           }}
         />
       ))}
