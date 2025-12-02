@@ -1,23 +1,5 @@
-import { RecordingView } from "@/components/RecordingView";
+import { RecordingViewNew } from "@/components/RecordingViewNew";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState } from "react";
-
-interface AIActionItem {
-  title: string;
-  description?: string;
-  owner?: string;
-  deadline?: string;
-  priority: 'critical' | 'high' | 'medium' | 'low';
-}
-
-interface AIProtocol {
-  title: string;
-  summary: string;
-  mainPoints: string[];
-  decisions: string[];
-  actionItems: AIActionItem[];
-  nextMeetingSuggestions?: string[];
-}
 
 const Recording = () => {
   const navigate = useNavigate();
@@ -28,17 +10,6 @@ const Recording = () => {
     selectedLanguage?: 'sv-SE' | 'en-US';
   } || {};
 
-  const handleFinishRecording = (data: { transcript: string; aiProtocol: AIProtocol | null }) => {
-    // Navigate to protocol view with data
-    navigate('/protocol', { 
-      state: { 
-        transcript: data.transcript, 
-        aiProtocol: data.aiProtocol 
-      },
-      replace: true
-    });
-  };
-
   const handleBack = () => {
     navigate('/', { replace: true });
   };
@@ -47,9 +18,8 @@ const Recording = () => {
   const recordingKey = state.continuedMeeting?.id || 'new';
 
   return (
-    <RecordingView
+    <RecordingViewNew
       key={recordingKey}
-      onFinish={handleFinishRecording}
       onBack={handleBack}
       continuedMeeting={state.continuedMeeting}
       isFreeTrialMode={state.isFreeTrialMode || false}
