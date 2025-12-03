@@ -275,6 +275,31 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   };
 
   const handleStopRecording = async () => {
+    // In test mode, skip API and go directly to result
+    if (isTestMode) {
+      if (testCleanupRef.current) {
+        testCleanupRef.current();
+        testCleanupRef.current = null;
+      }
+      setIsTestMode(false);
+      setIsRecording(false);
+      setViewState('result');
+      
+      // Generate title for test meeting
+      try {
+        const aiTitle = await generateMeetingTitle(transcript);
+        setMeetingName(aiTitle);
+      } catch (e) {
+        setMeetingName("Testmöte - Tivly Demo");
+      }
+      
+      toast({
+        title: "Testläge avslutat",
+        description: "Simulerat möte klart.",
+      });
+      return;
+    }
+
     if (durationSec < 5) {
       toast({
         title: 'För kort inspelning',
