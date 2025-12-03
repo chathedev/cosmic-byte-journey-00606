@@ -10,9 +10,9 @@ export const UnderConstructionOverlay = ({ children }: { children: React.ReactNo
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
-  // Routes that should NOT show the overlay
-  const excludedRoutes = ['/auth', '/magic-login', '/free-trial', '/generate-protocol'];
-  const isExcludedRoute = excludedRoutes.some(route => location.pathname.startsWith(route));
+  // Routes that should NOT show the overlay (public/auth routes)
+  const publicRoutes = ['/auth', '/magic-login', '/free-trial', '/generate-protocol'];
+  const isPublicRoute = publicRoutes.some(route => location.pathname.startsWith(route));
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -38,12 +38,17 @@ export const UnderConstructionOverlay = ({ children }: { children: React.ReactNo
     }
   }, [user, authLoading]);
 
-  // Don't block excluded routes (auth, login, etc.)
-  if (isExcludedRoute) {
+  // Always allow public routes (auth, login, etc.)
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 
-  // Still loading - show spinner
+  // If no user yet (not logged in), let them through to hit ProtectedRoute which will redirect to /auth
+  if (!authLoading && !user) {
+    return <>{children}</>;
+  }
+
+  // Still checking admin status for logged-in user
   if (authLoading || isChecking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -57,7 +62,7 @@ export const UnderConstructionOverlay = ({ children }: { children: React.ReactNo
     return <>{children}</>;
   }
 
-  // Non-admin on dashboard - show minimal overlay
+  // Non-admin logged in user trying to access dashboard - show lock overlay
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-background">
       <div className="text-center px-6 max-w-sm">
