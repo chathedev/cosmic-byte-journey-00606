@@ -14,7 +14,6 @@ import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
-import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -58,7 +57,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const createdAtRef = useRef<string>(continuedMeeting?.createdAt || new Date().toISOString());
   const wakeLockRef = useRef<any>(null);
   const hasIncrementedCountRef = useRef(!!continuedMeeting);
-  const testCleanupRef = useRef<(() => void) | null>(null);
   
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
@@ -227,76 +225,90 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Test mode - simulates a meeting without recording
-  const startTestMode = () => {
+  // Test mode - uses pre-recorded audio file with real transcription API
+  const startTestMode = async () => {
     if (isTestMode) return;
     
     setIsTestMode(true);
     setIsRecording(true);
     setViewState('recording');
+    setDurationSec(0);
     
-    let fullTranscript = "";
-    
-    const cleanup = simulateMeetingAudio((text, isFinal) => {
-      if (isFinal) {
-        fullTranscript += text + " ";
-        setTranscript(fullTranscript.trim());
-      }
+    // Simulate recording duration while fetching
+    const durationInterval = setInterval(() => {
       setDurationSec(prev => prev + 1);
-    });
+    }, 1000);
     
-    testCleanupRef.current = cleanup;
-    
-    // Auto-complete test after simulation
-    setTimeout(async () => {
-      if (testCleanupRef.current) {
-        testCleanupRef.current();
-        testCleanupRef.current = null;
-      }
-      setIsTestMode(false);
-      setIsRecording(false);
+    try {
+      // Show processing after short delay
+      setTimeout(() => {
+        setViewState('processing');
+        setIsRecording(false);
+      }, 2000);
       
-      // Go to result with simulated transcript
-      setViewState('result');
+      // Fetch the test audio file
+      const response = await fetch('/test-audio.wav');
+      const audioBlob = await response.blob();
       
-      // Generate title for test meeting
-      try {
-        const aiTitle = await generateMeetingTitle(fullTranscript);
-        setMeetingName(aiTitle);
-      } catch (e) {
-        setMeetingName("Testmöte - Tivly Demo");
-      }
+      console.log('📤 Test mode: Uploading test audio for transcription...', audioBlob.size, 'bytes');
       
-      toast({
-        title: "Testläge avslutat",
-        description: "Simulerat möte klart. Du kan nu spara eller generera protokoll.",
+      // Send to transcription API
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'test-audio.wav');
+      
+      const transcriptionResponse = await fetch('http://transcribe.api.tivly.se/transcribe', {
+        method: 'POST',
+        body: formData,
       });
-    }, 25000); // ~25 seconds for the simulation
+      
+      clearInterval(durationInterval);
+      
+      if (!transcriptionResponse.ok) {
+        throw new Error('Transcription failed');
+      }
+      
+      const result = await transcriptionResponse.json();
+      console.log('✅ Test transcription result:', result);
+      
+      if (result.status === 'done' && result.text) {
+        setTranscript(result.text);
+        setViewState('result');
+        
+        // Generate title
+        try {
+          const aiTitle = await generateMeetingTitle(result.text);
+          setMeetingName(aiTitle);
+        } catch (e) {
+          setMeetingName("Testmöte");
+        }
+        
+        toast({
+          title: "Testläge klart",
+          description: "Transkribering av testljud klar.",
+        });
+      } else {
+        throw new Error('No transcription text');
+      }
+    } catch (error) {
+      clearInterval(durationInterval);
+      console.error('❌ Test mode error:', error);
+      toast({
+        title: 'Testfel',
+        description: 'Kunde inte transkribera testljudet.',
+        variant: 'destructive',
+      });
+      setIsTestMode(false);
+      setViewState('recording');
+      // Restart normal recording
+      startRecording();
+    }
+    
+    setIsTestMode(false);
   };
 
   const handleStopRecording = async () => {
-    // In test mode, skip API and go directly to result
+    // In test mode, the test handles everything - just wait
     if (isTestMode) {
-      if (testCleanupRef.current) {
-        testCleanupRef.current();
-        testCleanupRef.current = null;
-      }
-      setIsTestMode(false);
-      setIsRecording(false);
-      setViewState('result');
-      
-      // Generate title for test meeting
-      try {
-        const aiTitle = await generateMeetingTitle(transcript);
-        setMeetingName(aiTitle);
-      } catch (e) {
-        setMeetingName("Testmöte - Tivly Demo");
-      }
-      
-      toast({
-        title: "Testläge avslutat",
-        description: "Simulerat möte klart.",
-      });
       return;
     }
 
