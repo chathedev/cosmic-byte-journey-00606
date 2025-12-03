@@ -230,24 +230,17 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     if (isTestMode) return;
     
     setIsTestMode(true);
-    setIsRecording(true);
-    setViewState('recording');
+    setIsRecording(false);
+    setViewState('processing');
     setDurationSec(0);
     
-    // Simulate recording duration while fetching
-    const durationInterval = setInterval(() => {
-      setDurationSec(prev => prev + 1);
-    }, 1000);
-    
     try {
-      // Show processing after short delay
-      setTimeout(() => {
-        setViewState('processing');
-        setIsRecording(false);
-      }, 2000);
-      
       // Fetch the test audio file
+      console.log('📥 Test mode: Fetching test audio file...');
       const response = await fetch('/test-audio.wav');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch test audio: ${response.status}`);
+      }
       const audioBlob = await response.blob();
       
       console.log('📤 Test mode: Uploading test audio for transcription...', audioBlob.size, 'bytes');
@@ -261,10 +254,12 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         body: formData,
       });
       
-      clearInterval(durationInterval);
+      console.log('📡 Test mode: API response status:', transcriptionResponse.status);
       
       if (!transcriptionResponse.ok) {
-        throw new Error('Transcription failed');
+        const errorText = await transcriptionResponse.text();
+        console.error('❌ Test mode API error:', transcriptionResponse.status, errorText);
+        throw new Error(`Transcription failed: ${transcriptionResponse.status}`);
       }
       
       const result = await transcriptionResponse.json();
@@ -287,23 +282,20 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           description: "Transkribering av testljud klar.",
         });
       } else {
-        throw new Error('No transcription text');
+        throw new Error('No transcription text received');
       }
-    } catch (error) {
-      clearInterval(durationInterval);
-      console.error('❌ Test mode error:', error);
+    } catch (error: any) {
+      console.error('❌ Test mode error:', error?.message || error);
       toast({
         title: 'Testfel',
-        description: 'Kunde inte transkribera testljudet.',
+        description: error?.message || 'Kunde inte transkribera testljudet.',
         variant: 'destructive',
       });
-      setIsTestMode(false);
       setViewState('recording');
-      // Restart normal recording
       startRecording();
+    } finally {
+      setIsTestMode(false);
     }
-    
-    setIsTestMode(false);
   };
 
   const handleStopRecording = async () => {
