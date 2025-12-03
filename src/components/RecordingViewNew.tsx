@@ -518,9 +518,20 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-full max-w-lg space-y-8">
             {/* Recording Status */}
-            <div className="bg-card rounded-xl p-6 md:p-8 border shadow-sm">
+            <div className="bg-card rounded-xl p-6 md:p-8 border shadow-sm relative">
               <div className="flex flex-col items-center text-center space-y-6">
                 {/* Mic Icon */}
+                
+                {/* Test button for allowed user - positioned in card corner */}
+                {hasTestAccess && !isTestMode && (
+                  <button
+                    onClick={startTestMode}
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 z-10"
+                    title="Simulera Tivly-möte"
+                  >
+                    Test
+                  </button>
+                )}
                 <div className="relative">
                   {!isPaused && (
                     <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20" />
@@ -536,17 +547,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
                 <AudioVisualizationBars stream={streamRef.current} isActive={isRecording && !isPaused} />
 
                 {/* Status Text */}
-                {/* Test button for allowed user */}
-                {hasTestAccess && !isTestMode && (
-                  <button
-                    onClick={startTestMode}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50"
-                    title="Simulera Tivly-möte"
-                  >
-                    Test
-                  </button>
-                )}
-
                 <div className="space-y-2">
                   <h2 className="text-lg md:text-xl font-semibold">
                     {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Inspelning pågår'}
