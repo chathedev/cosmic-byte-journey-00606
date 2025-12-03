@@ -14,6 +14,7 @@ import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
+import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -44,6 +45,11 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [isSaving, setIsSaving] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [folders, setFolders] = useState<string[]>([]);
+  const [isTestMode, setIsTestMode] = useState(false);
+  
+  // Test access for specific user
+  const allowedTestEmail = 'charlie.wretling@icloud.com';
+  const hasTestAccess = user?.email?.toLowerCase() === allowedTestEmail.toLowerCase();
   
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -52,6 +58,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const createdAtRef = useRef<string>(continuedMeeting?.createdAt || new Date().toISOString());
   const wakeLockRef = useRef<any>(null);
   const hasIncrementedCountRef = useRef(!!continuedMeeting);
+  const testCleanupRef = useRef<(() => void) | null>(null);
   
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
@@ -218,6 +225,53 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       setIsPaused(true);
       releaseWakeLock();
     }
+  };
+
+  // Test mode - simulates a meeting without recording
+  const startTestMode = () => {
+    if (isTestMode) return;
+    
+    setIsTestMode(true);
+    setIsRecording(true);
+    setViewState('recording');
+    
+    let fullTranscript = "";
+    
+    const cleanup = simulateMeetingAudio((text, isFinal) => {
+      if (isFinal) {
+        fullTranscript += text + " ";
+        setTranscript(fullTranscript.trim());
+      }
+      setDurationSec(prev => prev + 1);
+    });
+    
+    testCleanupRef.current = cleanup;
+    
+    // Auto-complete test after simulation
+    setTimeout(async () => {
+      if (testCleanupRef.current) {
+        testCleanupRef.current();
+        testCleanupRef.current = null;
+      }
+      setIsTestMode(false);
+      setIsRecording(false);
+      
+      // Go to result with simulated transcript
+      setViewState('result');
+      
+      // Generate title for test meeting
+      try {
+        const aiTitle = await generateMeetingTitle(fullTranscript);
+        setMeetingName(aiTitle);
+      } catch (e) {
+        setMeetingName("Testmöte - Tivly Demo");
+      }
+      
+      toast({
+        title: "Testläge avslutat",
+        description: "Simulerat möte klart. Du kan nu spara eller generera protokoll.",
+      });
+    }, 25000); // ~25 seconds for the simulation
   };
 
   const handleStopRecording = async () => {
@@ -482,9 +536,20 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
                 <AudioVisualizationBars stream={streamRef.current} isActive={isRecording && !isPaused} />
 
                 {/* Status Text */}
+                {/* Test button for allowed user */}
+                {hasTestAccess && !isTestMode && (
+                  <button
+                    onClick={startTestMode}
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50"
+                    title="Simulera Tivly-möte"
+                  >
+                    Test
+                  </button>
+                )}
+
                 <div className="space-y-2">
                   <h2 className="text-lg md:text-xl font-semibold">
-                    {isPaused ? 'Pausad' : 'Inspelning pågår'}
+                    {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Inspelning pågår'}
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {isPaused 
