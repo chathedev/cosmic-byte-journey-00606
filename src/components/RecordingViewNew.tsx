@@ -249,7 +249,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       const formData = new FormData();
       formData.append('file', audioBlob, 'test-audio.wav');
       
-      const transcriptionResponse = await fetch('http://transcribe.api.tivly.se/transcribe', {
+      const transcriptionResponse = await fetch('https://transcribe.api.tivly.se/transcribe', {
         method: 'POST',
         body: formData,
       });
