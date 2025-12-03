@@ -22,6 +22,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
+import { UnderConstructionOverlay } from "@/components/UnderConstructionOverlay";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
@@ -423,14 +424,15 @@ const App = () => {
             <BrowserRouter>
               <AuthProvider>
                 <SubscriptionProvider>
-                  <PlanGate>
-                    <ScrollToTop />
-                    <PreserveAppParam />
-                    <AuthRedirectHandler />
-                    <GlobalDevButton />
-                    <EnterpriseTrialCheck />
-                    <WelcomeGate>
-                      <AppLayout>
+                  <UnderConstructionOverlay>
+                    <PlanGate>
+                      <ScrollToTop />
+                      <PreserveAppParam />
+                      <AuthRedirectHandler />
+                      <GlobalDevButton />
+                      <EnterpriseTrialCheck />
+                      <WelcomeGate>
+                        <AppLayout>
                         <Suspense
                           fallback={
                             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -461,9 +463,10 @@ const App = () => {
                           <Route path="*" element={<NotFound />} />
                           </Routes>
                         </Suspense>
-                      </AppLayout>
-                    </WelcomeGate>
-                  </PlanGate>
+                        </AppLayout>
+                      </WelcomeGate>
+                    </PlanGate>
+                  </UnderConstructionOverlay>
                 </SubscriptionProvider>
               </AuthProvider>
             </BrowserRouter>
