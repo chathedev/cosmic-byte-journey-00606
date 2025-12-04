@@ -124,7 +124,7 @@ export async function persistTranscript(
   console.log('📝 Persisting transcript to backend:', meetingId);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/transcribe`, {
+    const response = await fetch(`${API_BASE_URL}/meetings/transcript`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
