@@ -50,9 +50,19 @@ const decodeBase64 = (value: string): Uint8Array => {
       throw new Error('Invalid base64 input: empty or not a string');
     }
     
-    // Remove any whitespace and validate base64 format
-    const cleaned = value.replace(/\s/g, '');
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
+    // Remove any whitespace
+    let cleaned = value.replace(/\s/g, '');
+    
+    // Handle URL-safe base64 (replace - with + and _ with /)
+    cleaned = cleaned.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add padding if needed
+    while (cleaned.length % 4 !== 0) {
+      cleaned += '=';
+    }
+    
+    // Validate base64 format (standard base64 with optional padding)
+    if (!/^[A-Za-z0-9+/]*={0,3}$/.test(cleaned)) {
       throw new Error('Invalid base64 format');
     }
     

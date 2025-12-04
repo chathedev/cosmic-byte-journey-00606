@@ -89,23 +89,30 @@ const Library = () => {
     loadData();
   }, [user]);
 
-  // Poll for processing meetings every 1 second
-  useEffect(() => {
-    // Check for meetings that are still processing (no transcript or explicitly processing)
-    const processingMeetings = meetings.filter(m => 
-      m.transcriptionStatus === 'processing' || 
-      (!m.transcript || m.transcript.trim().length === 0)
-    );
-    const pendingId = pendingMeetingIdRef.current;
-    
-    // Always poll if we have a pending meeting ID or processing meetings
-    if (processingMeetings.length === 0 && !pendingId) return;
+  // Poll for processing meetings every 1 second - use ref to avoid stale closures
+  const meetingsRef = useRef(meetings);
+  meetingsRef.current = meetings;
 
-    console.log('📊 Polling for', processingMeetings.length, 'processing meetings, pendingId:', pendingId);
+  useEffect(() => {
+    if (!user) return;
 
     const pollInterval = setInterval(async () => {
+      const currentMeetings = meetingsRef.current;
+      const pendingId = pendingMeetingIdRef.current;
+      
+      // Check for meetings that are still processing
+      const processingMeetings = currentMeetings.filter(m => 
+        m.transcriptionStatus === 'processing' || 
+        (!m.transcript || m.transcript.trim().length === 0)
+      );
+      
+      // Skip polling if nothing to poll for
+      if (processingMeetings.length === 0 && !pendingId) return;
+
+      console.log('📊 Polling for', processingMeetings.length, 'processing meetings, pendingId:', pendingId);
+
       try {
-        const userMeetings = await meetingStorage.getMeetings(user?.uid || '');
+        const userMeetings = await meetingStorage.getMeetings(user.uid);
         // De-duplicate by meeting ID
         const map = new Map<string, MeetingSession>();
         for (const m of userMeetings) {
@@ -126,7 +133,7 @@ const Library = () => {
             pendingMeetingIdRef.current = null;
           } else if (!loadedVersion) {
             // Backend doesn't have it yet - preserve the pending meeting from current state
-            const currentPending = meetings.find(m => m.id === pendingId);
+            const currentPending = currentMeetings.find(m => m.id === pendingId);
             if (currentPending) {
               currentPending.transcriptionStatus = 'processing';
               map.set(pendingId, currentPending);
@@ -143,7 +150,7 @@ const Library = () => {
           return updated && updated.transcript && updated.transcript.trim().length > 0;
         });
 
-        // Update meetings
+        // Update meetings state
         setMeetings(deduped);
         
         if (nowDone.length > 0) {
@@ -159,7 +166,7 @@ const Library = () => {
     }, 1000); // Poll every 1 second
 
     return () => clearInterval(pollInterval);
-  }, [meetings, user]);
+  }, [user]);
 
   // Don't redirect - allow viewing library but show upgrade prompts for actions
 
