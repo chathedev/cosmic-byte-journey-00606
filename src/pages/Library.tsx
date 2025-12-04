@@ -58,6 +58,48 @@ const Library = () => {
     loadData();
   }, [user]);
 
+  // Poll for processing meetings
+  useEffect(() => {
+    const processingMeetings = meetings.filter(m => m.transcriptionStatus === 'processing');
+    if (processingMeetings.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const userMeetings = await meetingStorage.getMeetings(user?.uid || '');
+        // De-duplicate by meeting ID
+        const map = new Map<string, MeetingSession>();
+        for (const m of userMeetings) {
+          const existing = map.get(m.id);
+          if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
+            map.set(m.id, m);
+          }
+        }
+        const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
+        
+        // Check if any processing meetings are now done
+        const stillProcessing = deduped.filter(m => m.transcriptionStatus === 'processing');
+        const nowDone = processingMeetings.filter(pm => {
+          const updated = deduped.find(m => m.id === pm.id);
+          return updated && updated.transcriptionStatus !== 'processing' && updated.transcript;
+        });
+
+        if (nowDone.length > 0 || stillProcessing.length !== processingMeetings.length) {
+          setMeetings(deduped);
+          if (nowDone.length > 0) {
+            toast({
+              title: 'Transkribering klar',
+              description: `${nowDone.length} möte${nowDone.length > 1 ? 'n' : ''} är klart.`,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [meetings, user]);
+
   // Don't redirect - allow viewing library but show upgrade prompts for actions
 
   const loadData = async () => {
@@ -66,13 +108,12 @@ const Library = () => {
     setIsLoading(true);
     try {
       const userMeetings = await meetingStorage.getMeetings(user.uid);
-      // De-duplicate meetings created accidentally by guarding on a signature
+      // De-duplicate by meeting ID (keep latest version)
       const map = new Map<string, MeetingSession>();
       for (const m of userMeetings) {
-        const key = `${m.title}|${m.createdAt}|${m.folder}|${(m.transcript || '').length}`;
-        const existing = map.get(key);
+        const existing = map.get(m.id);
         if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
-          map.set(key, m);
+          map.set(m.id, m);
         }
       }
       const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
@@ -582,7 +623,11 @@ const Library = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                    {meeting.transcript || "Ingen transkription ännu..."}
+                    {meeting.transcriptionStatus === 'processing' 
+                      ? '⏳ Transkribering pågår...'
+                      : meeting.transcriptionStatus === 'failed'
+                      ? '❌ Transkribering misslyckades'
+                      : (meeting.transcript || "Ingen transkription ännu...")}
                   </p>
                   
                   {/* Protocol Status Badge */}
@@ -694,8 +739,8 @@ const Library = () => {
                       onClick={() => handleContinueMeeting(meeting)}
                       size="sm"
                       variant="default"
-                      disabled={userPlan?.plan === 'free'}
-                      title={userPlan?.plan === 'free' ? 'Endast för betalande användare' : undefined}
+                      disabled={userPlan?.plan === 'free' || meeting.transcriptionStatus === 'processing'}
+                      title={userPlan?.plan === 'free' ? 'Endast för betalande användare' : meeting.transcriptionStatus === 'processing' ? 'Väntar på transkribering...' : undefined}
                     >
                       <Play className="w-4 h-4 mr-1" />
                       Fortsätt möte
@@ -704,11 +749,16 @@ const Library = () => {
                       onClick={() => handleCreateProtocol(meeting)}
                       size="sm"
                       variant="outline"
-                      disabled={!!protocolStatus[meeting.id]}
-                      title={protocolStatus[meeting.id] ? 'Protokoll redan sparat för detta möte' : undefined}
+                      disabled={!!protocolStatus[meeting.id] || meeting.transcriptionStatus === 'processing' || !meeting.transcript}
+                      title={
+                        meeting.transcriptionStatus === 'processing' ? 'Väntar på transkribering...' :
+                        protocolStatus[meeting.id] ? 'Protokoll redan sparat för detta möte' :
+                        !meeting.transcript ? 'Ingen transkription tillgänglig' :
+                        undefined
+                      }
                     >
                       <FileText className="w-4 h-4 mr-1" />
-                      {protocolStatus[meeting.id] ? 'Protokoll sparat' : (userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll')}
+                      {meeting.transcriptionStatus === 'processing' ? 'Analyserar...' : protocolStatus[meeting.id] ? 'Protokoll sparat' : (userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll')}
                     </Button>
                     {userPlan?.plan === 'plus' && (
                       <Button
