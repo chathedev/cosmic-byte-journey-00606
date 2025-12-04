@@ -22,7 +22,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
-import { UnderConstructionOverlay } from "@/components/UnderConstructionOverlay";
+
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import MagicLogin from "./pages/MagicLogin";
@@ -424,7 +424,6 @@ const App = () => {
             <BrowserRouter>
               <AuthProvider>
                 <SubscriptionProvider>
-                  <UnderConstructionOverlay>
                     <PlanGate>
                       <ScrollToTop />
                       <PreserveAppParam />
@@ -466,7 +465,6 @@ const App = () => {
                         </AppLayout>
                       </WelcomeGate>
                     </PlanGate>
-                  </UnderConstructionOverlay>
                 </SubscriptionProvider>
               </AuthProvider>
             </BrowserRouter>
