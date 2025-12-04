@@ -2,6 +2,13 @@ import { getUserIP } from '@/utils/ipDetection';
  
 const API_BASE_URL = 'https://api.tivly.se';
 
+export interface MaintenanceStatus {
+  enabled: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+}
+
 interface User {
   id: string;
   uid: string; // Alias for id to maintain compatibility
@@ -1786,6 +1793,26 @@ class ApiClient {
       throw new Error(result.error || 'Transcription failed');
     }
     return result.transcript || result.text || '';
+  }
+
+  // Maintenance mode
+  async getMaintenanceStatus(): Promise<{ success: boolean; maintenance: MaintenanceStatus }> {
+    const response = await this.fetchWithAuth('/maintenance');
+    if (!response.ok) {
+      throw new Error('Failed to fetch maintenance status');
+    }
+    return response.json();
+  }
+
+  async toggleMaintenance(): Promise<{ success: boolean; message: string; maintenance: MaintenanceStatus }> {
+    const response = await this.fetchWithAuth('/admin/maintenance/toggle', {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to toggle maintenance' }));
+      throw new Error((error as any).error || 'Failed to toggle maintenance');
+    }
+    return response.json();
   }
 }
 

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, Activity, HardDrive, Zap, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Shield, Globe, Download, Trash2, RefreshCw, FileText, TrendingUp, Users, Folder, FileCode } from "lucide-react";
+import { Database, Activity, HardDrive, Zap, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Shield, Globe, Download, Trash2, RefreshCw, FileText, TrendingUp, Users, Folder, FileCode, Construction } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { backendApi, DashboardData, HealthCheck } from '@/lib/backendApi';
+import { apiClient, MaintenanceStatus } from '@/lib/api';
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,9 +27,10 @@ const AdminBackend = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
+  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
-    action: 'cleanup' | 'restart' | null;
+    action: 'cleanup' | 'restart' | 'maintenance' | null;
     title: string;
     description: string;
   }>({
@@ -39,12 +42,16 @@ const AdminBackend = () => {
 
   const fetchData = async () => {
     try {
-      const [dashboardData, healthData] = await Promise.all([
+      const [dashboardData, healthData, maintenanceData] = await Promise.all([
         backendApi.getDashboard(),
         backendApi.getHealth(),
+        apiClient.getMaintenanceStatus().catch(() => ({ success: false, maintenance: { enabled: false } })),
       ]);
       setDashboard(dashboardData);
       setHealth(healthData);
+      if (maintenanceData.success) {
+        setMaintenance(maintenanceData.maintenance);
+      }
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Failed to fetch backend data:', error);
@@ -114,7 +121,20 @@ const AdminBackend = () => {
     }
   };
 
-  const openConfirmDialog = (action: 'cleanup' | 'restart') => {
+  const handleMaintenanceToggle = async () => {
+    setIsActionLoading('maintenance');
+    try {
+      const result = await apiClient.toggleMaintenance();
+      setMaintenance(result.maintenance);
+      toast.success(result.maintenance.enabled ? 'Underhållsläge aktiverat' : 'Underhållsläge avaktiverat');
+    } catch (error) {
+      toast.error('Kunde inte ändra underhållsläge');
+    } finally {
+      setIsActionLoading(null);
+    }
+  };
+
+  const openConfirmDialog = (action: 'cleanup' | 'restart' | 'maintenance') => {
     const dialogs = {
       cleanup: {
         title: 'Rensa temporära filer',
@@ -123,6 +143,12 @@ const AdminBackend = () => {
       restart: {
         title: 'Starta om servern',
         description: 'Är du säker på att du vill starta om servern? Detta kommer tillfälligt avbryta tjänsten.',
+      },
+      maintenance: {
+        title: maintenance?.enabled ? 'Avaktivera underhållsläge' : 'Aktivera underhållsläge',
+        description: maintenance?.enabled 
+          ? 'Är du säker på att du vill avaktivera underhållsläge? Användare kommer kunna använda appen igen.'
+          : 'Är du säker på att du vill aktivera underhållsläge? Användare kommer se ett meddelande om att appen är under underhåll.',
       },
     };
 
@@ -141,6 +167,8 @@ const AdminBackend = () => {
       await handleCleanup();
     } else if (action === 'restart') {
       await handleRestart();
+    } else if (action === 'maintenance') {
+      await handleMaintenanceToggle();
     }
   };
 
@@ -524,6 +552,51 @@ const AdminBackend = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Maintenance Mode */}
+        <Card className={`border-l-4 ${maintenance?.enabled ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Construction className={`w-5 h-5 ${maintenance?.enabled ? 'text-yellow-500' : 'text-green-500'}`} />
+              Underhållsläge
+            </CardTitle>
+            <CardDescription>
+              {maintenance?.enabled 
+                ? 'Appen är i underhållsläge - användare ser ett meddelande' 
+                : 'Appen fungerar normalt'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant={maintenance?.enabled ? 'secondary' : 'default'}>
+                    {maintenance?.enabled ? 'AKTIVT' : 'INAKTIVT'}
+                  </Badge>
+                </div>
+                {maintenance?.updatedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Senast ändrad: {new Date(maintenance.updatedAt).toLocaleString('sv-SE')}
+                    {maintenance.updatedByName && ` av ${maintenance.updatedByName}`}
+                  </p>
+                )}
+              </div>
+              <Button
+                onClick={() => openConfirmDialog('maintenance')}
+                disabled={isActionLoading !== null}
+                variant={maintenance?.enabled ? 'default' : 'destructive'}
+                className="gap-2"
+              >
+                {isActionLoading === 'maintenance' ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Construction className="w-4 h-4" />
+                )}
+                {maintenance?.enabled ? 'Avaktivera' : 'Aktivera'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Actions */}
         <Card>
