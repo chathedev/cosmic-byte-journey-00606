@@ -131,14 +131,12 @@ const Library = () => {
             !loadedVersion.transcript.includes('Transkribering pågår');
           
           if (loadedVersion && hasRealTranscript) {
-            // Transcription complete - stop tracking and FORCE PAGE REFRESH
-            console.log('✅ Transcription complete for:', pendingId);
+            // Transcription complete - HARD PAGE REFRESH
+            console.log('✅ Transcription complete for:', pendingId, '- RELOADING PAGE');
             pendingMeetingIdRef.current = null;
-            // Force immediate full page data reload
-            setTimeout(() => {
-              console.log('🔄 Force refreshing page data...');
-              loadData();
-            }, 100);
+            sessionStorage.removeItem('pendingMeeting');
+            window.location.reload();
+            return;
           } else if (!loadedVersion) {
             // Backend doesn't have it yet - preserve the pending meeting from current state
             const currentPending = currentMeetings.find(m => m.id === pendingId);
