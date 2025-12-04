@@ -610,11 +610,20 @@ const Library = () => {
             </div>
           ) : (
           <div className="grid gap-4">
-            {filteredMeetings.map((meeting, index) => (
+            <AnimatePresence mode="popLayout">
+            {filteredMeetings.map((meeting, index) => {
+              const isProcessing = meeting.transcriptionStatus === 'processing';
+              return (
+              <motion.div
+                key={meeting.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                layout
+              >
               <Card 
-                key={meeting.id} 
-                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
-                style={{ animationDelay: `${index * 50}ms` }}
+                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
               >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
@@ -636,15 +645,24 @@ const Library = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">{meeting.title}</CardTitle>
-                          <Button
-                            onClick={() => handleStartEdit(meeting)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </Button>
+                          {isProcessing ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-6 w-32 bg-gradient-to-r from-muted via-muted/50 to-muted animate-pulse rounded" />
+                              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                            </div>
+                          ) : (
+                            <>
+                              <CardTitle className="text-lg">{meeting.title}</CardTitle>
+                              <Button
+                                onClick={() => handleStartEdit(meeting)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
                       <CardDescription className="mt-2 flex items-center gap-4 text-xs flex-wrap">
@@ -674,12 +692,12 @@ const Library = () => {
                             </Badge>
                           </>
                         )}
-                        {meeting.transcriptionStatus === 'processing' && (
+                        {isProcessing && (
                           <>
                             <span className="text-muted-foreground">•</span>
-                            <Badge variant="outline" className="flex items-center gap-1 text-xs animate-pulse">
+                            <Badge variant="outline" className="flex items-center gap-1 text-xs bg-primary/10 border-primary/30">
                               <RefreshCw className="w-3 h-3 animate-spin" />
-                              Analyserar...
+                              Transkriberar...
                             </Badge>
                           </>
                         )}
@@ -697,16 +715,24 @@ const Library = () => {
                 </CardHeader>
                 <CardContent>
                   <AnimatePresence mode="wait">
-                    {meeting.transcriptionStatus === 'processing' ? (
+                    {isProcessing ? (
                       <motion.div
                         key="processing"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="flex items-center gap-2 mb-4 text-muted-foreground"
+                        className="mb-4 space-y-2"
                       >
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm">Analyserar...</span>
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                          </div>
+                          <span className="text-sm text-muted-foreground">Analyserar ljudet...</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="h-3 w-full bg-gradient-to-r from-muted via-muted/50 to-muted animate-pulse rounded" />
+                          <div className="h-3 w-3/4 bg-gradient-to-r from-muted via-muted/50 to-muted animate-pulse rounded" />
+                        </div>
                       </motion.div>
                     ) : meeting.transcriptionStatus === 'failed' ? (
                       <motion.div
@@ -727,7 +753,12 @@ const Library = () => {
                         exit={{ opacity: 0 }}
                         className="text-sm text-muted-foreground line-clamp-2 mb-4"
                       >
-                        {meeting.transcript || "Ingen transkription ännu..."}
+                        {meeting.transcript || (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Väntar på transkription...
+                          </span>
+                        )}
                       </motion.p>
                     )}
                   </AnimatePresence>
@@ -900,7 +931,10 @@ const Library = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              </motion.div>
+              );
+            })}
+            </AnimatePresence>
           </div>
         )}
       </div>
