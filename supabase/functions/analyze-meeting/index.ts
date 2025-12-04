@@ -42,49 +42,63 @@ serve(async (req) => {
     const wordCount = transcript.trim().split(/\s+/).length;
     console.log('📊 Processing transcript:', { wordCount, chars: transcript.length });
     
-    // Determine protocol length based on transcript length
-    let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsDetail, nextMeetingCount;
+    // Determine protocol length based on transcript length - enhanced scaling
+    let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
     
-    if (wordCount < 200) {
-      // Very short meeting
-      summaryLength = "2-3 meningar med kortfattad översikt";
-      mainPointsCount = "3-5 huvudpunkter";
-      mainPointsDetail = "En mening per punkt";
-      decisionsDetail = "Kort formulering";
-      actionItemsDetail = "Kortfattad beskrivning";
-      nextMeetingCount = "2-3 förslag";
-    } else if (wordCount < 500) {
+    if (wordCount < 100) {
+      // Very short - minimal protocol
+      summaryLength = "1-2 korta meningar";
+      mainPointsCount = "2-3";
+      mainPointsDetail = "Mycket kort, en halv mening per punkt";
+      decisionsDetail = "Endast om explicit nämnt";
+      actionItemsCount = "0-1";
+      actionItemsDetail = "Endast om tydligt nämnt med namn och uppgift";
+      nextMeetingCount = "0-1";
+    } else if (wordCount < 200) {
       // Short meeting
-      summaryLength = "3-5 meningar med översikt";
-      mainPointsCount = "5-8 huvudpunkter";
+      summaryLength = "2-3 meningar med kortfattad översikt";
+      mainPointsCount = "3-4";
+      mainPointsDetail = "En kort mening per punkt";
+      decisionsDetail = "Kort formulering om nämnt";
+      actionItemsCount = "1-2";
+      actionItemsDetail = "Kortfattad - titel och ansvarig om nämnt";
+      nextMeetingCount = "1-2";
+    } else if (wordCount < 500) {
+      // Medium-short meeting
+      summaryLength = "3-4 meningar med översikt";
+      mainPointsCount = "4-6";
       mainPointsDetail = "En till två meningar per punkt";
-      decisionsDetail = "Tydlig formulering med lite kontext";
-      actionItemsDetail = "Beskrivning med viktigaste detaljerna";
-      nextMeetingCount = "3-4 förslag";
-    } else if (wordCount < 1500) {
+      decisionsDetail = "Tydlig formulering";
+      actionItemsCount = "2-4";
+      actionItemsDetail = "Beskrivning med viktiga detaljer";
+      nextMeetingCount = "2-3";
+    } else if (wordCount < 1000) {
       // Medium meeting
-      summaryLength = "5-7 meningar med detaljerad översikt";
-      mainPointsCount = "8-12 huvudpunkter";
-      mainPointsDetail = "Två meningar per punkt med detaljer och kontext";
-      decisionsDetail = "Utförlig formulering med bakgrund";
-      actionItemsDetail = "Detaljerad beskrivning med kontext och betydelse";
-      nextMeetingCount = "4-5 förslag";
-    } else if (wordCount < 3000) {
+      summaryLength = "4-6 meningar med detaljerad översikt";
+      mainPointsCount = "6-10";
+      mainPointsDetail = "Två meningar per punkt med detaljer";
+      decisionsDetail = "Utförlig formulering med kontext";
+      actionItemsCount = "3-6";
+      actionItemsDetail = "Detaljerad beskrivning med kontext";
+      nextMeetingCount = "3-4";
+    } else if (wordCount < 2000) {
       // Long meeting
-      summaryLength = "7-10 meningar med mycket detaljerad översikt";
-      mainPointsCount = "12-18 huvudpunkter";
-      mainPointsDetail = "Två till tre meningar per punkt med omfattande detaljer, kontext och specifika diskussionspunkter";
-      decisionsDetail = "Mycket utförlig formulering med bakgrund, motivering och konsekvenser";
-      actionItemsDetail = "Omfattande beskrivning med full kontext, vad som ska göras, hur och varför";
-      nextMeetingCount = "5-6 förslag";
+      summaryLength = "6-8 meningar med mycket detaljerad översikt";
+      mainPointsCount = "10-15";
+      mainPointsDetail = "Två till tre meningar per punkt med omfattande detaljer";
+      decisionsDetail = "Mycket utförlig formulering med bakgrund och konsekvenser";
+      actionItemsCount = "5-10";
+      actionItemsDetail = "Omfattande beskrivning med full kontext och plan";
+      nextMeetingCount = "4-5";
     } else {
       // Very long meeting
-      summaryLength = "10-15 meningar med extremt detaljerad översikt av allt som diskuterades";
-      mainPointsCount = "20-30 huvudpunkter";
-      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer, alla aspekter av diskussionen, specifika siffror och insikter";
-      decisionsDetail = "Extremt detaljerad formulering med fullständig bakgrund, alla diskussionsaspekter, motivering och långsiktiga konsekvenser";
-      actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext, detaljerad plan för genomförande, varför det är viktigt och hur det relaterar till mötets diskussioner";
-      nextMeetingCount = "6-8 förslag";
+      summaryLength = "8-12 meningar med extremt detaljerad översikt";
+      mainPointsCount = "15-25";
+      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer och insikter";
+      decisionsDetail = "Extremt detaljerad med fullständig bakgrund och långsiktiga konsekvenser";
+      actionItemsCount = "8-15";
+      actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext och genomförandeplan";
+      nextMeetingCount = "5-7";
     }
     
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
@@ -146,16 +160,17 @@ Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struk
       "${decisionsDetail}. Lista alla beslut som togs."
     ],
     "åtgärdspunkter": [
+      "VIKTIGT: Generera EXAKT ${actionItemsCount} åtgärdspunkter baserat på mötets längd.",
       {
-        "titel": "Kort och koncis titel",
+        "titel": "Tydlig och konkret titel på uppgiften",
         "beskrivning": "${actionItemsDetail}",
-        "ansvarig": "Namn eller roll (lämna tom om ej nämnt)",
-        "deadline": "YYYY-MM-DD om datum nämns, annars lämna helt tom",
-        "prioritet": "critical" | "high" | "medium" | "low"
+        "ansvarig": "Namn eller roll om nämnt i mötet, annars tom sträng",
+        "deadline": "YYYY-MM-DD endast om datum explicit nämndes, annars tom sträng",
+        "prioritet": "critical | high | medium | low baserat på urgency i mötet"
       }
     ],
     "nästaMöteFörslag": [
-      "${nextMeetingCount}. Beskriv varje diskussionsämne med tillräcklig kontext."
+      "${nextMeetingCount} förslag. Beskriv varje diskussionsämne med tillräcklig kontext."
     ]
   }
 }
