@@ -245,10 +245,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       console.log('📤 Test mode: Saving and redirecting...');
       
-      // Generate a stable meeting ID using session ID
-      const testMeetingId = sessionId.startsWith('temp-') 
-        ? `test-${sessionId.replace('temp-', '')}`
-        : `test-${Date.now()}`;
+      // Generate a proper UUID for the meeting
+      const testMeetingId = crypto.randomUUID();
       
       // Save meeting to library first (with processing status)
       const now = new Date().toISOString();
@@ -364,10 +362,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         return;
       }
 
-      // Generate meeting ID (use stable ID from session)
-      const meetingId = sessionId.startsWith('temp-') 
-        ? `meeting-${sessionId.replace('temp-', '')}`
-        : sessionId;
+      // Generate a proper UUID for the meeting
+      const meetingId = crypto.randomUUID();
       
       // Save meeting to library first (with processing status)
       const now = new Date().toISOString();

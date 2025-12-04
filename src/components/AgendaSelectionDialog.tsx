@@ -40,13 +40,15 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
         console.warn('Failed to generate AI title:', e);
       }
 
-      // Save meeting with agenda and title
+      // Update meeting with agenda and title (don't create new)
       const now = new Date().toISOString();
       const { meetingStorage } = await import("@/utils/meetingStorage");
       
-      let finalId = meetingData.id;
+      const finalId = meetingData.id;
       try {
-        const savedId = await meetingStorage.saveMeeting({
+        // Only update existing meeting - don't create duplicates
+        console.log('📝 Updating existing meeting for protocol:', finalId);
+        await meetingStorage.saveMeeting({
           id: meetingData.id,
           title: aiTitle,
           folder: 'Allmänt',
@@ -58,19 +60,8 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           isCompleted: true,
           agendaId: selectedAgendaId,
         } as any);
-        if (savedId) finalId = savedId;
-        
-        // CRITICAL: Only count if this is a NEW meeting being created with agenda
-        // If meeting already exists (e.g., continued from library), it was already counted
-        const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
-        if (wasCounted && incrementMeetingCount) {
-          console.log('📊 New meeting with agenda - counting:', finalId);
-          await incrementMeetingCount(finalId);
-        } else {
-          console.log('⏭️ Meeting already counted, skipping:', finalId);
-        }
       } catch (e) {
-        console.warn('Failed to save meeting:', e);
+        console.warn('Failed to update meeting:', e);
       }
 
       // Check protocol generation limits using the FINAL id
