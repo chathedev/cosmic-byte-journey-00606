@@ -125,12 +125,20 @@ const Library = () => {
         // If we're tracking a pending meeting, keep it visible until backend has complete data
         if (pendingId) {
           const loadedVersion = map.get(pendingId);
-          const hasTranscript = loadedVersion?.transcript && loadedVersion.transcript.trim().length > 0;
+          // Only consider it done if transcript exists AND is not placeholder text
+          const hasRealTranscript = loadedVersion?.transcript && 
+            loadedVersion.transcript.trim().length > 0 && 
+            !loadedVersion.transcript.includes('Transkribering pågår');
           
-          if (loadedVersion && hasTranscript) {
-            // Transcription complete - stop tracking
+          if (loadedVersion && hasRealTranscript) {
+            // Transcription complete - stop tracking and FORCE PAGE REFRESH
             console.log('✅ Transcription complete for:', pendingId);
             pendingMeetingIdRef.current = null;
+            // Force immediate full page data reload
+            setTimeout(() => {
+              console.log('🔄 Force refreshing page data...');
+              loadData();
+            }, 100);
           } else if (!loadedVersion) {
             // Backend doesn't have it yet - preserve the pending meeting from current state
             const currentPending = currentMeetings.find(m => m.id === pendingId);
