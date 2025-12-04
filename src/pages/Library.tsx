@@ -99,42 +99,57 @@ const Library = () => {
 
   useEffect(() => {
     if (!user) return;
+    
+    // Skip polling if no pending meeting
+    const pendingId = pendingMeetingIdRef.current || urlMeetingId;
+    if (!pendingId) return;
 
     const pollInterval = setInterval(async () => {
-      const currentMeetings = meetingsRef.current;
-      const pendingId = pendingMeetingIdRef.current || urlMeetingId;
+      const currentPendingId = pendingMeetingIdRef.current || urlMeetingId;
       
-      // Skip polling if nothing to poll for
-      if (!pendingId) return;
-
-      console.log('📊 Polling transcription status for:', pendingId);
+      // Stop polling if no pending meeting
+      if (!currentPendingId) {
+        clearInterval(pollInterval);
+        return;
+      }
 
       try {
         // Poll GET /meetings/:id/transcription per spec
-        const status = await apiClient.getTranscriptionStatus(pendingId);
+        const status = await apiClient.getTranscriptionStatus(currentPendingId);
         
         if (status.success && status.status === 'done' && status.transcript) {
-          // Transcription complete - reload page
-          console.log('✅ Transcription complete for:', pendingId, '- RELOADING PAGE');
+          // Transcription complete - update state without reload
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
+          clearInterval(pollInterval);
+          
+          // Parse transcript if it's JSON
+          let cleanTranscript = status.transcript;
+          try {
+            const parsed = JSON.parse(status.transcript);
+            if (parsed.text) cleanTranscript = parsed.text;
+          } catch { /* not JSON, use as-is */ }
+          
+          // Update the meeting in state with the transcript
+          setMeetings(prev => prev.map(m => 
+            m.id === currentPendingId 
+              ? { ...m, transcript: cleanTranscript, transcriptionStatus: 'done' as const } 
+              : m
+          ));
           
           toast({
             title: 'Transkribering klar',
             description: 'Ditt möte har transkriberats.',
           });
-          
-          // Navigate to /library (without meetingId) and reload
-          window.location.href = '/library';
           return;
         } else if (status.status === 'failed') {
           // Transcription failed
-          console.error('❌ Transcription failed for:', pendingId);
           pendingMeetingIdRef.current = null;
+          clearInterval(pollInterval);
           
           // Update meeting in state to show failed status
           setMeetings(prev => prev.map(m => 
-            m.id === pendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
+            m.id === currentPendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
           ));
           
           toast({
@@ -145,9 +160,9 @@ const Library = () => {
         }
         // If still processing, continue polling
       } catch (error) {
-        console.error('Polling error:', error);
+        // Silent error - don't spam console
       }
-    }, 3000); // Poll every 3 seconds per spec
+    }, 3000);
 
     return () => clearInterval(pollInterval);
   }, [user, urlMeetingId]);

@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
+import { setDebugAdminStatus } from '@/lib/debugLogger';
 
 // Payment routing is PURELY domain-based:
 // - io.tivly.se = Apple IAP via RevenueCat
@@ -125,7 +126,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         admin = false;
       }
       setIsAdmin(admin);
-      console.log(`[SubscriptionContext] 📊 Admin status set to:`, admin);
+      setDebugAdminStatus(admin); // Enable debug logs for admins
       
       // TRUST THE BACKEND - use the plan data directly from the user object
       const backendPlanType = typeof user.plan === 'string' ? user.plan : user.plan?.plan;
@@ -379,6 +380,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         admin = !!roleData && (roleData.role === 'admin' || roleData.role === 'owner');
       } catch {}
       setIsAdmin(admin);
+      setDebugAdminStatus(admin); // Enable debug logs for admins
       
       // Force a backend fetch to get the latest counters
       let plan = await subscriptionService.getUserPlan(user.uid);
