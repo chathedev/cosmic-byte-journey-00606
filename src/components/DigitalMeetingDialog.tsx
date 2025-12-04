@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api";
+import { transcribeDirectly } from "@/lib/asrService";
 
 interface DigitalMeetingDialogProps {
   open: boolean;
@@ -21,6 +21,7 @@ export const DigitalMeetingDialog = ({
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -72,16 +73,25 @@ export const DigitalMeetingDialog = ({
     setIsUploading(true);
 
     try {
-      // Map language code to backend format
+      // Map language code to ASR format
       const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
       
-      const result = await apiClient.transcribeAudio(selectedFile, languageCode);
+      // Direct ASR - no backend proxy = much faster!
+      const result = await transcribeDirectly(selectedFile, {
+        language: languageCode,
+        onProgress: (stage, percent) => {
+          console.log(`🎤 Upload ASR: ${stage} ${percent}%`);
+          if (stage === 'uploading') setUploadProgress('Laddar upp...');
+          else if (stage === 'processing') setUploadProgress('Transkriberar...');
+          else setUploadProgress('');
+        }
+      });
       
       if (!result.success) {
         throw new Error(result.error || 'transcription_failed');
       }
 
-      const transcript = result.transcript || result.text || '';
+      const transcript = result.transcript || '';
       
       if (!transcript.trim()) {
         throw new Error('no_speech_detected');
@@ -90,7 +100,7 @@ export const DigitalMeetingDialog = ({
       toast({
         title: "Transkribering klar!",
         description: result.processing_time 
-          ? `Transkriberat på ${result.processing_time.toFixed(1)}s` 
+          ? `Transkriberat på ${(result.processing_time / 1000).toFixed(1)}s` 
           : "Ditt möte har transkriberats.",
       });
 
@@ -130,6 +140,7 @@ export const DigitalMeetingDialog = ({
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -234,7 +245,7 @@ export const DigitalMeetingDialog = ({
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Transkriberar...
+                  {uploadProgress || 'Transkriberar...'}
                 </>
               ) : (
                 <>
