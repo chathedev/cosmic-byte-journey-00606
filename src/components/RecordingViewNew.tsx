@@ -348,12 +348,53 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Test mode - uses pre-recorded audio file with instant redirect
+  // Test transcript text about Tivly
+  const testTranscriptText = `Välkomna till dagens möte om Tivly. Jag heter Anna Lindqvist och är produktchef. Med mig har jag Erik Johansson från utvecklingsteamet och Maria Svensson som är vår kundansvarig.
+
+Dagens agenda handlar om vår nya transkriberingsfunktion. Erik, kan du berätta lite om den tekniska lösningen?
+
+Absolut Anna. Vi har byggt en helt ny realtidstranskribering som fungerar direkt i webbläsaren. Det betyder att användarna kan se texten medan de pratar, vilket är perfekt för möten och intervjuer.
+
+Det låter fantastiskt Erik. Maria, hur har kunderna reagerat på beta-versionen?
+
+Responsen har varit överväldigande positiv. Många uppskattar att protokollen genereras automatiskt med AI. Det sparar dem timmar varje vecka. Särskilt företagskunder har visat stort intresse.
+
+Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nästa månad. Vi ses igen på fredag för uppföljning.`;
+
+  // Test mode - simulates typing for Free/Pro, uses audio file for Enterprise
   const startTestMode = async () => {
     if (isTestMode || isSavingRef.current) return;
     
-    isSavingRef.current = true;
     setIsTestMode(true);
+    
+    // For Free/Pro: Simulate typing text into transcript
+    if (!useAsrMode) {
+      console.log('📝 Test mode: Simulating real-time transcription...');
+      stopSpeechRecognition();
+      
+      // Animate typing effect
+      const words = testTranscriptText.split(' ');
+      let currentText = '';
+      
+      for (let i = 0; i < words.length; i++) {
+        currentText += (i === 0 ? '' : ' ') + words[i];
+        setLiveTranscript(currentText);
+        // Random delay between words (50-150ms) for realistic effect
+        await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+      }
+      
+      setInterimText('');
+      setIsTestMode(false);
+      
+      toast({
+        title: 'Testtext klar',
+        description: 'Klicka "Färdig" för att spara mötet.',
+      });
+      return;
+    }
+    
+    // For Enterprise: Use audio file with ASR
+    isSavingRef.current = true;
     setIsSaving(true);
     setIsRecording(false);
     stopSpeechRecognition();
