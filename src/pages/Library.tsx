@@ -89,10 +89,13 @@ const Library = () => {
     loadData();
   }, [user]);
 
-  // Poll for processing meetings every 2 seconds
+  // Poll for processing meetings every 1 second
   useEffect(() => {
     const processingMeetings = meetings.filter(m => m.transcriptionStatus === 'processing');
-    if (processingMeetings.length === 0) return;
+    const pendingId = pendingMeetingIdRef.current;
+    
+    // Always poll if we have a pending meeting ID (even if not in meetings array yet)
+    if (processingMeetings.length === 0 && !pendingId) return;
 
     const pollInterval = setInterval(async () => {
       try {
@@ -105,7 +108,25 @@ const Library = () => {
             map.set(m.id, m);
           }
         }
+        
+        // If we're tracking a pending meeting, keep it visible until backend has complete data
+        if (pendingId) {
+          const loadedVersion = map.get(pendingId);
+          if (loadedVersion && loadedVersion.transcriptionStatus !== 'processing' && loadedVersion.transcript) {
+            // Transcription complete - stop tracking
+            pendingMeetingIdRef.current = null;
+          } else if (!loadedVersion) {
+            // Backend doesn't have it yet - preserve the pending meeting from current state
+            const currentPending = meetings.find(m => m.id === pendingId);
+            if (currentPending) {
+              currentPending.transcriptionStatus = 'processing';
+              map.set(pendingId, currentPending);
+            }
+          }
+        }
+        
         const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
+        deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         
         // Check if any processing meetings are now done
         const nowDone = processingMeetings.filter(pm => {
@@ -113,7 +134,7 @@ const Library = () => {
           return updated && updated.transcriptionStatus !== 'processing' && updated.transcript;
         });
 
-        // Always update meetings to show latest state
+        // Update meetings
         setMeetings(deduped);
         
         if (nowDone.length > 0) {
@@ -125,7 +146,7 @@ const Library = () => {
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 1000); // Poll every 1 second
 
     return () => clearInterval(pollInterval);
   }, [meetings, user]);
