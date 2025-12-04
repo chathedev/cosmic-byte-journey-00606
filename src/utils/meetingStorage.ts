@@ -119,38 +119,30 @@ export const meetingStorage = {
       // CRITICAL: Determine if this is an update or create operation
       const hasValidId = meeting.id && isValidUUID(meeting.id);
       const isTempId = meeting.id && meeting.id.startsWith('temp-');
-      const shouldSaveToBackend = hasValidId || meeting.isCompleted;
+      const isNewMeeting = !hasValidId || isTempId || (meeting as any).forceCreate;
 
       console.log('💾 saveMeeting decision:', {
         meetingId: meeting.id,
         hasValidId,
         isTempId,
         isCompleted: meeting.isCompleted,
-        shouldSaveToBackend,
-        willCreate: !hasValidId && meeting.isCompleted,
-        willUpdate: hasValidId && meeting.isCompleted
+        isNewMeeting,
       });
 
-      if (!shouldSaveToBackend) {
-        // Draft meeting - return temp ID without backend save
+      // Draft meeting - return temp ID without backend save
+      if (!meeting.isCompleted && !hasValidId) {
         console.log('💾 Draft meeting - returning temp ID:', meeting.id);
         return meeting.id || `temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       }
 
-      if (hasValidId) {
-        // Existing meeting with valid UUID - update it
-        console.log('💾 Updating existing meeting:', meeting.id);
-        const result = await apiClient.updateMeeting(meeting.id, payload);
-        return String(result.meeting?.id || meeting.id);
-      } else {
-        // New meeting (temp ID or no ID) - CREATE new meeting on backend
-        console.log('💾 Creating NEW meeting (temp ID or isCompleted):', {
+      // For new meetings (temp ID, no ID, or forceCreate), always CREATE
+      if (isNewMeeting) {
+        console.log('💾 Creating NEW meeting:', {
           tempId: meeting.id,
           title: meeting.title,
-          isCompleted: meeting.isCompleted
         });
         
-        // CRITICAL: Remove the temp ID before creating so backend generates a new UUID
+        // Remove any temp or client-generated ID - let backend generate UUID
         delete payload.id;
         
         const result = await apiClient.createMeeting(payload);
@@ -161,9 +153,14 @@ export const meetingStorage = {
           throw new Error('Failed to create meeting: invalid ID returned from backend');
         }
         
-        console.log('✅ Created NEW meeting with UUID:', newId, 'replacing temp ID:', meeting.id);
+        console.log('✅ Created NEW meeting with UUID:', newId);
         return newId;
       }
+
+      // Existing meeting with valid UUID - update it
+      console.log('💾 Updating existing meeting:', meeting.id);
+      const result = await apiClient.updateMeeting(meeting.id, payload);
+      return String(result.meeting?.id || meeting.id);
     } catch (error) {
       console.error('Error saving meeting (API):', error);
       throw error;
