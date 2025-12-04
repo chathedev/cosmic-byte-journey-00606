@@ -1,7 +1,7 @@
 // Direct ASR Service - Frontend handles transcription directly
 // Client ASR + POST transcript to backend = fast path per spec
 
-const ASR_ENDPOINT = 'https://transcribe.api.tivly.se/transcribe';
+const ASR_ENDPOINT = 'https://asr.api.tivly.se/transcribe';
 const API_BASE_URL = 'https://api.tivly.se';
 
 export interface ASRResult {
