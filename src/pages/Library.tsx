@@ -277,10 +277,10 @@ const Library = () => {
     const effectiveMeeting = latest || meeting;
 
     const wordCount = effectiveMeeting.transcript ? effectiveMeeting.transcript.trim().split(/\s+/).filter(w => w).length : 0;
-    if (!effectiveMeeting.transcript || wordCount < 50) {
+    if (!effectiveMeeting.transcript || wordCount < 20) {
       toast({
         title: "För kort transkription",
-        description: `Transkriptionen innehåller ${wordCount} ord. Minst 50 ord krävs för att skapa ett kvalitativt protokoll.`,
+        description: `Transkriptionen innehåller ${wordCount} ord. Minst 20 ord krävs för att skapa ett protokoll.`,
         variant: "destructive",
       });
       return;

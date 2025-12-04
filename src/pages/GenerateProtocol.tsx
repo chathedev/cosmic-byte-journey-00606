@@ -90,11 +90,11 @@ export default function GenerateProtocol() {
 
       // Validate minimum word count
       const wordCount = payload.transcript.trim().split(/\s+/).filter(w => w).length;
-      if (wordCount < 50) {
+      if (wordCount < 20) {
         console.warn('⛔ Transcript too short', { wordCount });
         toast({
           title: "För kort transkription",
-          description: `Transkriptionen innehåller ${wordCount} ord. Minst 50 ord krävs för att skapa ett kvalitativt protokoll.`,
+          description: `Transkriptionen innehåller ${wordCount} ord. Minst 20 ord krävs för att skapa ett protokoll.`,
           variant: "destructive",
         });
         navigate("/");
