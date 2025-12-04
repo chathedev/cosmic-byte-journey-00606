@@ -97,28 +97,34 @@ const Library = () => {
   const meetingsRef = useRef(meetings);
   meetingsRef.current = meetings;
 
+  // Track if transcription was completed via direct event (to stop polling)
+  const transcriptionDoneRef = useRef(false);
+
+  // Polling for transcription status - only if direct event hasn't fired
   useEffect(() => {
     if (!user) return;
     
-    // Skip polling if no pending meeting
     const pendingId = pendingMeetingIdRef.current || urlMeetingId;
     if (!pendingId) return;
 
     const pollInterval = setInterval(async () => {
-      const currentPendingId = pendingMeetingIdRef.current || urlMeetingId;
+      // Stop if transcription was completed via direct event
+      if (transcriptionDoneRef.current) {
+        clearInterval(pollInterval);
+        return;
+      }
       
-      // Stop polling if no pending meeting
+      const currentPendingId = pendingMeetingIdRef.current || urlMeetingId;
       if (!currentPendingId) {
         clearInterval(pollInterval);
         return;
       }
 
       try {
-        // Poll GET /meetings/:id/transcription per spec
         const status = await apiClient.getTranscriptionStatus(currentPendingId);
         
         if (status.success && status.status === 'done' && status.transcript) {
-          // Transcription complete - update state without reload
+          transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
@@ -128,9 +134,8 @@ const Library = () => {
           try {
             const parsed = JSON.parse(status.transcript);
             if (parsed.text) cleanTranscript = parsed.text;
-          } catch { /* not JSON, use as-is */ }
+          } catch { /* not JSON */ }
           
-          // Update the meeting in state with the transcript
           setMeetings(prev => prev.map(m => 
             m.id === currentPendingId 
               ? { ...m, transcript: cleanTranscript, transcriptionStatus: 'done' as const } 
@@ -141,53 +146,82 @@ const Library = () => {
             title: 'Transkribering klar',
             description: 'Ditt möte har transkriberats.',
           });
-          return;
         } else if (status.status === 'failed') {
-          // Transcription failed
+          transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           clearInterval(pollInterval);
           
-          // Update meeting in state to show failed status
           setMeetings(prev => prev.map(m => 
             m.id === currentPendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
           ));
           
           toast({
             title: 'Transkribering misslyckades',
-            description: status.error || 'Försök igen eller kontakta support.',
+            description: status.error || 'Försök igen.',
             variant: 'destructive',
           });
         }
-        // If still processing, continue polling
-      } catch (error) {
-        // Silent error - don't spam console
-      }
-    }, 3000);
+      } catch { /* silent */ }
+    }, 2000);
 
     return () => clearInterval(pollInterval);
   }, [user, urlMeetingId]);
 
-  // Listen for direct ASR completion event (much faster than polling!)
+  // Listen for direct ASR completion event - immediate update
   useEffect(() => {
     const handleTranscriptionComplete = async (event: CustomEvent) => {
-      const { meetingId } = event.detail || {};
-      console.log('🚀 Direct ASR complete event received for:', meetingId);
+      const { meetingId, transcript } = event.detail || {};
       
-      // Clear pending state
+      // Mark as done so polling stops
+      transcriptionDoneRef.current = true;
       pendingMeetingIdRef.current = null;
       sessionStorage.removeItem('pendingMeeting');
       
-      // Refresh data without full page reload
-      if (user) {
-        const userMeetings = await meetingStorage.getMeetings(user.uid);
-        const map = new Map<string, MeetingSession>();
-        for (const m of userMeetings) {
-          const existing = map.get(m.id);
-          if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
-            map.set(m.id, m);
+      // If transcript was passed directly, use it
+      if (transcript && meetingId) {
+        let cleanTranscript = transcript;
+        try {
+          const parsed = JSON.parse(transcript);
+          if (parsed.text) cleanTranscript = parsed.text;
+        } catch { /* not JSON */ }
+        
+        setMeetings(prev => prev.map(m => 
+          m.id === meetingId 
+            ? { ...m, transcript: cleanTranscript, transcriptionStatus: 'done' as const } 
+            : m
+        ));
+        
+        toast({
+          title: 'Transkribering klar',
+          description: 'Ditt möte har transkriberats.',
+        });
+        return;
+      }
+      
+      // Otherwise fetch from backend
+      if (user && meetingId) {
+        try {
+          const userMeetings = await meetingStorage.getMeetings(user.uid);
+          const meeting = userMeetings.find(m => m.id === meetingId);
+          if (meeting?.transcript) {
+            let cleanTranscript = meeting.transcript;
+            try {
+              const parsed = JSON.parse(meeting.transcript);
+              if (parsed.text) cleanTranscript = parsed.text;
+            } catch { /* not JSON */ }
+            
+            setMeetings(prev => prev.map(m => 
+              m.id === meetingId 
+                ? { ...m, transcript: cleanTranscript, transcriptionStatus: 'done' as const } 
+                : m
+            ));
+            
+            toast({
+              title: 'Transkribering klar',
+              description: 'Ditt möte har transkriberats.',
+            });
           }
-        }
-        setMeetings(Array.from(map.values()));
+        } catch { /* silent */ }
       }
     };
 
