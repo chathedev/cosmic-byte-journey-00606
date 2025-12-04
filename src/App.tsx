@@ -22,6 +22,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
+import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -429,6 +430,7 @@ const App = () => {
                       <PreserveAppParam />
                       <AuthRedirectHandler />
                       <GlobalDevButton />
+                      <MaintenanceOverlay />
                       <EnterpriseTrialCheck />
                       <WelcomeGate>
                         <AppLayout>
