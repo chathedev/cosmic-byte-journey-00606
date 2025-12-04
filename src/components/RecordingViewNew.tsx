@@ -55,6 +55,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const createdAtRef = useRef<string>(continuedMeeting?.createdAt || new Date().toISOString());
   const wakeLockRef = useRef<any>(null);
   const hasIncrementedCountRef = useRef(!!continuedMeeting);
+  const isSavingRef = useRef(false); // Guard against double saves
   
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
@@ -225,8 +226,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
   // Test mode - uses pre-recorded audio file with instant redirect
   const startTestMode = async () => {
-    if (isTestMode) return;
+    if (isTestMode || isSavingRef.current) return;
     
+    isSavingRef.current = true;
     setIsTestMode(true);
     setIsRecording(false);
     
@@ -241,8 +243,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       console.log('📤 Test mode: Saving and redirecting...');
       
-      // Generate a meeting ID
-      const testMeetingId = `test-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      // Generate a stable meeting ID using session ID
+      const testMeetingId = sessionId.startsWith('temp-') 
+        ? `test-${sessionId.replace('temp-', '')}`
+        : `test-${Date.now()}`;
       
       // Save meeting to library first (with processing status)
       const now = new Date().toISOString();
@@ -282,6 +286,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
     } catch (error: any) {
       console.error('❌ Test mode error:', error?.message || error);
+      isSavingRef.current = false;
       toast({
         title: 'Testläge misslyckades',
         description: error?.message || 'Kunde inte starta testläge',
@@ -321,7 +326,14 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
   // Save meeting, redirect instantly, upload audio in background
   const saveAndRedirectInstantly = async () => {
+    // Guard against double saves
+    if (isSavingRef.current) {
+      console.log('⚠️ Save already in progress, ignoring duplicate call');
+      return;
+    }
     if (!user) return;
+    
+    isSavingRef.current = true;
     
     try {
       console.log('📤 Saving meeting and redirecting instantly...');
@@ -338,14 +350,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           description: 'Försök spela in igen.',
           variant: 'destructive',
         });
+        isSavingRef.current = false;
         setViewState('recording');
         startRecording();
         return;
       }
 
-      // Generate meeting ID
+      // Generate meeting ID (use stable ID from session)
       const meetingId = sessionId.startsWith('temp-') 
-        ? `meeting-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
+        ? `meeting-${sessionId.replace('temp-', '')}`
         : sessionId;
       
       // Save meeting to library first (with processing status)
@@ -407,6 +420,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
     } catch (error: any) {
       console.error('❌ Save error:', error);
+      isSavingRef.current = false;
       toast({
         title: 'Fel vid sparning',
         description: error.message || 'Kunde inte spara mötet',
