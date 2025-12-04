@@ -287,9 +287,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           console.log(`🎤 Test ASR: ${stage} ${percent}%`);
         },
         onTranscriptReady: (transcript) => {
-          console.log('✅ Test transcript ready, length:', transcript.length);
+          // Parse transcript if JSON
+          let cleanTranscript = transcript;
+          try {
+            const parsed = JSON.parse(transcript);
+            if (parsed.text) cleanTranscript = parsed.text;
+          } catch { /* not JSON */ }
+          
           window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-            detail: { meetingId: testMeetingId } 
+            detail: { meetingId: testMeetingId, transcript: cleanTranscript } 
           }));
         }
       }).then(result => {
@@ -431,9 +437,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           console.log(`🎤 ASR: ${stage} ${percent}%`);
         },
         onTranscriptReady: (transcript) => {
-          console.log('✅ Transcript ready, length:', transcript.length);
+          // Parse transcript if JSON
+          let cleanTranscript = transcript;
+          try {
+            const parsed = JSON.parse(transcript);
+            if (parsed.text) cleanTranscript = parsed.text;
+          } catch { /* not JSON */ }
+          
           window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-            detail: { meetingId } 
+            detail: { meetingId, transcript: cleanTranscript } 
           }));
         }
       }).then(result => {
