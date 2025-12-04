@@ -55,6 +55,7 @@ interface SubscriptionContextType {
   requiresPayment: boolean;
   paymentDomain: PaymentDomain;
   enterpriseMembership: EnterpriseMembership | null;
+  isAdmin: boolean;
   refreshPlan: () => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
   canGenerateProtocol: (meetingId: string, protocolCount: number) => Promise<{ allowed: boolean; reason?: string }>;
@@ -519,7 +520,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );

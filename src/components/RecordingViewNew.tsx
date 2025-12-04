@@ -29,7 +29,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userPlan, canCreateMeeting, incrementMeetingCount, refreshPlan } = useSubscription();
+  const { userPlan, canCreateMeeting, incrementMeetingCount, refreshPlan, isAdmin } = useSubscription();
   
   const [viewState, setViewState] = useState<ViewState>('recording');
   const [isRecording, setIsRecording] = useState(false);
@@ -50,9 +50,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [transcriptionProgress, setTranscriptionProgress] = useState(0);
   const [pendingAudioBlob, setPendingAudioBlob] = useState<Blob | null>(null);
   
-  // Test access for specific user
+  // Test access for admins and specific user
   const allowedTestEmail = 'charlie.wretling@icloud.com';
-  const hasTestAccess = user?.email?.toLowerCase() === allowedTestEmail.toLowerCase();
+  const hasTestAccess = isAdmin || user?.email?.toLowerCase() === allowedTestEmail.toLowerCase();
   
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
