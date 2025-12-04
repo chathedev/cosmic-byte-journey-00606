@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Construction, RefreshCw } from 'lucide-react';
+import { Construction } from 'lucide-react';
 import { apiClient, MaintenanceStatus } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { Button } from './ui/button';
 
 export const MaintenanceOverlay = () => {
   const { isAdmin } = useSubscription();
@@ -68,15 +67,6 @@ export const MaintenanceOverlay = () => {
             Påbörjat: {new Date(maintenance.updatedAt).toLocaleString('sv-SE')}
           </p>
         )}
-
-        <Button 
-          onClick={checkMaintenance} 
-          variant="outline" 
-          className="gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Kontrollera igen
-        </Button>
       </div>
     </div>
   );
