@@ -420,6 +420,16 @@ export const AutoProtocolGenerator = ({
     // CRITICAL: The protocol is already auto-saved to the meeting during generation
     // This button is just for user confirmation and navigation
     
+    // Free users don't have library access - just show confirmation
+    if (isFreeTrialMode) {
+      toast({
+        title: "Protokoll klart!",
+        description: "Ladda ner protokollet för att spara det.",
+        duration: 3000,
+      });
+      return;
+    }
+    
     if (!meetingId || !isValidUUID(meetingId)) {
       console.warn('⚠️ No valid meeting ID - protocol already generated, navigating to library');
       toast({
@@ -528,13 +538,26 @@ export const AutoProtocolGenerator = ({
                 <Download className="w-4 h-4 mr-2" />
                 Ladda ner
               </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Spara
-              </Button>
+              {/* Hide Save button for free users - they don't have library access */}
+              {!isFreeTrialMode && (
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Spara
+                </Button>
+              )}
+              {/* Show "Klar" button for free users to go back */}
+              {isFreeTrialMode && (
+                <Button
+                  size="sm"
+                  onClick={onBack}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Klar
+                </Button>
+              )}
             </div>
           </div>
         </div>
