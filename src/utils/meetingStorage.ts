@@ -40,8 +40,8 @@ const mapMeeting = (m: any, userIdHint?: string): MeetingSession => ({
   protocolCount: Number(m.protocolCount ?? 0),
   agendaId: m.agendaId || m.agendaid || undefined,
   source: m.source || undefined,
-  // CRITICAL: Override status to 'done' if transcript exists, regardless of backend status
-  transcriptionStatus: (m.transcript && m.transcript.trim().length > 0) ? 'done' : (m.transcriptionStatus || 'processing'),
+  // CRITICAL: Override status to 'done' if real transcript exists (not placeholder text)
+  transcriptionStatus: (m.transcript && m.transcript.trim().length > 0 && !m.transcript.includes('Transkribering pågår')) ? 'done' : (m.transcriptionStatus || 'processing'),
 });
 
 export const meetingStorage = {

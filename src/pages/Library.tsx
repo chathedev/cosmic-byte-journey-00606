@@ -144,17 +144,22 @@ const Library = () => {
         const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
         deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         
-        // Check if any processing meetings are now done
+        // Check if any processing meetings are now done (have real transcript, not placeholder)
         const nowDone = processingMeetings.filter(pm => {
           const updated = deduped.find(m => m.id === pm.id);
-          return updated && updated.transcript && updated.transcript.trim().length > 0;
+          const hasRealTranscript = updated?.transcript && 
+            updated.transcript.trim().length > 0 && 
+            !updated.transcript.includes('Transkribering pågår');
+          return hasRealTranscript;
         });
 
         // Update meetings state
         setMeetings(deduped);
         
         if (nowDone.length > 0) {
-          console.log('🎉 Transcription complete for', nowDone.length, 'meetings');
+          console.log('🎉 Transcription complete for', nowDone.length, 'meetings - refreshing data');
+          // Force full reload to get latest transcript from backend
+          setTimeout(() => loadData(), 500);
           toast({
             title: 'Transkribering klar',
             description: `${nowDone.length} möte${nowDone.length > 1 ? 'n' : ''} är klart.`,
