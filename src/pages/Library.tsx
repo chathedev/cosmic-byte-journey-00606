@@ -154,7 +154,7 @@ const Library = () => {
 
   // Listen for direct ASR completion event (much faster than polling!)
   useEffect(() => {
-    const handleTranscriptionComplete = (event: CustomEvent) => {
+    const handleTranscriptionComplete = async (event: CustomEvent) => {
       const { meetingId } = event.detail || {};
       console.log('🚀 Direct ASR complete event received for:', meetingId);
       
@@ -162,15 +162,25 @@ const Library = () => {
       pendingMeetingIdRef.current = null;
       sessionStorage.removeItem('pendingMeeting');
       
-      // Immediate hard page refresh
-      window.location.reload();
+      // Refresh data without full page reload
+      if (user) {
+        const userMeetings = await meetingStorage.getMeetings(user.uid);
+        const map = new Map<string, MeetingSession>();
+        for (const m of userMeetings) {
+          const existing = map.get(m.id);
+          if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
+            map.set(m.id, m);
+          }
+        }
+        setMeetings(Array.from(map.values()));
+      }
     };
 
     window.addEventListener('transcriptionComplete', handleTranscriptionComplete as EventListener);
     return () => {
       window.removeEventListener('transcriptionComplete', handleTranscriptionComplete as EventListener);
     };
-  }, []);
+  }, [user]);
 
   // Don't redirect - allow viewing library but show upgrade prompts for actions
 
