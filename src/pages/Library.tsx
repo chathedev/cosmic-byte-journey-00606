@@ -52,30 +52,36 @@ const Library = () => {
   const location = useLocation();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
-  const hasLoadedPendingRef = useRef(false);
+  const pendingMeetingIdRef = useRef<string | null>(null);
   
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
 
-  // Load pending meeting ONLY when coming from recording (not on refresh)
+  // Load pending meeting ONLY when navigating from recording (not on refresh)
   useEffect(() => {
     const fromRecording = location.state?.fromRecording === true;
     
-    if (fromRecording && !hasLoadedPendingRef.current) {
-      hasLoadedPendingRef.current = true;
+    if (fromRecording) {
       const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
       if (pendingMeetingJson) {
         try {
           const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
           pendingMeeting.transcriptionStatus = 'processing';
+          // Track this pending meeting ID for loadData to use
+          pendingMeetingIdRef.current = pendingMeeting.id;
           setMeetings([pendingMeeting]);
           setIsLoading(false);
         } catch (e) {
           console.error('Failed to parse pending meeting:', e);
         }
       }
-      // Clear navigation state to prevent re-triggering on back navigation
+      // Clear sessionStorage immediately - we've captured what we need
+      sessionStorage.removeItem('pendingMeeting');
+      // Clear navigation state
       window.history.replaceState({}, document.title);
+    } else {
+      // Not from recording - clear any stale sessionStorage
+      sessionStorage.removeItem('pendingMeeting');
     }
   }, [location.state]);
 
@@ -145,23 +151,20 @@ const Library = () => {
         }
       }
       
-      // Merge with current meetings to preserve pending ones until backend catches up
-      const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
-      if (pendingMeetingJson) {
-        try {
-          const pending = JSON.parse(pendingMeetingJson) as MeetingSession;
-          const loadedVersion = map.get(pending.id);
-          
-          if (loadedVersion && (loadedVersion.transcriptionStatus !== 'processing' || loadedVersion.transcript)) {
-            // Transcription complete - clear pending
-            sessionStorage.removeItem('pendingMeeting');
-          } else if (!loadedVersion) {
-            // Keep pending meeting visible until backend has it
-            pending.transcriptionStatus = 'processing';
-            map.set(pending.id, pending);
+      // If we're tracking a pending meeting from recording, keep it visible until backend has it
+      const pendingId = pendingMeetingIdRef.current;
+      if (pendingId) {
+        const loadedVersion = map.get(pendingId);
+        if (loadedVersion && (loadedVersion.transcriptionStatus !== 'processing' || loadedVersion.transcript)) {
+          // Transcription complete - stop tracking
+          pendingMeetingIdRef.current = null;
+        } else if (!loadedVersion) {
+          // Backend doesn't have it yet - preserve the pending meeting from current state
+          const currentPending = meetings.find(m => m.id === pendingId);
+          if (currentPending) {
+            currentPending.transcriptionStatus = 'processing';
+            map.set(pendingId, currentPending);
           }
-        } catch (e) {
-          console.error('Failed to merge pending meeting:', e);
         }
       }
       
