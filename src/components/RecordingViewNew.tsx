@@ -275,7 +275,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         description: 'Transkribering pågår i bakgrunden.',
       });
       
-      navigate('/library');
+      navigate('/library', { state: { fromRecording: true } });
       
       // Upload audio in background (fire and forget)
       apiClient.uploadForTranscription(audioBlob, testMeetingId, {
@@ -408,7 +408,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         description: 'Transkribering pågår i bakgrunden.',
       });
       
-      navigate('/library');
+      navigate('/library', { state: { fromRecording: true } });
 
       // Upload audio in background (fire and forget)
       apiClient.uploadForTranscription(blob, meetingId, {

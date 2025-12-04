@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useNavigate } from "react-router-dom";
-import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Eye, RefreshCw } from "lucide-react";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Library = () => {
   const { user } = useAuth();
@@ -48,36 +49,38 @@ const Library = () => {
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
+  const hasLoadedPendingRef = useRef(false);
   
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
 
-  // Load pending meeting from sessionStorage immediately on mount
+  // Load pending meeting ONLY when coming from recording (not on refresh)
   useEffect(() => {
-    const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
-    if (pendingMeetingJson) {
-      try {
-        const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
-        // Ensure it has processing status for display
-        pendingMeeting.transcriptionStatus = pendingMeeting.transcriptionStatus || 'processing';
-        // Show pending meeting immediately as placeholder
-        setMeetings([pendingMeeting]);
-        setIsLoading(false); // Don't show loading spinner, show the placeholder
-      } catch (e) {
-        console.error('Failed to parse pending meeting:', e);
+    const fromRecording = location.state?.fromRecording === true;
+    
+    if (fromRecording && !hasLoadedPendingRef.current) {
+      hasLoadedPendingRef.current = true;
+      const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
+      if (pendingMeetingJson) {
+        try {
+          const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
+          pendingMeeting.transcriptionStatus = 'processing';
+          setMeetings([pendingMeeting]);
+          setIsLoading(false);
+        } catch (e) {
+          console.error('Failed to parse pending meeting:', e);
+        }
       }
+      // Clear navigation state to prevent re-triggering on back navigation
+      window.history.replaceState({}, document.title);
     }
-  }, []);
+  }, [location.state]);
 
   useEffect(() => {
-    // Only load data after a short delay to avoid overwriting pending meeting
-    const loadTimer = setTimeout(() => {
-      loadData();
-    }, 500);
-    
-    return () => clearTimeout(loadTimer);
+    loadData();
   }, [user]);
 
   // Poll for processing meetings every 2 seconds
@@ -126,11 +129,8 @@ const Library = () => {
   const loadData = async () => {
     if (!user) return;
     
-    // Don't set loading if we have a pending meeting showing
-    const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
-    const hasPending = !!pendingMeetingJson;
-    
-    if (!hasPending) {
+    // Don't show loading spinner if we already have meetings displayed
+    if (meetings.length === 0) {
       setIsLoading(true);
     }
     
@@ -145,21 +145,18 @@ const Library = () => {
         }
       }
       
-      // If we have a pending meeting, merge it (update if exists in loaded data)
+      // Merge with current meetings to preserve pending ones until backend catches up
+      const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
       if (pendingMeetingJson) {
         try {
           const pending = JSON.parse(pendingMeetingJson) as MeetingSession;
           const loadedVersion = map.get(pending.id);
           
-          if (loadedVersion) {
-            // Backend has updated data - use it and clear pending
-            map.set(pending.id, loadedVersion);
-            // Only clear if transcription is done or failed
-            if (loadedVersion.transcriptionStatus !== 'processing' || loadedVersion.transcript) {
-              sessionStorage.removeItem('pendingMeeting');
-            }
-          } else {
-            // Meeting not yet in backend - keep showing pending
+          if (loadedVersion && (loadedVersion.transcriptionStatus !== 'processing' || loadedVersion.transcript)) {
+            // Transcription complete - clear pending
+            sessionStorage.removeItem('pendingMeeting');
+          } else if (!loadedVersion) {
+            // Keep pending meeting visible until backend has it
             pending.transcriptionStatus = 'processing';
             map.set(pending.id, pending);
           }
@@ -169,7 +166,6 @@ const Library = () => {
       }
       
       const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
-      // Sort by date, newest first
       deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setMeetings(deduped);
       
@@ -676,29 +672,41 @@ const Library = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {meeting.transcriptionStatus === 'processing' ? (
-                    <div className="flex items-center gap-3 mb-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                      <div className="relative">
-                        <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-primary">Transkribering pågår...</p>
-                        <p className="text-xs text-muted-foreground">Vänta medan vi analyserar ditt möte</p>
-                      </div>
-                    </div>
-                  ) : meeting.transcriptionStatus === 'failed' ? (
-                    <div className="flex items-center gap-3 mb-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                      <span className="text-destructive text-lg">✕</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-destructive">Transkribering misslyckades</p>
-                        <p className="text-xs text-muted-foreground">Försök spela in mötet igen</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                      {meeting.transcript || "Ingen transkription ännu..."}
-                    </p>
-                  )}
+                  <AnimatePresence mode="wait">
+                    {meeting.transcriptionStatus === 'processing' ? (
+                      <motion.div
+                        key="processing"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center gap-2 mb-4 text-muted-foreground"
+                      >
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">Analyserar...</span>
+                      </motion.div>
+                    ) : meeting.transcriptionStatus === 'failed' ? (
+                      <motion.div
+                        key="failed"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center gap-2 mb-4 text-destructive"
+                      >
+                        <span>✕</span>
+                        <span className="text-sm">Transkribering misslyckades</span>
+                      </motion.div>
+                    ) : (
+                      <motion.p
+                        key="transcript"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="text-sm text-muted-foreground line-clamp-2 mb-4"
+                      >
+                        {meeting.transcript || "Ingen transkription ännu..."}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
                   
                   {/* Protocol Status Badge */}
                   {protocolStatus[meeting.id] && (
