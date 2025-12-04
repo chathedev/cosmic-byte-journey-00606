@@ -46,7 +46,7 @@ export async function transcribeDirectly(
   const formData = new FormData();
   const fileName = audioBlob.type.includes('webm') ? 'audio.webm' : 
                    audioBlob.type.includes('mp4') ? 'audio.m4a' : 'audio.wav';
-  formData.append('file', audioBlob, fileName);
+  formData.append('audio', audioBlob, fileName);
   formData.append('language', language);
 
   try {
