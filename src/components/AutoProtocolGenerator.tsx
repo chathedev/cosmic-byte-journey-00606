@@ -284,82 +284,150 @@ export const AutoProtocolGenerator = ({
   };
 
   const generateDocument = async (protocol: AIProtocol, title: string) => {
+    const { TextRun } = await import("docx");
+    
+    const documentChildren = [
+      new Paragraph({
+        text: title,
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 },
+      }),
+      new Paragraph({
+        text: `Datum: ${new Date(meetingCreatedAt || Date.now()).toLocaleDateString('sv-SE')}`,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 },
+      }),
+      new Paragraph({
+        text: "Sammanfattning",
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 200 },
+      }),
+      new Paragraph({
+        text: protocol.summary,
+        spacing: { after: 300 },
+      }),
+      new Paragraph({
+        text: "Huvudpunkter",
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 200 },
+      }),
+      ...protocol.mainPoints.map(point => 
+        new Paragraph({
+          children: [new TextRun({ text: `• ${point}` })],
+          spacing: { after: 100 },
+        })
+      ),
+    ];
+
+    // Add decisions section if there are any
+    if (protocol.decisions && protocol.decisions.length > 0) {
+      documentChildren.push(
+        new Paragraph({
+          text: "Beslut",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 200 },
+        }),
+        ...protocol.decisions.map(decision => 
+          new Paragraph({
+            children: [new TextRun({ text: `• ${decision}` })],
+            spacing: { after: 100 },
+          })
+        )
+      );
+    }
+
+    // Add action items section with better visibility
+    if (protocol.actionItems && protocol.actionItems.length > 0) {
+      documentChildren.push(
+        new Paragraph({
+          text: "Åtgärdspunkter",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 200 },
+        })
+      );
+
+      protocol.actionItems.forEach((item, index) => {
+        // Title with priority indicator
+        const priorityEmoji = item.priority === 'critical' ? '🔴' : 
+                             item.priority === 'high' ? '🟠' : 
+                             item.priority === 'medium' ? '🟡' : '🟢';
+        
+        documentChildren.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: `${index + 1}. `, bold: true }),
+              new TextRun({ text: item.title, bold: true }),
+              new TextRun({ text: ` ${priorityEmoji}` }),
+            ],
+            spacing: { before: 150, after: 50 },
+          })
+        );
+
+        // Description
+        if (item.description && item.description.trim()) {
+          documentChildren.push(
+            new Paragraph({
+              children: [new TextRun({ text: `   ${item.description}` })],
+              spacing: { after: 50 },
+            })
+          );
+        }
+
+        // Owner and deadline on same line if both exist
+        const metaInfo: string[] = [];
+        if (item.owner && item.owner.trim()) {
+          metaInfo.push(`Ansvarig: ${item.owner}`);
+        }
+        if (item.deadline && item.deadline.trim()) {
+          metaInfo.push(`Deadline: ${item.deadline}`);
+        }
+        
+        if (metaInfo.length > 0) {
+          documentChildren.push(
+            new Paragraph({
+              children: [new TextRun({ text: `   ${metaInfo.join(' | ')}`, italics: true })],
+              spacing: { after: 100 },
+            })
+          );
+        }
+      });
+    } else {
+      // Add placeholder if no action items
+      documentChildren.push(
+        new Paragraph({
+          text: "Åtgärdspunkter",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 200 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: "Inga specifika åtgärdspunkter identifierades.", italics: true })],
+          spacing: { after: 100 },
+        })
+      );
+    }
+
+    // Add next meeting suggestions if available
+    if (protocol.nextMeetingSuggestions && protocol.nextMeetingSuggestions.length > 0) {
+      documentChildren.push(
+        new Paragraph({
+          text: "Förslag till nästa möte",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 200 },
+        }),
+        ...protocol.nextMeetingSuggestions.map(suggestion => 
+          new Paragraph({
+            children: [new TextRun({ text: `• ${suggestion}` })],
+            spacing: { after: 100 },
+          })
+        )
+      );
+    }
+
     const doc = new Document({
       sections: [{
         properties: {},
-        children: [
-          new Paragraph({
-            text: title,
-            heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-          }),
-          new Paragraph({
-            text: `Datum: ${new Date(meetingCreatedAt || Date.now()).toLocaleDateString('sv-SE')}`,
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-          }),
-          new Paragraph({
-            text: "Sammanfattning",
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 200 },
-          }),
-          new Paragraph({
-            text: protocol.summary,
-            spacing: { after: 300 },
-          }),
-          new Paragraph({
-            text: "Huvudpunkter",
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 200 },
-          }),
-          ...protocol.mainPoints.map(point => 
-            new Paragraph({
-              text: point,
-              bullet: { level: 0 },
-              spacing: { after: 100 },
-            })
-          ),
-          new Paragraph({
-            text: "Beslut",
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 200 },
-          }),
-          ...protocol.decisions.map(decision => 
-            new Paragraph({
-              text: decision,
-              bullet: { level: 0 },
-              spacing: { after: 100 },
-            })
-          ),
-          new Paragraph({
-            text: "Åtgärdspunkter",
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 200 },
-          }),
-          ...protocol.actionItems.flatMap(item => [
-            new Paragraph({
-              text: item.title,
-              bullet: { level: 0 },
-              spacing: { after: 50 },
-            }),
-            ...(item.description ? [new Paragraph({
-              text: item.description,
-              bullet: { level: 1 },
-              spacing: { after: 50 },
-            })] : []),
-            ...(item.owner ? [new Paragraph({
-              text: `Ansvarig: ${item.owner}`,
-              bullet: { level: 1 },
-              spacing: { after: 50 },
-            })] : []),
-            ...(item.deadline && item.deadline.trim() !== '' ? [new Paragraph({
-              text: `Deadline: ${item.deadline}`,
-              bullet: { level: 1 },
-              spacing: { after: 100 },
-            })] : []),
-          ]),
-        ],
+        children: documentChildren,
       }],
     });
 
