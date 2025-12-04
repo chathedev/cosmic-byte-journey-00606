@@ -31,6 +31,12 @@ const hasAsrAccess = (plan: string | undefined): boolean => {
   return ['enterprise', 'plus', 'unlimited'].includes(plan.toLowerCase());
 };
 
+// Check if user has library access (pro and above)
+const hasLibraryAccess = (plan: string | undefined): boolean => {
+  if (!plan) return false;
+  return ['pro', 'enterprise', 'plus', 'unlimited'].includes(plan.toLowerCase());
+};
+
 export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = false, selectedLanguage: initialLanguage = 'sv-SE' }: RecordingViewNewProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -533,58 +539,93 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       console.log(`✅ Meeting ${isContinuedMeeting ? 'updated' : 'created'} with ID:`, meetingId);
       
       const meeting = { ...meetingData, id: meetingId };
-      sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
       
-      if (!hasIncrementedCountRef.current) {
-        const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
-        if (wasCounted) {
-          await incrementMeetingCount(meetingId);
-          await refreshPlan();
+      // Determine user flow based on plan
+      const canAccessLibrary = hasLibraryAccess(userPlan?.plan);
+      
+      if (canAccessLibrary) {
+        // Pro/Enterprise/Plus/Unlimited - redirect to library
+        sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
+        
+        if (!hasIncrementedCountRef.current) {
+          const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
+          if (wasCounted) {
+            await incrementMeetingCount(meetingId);
+            await refreshPlan();
+          }
+          hasIncrementedCountRef.current = true;
         }
-        hasIncrementedCountRef.current = true;
-      }
 
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      
-      toast({
-        title: 'Möte sparat',
-        description: useAsrMode ? 'Transkribering pågår i bakgrunden.' : 'Transkribering klar!',
-      });
-      
-      navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
-
-      // Only use ASR for enterprise/plus/unlimited plans
-      if (useAsrMode) {
-        transcribeAndSave(blob, meetingId, {
-          language: 'sv',
-          meetingTitle: meetingName,
-          onProgress: (stage, percent) => {
-            console.log(`🎤 ASR: ${stage} ${percent}%`);
-          },
-          onTranscriptReady: (transcript) => {
-            let cleanTranscript = transcript;
-            try {
-              const parsed = JSON.parse(transcript);
-              if (parsed.text) cleanTranscript = parsed.text;
-            } catch { /* not JSON */ }
-            
-            window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-              detail: { meetingId, transcript: cleanTranscript } 
-            }));
-          }
-        }).then(result => {
-          if (!result.success) {
-            console.error('❌ Client ASR failed:', result.error);
-          }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        
+        toast({
+          title: 'Möte sparat',
+          description: useAsrMode ? 'Transkribering pågår i bakgrunden.' : 'Transkribering klar!',
         });
+        
+        navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
+
+        // Only use ASR for enterprise/plus/unlimited plans
+        if (useAsrMode) {
+          transcribeAndSave(blob, meetingId, {
+            language: 'sv',
+            meetingTitle: meetingName,
+            onProgress: (stage, percent) => {
+              console.log(`🎤 ASR: ${stage} ${percent}%`);
+            },
+            onTranscriptReady: (transcript) => {
+              let cleanTranscript = transcript;
+              try {
+                const parsed = JSON.parse(transcript);
+                if (parsed.text) cleanTranscript = parsed.text;
+              } catch { /* not JSON */ }
+              
+              window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+                detail: { meetingId, transcript: cleanTranscript } 
+              }));
+            }
+          }).then(result => {
+            if (!result.success) {
+              console.error('❌ Client ASR failed:', result.error);
+            }
+          });
+        } else {
+          // For browser mode (Pro), dispatch completion event immediately
+          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+            detail: { meetingId, transcript: finalTranscript } 
+          }));
+        }
       } else {
-        // For browser mode, dispatch completion event immediately
-        window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-          detail: { meetingId, transcript: finalTranscript } 
-        }));
+        // Free plan - show protocol page directly, secretly save in background
+        console.log('📋 Free user: Redirecting to protocol page');
+        
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        
+        // Count meeting silently
+        if (!hasIncrementedCountRef.current) {
+          const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
+          if (wasCounted) {
+            await incrementMeetingCount(meetingId);
+            await refreshPlan();
+          }
+          hasIncrementedCountRef.current = true;
+        }
+        
+        // Navigate to protocol page with transcript (don't mention saving)
+        navigate('/protocol', { 
+          state: { 
+            transcript: finalTranscript, 
+            aiProtocol: null,
+            meetingId // Pass meetingId so protocol page knows it's saved
+          },
+          replace: true 
+        });
       }
       
     } catch (error: any) {
