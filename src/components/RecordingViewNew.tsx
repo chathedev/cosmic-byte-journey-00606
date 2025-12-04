@@ -245,13 +245,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       console.log('📤 Test mode: Saving and redirecting...');
       
-      // Generate a proper UUID for the meeting
-      const testMeetingId = crypto.randomUUID();
-      
       // Save meeting to library first (with processing status)
+      // Let backend generate the ID by not providing one
       const now = new Date().toISOString();
-      const meeting = {
-        id: testMeetingId,
+      const meetingData = {
         title: 'Testmöte',
         folder: selectedFolder,
         transcript: '', // Empty - will be filled by backend
@@ -259,12 +256,16 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         createdAt: now,
         updatedAt: now,
         userId: user?.uid || '',
-        isCompleted: false,
+        isCompleted: true, // Mark as completed so it gets created
         source: 'live' as const,
         transcriptionStatus: 'processing' as const,
       };
 
-      await meetingStorage.saveMeeting(meeting as any);
+      const testMeetingId = await meetingStorage.saveMeeting(meetingData as any);
+      console.log('✅ Test meeting created with ID:', testMeetingId);
+      
+      // Create the full meeting object for sessionStorage
+      const meeting = { ...meetingData, id: testMeetingId };
       
       // Store pending meeting in sessionStorage for instant display
       sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
@@ -278,7 +279,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       navigate('/library', { state: { fromRecording: true } });
       
       // Upload audio in background (fire and forget)
-      apiClient.uploadForTranscription(audioBlob, testMeetingId, {
+      apiClient.uploadForTranscription(audioBlob, meeting.id, {
         meetingTitle: 'Testmöte',
         language: 'sv',
       }).then(result => {
@@ -362,13 +363,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         return;
       }
 
-      // Generate a proper UUID for the meeting
-      const meetingId = crypto.randomUUID();
-      
       // Save meeting to library first (with processing status)
+      // Let backend generate the ID by not providing one
       const now = new Date().toISOString();
-      const meeting = {
-        id: meetingId,
+      const meetingData = {
         title: meetingName,
         folder: selectedFolder,
         transcript: '', // Empty - will be filled by backend
@@ -376,13 +374,16 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         createdAt: createdAtRef.current,
         updatedAt: now,
         userId: user.uid,
-        isCompleted: false,
+        isCompleted: true, // Mark as completed so it gets created
         source: 'live' as const,
         transcriptionStatus: 'processing' as const,
       };
 
-      await meetingStorage.saveMeeting(meeting as any);
-      console.log('✅ Meeting saved to library:', meetingId);
+      const meetingId = await meetingStorage.saveMeeting(meetingData as any);
+      console.log('✅ Meeting created with ID:', meetingId);
+      
+      // Create the full meeting object for sessionStorage
+      const meeting = { ...meetingData, id: meetingId };
       
       // Store pending meeting in sessionStorage for instant display
       sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
