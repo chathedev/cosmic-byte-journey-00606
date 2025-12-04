@@ -21,6 +21,7 @@ export interface ASROptions {
 
 /**
  * Step 1: Send audio to ASR service and get transcript back
+ * Endpoint: https://asr.api.tivly.se/transcribe
  */
 export async function transcribeDirectly(
   audioBlob: Blob,
@@ -29,11 +30,10 @@ export async function transcribeDirectly(
   const { language = 'sv', onProgress } = options;
   
   const fileSizeMB = audioBlob.size / 1024 / 1024;
-  console.log('🎤 Direct ASR: Starting transcription', {
+  console.log('🎤 ASR Step 1: Sending audio to asr.api.tivly.se', {
     fileSize: `${fileSizeMB.toFixed(2)}MB`,
     fileType: audioBlob.type,
-    language,
-    endpoint: ASR_ENDPOINT
+    language
   });
 
   // Validate file size (250MB limit)
@@ -55,8 +55,6 @@ export async function transcribeDirectly(
     
     const startTime = Date.now();
     
-    console.log('📤 Sending audio to ASR service:', ASR_ENDPOINT);
-    
     const response = await fetch(ASR_ENDPOINT, {
       method: 'POST',
       body: formData,
@@ -66,7 +64,7 @@ export async function transcribeDirectly(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Direct ASR failed:', {
+      console.error('❌ ASR service error:', {
         status: response.status,
         error: errorText
       });
@@ -92,7 +90,7 @@ export async function transcribeDirectly(
       };
     }
     
-    console.log('✅ Direct ASR complete:', {
+    console.log('✅ ASR Step 1 complete: Got transcript', {
       transcriptLength: transcript.length,
       processingTime: `${processingTime}ms`,
       duration: data.audio_duration || data.duration
@@ -105,7 +103,7 @@ export async function transcribeDirectly(
       processing_time: processingTime
     };
   } catch (error: any) {
-    console.error('❌ Direct ASR error:', error);
+    console.error('❌ ASR network error:', error);
     return {
       success: false,
       error: error.message || 'Network error during transcription'
@@ -114,7 +112,8 @@ export async function transcribeDirectly(
 }
 
 /**
- * Step 2: Save transcript to backend
+ * Step 2: Save transcript to backend via PUT /meetings/:id
+ * This updates the meeting with the transcript
  */
 export async function saveTranscriptToBackend(
   meetingId: string,
@@ -128,35 +127,35 @@ export async function saveTranscriptToBackend(
 ): Promise<ASRResult> {
   const token = localStorage.getItem('authToken');
   if (!token) {
+    console.error('❌ No auth token for saving transcript');
     return { success: false, error: 'Authentication required' };
   }
 
-  console.log('📝 Saving transcript to backend:', {
+  console.log('📝 ASR Step 2: Saving transcript to api.tivly.se', {
     meetingId,
-    transcriptLength: transcript.length,
-    endpoint: `${BACKEND_API_URL}/meetings/transcript`
+    transcriptLength: transcript.length
   });
 
   try {
-    const response = await fetch(`${BACKEND_API_URL}/meetings/transcript`, {
-      method: 'POST',
+    // Update the meeting with the transcript
+    const response = await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
+      method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        meetingId,
         transcript,
+        transcriptionStatus: 'done',
         duration: options?.duration,
         processing_time: options?.processing_time,
         language: options?.language || 'sv',
-        meetingTitle: options?.meetingTitle,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Save transcript failed:', response.status, errorText);
+      console.error('❌ Backend save error:', response.status, errorText);
       return {
         success: false,
         error: `Save failed: ${response.status}`
@@ -164,7 +163,7 @@ export async function saveTranscriptToBackend(
     }
 
     const data = await response.json();
-    console.log('✅ Transcript saved to backend:', data);
+    console.log('✅ ASR Step 2 complete: Transcript saved to backend');
 
     return {
       success: true,
@@ -175,7 +174,7 @@ export async function saveTranscriptToBackend(
       processing_time: data.processing_time
     };
   } catch (error: any) {
-    console.error('❌ Save transcript error:', error);
+    console.error('❌ Backend save network error:', error);
     return {
       success: false,
       error: error.message || 'Network error during save'
@@ -188,6 +187,10 @@ export const persistTranscript = saveTranscriptToBackend;
 
 /**
  * Complete flow: Transcribe audio via ASR, then save to backend
+ * 
+ * Flow:
+ * 1. Send audio to asr.api.tivly.se/transcribe → get transcript
+ * 2. Save transcript to api.tivly.se/meetings/:id → update meeting
  */
 export async function transcribeAndSave(
   audioBlob: Blob,
@@ -199,19 +202,21 @@ export async function transcribeAndSave(
 ): Promise<ASRResult> {
   const { onTranscriptReady, meetingTitle, ...asrOptions } = options;
   
-  console.log('🚀 Starting transcription flow for meeting:', meetingId);
-  console.log('  Step 1: Send audio to ASR service (asr.api.tivly.se)');
-  console.log('  Step 2: Save transcript to backend (api.tivly.se)');
+  console.log('🚀 ========== TRANSCRIPTION FLOW START ==========');
+  console.log('📋 Meeting ID:', meetingId);
+  console.log('🎯 Step 1: ASR at asr.api.tivly.se');
+  console.log('🎯 Step 2: Save at api.tivly.se');
   
   // Step 1: Transcribe via ASR service
   const asrResult = await transcribeDirectly(audioBlob, asrOptions);
   
   if (!asrResult.success || !asrResult.transcript) {
-    console.error('❌ Step 1 failed: ASR transcription failed for meeting:', meetingId);
+    console.error('❌ FLOW FAILED at Step 1: ASR transcription failed');
     return asrResult;
   }
   
-  console.log('✅ Step 1 complete: Got transcript from ASR service');
+  console.log('✅ Step 1 SUCCESS: Got transcript from ASR');
+  console.log('📝 Transcript preview:', asrResult.transcript.substring(0, 100) + '...');
   
   // Notify that transcript is ready (for UI updates)
   onTranscriptReady?.(asrResult.transcript);
@@ -225,9 +230,10 @@ export async function transcribeAndSave(
   });
   
   if (saveResult.success) {
-    console.log('✅ Step 2 complete: Transcript saved to backend');
+    console.log('✅ Step 2 SUCCESS: Transcript saved to backend');
+    console.log('🚀 ========== TRANSCRIPTION FLOW COMPLETE ==========');
   } else {
-    console.error('❌ Step 2 failed: Could not save transcript:', saveResult.error);
+    console.error('❌ FLOW FAILED at Step 2: Could not save transcript:', saveResult.error);
   }
   
   return {
