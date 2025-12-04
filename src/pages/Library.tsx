@@ -91,11 +91,17 @@ const Library = () => {
 
   // Poll for processing meetings every 1 second
   useEffect(() => {
-    const processingMeetings = meetings.filter(m => m.transcriptionStatus === 'processing');
+    // Check for meetings that are still processing (no transcript or explicitly processing)
+    const processingMeetings = meetings.filter(m => 
+      m.transcriptionStatus === 'processing' || 
+      (!m.transcript || m.transcript.trim().length === 0)
+    );
     const pendingId = pendingMeetingIdRef.current;
     
-    // Always poll if we have a pending meeting ID (even if not in meetings array yet)
+    // Always poll if we have a pending meeting ID or processing meetings
     if (processingMeetings.length === 0 && !pendingId) return;
+
+    console.log('📊 Polling for', processingMeetings.length, 'processing meetings, pendingId:', pendingId);
 
     const pollInterval = setInterval(async () => {
       try {
@@ -112,8 +118,11 @@ const Library = () => {
         // If we're tracking a pending meeting, keep it visible until backend has complete data
         if (pendingId) {
           const loadedVersion = map.get(pendingId);
-          if (loadedVersion && loadedVersion.transcriptionStatus !== 'processing' && loadedVersion.transcript) {
+          const hasTranscript = loadedVersion?.transcript && loadedVersion.transcript.trim().length > 0;
+          
+          if (loadedVersion && hasTranscript) {
             // Transcription complete - stop tracking
+            console.log('✅ Transcription complete for:', pendingId);
             pendingMeetingIdRef.current = null;
           } else if (!loadedVersion) {
             // Backend doesn't have it yet - preserve the pending meeting from current state
@@ -131,13 +140,14 @@ const Library = () => {
         // Check if any processing meetings are now done
         const nowDone = processingMeetings.filter(pm => {
           const updated = deduped.find(m => m.id === pm.id);
-          return updated && updated.transcriptionStatus !== 'processing' && updated.transcript;
+          return updated && updated.transcript && updated.transcript.trim().length > 0;
         });
 
         // Update meetings
         setMeetings(deduped);
         
         if (nowDone.length > 0) {
+          console.log('🎉 Transcription complete for', nowDone.length, 'meetings');
           toast({
             title: 'Transkribering klar',
             description: `${nowDone.length} möte${nowDone.length > 1 ? 'n' : ''} är klart.`,
