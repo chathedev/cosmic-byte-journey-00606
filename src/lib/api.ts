@@ -32,7 +32,14 @@ interface User {
 }
 
 interface TranscribeResponse {
-  text: string;
+  success: boolean;
+  transcript?: string;
+  text?: string; // Legacy field
+  path?: string;
+  jsonPath?: string;
+  duration?: number;
+  processing_time?: number;
+  error?: string;
   processedAt?: string;
   fileSizeMB?: string;
 }
@@ -1501,27 +1508,48 @@ class ApiClient {
     return response.json();
   }
 
-  // Transcription API
-  async transcribeAudio(audioFile: File, language: string = 'sv', modelSize: string = 'base'): Promise<string> {
+  // Transcription API - Enhanced with meetingId support and retry
+  async transcribeAudio(
+    audioFile: File | Blob, 
+    language: string = 'sv', 
+    options?: { 
+      meetingId?: string;
+      onProgress?: (progress: number) => void;
+    }
+  ): Promise<TranscribeResponse> {
     const token = this.getToken();
     if (!token) {
       throw new Error('Authentication required');
     }
 
+    const fileSizeMB = ((audioFile as File).size || (audioFile as Blob).size) / 1024 / 1024;
+    const fileName = (audioFile as File).name || 'audio.wav';
+
     console.log('🎤 Transcribing audio:', {
-      fileName: audioFile.name,
-      fileSize: `${(audioFile.size / 1024 / 1024).toFixed(2)}MB`,
+      fileName,
+      fileSize: `${fileSizeMB.toFixed(2)}MB`,
       fileType: audioFile.type,
       language,
-      modelSize
+      meetingId: options?.meetingId
     });
 
+    // Validate file size (250MB limit)
+    if (fileSizeMB > 250) {
+      throw new Error('File size exceeds 250MB limit');
+    }
+
     const formData = new FormData();
-    formData.append('audioFile', audioFile);
+    formData.append('audioFile', audioFile, fileName);
+    formData.append('file', audioFile, fileName); // Alternative field name
     formData.append('language', language);
-    formData.append('modelSize', modelSize);
+    if (options?.meetingId) {
+      formData.append('meetingId', options.meetingId);
+    }
 
     try {
+      // Report initial progress
+      options?.onProgress?.(10);
+
       const response = await fetch(`${API_BASE_URL}/transcribe`, {
         method: 'POST',
         credentials: 'include',
@@ -1530,6 +1558,9 @@ class ApiClient {
         },
         body: formData,
       });
+
+      // Report upload complete
+      options?.onProgress?.(50);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1546,21 +1577,54 @@ class ApiClient {
           errorData = { error: errorText || 'Failed to transcribe audio' };
         }
 
-        // Throw specific error messages
-        const errorMessage = errorData.error || errorData.message || 'transcription_failed';
-        throw new Error(errorMessage);
+        // Return failure response for retry handling
+        return {
+          success: false,
+          error: errorData.error || errorData.message || 'transcription_failed'
+        };
       }
 
       const data: TranscribeResponse = await response.json();
+      
+      // Report complete
+      options?.onProgress?.(100);
+
+      // Normalize response - handle both new and legacy formats
+      const transcript = data.transcript || data.text || '';
+      
       console.log('✅ Transcription successful:', {
-        textLength: data.text.length,
-        processedAt: data.processedAt
+        textLength: transcript.length,
+        path: data.path,
+        jsonPath: data.jsonPath,
+        duration: data.duration,
+        processing_time: data.processing_time
       });
-      return data.text;
+
+      return {
+        success: data.success !== false,
+        transcript,
+        text: transcript, // Legacy compatibility
+        path: data.path,
+        jsonPath: data.jsonPath,
+        duration: data.duration,
+        processing_time: data.processing_time
+      };
     } catch (error: any) {
       console.error('❌ Transcription error:', error);
-      throw error;
+      return {
+        success: false,
+        error: error.message || 'Network error during transcription'
+      };
     }
+  }
+
+  // Legacy wrapper for backward compatibility
+  async transcribeAudioSimple(audioFile: File, language: string = 'sv'): Promise<string> {
+    const result = await this.transcribeAudio(audioFile, language);
+    if (!result.success) {
+      throw new Error(result.error || 'Transcription failed');
+    }
+    return result.transcript || result.text || '';
   }
 }
 
