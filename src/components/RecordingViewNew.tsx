@@ -111,6 +111,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         setSessionId(continuedMeeting.id);
         setSelectedFolder(continuedMeeting.folder);
         hasIncrementedCountRef.current = true;
+        // Start recording for continued meeting too
+        startRecording();
         return;
       }
 
@@ -379,25 +381,35 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         return;
       }
 
+      // Check if this is a continued meeting (has existing ID, not temp)
+      const isContinuedMeeting = continuedMeeting && sessionId && !sessionId.startsWith('temp-');
+      
       // Save meeting to library first (with processing status)
-      // Let backend generate the ID by not providing one
       const now = new Date().toISOString();
       const meetingData = {
+        ...(isContinuedMeeting ? { id: sessionId } : {}), // Use existing ID for continued meetings
         title: meetingName,
         folder: selectedFolder,
-        transcript: '', // Empty - will be filled by backend
-        protocol: '',
+        transcript: '', // Empty - will be filled by backend (will append for continued)
+        protocol: continuedMeeting?.protocol || '',
         createdAt: createdAtRef.current,
         updatedAt: now,
         userId: user.uid,
         isCompleted: true,
         source: 'live' as const,
         transcriptionStatus: 'processing' as const,
-        forceCreate: true, // CRITICAL: Force CREATE, never UPDATE
+        forceCreate: !isContinuedMeeting, // Only force create for new meetings
       };
 
-      const meetingId = await meetingStorage.saveMeeting(meetingData as any);
-      console.log('✅ Meeting created with ID:', meetingId);
+      const meetingId = isContinuedMeeting 
+        ? sessionId 
+        : await meetingStorage.saveMeeting(meetingData as any);
+      
+      // For continued meetings, update the existing meeting
+      if (isContinuedMeeting) {
+        await meetingStorage.saveMeeting({ ...meetingData, id: meetingId } as any);
+      }
+      console.log(`✅ Meeting ${isContinuedMeeting ? 'updated' : 'created'} with ID:`, meetingId);
       
       // Create the full meeting object for sessionStorage
       const meeting = { ...meetingData, id: meetingId };
