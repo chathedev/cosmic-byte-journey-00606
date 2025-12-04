@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Construction } from 'lucide-react';
 import { apiClient, MaintenanceStatus } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -7,26 +7,45 @@ export const MaintenanceOverlay = () => {
   const { isAdmin } = useSubscription();
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initialLoadDone = useRef(false);
 
-  const checkMaintenance = async () => {
+  const checkMaintenance = useCallback(async (skipIfLoaded = false) => {
+    // Don't update state if we already have data and this is a background refresh
+    if (skipIfLoaded && initialLoadDone.current) {
+      try {
+        const result = await apiClient.getMaintenanceStatus();
+        if (result.success) {
+          setMaintenance(result.maintenance);
+        }
+      } catch (error) {
+        // Silently ignore background refresh errors
+      }
+      return;
+    }
+
     try {
       const result = await apiClient.getMaintenanceStatus();
       if (result.success) {
         setMaintenance(result.maintenance);
+        initialLoadDone.current = true;
       }
     } catch (error) {
       console.error('Failed to check maintenance status:', error);
-      setMaintenance(null);
+      // Don't reset maintenance state on error - keep last known state
+      if (!initialLoadDone.current) {
+        setMaintenance(null);
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    checkMaintenance();
-    const interval = setInterval(checkMaintenance, 30000);
+    checkMaintenance(false);
+    // Background refresh - won't cause UI flicker
+    const interval = setInterval(() => checkMaintenance(true), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [checkMaintenance]);
 
   if (isLoading) return null;
   if (!maintenance?.enabled) return null;
