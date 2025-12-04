@@ -43,6 +43,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [showInstructions, setShowInstructions] = useState(false);
   const [folders, setFolders] = useState<string[]>([]);
   const [isTestMode, setIsTestMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Test access for admins and specific user
   const allowedTestEmail = 'charlie.wretling@icloud.com';
@@ -230,6 +231,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     
     isSavingRef.current = true;
     setIsTestMode(true);
+    setIsSaving(true);
     setIsRecording(false);
     
     try {
@@ -290,6 +292,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     } catch (error: any) {
       console.error('❌ Test mode error:', error?.message || error);
       isSavingRef.current = false;
+      setIsSaving(false);
       toast({
         title: 'Testläge misslyckades',
         description: error?.message || 'Kunde inte starta testläge',
@@ -302,7 +305,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
   // Library-first flow: save meeting, redirect instantly, upload in background
   const handleStopRecording = async () => {
-    if (isTestMode) return;
+    if (isTestMode || isSaving) return;
 
     if (durationSec < 5) {
       toast({
@@ -313,6 +316,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       return;
     }
 
+    setIsSaving(true);
     setIsRecording(false);
     await releaseWakeLock();
 
@@ -354,6 +358,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           variant: 'destructive',
         });
         isSavingRef.current = false;
+        setIsSaving(false);
         setViewState('recording');
         startRecording();
         return;
@@ -427,6 +432,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     } catch (error: any) {
       console.error('❌ Save error:', error);
       isSavingRef.current = false;
+      setIsSaving(false);
       toast({
         title: 'Fel vid sparning',
         description: error.message || 'Kunde inte spara mötet',
@@ -443,6 +449,19 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     stopMediaRecorder();
     onBack();
   };
+
+  // Loading overlay while saving
+  if (isSaving) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <h2 className="text-lg font-medium">Sparar möte...</h2>
+          <p className="text-sm text-muted-foreground">Omdirigerar till biblioteket</p>
+        </div>
+      </div>
+    );
+  }
 
   // Recording View
   if (viewState === 'recording') {
