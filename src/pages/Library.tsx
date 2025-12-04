@@ -179,6 +179,26 @@ const Library = () => {
     return () => clearInterval(pollInterval);
   }, [user]);
 
+  // Listen for direct ASR completion event (much faster than polling!)
+  useEffect(() => {
+    const handleTranscriptionComplete = (event: CustomEvent) => {
+      const { meetingId } = event.detail || {};
+      console.log('🚀 Direct ASR complete event received for:', meetingId);
+      
+      // Clear pending state
+      pendingMeetingIdRef.current = null;
+      sessionStorage.removeItem('pendingMeeting');
+      
+      // Immediate hard page refresh
+      window.location.reload();
+    };
+
+    window.addEventListener('transcriptionComplete', handleTranscriptionComplete as EventListener);
+    return () => {
+      window.removeEventListener('transcriptionComplete', handleTranscriptionComplete as EventListener);
+    };
+  }, []);
+
   // Don't redirect - allow viewing library but show upgrade prompts for actions
 
   const loadData = async () => {

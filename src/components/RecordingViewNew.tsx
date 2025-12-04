@@ -14,6 +14,7 @@ import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
 import { apiClient } from "@/lib/api";
+import { transcribeAndSave } from "@/lib/asrService";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -279,14 +280,24 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       navigate('/library', { state: { fromRecording: true } });
       
-      // Upload audio in background (fire and forget)
-      apiClient.uploadForTranscription(audioBlob, meeting.id, {
-        meetingTitle: 'Testmöte',
+      // Direct ASR in background (no backend proxy - much faster!)
+      transcribeAndSave(audioBlob, testMeetingId, {
         language: 'sv',
+        apiClient,
+        onProgress: (stage, percent) => {
+          console.log(`🎤 Test ASR: ${stage} ${percent}%`);
+        },
+        onTranscriptReady: (transcript) => {
+          console.log('✅ Test transcript ready, length:', transcript.length);
+          // Dispatch event to trigger library refresh
+          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+            detail: { meetingId: testMeetingId } 
+          }));
+        }
       }).then(result => {
-        console.log('✅ Test upload result:', result.success);
-      }).catch(err => {
-        console.error('❌ Test upload error:', err);
+        if (!result.success) {
+          console.error('❌ Test ASR failed:', result.error);
+        }
       });
       
     } catch (error: any) {
@@ -414,18 +425,24 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       navigate('/library', { state: { fromRecording: true } });
 
-      // Upload audio in background (fire and forget)
-      apiClient.uploadForTranscription(blob, meetingId, {
-        meetingTitle: meetingName,
+      // Direct ASR in background (no backend proxy - much faster!)
+      transcribeAndSave(blob, meetingId, {
         language: 'sv',
+        apiClient,
+        onProgress: (stage, percent) => {
+          console.log(`🎤 ASR: ${stage} ${percent}%`);
+        },
+        onTranscriptReady: (transcript) => {
+          console.log('✅ Transcript ready, length:', transcript.length);
+          // Dispatch event to trigger library refresh
+          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+            detail: { meetingId } 
+          }));
+        }
       }).then(result => {
         if (!result.success) {
-          console.error('❌ Background upload failed:', result.error);
-        } else {
-          console.log('✅ Background upload completed');
+          console.error('❌ Direct ASR failed:', result.error);
         }
-      }).catch(err => {
-        console.error('❌ Background upload error:', err);
       });
       
     } catch (error: any) {
