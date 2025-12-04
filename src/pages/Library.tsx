@@ -629,7 +629,10 @@ const Library = () => {
           <div className="grid gap-4">
             <AnimatePresence mode="popLayout">
             {filteredMeetings.map((meeting, index) => {
-              const isProcessing = meeting.transcriptionStatus === 'processing';
+              // Consider processing if explicitly marked OR if transcript is empty/missing
+              const isProcessing = meeting.transcriptionStatus === 'processing' || 
+                (!meeting.transcript || meeting.transcript.trim().length === 0);
+              const hasTranscript = meeting.transcript && meeting.transcript.trim().length > 0;
               return (
               <motion.div
                 key={meeting.id}
@@ -662,10 +665,9 @@ const Library = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          {isProcessing ? (
+                        {isProcessing && !hasTranscript ? (
                             <div className="flex items-center gap-2">
-                              <div className="h-6 w-32 bg-gradient-to-r from-muted via-muted/50 to-muted animate-pulse rounded" />
-                              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              <CardTitle className="text-lg text-muted-foreground">{meeting.title || 'Nytt möte'}</CardTitle>
                             </div>
                           ) : (
                             <>
@@ -709,7 +711,7 @@ const Library = () => {
                             </Badge>
                           </>
                         )}
-                        {isProcessing && (
+                        {isProcessing && !hasTranscript && (
                           <>
                             <span className="text-muted-foreground">•</span>
                             <Badge variant="outline" className="flex items-center gap-1 text-xs bg-primary/10 border-primary/30">
@@ -732,23 +734,17 @@ const Library = () => {
                 </CardHeader>
                 <CardContent>
                   <AnimatePresence mode="wait">
-                    {isProcessing ? (
+                    {isProcessing && !hasTranscript ? (
                       <motion.div
                         key="processing"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="mb-4 space-y-2"
+                        className="mb-4"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                          </div>
-                          <span className="text-sm text-muted-foreground">Analyserar ljudet...</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="h-3 w-full bg-gradient-to-r from-muted via-muted/50 to-muted animate-pulse rounded" />
-                          <div className="h-3 w-3/4 bg-gradient-to-r from-muted via-muted/50 to-muted animate-pulse rounded" />
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                          <span className="text-sm text-muted-foreground">Transkribering pågår...</span>
                         </div>
                       </motion.div>
                     ) : meeting.transcriptionStatus === 'failed' ? (
@@ -770,12 +766,7 @@ const Library = () => {
                         exit={{ opacity: 0 }}
                         className="text-sm text-muted-foreground line-clamp-2 mb-4"
                       >
-                        {meeting.transcript || (
-                          <span className="flex items-center gap-2">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Väntar på transkription...
-                          </span>
-                        )}
+                        {meeting.transcript}
                       </motion.p>
                     )}
                   </AnimatePresence>
@@ -889,8 +880,8 @@ const Library = () => {
                       onClick={() => handleContinueMeeting(meeting)}
                       size="sm"
                       variant="default"
-                      disabled={userPlan?.plan === 'free' || meeting.transcriptionStatus === 'processing'}
-                      title={userPlan?.plan === 'free' ? 'Endast för betalande användare' : meeting.transcriptionStatus === 'processing' ? 'Väntar på transkribering...' : undefined}
+                      disabled={userPlan?.plan === 'free' || (isProcessing && !hasTranscript)}
+                      title={userPlan?.plan === 'free' ? 'Endast för betalande användare' : (isProcessing && !hasTranscript) ? 'Väntar på transkribering...' : undefined}
                     >
                       <Play className="w-4 h-4 mr-1" />
                       Fortsätt möte
@@ -899,16 +890,16 @@ const Library = () => {
                       onClick={() => handleCreateProtocol(meeting)}
                       size="sm"
                       variant="outline"
-                      disabled={!!protocolStatus[meeting.id] || meeting.transcriptionStatus === 'processing' || !meeting.transcript}
+                      disabled={!!protocolStatus[meeting.id] || isProcessing || !hasTranscript}
                       title={
-                        meeting.transcriptionStatus === 'processing' ? 'Väntar på transkribering...' :
+                        isProcessing ? 'Väntar på transkribering...' :
                         protocolStatus[meeting.id] ? 'Protokoll redan sparat för detta möte' :
-                        !meeting.transcript ? 'Ingen transkription tillgänglig' :
+                        !hasTranscript ? 'Ingen transkription tillgänglig' :
                         undefined
                       }
                     >
                       <FileText className="w-4 h-4 mr-1" />
-                      {meeting.transcriptionStatus === 'processing' ? 'Analyserar...' : protocolStatus[meeting.id] ? 'Protokoll sparat' : (userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll')}
+                      {isProcessing && !hasTranscript ? 'Transkriberar...' : protocolStatus[meeting.id] ? 'Protokoll sparat' : (userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll')}
                     </Button>
                     {userPlan?.plan === 'plus' && (
                       <Button
