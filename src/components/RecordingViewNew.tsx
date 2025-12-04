@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, Loader2, ArrowLeft, AlertTriangle, Save, FileText, Mic } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, Clock, Loader2, ArrowLeft, AlertTriangle, Save, FileText, Mic, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -14,6 +14,7 @@ import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
+import { apiClient } from "@/lib/api";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -22,7 +23,7 @@ interface RecordingViewNewProps {
   selectedLanguage?: 'sv-SE' | 'en-US';
 }
 
-type ViewState = 'recording' | 'processing' | 'result';
+type ViewState = 'recording' | 'processing' | 'result' | 'error';
 
 export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = false, selectedLanguage: initialLanguage = 'sv-SE' }: RecordingViewNewProps) => {
   const navigate = useNavigate();
@@ -45,6 +46,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [showInstructions, setShowInstructions] = useState(false);
   const [folders, setFolders] = useState<string[]>([]);
   const [isTestMode, setIsTestMode] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [transcriptionProgress, setTranscriptionProgress] = useState(0);
+  const [pendingAudioBlob, setPendingAudioBlob] = useState<Blob | null>(null);
   
   // Test access for specific user
   const allowedTestEmail = 'charlie.wretling@icloud.com';
@@ -331,62 +335,66 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     });
   };
 
-  const uploadAndTranscribe = async () => {
+  const uploadAndTranscribe = async (audioBlob?: Blob) => {
     try {
       console.log('📤 Uploading audio for transcription...');
+      setTranscriptionError(null);
+      setTranscriptionProgress(0);
       
-      const audioBlob = new Blob(audioChunksRef.current, { 
+      const blob = audioBlob || new Blob(audioChunksRef.current, { 
         type: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' 
       });
       
-      console.log('Audio blob size:', audioBlob.size, 'bytes');
+      // Store blob for potential retry
+      setPendingAudioBlob(blob);
+      
+      console.log('Audio blob size:', blob.size, 'bytes');
 
-      if (audioBlob.size < 1000) {
+      if (blob.size < 1000) {
         throw new Error('Audio file too small');
       }
 
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.wav');
-
-      // Use the transcription API
-      const response = await fetch('http://transcribe.api.tivly.se/transcribe', {
-        method: 'POST',
-        body: formData,
+      // Use the enhanced transcription API with auth
+      const result = await apiClient.transcribeAudio(blob, 'sv', {
+        meetingId: sessionId,
+        onProgress: setTranscriptionProgress,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Transcription API error:', response.status, errorText);
-        throw new Error('Transcription failed');
-      }
-
-      const result = await response.json();
       console.log('✅ Transcription result:', result);
 
-      if (result.status === 'done' && result.text) {
-        setTranscript(result.text);
-        setViewState('result');
-        
-        // Auto-generate title
-        try {
-          const aiTitle = await generateMeetingTitle(result.text);
-          setMeetingName(aiTitle);
-        } catch (e) {
-          console.warn('Failed to generate title:', e);
-        }
-      } else {
+      if (!result.success) {
+        throw new Error(result.error || 'Transcription failed');
+      }
+
+      const transcriptText = result.transcript || result.text || '';
+      
+      if (!transcriptText.trim()) {
         throw new Error('No transcription text received');
       }
-    } catch (error) {
+
+      setTranscript(transcriptText);
+      setViewState('result');
+      setPendingAudioBlob(null);
+      
+      // Auto-generate title
+      try {
+        const aiTitle = await generateMeetingTitle(transcriptText);
+        setMeetingName(aiTitle);
+      } catch (e) {
+        console.warn('Failed to generate title:', e);
+      }
+
+      // Show processing time if available
+      if (result.processing_time) {
+        toast({
+          title: 'Transkribering klar',
+          description: `Bearbetad på ${result.processing_time.toFixed(1)}s`,
+        });
+      }
+    } catch (error: any) {
       console.error('❌ Transcription error:', error);
-      toast({
-        title: 'Transkribering misslyckades',
-        description: 'Kunde inte bearbeta ljudet. Försök igen.',
-        variant: 'destructive',
-      });
-      setViewState('recording');
-      // Restart recording
-      startRecording();
+      setTranscriptionError(error.message || 'Transcription failed');
+      setViewState('error');
     } finally {
       // Clean up stream
       if (streamRef.current) {
@@ -394,6 +402,24 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         streamRef.current = null;
       }
     }
+  };
+
+  const handleRetry = () => {
+    if (pendingAudioBlob) {
+      setViewState('processing');
+      uploadAndTranscribe(pendingAudioBlob);
+    } else {
+      // No blob to retry with, go back to recording
+      setViewState('recording');
+      startRecording();
+    }
+  };
+
+  const handleCancelTranscription = () => {
+    setPendingAudioBlob(null);
+    setTranscriptionError(null);
+    setViewState('recording');
+    startRecording();
   };
 
   const saveToLibrary = async () => {
@@ -672,7 +698,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   if (viewState === 'processing') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-        <div className="text-center space-y-6">
+        <div className="text-center space-y-6 max-w-sm">
           <div className="relative inline-flex">
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -683,6 +709,50 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
             <p className="text-muted-foreground">
               Bearbetar {Math.floor(durationSec / 60)} min {durationSec % 60} sek ljud
             </p>
+          </div>
+          {/* Progress bar */}
+          {transcriptionProgress > 0 && (
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${transcriptionProgress}%` }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Error View with Retry
+  if (viewState === 'error') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+        <div className="text-center space-y-6 max-w-sm">
+          <div className="relative inline-flex">
+            <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertTriangle className="w-10 h-10 text-destructive" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Transkribering misslyckades</h2>
+            <p className="text-muted-foreground text-sm">
+              {transcriptionError?.includes('asr_failed') 
+                ? 'Kunde inte tolka ljudet. Kontrollera att inspelningen innehåller tydligt tal.'
+                : transcriptionError?.includes('Network') 
+                ? 'Nätverksfel. Kontrollera din internetanslutning.'
+                : 'Kunde inte bearbeta ljudet. Försök igen.'}
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button onClick={handleRetry} className="w-full">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Försök igen
+            </Button>
+            <Button onClick={handleCancelTranscription} variant="outline" className="w-full">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Spela in igen
+            </Button>
           </div>
         </div>
       </div>

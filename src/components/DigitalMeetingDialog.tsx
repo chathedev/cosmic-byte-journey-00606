@@ -75,11 +75,23 @@ export const DigitalMeetingDialog = ({
       // Map language code to backend format
       const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
       
-      const transcript = await apiClient.transcribeAudio(selectedFile, languageCode);
+      const result = await apiClient.transcribeAudio(selectedFile, languageCode);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'transcription_failed');
+      }
+
+      const transcript = result.transcript || result.text || '';
+      
+      if (!transcript.trim()) {
+        throw new Error('no_speech_detected');
+      }
       
       toast({
         title: "Transkribering klar!",
-        description: "Ditt möte har transkriberats.",
+        description: result.processing_time 
+          ? `Transkriberat på ${result.processing_time.toFixed(1)}s` 
+          : "Ditt möte har transkriberats.",
       });
 
       onTranscriptReady(transcript);
@@ -94,15 +106,15 @@ export const DigitalMeetingDialog = ({
       if (error.message?.includes('no_speech_detected')) {
         errorMessage = "Inget tal kunde detekteras i ljudfilen.";
         errorDetails = "Kontrollera att filen innehåller tal och att rätt språk är valt.";
-      } else if (error.message?.includes('file_too_large')) {
+      } else if (error.message?.includes('file_too_large') || error.message?.includes('250MB')) {
         errorMessage = "Filen är för stor.";
-        errorDetails = "Maximal filstorlek är 500MB.";
+        errorDetails = "Maximal filstorlek är 250MB.";
       } else if (error.message?.includes('transcription_backend_missing')) {
         errorMessage = "Transkriptionstjänsten är inte tillgänglig just nu.";
         errorDetails = "Försök igen om en stund eller kontakta support.";
-      } else if (error.message?.includes('transcription_failed')) {
+      } else if (error.message?.includes('transcription_failed') || error.message?.includes('asr_failed')) {
         errorMessage = "Transkriberingen misslyckades.";
-        errorDetails = "Kontrollera att filen är ett giltigt ljudformat och innehåller tydligt tal. Om problemet kvarstår, kontakta support.";
+        errorDetails = "Kontrollera att filen är ett giltigt ljudformat och innehåller tydligt tal. Försök igen.";
       } else if (error.message?.includes('Authentication required')) {
         errorMessage = "Du måste vara inloggad.";
         errorDetails = "Ladda om sidan och logga in igen.";
