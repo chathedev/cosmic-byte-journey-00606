@@ -56,9 +56,16 @@ const Library = () => {
 
   useEffect(() => {
     loadData();
+    
+    // Quick re-poll after 1 second to catch recently saved meetings
+    const quickPoll = setTimeout(() => {
+      loadData();
+    }, 1000);
+    
+    return () => clearTimeout(quickPoll);
   }, [user]);
 
-  // Poll for processing meetings
+  // Poll for processing meetings every 2 seconds
   useEffect(() => {
     const processingMeetings = meetings.filter(m => m.transcriptionStatus === 'processing');
     if (processingMeetings.length === 0) return;
@@ -77,25 +84,24 @@ const Library = () => {
         const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
         
         // Check if any processing meetings are now done
-        const stillProcessing = deduped.filter(m => m.transcriptionStatus === 'processing');
         const nowDone = processingMeetings.filter(pm => {
           const updated = deduped.find(m => m.id === pm.id);
           return updated && updated.transcriptionStatus !== 'processing' && updated.transcript;
         });
 
-        if (nowDone.length > 0 || stillProcessing.length !== processingMeetings.length) {
-          setMeetings(deduped);
-          if (nowDone.length > 0) {
-            toast({
-              title: 'Transkribering klar',
-              description: `${nowDone.length} möte${nowDone.length > 1 ? 'n' : ''} är klart.`,
-            });
-          }
+        // Always update meetings to show latest state
+        setMeetings(deduped);
+        
+        if (nowDone.length > 0) {
+          toast({
+            title: 'Transkribering klar',
+            description: `${nowDone.length} möte${nowDone.length > 1 ? 'n' : ''} är klart.`,
+          });
         }
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 5000); // Poll every 5 seconds
+    }, 2000); // Poll every 2 seconds
 
     return () => clearInterval(pollInterval);
   }, [meetings, user]);
@@ -622,13 +628,29 @@ const Library = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                    {meeting.transcriptionStatus === 'processing' 
-                      ? '⏳ Transkribering pågår...'
-                      : meeting.transcriptionStatus === 'failed'
-                      ? '❌ Transkribering misslyckades'
-                      : (meeting.transcript || "Ingen transkription ännu...")}
-                  </p>
+                  {meeting.transcriptionStatus === 'processing' ? (
+                    <div className="flex items-center gap-3 mb-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                      <div className="relative">
+                        <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-primary">Transkribering pågår...</p>
+                        <p className="text-xs text-muted-foreground">Vänta medan vi analyserar ditt möte</p>
+                      </div>
+                    </div>
+                  ) : meeting.transcriptionStatus === 'failed' ? (
+                    <div className="flex items-center gap-3 mb-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                      <span className="text-destructive text-lg">✕</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-destructive">Transkribering misslyckades</p>
+                        <p className="text-xs text-muted-foreground">Försök spela in mötet igen</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                      {meeting.transcript || "Ingen transkription ännu..."}
+                    </p>
+                  )}
                   
                   {/* Protocol Status Badge */}
                   {protocolStatus[meeting.id] && (
