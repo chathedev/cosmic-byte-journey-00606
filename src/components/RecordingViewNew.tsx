@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
-import { apiClient } from "@/lib/api";
 import { transcribeAndSave } from "@/lib/asrService";
 
 interface RecordingViewNewProps {
@@ -278,18 +277,17 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         description: 'Transkribering pågår i bakgrunden.',
       });
       
-      navigate('/library', { state: { fromRecording: true } });
+      navigate(`/library/${testMeetingId}`, { state: { fromRecording: true } });
       
-      // Direct ASR in background (no backend proxy - much faster!)
+      // Client ASR + POST /transcribe per spec
       transcribeAndSave(audioBlob, testMeetingId, {
         language: 'sv',
-        apiClient,
+        meetingTitle: 'Testmöte',
         onProgress: (stage, percent) => {
           console.log(`🎤 Test ASR: ${stage} ${percent}%`);
         },
         onTranscriptReady: (transcript) => {
           console.log('✅ Test transcript ready, length:', transcript.length);
-          // Dispatch event to trigger library refresh
           window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
             detail: { meetingId: testMeetingId } 
           }));
@@ -423,25 +421,24 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         description: 'Transkribering pågår i bakgrunden.',
       });
       
-      navigate('/library', { state: { fromRecording: true } });
+      navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
 
-      // Direct ASR in background (no backend proxy - much faster!)
+      // Client ASR + POST /transcribe per spec
       transcribeAndSave(blob, meetingId, {
         language: 'sv',
-        apiClient,
+        meetingTitle: meetingName,
         onProgress: (stage, percent) => {
           console.log(`🎤 ASR: ${stage} ${percent}%`);
         },
         onTranscriptReady: (transcript) => {
           console.log('✅ Transcript ready, length:', transcript.length);
-          // Dispatch event to trigger library refresh
           window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
             detail: { meetingId } 
           }));
         }
       }).then(result => {
         if (!result.success) {
-          console.error('❌ Direct ASR failed:', result.error);
+          console.error('❌ Client ASR failed:', result.error);
         }
       });
       

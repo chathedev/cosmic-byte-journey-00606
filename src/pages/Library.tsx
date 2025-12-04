@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,9 +21,11 @@ import { Download, Eye, RefreshCw } from "lucide-react";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
+import { apiClient } from "@/lib/api";
 
 const Library = () => {
   const { user } = useAuth();
+  const { meetingId: urlMeetingId } = useParams<{ meetingId?: string }>();
   const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting } = useSubscription();
   const [meetings, setMeetings] = useState<MeetingSession[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
@@ -57,9 +59,15 @@ const Library = () => {
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
 
-  // Load pending meeting ONLY when navigating from recording (not on refresh)
+  // Load pending meeting from URL param or sessionStorage (when navigating from recording)
   useEffect(() => {
     const fromRecording = location.state?.fromRecording === true;
+    
+    // If we have a meetingId in URL, track it for polling
+    if (urlMeetingId) {
+      pendingMeetingIdRef.current = urlMeetingId;
+      console.log('📌 Tracking meeting from URL:', urlMeetingId);
+    }
     
     if (fromRecording) {
       const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
@@ -67,7 +75,6 @@ const Library = () => {
         try {
           const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
           pendingMeeting.transcriptionStatus = 'processing';
-          // Track this pending meeting ID for loadData to use
           pendingMeetingIdRef.current = pendingMeeting.id;
           setMeetings([pendingMeeting]);
           setIsLoading(false);
@@ -75,21 +82,18 @@ const Library = () => {
           console.error('Failed to parse pending meeting:', e);
         }
       }
-      // Clear sessionStorage immediately - we've captured what we need
       sessionStorage.removeItem('pendingMeeting');
-      // Clear navigation state
-      window.history.replaceState({}, document.title);
+      window.history.replaceState({}, document.title, urlMeetingId ? `/library/${urlMeetingId}` : '/library');
     } else {
-      // Not from recording - clear any stale sessionStorage
       sessionStorage.removeItem('pendingMeeting');
     }
-  }, [location.state]);
+  }, [location.state, urlMeetingId]);
 
   useEffect(() => {
     loadData();
   }, [user]);
 
-  // Poll for processing meetings every 1 second - use ref to avoid stale closures
+  // Poll for processing meetings via GET /meetings/:id/transcription per spec
   const meetingsRef = useRef(meetings);
   meetingsRef.current = meetings;
 
@@ -98,86 +102,55 @@ const Library = () => {
 
     const pollInterval = setInterval(async () => {
       const currentMeetings = meetingsRef.current;
-      const pendingId = pendingMeetingIdRef.current;
-      
-      // Check for meetings that are still processing
-      const processingMeetings = currentMeetings.filter(m => 
-        m.transcriptionStatus === 'processing' || 
-        (!m.transcript || m.transcript.trim().length === 0)
-      );
+      const pendingId = pendingMeetingIdRef.current || urlMeetingId;
       
       // Skip polling if nothing to poll for
-      if (processingMeetings.length === 0 && !pendingId) return;
+      if (!pendingId) return;
 
-      console.log('📊 Polling for', processingMeetings.length, 'processing meetings, pendingId:', pendingId);
+      console.log('📊 Polling transcription status for:', pendingId);
 
       try {
-        const userMeetings = await meetingStorage.getMeetings(user.uid);
-        // De-duplicate by meeting ID
-        const map = new Map<string, MeetingSession>();
-        for (const m of userMeetings) {
-          const existing = map.get(m.id);
-          if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
-            map.set(m.id, m);
-          }
-        }
+        // Poll GET /meetings/:id/transcription per spec
+        const status = await apiClient.getTranscriptionStatus(pendingId);
         
-        // If we're tracking a pending meeting, keep it visible until backend has complete data
-        if (pendingId) {
-          const loadedVersion = map.get(pendingId);
-          // Only consider it done if transcript exists AND is not placeholder text
-          const hasRealTranscript = loadedVersion?.transcript && 
-            loadedVersion.transcript.trim().length > 0 && 
-            !loadedVersion.transcript.includes('Transkribering pågår');
+        if (status.success && status.status === 'done' && status.transcript) {
+          // Transcription complete - reload page
+          console.log('✅ Transcription complete for:', pendingId, '- RELOADING PAGE');
+          pendingMeetingIdRef.current = null;
+          sessionStorage.removeItem('pendingMeeting');
           
-          if (loadedVersion && hasRealTranscript) {
-            // Transcription complete - HARD PAGE REFRESH
-            console.log('✅ Transcription complete for:', pendingId, '- RELOADING PAGE');
-            pendingMeetingIdRef.current = null;
-            sessionStorage.removeItem('pendingMeeting');
-            window.location.reload();
-            return;
-          } else if (!loadedVersion) {
-            // Backend doesn't have it yet - preserve the pending meeting from current state
-            const currentPending = currentMeetings.find(m => m.id === pendingId);
-            if (currentPending) {
-              currentPending.transcriptionStatus = 'processing';
-              map.set(pendingId, currentPending);
-            }
-          }
-        }
-        
-        const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
-        deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
-        // Check if any processing meetings are now done (have real transcript, not placeholder)
-        const nowDone = processingMeetings.filter(pm => {
-          const updated = deduped.find(m => m.id === pm.id);
-          const hasRealTranscript = updated?.transcript && 
-            updated.transcript.trim().length > 0 && 
-            !updated.transcript.includes('Transkribering pågår');
-          return hasRealTranscript;
-        });
-
-        // Update meetings state
-        setMeetings(deduped);
-        
-        if (nowDone.length > 0) {
-          console.log('🎉 Transcription complete for', nowDone.length, 'meetings - refreshing data');
-          // Force full reload to get latest transcript from backend
-          setTimeout(() => loadData(), 500);
           toast({
             title: 'Transkribering klar',
-            description: `${nowDone.length} möte${nowDone.length > 1 ? 'n' : ''} är klart.`,
+            description: 'Ditt möte har transkriberats.',
+          });
+          
+          // Navigate to /library (without meetingId) and reload
+          window.location.href = '/library';
+          return;
+        } else if (status.status === 'failed') {
+          // Transcription failed
+          console.error('❌ Transcription failed for:', pendingId);
+          pendingMeetingIdRef.current = null;
+          
+          // Update meeting in state to show failed status
+          setMeetings(prev => prev.map(m => 
+            m.id === pendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
+          ));
+          
+          toast({
+            title: 'Transkribering misslyckades',
+            description: status.error || 'Försök igen eller kontakta support.',
+            variant: 'destructive',
           });
         }
+        // If still processing, continue polling
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 1000); // Poll every 1 second
+    }, 3000); // Poll every 3 seconds per spec
 
     return () => clearInterval(pollInterval);
-  }, [user]);
+  }, [user, urlMeetingId]);
 
   // Listen for direct ASR completion event (much faster than polling!)
   useEffect(() => {

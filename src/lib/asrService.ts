@@ -1,13 +1,16 @@
 // Direct ASR Service - Frontend handles transcription directly
-// No backend middleman = faster, more reliable
+// Client ASR + POST transcript to backend = fast path per spec
 
 const ASR_ENDPOINT = 'https://transcribe.api.tivly.se/transcribe';
+const API_BASE_URL = 'https://api.tivly.se';
 
 export interface ASRResult {
   success: boolean;
   transcript?: string;
   duration?: number;
   processing_time?: number;
+  path?: string;
+  jsonPath?: string;
   error?: string;
 }
 
@@ -100,56 +103,120 @@ export async function transcribeDirectly(
 }
 
 /**
- * Transcribe and save to meeting in one flow
- * Frontend handles ASR, then updates backend with result
+ * Persist transcript to backend via POST /transcribe
+ * Per spec: meetingId + transcript is the fast path
+ */
+export async function persistTranscript(
+  meetingId: string,
+  transcript: string,
+  options?: {
+    duration?: number;
+    processing_time?: number;
+    language?: string;
+    meetingTitle?: string;
+  }
+): Promise<ASRResult> {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    return { success: false, error: 'Authentication required' };
+  }
+
+  console.log('📝 Persisting transcript to backend:', meetingId);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/transcribe`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        meetingId,
+        transcript,
+        duration: options?.duration,
+        processing_time: options?.processing_time,
+        language: options?.language || 'sv',
+        meetingTitle: options?.meetingTitle,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Persist transcript failed:', response.status, errorText);
+      return {
+        success: false,
+        error: `Persist failed: ${response.status}`
+      };
+    }
+
+    const data = await response.json();
+    console.log('✅ Transcript persisted:', data);
+
+    return {
+      success: true,
+      transcript: data.transcript,
+      path: data.path,
+      jsonPath: data.jsonPath,
+      duration: data.duration,
+      processing_time: data.processing_time
+    };
+  } catch (error: any) {
+    console.error('❌ Persist error:', error);
+    return {
+      success: false,
+      error: error.message || 'Network error during persist'
+    };
+  }
+}
+
+/**
+ * Transcribe and persist in one flow (per spec)
+ * 1. Run ASR client-side
+ * 2. POST /transcribe with meetingId + transcript
  */
 export async function transcribeAndSave(
   audioBlob: Blob,
   meetingId: string,
   options: ASROptions & { 
+    meetingTitle?: string;
     onTranscriptReady?: (transcript: string) => void;
-    apiClient: any;
   }
 ): Promise<ASRResult> {
-  const { apiClient, onTranscriptReady, ...asrOptions } = options;
+  const { onTranscriptReady, meetingTitle, ...asrOptions } = options;
   
-  console.log('🚀 Direct ASR flow: Transcribing meeting', meetingId);
+  console.log('🚀 Client ASR flow: Transcribing meeting', meetingId);
   
-  // Step 1: Transcribe directly
-  const result = await transcribeDirectly(audioBlob, asrOptions);
+  // Step 1: Transcribe directly via ASR service
+  const asrResult = await transcribeDirectly(audioBlob, asrOptions);
   
-  if (!result.success || !result.transcript) {
-    console.error('❌ Transcription failed, updating meeting status');
-    // Update meeting with failed status
-    try {
-      await apiClient.updateMeeting(meetingId, {
-        transcriptionStatus: 'failed',
-        transcript: ''
-      });
-    } catch (e) {
-      console.error('Failed to update meeting status:', e);
-    }
-    return result;
+  if (!asrResult.success || !asrResult.transcript) {
+    console.error('❌ ASR failed for meeting:', meetingId);
+    // Persist failure status
+    await persistTranscript(meetingId, '', {
+      language: asrOptions.language,
+      meetingTitle,
+    }).catch(e => console.error('Failed to persist failure:', e));
+    return asrResult;
   }
   
-  // Step 2: Update meeting with transcript
-  console.log('📝 Saving transcript to meeting:', meetingId);
+  // Step 2: POST /transcribe with transcript (fast path per spec)
+  const persistResult = await persistTranscript(meetingId, asrResult.transcript, {
+    duration: asrResult.duration,
+    processing_time: asrResult.processing_time,
+    language: asrOptions.language,
+    meetingTitle,
+  });
   
-  try {
-    await apiClient.updateMeeting(meetingId, {
-      transcript: result.transcript,
-      transcriptionStatus: 'done'
-    });
-    
-    console.log('✅ Meeting updated with transcript');
-    onTranscriptReady?.(result.transcript);
-    
-    return result;
-  } catch (error: any) {
-    console.error('❌ Failed to save transcript:', error);
-    return {
-      ...result,
-      error: 'Transcript generated but failed to save: ' + error.message
-    };
+  if (persistResult.success) {
+    console.log('✅ Transcript persisted successfully');
+    onTranscriptReady?.(asrResult.transcript);
+  } else {
+    console.error('❌ Failed to persist transcript:', persistResult.error);
   }
+  
+  return {
+    ...asrResult,
+    path: persistResult.path,
+    jsonPath: persistResult.jsonPath,
+  };
 }
