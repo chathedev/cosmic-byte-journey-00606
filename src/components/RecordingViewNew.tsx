@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, Loader2, ArrowLeft, AlertTriangle, Save, FileText, Mic, RefreshCw } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, Clock, Loader2, ArrowLeft, AlertTriangle, Mic, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -10,7 +10,6 @@ import { SubscribeDialog } from "./SubscribeDialog";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
@@ -23,7 +22,7 @@ interface RecordingViewNewProps {
   selectedLanguage?: 'sv-SE' | 'en-US';
 }
 
-type ViewState = 'recording' | 'processing' | 'result' | 'error';
+type ViewState = 'recording' | 'uploading' | 'error';
 
 export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = false, selectedLanguage: initialLanguage = 'sv-SE' }: RecordingViewNewProps) => {
   const navigate = useNavigate();
@@ -34,7 +33,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [viewState, setViewState] = useState<ViewState>('recording');
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [transcript, setTranscript] = useState("");
   const [sessionId, setSessionId] = useState<string>(continuedMeeting?.id || "");
   const [meetingName, setMeetingName] = useState(continuedMeeting?.title || "Namnlöst möte");
   const [selectedFolder, setSelectedFolder] = useState(continuedMeeting?.folder || "Allmänt");
@@ -42,12 +40,11 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [durationSec, setDurationSec] = useState(0);
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [folders, setFolders] = useState<string[]>([]);
   const [isTestMode, setIsTestMode] = useState(false);
-  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
-  const [transcriptionProgress, setTranscriptionProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [pendingAudioBlob, setPendingAudioBlob] = useState<Blob | null>(null);
   
   // Test access for admins and specific user
@@ -229,16 +226,16 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Test mode - uses pre-recorded audio file with the same transcription flow as normal recording
+  // Test mode - uses pre-recorded audio file with the Library-first flow
   const startTestMode = async () => {
     if (isTestMode) return;
     
     setIsTestMode(true);
     setIsRecording(false);
-    setViewState('processing');
+    setViewState('uploading');
     setDurationSec(0);
-    setTranscriptionError(null);
-    setTranscriptionProgress(0);
+    setUploadError(null);
+    setUploadProgress(0);
     
     try {
       // Fetch the test audio file
@@ -249,61 +246,64 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       }
       const audioBlob = await response.blob();
       
-      console.log('📤 Test mode: Uploading test audio for transcription...', audioBlob.size, 'bytes');
+      console.log('📤 Test mode: Uploading test audio...', audioBlob.size, 'bytes');
       
       // Store blob for potential retry
       setPendingAudioBlob(audioBlob);
       
-      // Use the same API client as normal recording flow
-      const result = await apiClient.transcribeAudio(audioBlob, 'sv', {
-        meetingId: sessionId || `test-${Date.now()}`,
-        onProgress: setTranscriptionProgress,
-      });
+      // Generate a meeting ID
+      const testMeetingId = `test-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       
-      console.log('✅ Test transcription result:', result);
+      // Save meeting to library first (with processing status)
+      const now = new Date().toISOString();
+      const meeting = {
+        id: testMeetingId,
+        title: 'Testmöte',
+        folder: selectedFolder,
+        transcript: '', // Empty - will be filled by backend
+        protocol: '',
+        createdAt: now,
+        updatedAt: now,
+        userId: user?.uid || '',
+        isCompleted: false,
+        source: 'live' as const,
+        transcriptionStatus: 'processing' as const,
+      };
+
+      await meetingStorage.saveMeeting(meeting as any);
+      
+      // Upload audio for transcription (backend will process)
+      const result = await apiClient.uploadForTranscription(audioBlob, testMeetingId, {
+        meetingTitle: 'Testmöte',
+        language: 'sv',
+        onProgress: setUploadProgress,
+      });
       
       if (!result.success) {
-        throw new Error(result.error || 'Transcription failed');
+        throw new Error(result.error || 'Upload failed');
       }
       
-      const transcriptText = result.transcript || result.text || '';
+      console.log('✅ Test upload successful, redirecting to library');
       
-      if (!transcriptText.trim()) {
-        throw new Error('No transcription text received');
-      }
-      
-      setTranscript(transcriptText);
-      setViewState('result');
-      setPendingAudioBlob(null);
-      
-      // Generate title
-      try {
-        const aiTitle = await generateMeetingTitle(transcriptText);
-        setMeetingName(aiTitle);
-      } catch (e) {
-        setMeetingName("Testmöte");
-      }
-      
+      // Redirect to library - transcription will be polled there
       toast({
-        title: "Testläge klart",
-        description: result.processing_time 
-          ? `Transkribering klar på ${result.processing_time.toFixed(1)}s`
-          : "Transkribering av testljud klar.",
+        title: 'Uppladdning klar',
+        description: 'Transkribering pågår i bakgrunden.',
       });
+      
+      navigate('/library');
     } catch (error: any) {
       console.error('❌ Test mode error:', error?.message || error);
-      setTranscriptionError(error?.message || 'Kunde inte transkribera testljudet');
+      setUploadError(error?.message || 'Kunde inte ladda upp testljudet');
       setViewState('error');
     } finally {
       setIsTestMode(false);
     }
   };
 
+  // Library-first flow: save meeting, upload audio, redirect to library
   const handleStopRecording = async () => {
-    // In test mode, the test handles everything - just wait
-    if (isTestMode) {
-      return;
-    }
+    if (isTestMode) return;
 
     if (durationSec < 5) {
       toast({
@@ -314,7 +314,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       return;
     }
 
-    setViewState('processing');
+    setViewState('uploading');
     setIsRecording(false);
     await releaseWakeLock();
 
@@ -322,21 +322,24 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     return new Promise<void>((resolve) => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.onstop = async () => {
-          await uploadAndTranscribe();
+          await saveAndUpload();
           resolve();
         };
         mediaRecorderRef.current.stop();
       } else {
-        uploadAndTranscribe().then(resolve);
+        saveAndUpload().then(resolve);
       }
     });
   };
 
-  const uploadAndTranscribe = async (audioBlob?: Blob) => {
+  // Library-first: Save meeting to library, upload audio, redirect
+  const saveAndUpload = async (audioBlob?: Blob) => {
+    if (!user) return;
+    
     try {
-      console.log('📤 Uploading audio for transcription...');
-      setTranscriptionError(null);
-      setTranscriptionProgress(0);
+      console.log('📤 Library-first: Saving meeting and uploading audio...');
+      setUploadError(null);
+      setUploadProgress(0);
       
       const blob = audioBlob || new Blob(audioChunksRef.current, { 
         type: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' 
@@ -348,52 +351,78 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       console.log('Audio blob size:', blob.size, 'bytes');
 
       if (blob.size < 1000) {
-        throw new Error('Audio file too small');
+        throw new Error('Ljudfilen är för liten');
       }
 
-      // Use the enhanced transcription API with auth
-      const result = await apiClient.transcribeAudio(blob, 'sv', {
-        meetingId: sessionId,
-        onProgress: setTranscriptionProgress,
+      // Generate meeting ID if not exists
+      const meetingId = sessionId.startsWith('temp-') 
+        ? `meeting-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
+        : sessionId;
+      
+      // Save meeting to library first (with processing status)
+      const now = new Date().toISOString();
+      const meeting = {
+        id: meetingId,
+        title: meetingName,
+        folder: selectedFolder,
+        transcript: '', // Empty - will be filled by backend polling
+        protocol: '',
+        createdAt: createdAtRef.current,
+        updatedAt: now,
+        userId: user.uid,
+        isCompleted: false,
+        source: 'live' as const,
+        transcriptionStatus: 'processing' as const,
+      };
+
+      await meetingStorage.saveMeeting(meeting as any);
+      console.log('✅ Meeting saved to library:', meetingId);
+      
+      // Count meeting
+      if (!hasIncrementedCountRef.current) {
+        const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
+        if (wasCounted) {
+          await incrementMeetingCount(meetingId);
+          await refreshPlan();
+        }
+        hasIncrementedCountRef.current = true;
+      }
+
+      // Upload audio for transcription (backend will process)
+      setUploadProgress(25);
+      const result = await apiClient.uploadForTranscription(blob, meetingId, {
+        meetingTitle: meetingName,
+        language: 'sv',
+        onProgress: (p) => setUploadProgress(25 + (p * 0.75)),
       });
-
-      console.log('✅ Transcription result:', result);
-
+      
       if (!result.success) {
-        throw new Error(result.error || 'Transcription failed');
+        throw new Error(result.error || 'Uppladdning misslyckades');
       }
-
-      const transcriptText = result.transcript || result.text || '';
       
-      if (!transcriptText.trim()) {
-        throw new Error('No transcription text received');
-      }
-
-      setTranscript(transcriptText);
-      setViewState('result');
+      console.log('✅ Audio upload successful, redirecting to library');
+      
+      // Clean up
       setPendingAudioBlob(null);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
       
-      // Auto-generate title
-      try {
-        const aiTitle = await generateMeetingTitle(transcriptText);
-        setMeetingName(aiTitle);
-      } catch (e) {
-        console.warn('Failed to generate title:', e);
-      }
-
-      // Show processing time if available
-      if (result.processing_time) {
-        toast({
-          title: 'Transkribering klar',
-          description: `Bearbetad på ${result.processing_time.toFixed(1)}s`,
-        });
-      }
+      // Show success toast and redirect
+      toast({
+        title: 'Uppladdning klar',
+        description: 'Transkribering pågår. Resultatet visas i biblioteket.',
+      });
+      
+      // Redirect to library
+      navigate('/library');
     } catch (error: any) {
-      console.error('❌ Transcription error:', error);
-      setTranscriptionError(error.message || 'Transcription failed');
+      console.error('❌ Save and upload error:', error);
+      setUploadError(error.message || 'Kunde inte ladda upp ljudet');
       setViewState('error');
-    } finally {
-      // Clean up stream
+      
+      // Clean up stream on error
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
@@ -403,8 +432,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
   const handleRetry = () => {
     if (pendingAudioBlob) {
-      setViewState('processing');
-      uploadAndTranscribe(pendingAudioBlob);
+      setViewState('uploading');
+      saveAndUpload(pendingAudioBlob);
     } else {
       // No blob to retry with, go back to recording
       setViewState('recording');
@@ -412,106 +441,11 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  const handleCancelTranscription = () => {
+  const handleCancelUpload = () => {
     setPendingAudioBlob(null);
-    setTranscriptionError(null);
+    setUploadError(null);
     setViewState('recording');
     startRecording();
-  };
-
-  const saveToLibrary = async () => {
-    if (!user || !transcript.trim()) return;
-    setIsSaving(true);
-
-    try {
-      const now = new Date().toISOString();
-      const meeting = {
-        id: sessionId,
-        title: meetingName,
-        folder: selectedFolder,
-        transcript: transcript,
-        protocol: '',
-        createdAt: createdAtRef.current,
-        updatedAt: now,
-        userId: user.uid,
-        isCompleted: true,
-        source: 'live',
-      };
-
-      const newId = await meetingStorage.saveMeeting(meeting as any);
-      const finalId = newId || sessionId;
-
-      // Count meeting
-      if (!hasIncrementedCountRef.current) {
-        const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
-        if (wasCounted) {
-          await incrementMeetingCount(finalId);
-          await refreshPlan();
-        }
-        hasIncrementedCountRef.current = true;
-      }
-
-      toast({
-        title: 'Sparat!',
-        description: `"${meetingName}" har sparats i biblioteket.`,
-      });
-      
-      navigate('/library');
-    } catch (error) {
-      console.error('Error saving:', error);
-      toast({
-        title: 'Fel vid sparning',
-        description: 'Kunde inte spara. Försök igen.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const saveAndGenerateProtocol = async () => {
-    if (!user || !transcript.trim()) return;
-    setIsSaving(true);
-
-    try {
-      const now = new Date().toISOString();
-      const meeting = {
-        id: sessionId,
-        title: meetingName,
-        folder: selectedFolder,
-        transcript: transcript,
-        protocol: '',
-        createdAt: createdAtRef.current,
-        updatedAt: now,
-        userId: user.uid,
-        isCompleted: true,
-        source: 'live',
-      };
-
-      const newId = await meetingStorage.saveMeeting(meeting as any);
-      const finalId = newId || sessionId;
-
-      // Count meeting
-      if (!hasIncrementedCountRef.current) {
-        const wasCounted = await meetingStorage.markCountedIfNeeded(finalId);
-        if (wasCounted) {
-          await incrementMeetingCount(finalId);
-          await refreshPlan();
-        }
-        hasIncrementedCountRef.current = true;
-      }
-
-      // Navigate to protocol generation
-      navigate(`/generate-protocol?meetingId=${finalId}&title=${encodeURIComponent(meetingName)}`);
-    } catch (error) {
-      console.error('Error saving:', error);
-      toast({
-        title: 'Fel vid sparning',
-        description: 'Kunde inte spara. Försök igen.',
-        variant: 'destructive',
-      });
-      setIsSaving(false);
-    }
   };
 
   const handleBackClick = () => {
@@ -658,7 +592,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
                 className="bg-primary hover:bg-primary/90 font-semibold min-w-[140px]"
               >
                 <Square className="w-5 h-5 mr-2" />
-                Nästa
+                Färdig
               </Button>
             </div>
           </div>
@@ -691,8 +625,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     );
   }
 
-  // Processing View
-  if (viewState === 'processing') {
+  // Uploading View
+  if (viewState === 'uploading') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
         <div className="text-center space-y-6 max-w-sm">
@@ -702,17 +636,17 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
             </div>
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Transkriberar...</h2>
+            <h2 className="text-xl font-semibold">Laddar upp...</h2>
             <p className="text-muted-foreground">
-              Bearbetar {Math.floor(durationSec / 60)} min {durationSec % 60} sek ljud
+              Sparar {Math.floor(durationSec / 60)} min {durationSec % 60} sek ljud
             </p>
           </div>
           {/* Progress bar */}
-          {transcriptionProgress > 0 && (
+          {uploadProgress > 0 && (
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div 
                 className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${transcriptionProgress}%` }}
+                style={{ width: `${uploadProgress}%` }}
               />
             </div>
           )}
@@ -732,13 +666,11 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
             </div>
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Transkribering misslyckades</h2>
+            <h2 className="text-xl font-semibold">Uppladdning misslyckades</h2>
             <p className="text-muted-foreground text-sm">
-              {transcriptionError?.includes('asr_failed') 
-                ? 'Kunde inte tolka ljudet. Kontrollera att inspelningen innehåller tydligt tal.'
-                : transcriptionError?.includes('Network') 
+              {uploadError?.includes('Network') 
                 ? 'Nätverksfel. Kontrollera din internetanslutning.'
-                : 'Kunde inte bearbeta ljudet. Försök igen.'}
+                : uploadError || 'Kunde inte ladda upp ljudet. Försök igen.'}
             </p>
           </div>
           <div className="flex flex-col gap-3">
@@ -746,7 +678,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
               <RefreshCw className="w-4 h-4 mr-2" />
               Försök igen
             </Button>
-            <Button onClick={handleCancelTranscription} variant="outline" className="w-full">
+            <Button onClick={handleCancelUpload} variant="outline" className="w-full">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Spela in igen
             </Button>
@@ -756,108 +688,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     );
   }
 
-  // Result View
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
-      {/* Header */}
-      <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 ${isNative ? 'pt-safe' : ''}`}>
-        <div className="max-w-5xl mx-auto px-3 md:px-4 py-3">
-          <div className="flex items-center justify-between">
-            <Button onClick={() => navigate('/')} variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Hem
-            </Button>
-            <h1 className="text-sm font-medium">Transkription klar</h1>
-            <div className="w-20" />
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 max-w-3xl mx-auto w-full p-4 space-y-4">
-        {/* Meeting Name */}
-        <div className="bg-card rounded-xl p-4 border">
-          <div className="flex items-center gap-3">
-            {isEditingName ? (
-              <div className="flex gap-2 items-center flex-1">
-                <Input
-                  value={meetingName}
-                  onChange={(e) => setMeetingName(e.target.value)}
-                  onBlur={() => setIsEditingName(false)}
-                  onKeyDown={(e) => e.key === "Enter" && setIsEditingName(false)}
-                  autoFocus
-                  className="text-lg font-semibold"
-                />
-                <Button onClick={() => setIsEditingName(false)} size="sm" variant="ghost">
-                  <Check className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 flex-1 cursor-pointer group" onClick={() => setIsEditingName(true)}>
-                <h2 className="text-lg font-semibold">{meetingName}</h2>
-                <Edit2 className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            )}
-            <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {folders.map((f) => (
-                  <SelectItem key={f} value={f}>{f}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Transcript Preview */}
-        <div className="bg-card rounded-xl p-4 border flex-1">
-          <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Transkription ({transcript.split(/\s+/).length} ord)
-          </h3>
-          <div className="h-[300px] md:h-[400px] overflow-y-auto bg-muted/30 rounded-lg p-4 text-sm leading-relaxed">
-            <p className="whitespace-pre-wrap">{transcript}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className={`sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg ${isNative ? 'pb-safe' : ''}`}>
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              onClick={saveToLibrary}
-              variant="outline"
-              size="lg"
-              disabled={isSaving}
-              className="flex-1"
-            >
-              {isSaving ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-5 h-5 mr-2" />
-              )}
-              Spara till bibliotek
-            </Button>
-            
-            <Button
-              onClick={saveAndGenerateProtocol}
-              size="lg"
-              disabled={isSaving}
-              className="flex-1 bg-primary hover:bg-primary/90 font-semibold"
-            >
-              {isSaving ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              ) : (
-                <FileText className="w-5 h-5 mr-2" />
-              )}
-              Spara & Generera protokoll
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  // Fallback (should not reach here normally)
+  return null;
 };

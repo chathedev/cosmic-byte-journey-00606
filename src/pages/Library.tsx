@@ -559,6 +559,23 @@ const Library = () => {
                             </Badge>
                           </>
                         )}
+                        {meeting.transcriptionStatus === 'processing' && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <Badge variant="outline" className="flex items-center gap-1 text-xs animate-pulse">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Analyserar...
+                            </Badge>
+                          </>
+                        )}
+                        {meeting.transcriptionStatus === 'failed' && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                              Misslyckades
+                            </Badge>
+                          </>
+                        )}
                       </CardDescription>
                     </div>
                   </div>
