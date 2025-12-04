@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, Loader2, ArrowLeft, AlertTriangle, Mic, RefreshCw } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -22,7 +22,7 @@ interface RecordingViewNewProps {
   selectedLanguage?: 'sv-SE' | 'en-US';
 }
 
-type ViewState = 'recording' | 'uploading' | 'error';
+type ViewState = 'recording';
 
 export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = false, selectedLanguage: initialLanguage = 'sv-SE' }: RecordingViewNewProps) => {
   const navigate = useNavigate();
@@ -43,9 +43,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [showInstructions, setShowInstructions] = useState(false);
   const [folders, setFolders] = useState<string[]>([]);
   const [isTestMode, setIsTestMode] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [pendingAudioBlob, setPendingAudioBlob] = useState<Blob | null>(null);
   
   // Test access for admins and specific user
   const allowedTestEmail = 'charlie.wretling@icloud.com';
@@ -226,16 +223,12 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Test mode - uses pre-recorded audio file with the Library-first flow
+  // Test mode - uses pre-recorded audio file with instant redirect
   const startTestMode = async () => {
     if (isTestMode) return;
     
     setIsTestMode(true);
     setIsRecording(false);
-    setViewState('uploading');
-    setDurationSec(0);
-    setUploadError(null);
-    setUploadProgress(0);
     
     try {
       // Fetch the test audio file
@@ -246,10 +239,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       }
       const audioBlob = await response.blob();
       
-      console.log('📤 Test mode: Uploading test audio...', audioBlob.size, 'bytes');
-      
-      // Store blob for potential retry
-      setPendingAudioBlob(audioBlob);
+      console.log('📤 Test mode: Saving and redirecting...');
       
       // Generate a meeting ID
       const testMeetingId = `test-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -272,36 +262,37 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
       await meetingStorage.saveMeeting(meeting as any);
       
-      // Upload audio for transcription (backend will process)
-      const result = await apiClient.uploadForTranscription(audioBlob, testMeetingId, {
-        meetingTitle: 'Testmöte',
-        language: 'sv',
-        onProgress: setUploadProgress,
-      });
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Upload failed');
-      }
-      
-      console.log('✅ Test upload successful, redirecting to library');
-      
-      // Redirect to library - transcription will be polled there
+      // Toast and redirect immediately
       toast({
-        title: 'Uppladdning klar',
+        title: 'Testmöte sparat',
         description: 'Transkribering pågår i bakgrunden.',
       });
       
       navigate('/library');
+      
+      // Upload audio in background (fire and forget)
+      apiClient.uploadForTranscription(audioBlob, testMeetingId, {
+        meetingTitle: 'Testmöte',
+        language: 'sv',
+      }).then(result => {
+        console.log('✅ Test upload result:', result.success);
+      }).catch(err => {
+        console.error('❌ Test upload error:', err);
+      });
+      
     } catch (error: any) {
       console.error('❌ Test mode error:', error?.message || error);
-      setUploadError(error?.message || 'Kunde inte ladda upp testljudet');
-      setViewState('error');
+      toast({
+        title: 'Testläge misslyckades',
+        description: error?.message || 'Kunde inte starta testläge',
+        variant: 'destructive',
+      });
     } finally {
       setIsTestMode(false);
     }
   };
 
-  // Library-first flow: save meeting, upload audio, redirect to library
+  // Library-first flow: save meeting, redirect instantly, upload in background
   const handleStopRecording = async () => {
     if (isTestMode) return;
 
@@ -314,47 +305,45 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       return;
     }
 
-    setViewState('uploading');
     setIsRecording(false);
     await releaseWakeLock();
 
-    // Stop media recorder and wait for final data
-    return new Promise<void>((resolve) => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.onstop = async () => {
-          await saveAndUpload();
-          resolve();
-        };
-        mediaRecorderRef.current.stop();
-      } else {
-        saveAndUpload().then(resolve);
-      }
-    });
+    // Stop media recorder and get final audio data
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.onstop = () => {
+        saveAndRedirectInstantly();
+      };
+      mediaRecorderRef.current.stop();
+    } else {
+      saveAndRedirectInstantly();
+    }
   };
 
-  // Library-first: Save meeting to library, upload audio, redirect
-  const saveAndUpload = async (audioBlob?: Blob) => {
+  // Save meeting, redirect instantly, upload audio in background
+  const saveAndRedirectInstantly = async () => {
     if (!user) return;
     
     try {
-      console.log('📤 Library-first: Saving meeting and uploading audio...');
-      setUploadError(null);
-      setUploadProgress(0);
+      console.log('📤 Saving meeting and redirecting instantly...');
       
-      const blob = audioBlob || new Blob(audioChunksRef.current, { 
+      const blob = new Blob(audioChunksRef.current, { 
         type: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' 
       });
-      
-      // Store blob for potential retry
-      setPendingAudioBlob(blob);
       
       console.log('Audio blob size:', blob.size, 'bytes');
 
       if (blob.size < 1000) {
-        throw new Error('Ljudfilen är för liten');
+        toast({
+          title: 'Ljudfilen är för liten',
+          description: 'Försök spela in igen.',
+          variant: 'destructive',
+        });
+        setViewState('recording');
+        startRecording();
+        return;
       }
 
-      // Generate meeting ID if not exists
+      // Generate meeting ID
       const meetingId = sessionId.startsWith('temp-') 
         ? `meeting-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`
         : sessionId;
@@ -365,7 +354,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         id: meetingId,
         title: meetingName,
         folder: selectedFolder,
-        transcript: '', // Empty - will be filled by backend polling
+        transcript: '', // Empty - will be filled by backend
         protocol: '',
         createdAt: createdAtRef.current,
         updatedAt: now,
@@ -388,64 +377,42 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         hasIncrementedCountRef.current = true;
       }
 
-      // Upload audio for transcription (backend will process)
-      setUploadProgress(25);
-      const result = await apiClient.uploadForTranscription(blob, meetingId, {
+      // Clean up stream immediately
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      // Show toast and redirect IMMEDIATELY
+      toast({
+        title: 'Möte sparat',
+        description: 'Transkribering pågår i bakgrunden.',
+      });
+      
+      navigate('/library');
+
+      // Upload audio in background (fire and forget)
+      apiClient.uploadForTranscription(blob, meetingId, {
         meetingTitle: meetingName,
         language: 'sv',
-        onProgress: (p) => setUploadProgress(25 + (p * 0.75)),
+      }).then(result => {
+        if (!result.success) {
+          console.error('❌ Background upload failed:', result.error);
+        } else {
+          console.log('✅ Background upload completed');
+        }
+      }).catch(err => {
+        console.error('❌ Background upload error:', err);
       });
       
-      if (!result.success) {
-        throw new Error(result.error || 'Uppladdning misslyckades');
-      }
-      
-      console.log('✅ Audio upload successful, redirecting to library');
-      
-      // Clean up
-      setPendingAudioBlob(null);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      
-      // Show success toast and redirect
-      toast({
-        title: 'Uppladdning klar',
-        description: 'Transkribering pågår. Resultatet visas i biblioteket.',
-      });
-      
-      // Redirect to library
-      navigate('/library');
     } catch (error: any) {
-      console.error('❌ Save and upload error:', error);
-      setUploadError(error.message || 'Kunde inte ladda upp ljudet');
-      setViewState('error');
-      
-      // Clean up stream on error
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
+      console.error('❌ Save error:', error);
+      toast({
+        title: 'Fel vid sparning',
+        description: error.message || 'Kunde inte spara mötet',
+        variant: 'destructive',
+      });
     }
-  };
-
-  const handleRetry = () => {
-    if (pendingAudioBlob) {
-      setViewState('uploading');
-      saveAndUpload(pendingAudioBlob);
-    } else {
-      // No blob to retry with, go back to recording
-      setViewState('recording');
-      startRecording();
-    }
-  };
-
-  const handleCancelUpload = () => {
-    setPendingAudioBlob(null);
-    setUploadError(null);
-    setViewState('recording');
-    startRecording();
   };
 
   const handleBackClick = () => {
@@ -621,69 +588,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
         <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
         <RecordingInstructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} />
-      </div>
-    );
-  }
-
-  // Uploading View
-  if (viewState === 'uploading') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-        <div className="text-center space-y-6 max-w-sm">
-          <div className="relative inline-flex">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-              <Loader2 className="w-10 h-10 text-primary animate-spin" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Laddar upp...</h2>
-            <p className="text-muted-foreground">
-              Sparar {Math.floor(durationSec / 60)} min {durationSec % 60} sek ljud
-            </p>
-          </div>
-          {/* Progress bar */}
-          {uploadProgress > 0 && (
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Error View with Retry
-  if (viewState === 'error') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
-        <div className="text-center space-y-6 max-w-sm">
-          <div className="relative inline-flex">
-            <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="w-10 h-10 text-destructive" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Uppladdning misslyckades</h2>
-            <p className="text-muted-foreground text-sm">
-              {uploadError?.includes('Network') 
-                ? 'Nätverksfel. Kontrollera din internetanslutning.'
-                : uploadError || 'Kunde inte ladda upp ljudet. Försök igen.'}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3">
-            <Button onClick={handleRetry} className="w-full">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Försök igen
-            </Button>
-            <Button onClick={handleCancelUpload} variant="outline" className="w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Spela in igen
-            </Button>
-          </div>
-        </div>
       </div>
     );
   }
