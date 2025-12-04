@@ -14,6 +14,7 @@ import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
 import { transcribeAndSave } from "@/lib/asrService";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -23,6 +24,12 @@ interface RecordingViewNewProps {
 }
 
 type ViewState = 'recording';
+
+// Check if user has ASR access (enterprise/plus/unlimited)
+const hasAsrAccess = (plan: string | undefined): boolean => {
+  if (!plan) return false;
+  return ['enterprise', 'plus', 'unlimited'].includes(plan.toLowerCase());
+};
 
 export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = false, selectedLanguage: initialLanguage = 'sv-SE' }: RecordingViewNewProps) => {
   const navigate = useNavigate();
@@ -45,6 +52,13 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [isTestMode, setIsTestMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
+  // Real-time transcript for Free/Pro plans (browser speech recognition)
+  const [liveTranscript, setLiveTranscript] = useState<string>(continuedMeeting?.transcript || "");
+  const [interimText, setInterimText] = useState<string>("");
+  
+  // Determine transcription mode based on plan
+  const useAsrMode = hasAsrAccess(userPlan?.plan);
+  
   // Test access for admins and specific user
   const allowedTestEmail = 'charlie.wretling@icloud.com';
   const hasTestAccess = isAdmin || user?.email?.toLowerCase() === allowedTestEmail.toLowerCase();
@@ -56,7 +70,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const createdAtRef = useRef<string>(continuedMeeting?.createdAt || new Date().toISOString());
   const wakeLockRef = useRef<any>(null);
   const hasIncrementedCountRef = useRef(!!continuedMeeting);
-  const isSavingRef = useRef(false); // Guard against double saves
+  const isSavingRef = useRef(false);
+  const recognitionRef = useRef<any>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement>(null);
   
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
@@ -80,6 +96,13 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   }, [continuedMeeting]);
 
+  // Auto-scroll transcript to bottom
+  useEffect(() => {
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+    }
+  }, [liveTranscript, interimText]);
+
   // Wake lock management
   const requestWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -99,6 +122,84 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       } catch (err) {
         console.error('Failed to release wake lock:', err);
       }
+    }
+  };
+
+  // Initialize browser speech recognition for Free/Pro plans
+  const startSpeechRecognition = () => {
+    if (useAsrMode) return; // Don't use browser recognition for ASR plans
+    
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Browser speech recognition not supported');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = initialLanguage;
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      let final = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript + ' ';
+        } else {
+          interim += transcript;
+        }
+      }
+      
+      if (final) {
+        setLiveTranscript(prev => prev + final);
+        setInterimText('');
+      } else {
+        setInterimText(interim);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      // Auto-restart on recoverable errors
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        if (isRecording && !isPaused && recognitionRef.current) {
+          setTimeout(() => {
+            try {
+              recognitionRef.current?.start();
+            } catch { /* ignore */ }
+          }, 100);
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      // Auto-restart if still recording
+      if (isRecording && !isPaused && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch { /* ignore */ }
+      }
+    };
+
+    recognitionRef.current = recognition;
+    
+    try {
+      recognition.start();
+      console.log('✅ Browser speech recognition started');
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err);
+    }
+  };
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      } catch { /* ignore */ }
     }
   };
 
@@ -134,6 +235,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     
     return () => {
       stopMediaRecorder();
+      stopSpeechRecognition();
       releaseWakeLock();
     };
   }, [user]);
@@ -185,13 +287,18 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         }
       };
 
-      mediaRecorder.start(1000); // Collect data every second
+      mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
       
       setIsRecording(true);
       await requestWakeLock();
       
-      console.log('✅ Recording started');
+      // Start browser speech recognition for Free/Pro plans
+      if (!useAsrMode) {
+        startSpeechRecognition();
+      }
+      
+      console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)');
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -220,10 +327,18 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       mediaRecorderRef.current.resume();
       setIsPaused(false);
       requestWakeLock();
+      // Resume speech recognition for Free/Pro
+      if (!useAsrMode && recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch { /* ignore */ }
+      }
     } else {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
       releaseWakeLock();
+      // Pause speech recognition for Free/Pro
+      if (!useAsrMode && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      }
     }
   };
 
@@ -235,9 +350,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     setIsTestMode(true);
     setIsSaving(true);
     setIsRecording(false);
+    stopSpeechRecognition();
     
     try {
-      // Fetch the test audio file
       console.log('📥 Test mode: Fetching test audio file...');
       const response = await fetch('/test-audio.wav');
       if (!response.ok) {
@@ -247,13 +362,11 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       console.log('📤 Test mode: Saving and redirecting...');
       
-      // Save meeting to library first (with processing status)
-      // Let backend generate the ID by not providing one
       const now = new Date().toISOString();
       const meetingData = {
         title: 'Testmöte',
         folder: selectedFolder,
-        transcript: '', // Empty - will be filled by backend
+        transcript: '',
         protocol: '',
         createdAt: now,
         updatedAt: now,
@@ -261,19 +374,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         isCompleted: true,
         source: 'live' as const,
         transcriptionStatus: 'processing' as const,
-        forceCreate: true, // CRITICAL: Force CREATE, never UPDATE
+        forceCreate: true,
       };
 
       const testMeetingId = await meetingStorage.saveMeeting(meetingData as any);
       console.log('✅ Test meeting created with ID:', testMeetingId);
       
-      // Create the full meeting object for sessionStorage
       const meeting = { ...meetingData, id: testMeetingId };
-      
-      // Store pending meeting in sessionStorage for instant display
       sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
       
-      // Toast and redirect immediately
       toast({
         title: 'Testmöte sparat',
         description: 'Transkribering pågår i bakgrunden.',
@@ -281,7 +390,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       navigate(`/library/${testMeetingId}`, { state: { fromRecording: true } });
       
-      // Client ASR + POST /transcribe per spec
       transcribeAndSave(audioBlob, testMeetingId, {
         language: 'sv',
         meetingTitle: 'Testmöte',
@@ -289,7 +397,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           console.log(`🎤 Test ASR: ${stage} ${percent}%`);
         },
         onTranscriptReady: (transcript) => {
-          // Parse transcript if JSON
           let cleanTranscript = transcript;
           try {
             const parsed = JSON.parse(transcript);
@@ -320,7 +427,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Library-first flow: save meeting, redirect instantly, upload in background
+  // Library-first flow: save meeting, redirect instantly
   const handleStopRecording = async () => {
     if (isTestMode || isSaving) return;
 
@@ -333,8 +440,19 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       return;
     }
 
+    // For browser mode (Free/Pro), check if we have any transcript
+    if (!useAsrMode && !liveTranscript.trim() && !interimText.trim()) {
+      toast({
+        title: 'Ingen text transkriberad',
+        description: 'Försäkra dig om att mikrofonen fungerar och tala tydligt.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSaving(true);
     setIsRecording(false);
+    stopSpeechRecognition();
     await releaseWakeLock();
 
     // Stop media recorder and get final audio data
@@ -348,9 +466,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Save meeting, redirect instantly, upload audio in background
+  // Save meeting, redirect instantly
   const saveAndRedirectInstantly = async () => {
-    // Guard against double saves
     if (isSavingRef.current) {
       console.log('⚠️ Save already in progress, ignoring duplicate call');
       return;
@@ -362,13 +479,18 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     try {
       console.log('📤 Saving meeting and redirecting instantly...');
       
+      // Combine live transcript with any interim text
+      const finalTranscript = (liveTranscript + ' ' + interimText).trim();
+      
+      // For ASR mode, we need the audio blob
       const blob = new Blob(audioChunksRef.current, { 
         type: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' 
       });
       
       console.log('Audio blob size:', blob.size, 'bytes');
 
-      if (blob.size < 1000) {
+      // Only check blob size for ASR mode
+      if (useAsrMode && blob.size < 1000) {
         toast({
           title: 'Ljudfilen är för liten',
           description: 'Försök spela in igen.',
@@ -381,43 +503,38 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         return;
       }
 
-      // Check if this is a continued meeting (has existing ID, not temp)
       const isContinuedMeeting = continuedMeeting && sessionId && !sessionId.startsWith('temp-');
       
-      // Save meeting to library first (with processing status)
       const now = new Date().toISOString();
       const meetingData = {
-        ...(isContinuedMeeting ? { id: sessionId } : {}), // Use existing ID for continued meetings
+        ...(isContinuedMeeting ? { id: sessionId } : {}),
         title: meetingName,
         folder: selectedFolder,
-        transcript: '', // Empty - will be filled by backend (will append for continued)
+        // For browser mode: save transcript directly. For ASR mode: empty (filled by backend)
+        transcript: useAsrMode ? '' : finalTranscript,
         protocol: continuedMeeting?.protocol || '',
         createdAt: createdAtRef.current,
         updatedAt: now,
         userId: user.uid,
         isCompleted: true,
         source: 'live' as const,
-        transcriptionStatus: 'processing' as const,
-        forceCreate: !isContinuedMeeting, // Only force create for new meetings
+        // For browser mode: done immediately. For ASR mode: processing
+        transcriptionStatus: useAsrMode ? 'processing' as const : 'done' as const,
+        forceCreate: !isContinuedMeeting,
       };
 
       const meetingId = isContinuedMeeting 
         ? sessionId 
         : await meetingStorage.saveMeeting(meetingData as any);
       
-      // For continued meetings, update the existing meeting
       if (isContinuedMeeting) {
         await meetingStorage.saveMeeting({ ...meetingData, id: meetingId } as any);
       }
       console.log(`✅ Meeting ${isContinuedMeeting ? 'updated' : 'created'} with ID:`, meetingId);
       
-      // Create the full meeting object for sessionStorage
       const meeting = { ...meetingData, id: meetingId };
-      
-      // Store pending meeting in sessionStorage for instant display
       sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
       
-      // Count meeting
       if (!hasIncrementedCountRef.current) {
         const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
         if (wasCounted) {
@@ -427,44 +544,48 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         hasIncrementedCountRef.current = true;
       }
 
-      // Clean up stream immediately
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
       
-      // Show toast and redirect IMMEDIATELY
       toast({
         title: 'Möte sparat',
-        description: 'Transkribering pågår i bakgrunden.',
+        description: useAsrMode ? 'Transkribering pågår i bakgrunden.' : 'Transkribering klar!',
       });
       
       navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
 
-      // Client ASR + POST /transcribe per spec
-      transcribeAndSave(blob, meetingId, {
-        language: 'sv',
-        meetingTitle: meetingName,
-        onProgress: (stage, percent) => {
-          console.log(`🎤 ASR: ${stage} ${percent}%`);
-        },
-        onTranscriptReady: (transcript) => {
-          // Parse transcript if JSON
-          let cleanTranscript = transcript;
-          try {
-            const parsed = JSON.parse(transcript);
-            if (parsed.text) cleanTranscript = parsed.text;
-          } catch { /* not JSON */ }
-          
-          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-            detail: { meetingId, transcript: cleanTranscript } 
-          }));
-        }
-      }).then(result => {
-        if (!result.success) {
-          console.error('❌ Client ASR failed:', result.error);
-        }
-      });
+      // Only use ASR for enterprise/plus/unlimited plans
+      if (useAsrMode) {
+        transcribeAndSave(blob, meetingId, {
+          language: 'sv',
+          meetingTitle: meetingName,
+          onProgress: (stage, percent) => {
+            console.log(`🎤 ASR: ${stage} ${percent}%`);
+          },
+          onTranscriptReady: (transcript) => {
+            let cleanTranscript = transcript;
+            try {
+              const parsed = JSON.parse(transcript);
+              if (parsed.text) cleanTranscript = parsed.text;
+            } catch { /* not JSON */ }
+            
+            window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+              detail: { meetingId, transcript: cleanTranscript } 
+            }));
+          }
+        }).then(result => {
+          if (!result.success) {
+            console.error('❌ Client ASR failed:', result.error);
+          }
+        });
+      } else {
+        // For browser mode, dispatch completion event immediately
+        window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+          detail: { meetingId, transcript: finalTranscript } 
+        }));
+      }
       
     } catch (error: any) {
       console.error('❌ Save error:', error);
@@ -484,6 +605,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       return;
     }
     stopMediaRecorder();
+    stopSpeechRecognition();
     onBack();
   };
 
@@ -545,13 +667,11 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg space-y-8">
+          <div className="w-full max-w-lg space-y-6">
             {/* Recording Status */}
             <div className="bg-card rounded-xl p-6 md:p-8 border shadow-sm relative">
-              <div className="flex flex-col items-center text-center space-y-6">
-                {/* Mic Icon */}
-                
-                {/* Test button for allowed user - positioned in card corner */}
+              <div className="flex flex-col items-center text-center space-y-4">
+                {/* Test button for allowed user */}
                 {hasTestAccess && !isTestMode && (
                   <button
                     onClick={startTestMode}
@@ -565,29 +685,58 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
                   {!isPaused && (
                     <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20" />
                   )}
-                  <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all ${
+                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all ${
                     !isPaused ? 'bg-red-500 shadow-lg shadow-red-500/30' : 'bg-muted'
                   }`}>
-                    <Mic className={`w-10 h-10 md:w-12 md:h-12 ${!isPaused ? 'text-white' : 'text-muted-foreground'}`} />
+                    <Mic className={`w-8 h-8 md:w-10 md:h-10 ${!isPaused ? 'text-white' : 'text-muted-foreground'}`} />
                   </div>
                 </div>
 
-                {/* Audio Visualization */}
-                <AudioVisualizationBars stream={streamRef.current} isActive={isRecording && !isPaused} />
+                {/* Audio Visualization (for ASR mode) or Status */}
+                {useAsrMode ? (
+                  <AudioVisualizationBars stream={streamRef.current} isActive={isRecording && !isPaused} />
+                ) : null}
 
                 {/* Status Text */}
-                <div className="space-y-2">
-                  <h2 className="text-lg md:text-xl font-semibold">
+                <div className="space-y-1">
+                  <h2 className="text-base md:text-lg font-semibold">
                     {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Inspelning pågår'}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {isPaused 
                       ? 'Tryck "Återuppta" för att fortsätta'
-                      : 'Tala tydligt. Ljudet spelas in för transkribering.'}
+                      : useAsrMode 
+                        ? 'Ljudet spelas in för transkribering.'
+                        : 'Tala tydligt – texten visas direkt.'}
                   </p>
                 </div>
               </div>
             </div>
+
+            {/* Live Transcript Display (Free/Pro only) */}
+            {!useAsrMode && (
+              <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                <div className="px-4 py-2 border-b bg-muted/30">
+                  <span className="text-xs font-medium text-muted-foreground">Transkribering</span>
+                </div>
+                <ScrollArea className="h-[200px] md:h-[240px]">
+                  <div ref={transcriptScrollRef} className="p-4 text-sm leading-relaxed">
+                    {liveTranscript || interimText ? (
+                      <>
+                        <span className="text-foreground">{liveTranscript}</span>
+                        {interimText && (
+                          <span className="text-muted-foreground/60 italic">{interimText}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground italic">
+                        Börja tala för att se transkriberingen...
+                      </span>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
 
             {/* Folder Selection */}
             <div className="flex items-center justify-center gap-3">
@@ -655,7 +804,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Fortsätt spela in</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { stopMediaRecorder(); onBack(); }} className="bg-destructive">
+              <AlertDialogAction onClick={() => { stopMediaRecorder(); stopSpeechRecognition(); onBack(); }} className="bg-destructive">
                 Lämna utan att spara
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -668,6 +817,5 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     );
   }
 
-  // Fallback (should not reach here normally)
   return null;
 };
