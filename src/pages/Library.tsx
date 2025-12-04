@@ -54,6 +54,24 @@ const Library = () => {
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
 
+  // Load pending meeting from sessionStorage immediately
+  useEffect(() => {
+    const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
+    if (pendingMeetingJson) {
+      try {
+        const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
+        // Show pending meeting immediately
+        setMeetings(prev => {
+          const exists = prev.some(m => m.id === pendingMeeting.id);
+          if (exists) return prev;
+          return [pendingMeeting, ...prev];
+        });
+      } catch (e) {
+        console.error('Failed to parse pending meeting:', e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
     
@@ -124,6 +142,15 @@ const Library = () => {
       }
       const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
       setMeetings(deduped);
+      
+      // Clear pending meeting once we have real data
+      const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
+      if (pendingMeetingJson) {
+        const pending = JSON.parse(pendingMeetingJson);
+        if (deduped.some(m => m.id === pending.id)) {
+          sessionStorage.removeItem('pendingMeeting');
+        }
+      }
       
       const allFolders = await meetingStorage.getFolders(user.uid);
       setFolders(allFolders.map(f => f.name));

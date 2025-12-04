@@ -266,6 +266,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
       await meetingStorage.saveMeeting(meeting as any);
       
+      // Store pending meeting in sessionStorage for instant display
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
+      
       // Toast and redirect immediately
       toast({
         title: 'Testmöte sparat',
@@ -379,6 +382,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
       await meetingStorage.saveMeeting(meeting as any);
       console.log('✅ Meeting saved to library:', meetingId);
+      
+      // Store pending meeting in sessionStorage for instant display
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(meeting));
       
       // Count meeting
       if (!hasIncrementedCountRef.current) {
