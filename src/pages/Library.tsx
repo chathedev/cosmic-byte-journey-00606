@@ -54,18 +54,17 @@ const Library = () => {
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
 
-  // Load pending meeting from sessionStorage immediately
+  // Load pending meeting from sessionStorage immediately on mount
   useEffect(() => {
     const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
     if (pendingMeetingJson) {
       try {
         const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
-        // Show pending meeting immediately
-        setMeetings(prev => {
-          const exists = prev.some(m => m.id === pendingMeeting.id);
-          if (exists) return prev;
-          return [pendingMeeting, ...prev];
-        });
+        // Ensure it has processing status for display
+        pendingMeeting.transcriptionStatus = pendingMeeting.transcriptionStatus || 'processing';
+        // Show pending meeting immediately as placeholder
+        setMeetings([pendingMeeting]);
+        setIsLoading(false); // Don't show loading spinner, show the placeholder
       } catch (e) {
         console.error('Failed to parse pending meeting:', e);
       }
@@ -73,14 +72,12 @@ const Library = () => {
   }, []);
 
   useEffect(() => {
-    loadData();
-    
-    // Quick re-poll after 1 second to catch recently saved meetings
-    const quickPoll = setTimeout(() => {
+    // Only load data after a short delay to avoid overwriting pending meeting
+    const loadTimer = setTimeout(() => {
       loadData();
-    }, 1000);
+    }, 500);
     
-    return () => clearTimeout(quickPoll);
+    return () => clearTimeout(loadTimer);
   }, [user]);
 
   // Poll for processing meetings every 2 seconds
@@ -129,7 +126,14 @@ const Library = () => {
   const loadData = async () => {
     if (!user) return;
     
-    setIsLoading(true);
+    // Don't set loading if we have a pending meeting showing
+    const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
+    const hasPending = !!pendingMeetingJson;
+    
+    if (!hasPending) {
+      setIsLoading(true);
+    }
+    
     try {
       const userMeetings = await meetingStorage.getMeetings(user.uid);
       // De-duplicate by meeting ID (keep latest version)
@@ -140,17 +144,34 @@ const Library = () => {
           map.set(m.id, m);
         }
       }
-      const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
-      setMeetings(deduped);
       
-      // Clear pending meeting once we have real data
-      const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
+      // If we have a pending meeting, merge it (update if exists in loaded data)
       if (pendingMeetingJson) {
-        const pending = JSON.parse(pendingMeetingJson);
-        if (deduped.some(m => m.id === pending.id)) {
-          sessionStorage.removeItem('pendingMeeting');
+        try {
+          const pending = JSON.parse(pendingMeetingJson) as MeetingSession;
+          const loadedVersion = map.get(pending.id);
+          
+          if (loadedVersion) {
+            // Backend has updated data - use it and clear pending
+            map.set(pending.id, loadedVersion);
+            // Only clear if transcription is done or failed
+            if (loadedVersion.transcriptionStatus !== 'processing' || loadedVersion.transcript) {
+              sessionStorage.removeItem('pendingMeeting');
+            }
+          } else {
+            // Meeting not yet in backend - keep showing pending
+            pending.transcriptionStatus = 'processing';
+            map.set(pending.id, pending);
+          }
+        } catch (e) {
+          console.error('Failed to merge pending meeting:', e);
         }
       }
+      
+      const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
+      // Sort by date, newest first
+      deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setMeetings(deduped);
       
       const allFolders = await meetingStorage.getFolders(user.uid);
       setFolders(allFolders.map(f => f.name));
