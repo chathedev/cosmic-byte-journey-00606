@@ -229,7 +229,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Test mode - uses pre-recorded audio file with real transcription API
+  // Test mode - uses pre-recorded audio file with the same transcription flow as normal recording
   const startTestMode = async () => {
     if (isTestMode) return;
     
@@ -237,6 +237,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     setIsRecording(false);
     setViewState('processing');
     setDurationSec(0);
+    setTranscriptionError(null);
+    setTranscriptionProgress(0);
     
     try {
       // Fetch the test audio file
@@ -249,54 +251,49 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       console.log('📤 Test mode: Uploading test audio for transcription...', audioBlob.size, 'bytes');
       
-      // Send to transcription API
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'test-audio.wav');
+      // Store blob for potential retry
+      setPendingAudioBlob(audioBlob);
       
-      const transcriptionResponse = await fetch('https://transcribe.api.tivly.se/transcribe', {
-        method: 'POST',
-        body: formData,
+      // Use the same API client as normal recording flow
+      const result = await apiClient.transcribeAudio(audioBlob, 'sv', {
+        meetingId: sessionId || `test-${Date.now()}`,
+        onProgress: setTranscriptionProgress,
       });
       
-      console.log('📡 Test mode: API response status:', transcriptionResponse.status);
-      
-      if (!transcriptionResponse.ok) {
-        const errorText = await transcriptionResponse.text();
-        console.error('❌ Test mode API error:', transcriptionResponse.status, errorText);
-        throw new Error(`Transcription failed: ${transcriptionResponse.status}`);
-      }
-      
-      const result = await transcriptionResponse.json();
       console.log('✅ Test transcription result:', result);
       
-      if (result.status === 'done' && result.text) {
-        setTranscript(result.text);
-        setViewState('result');
-        
-        // Generate title
-        try {
-          const aiTitle = await generateMeetingTitle(result.text);
-          setMeetingName(aiTitle);
-        } catch (e) {
-          setMeetingName("Testmöte");
-        }
-        
-        toast({
-          title: "Testläge klart",
-          description: "Transkribering av testljud klar.",
-        });
-      } else {
+      if (!result.success) {
+        throw new Error(result.error || 'Transcription failed');
+      }
+      
+      const transcriptText = result.transcript || result.text || '';
+      
+      if (!transcriptText.trim()) {
         throw new Error('No transcription text received');
       }
+      
+      setTranscript(transcriptText);
+      setViewState('result');
+      setPendingAudioBlob(null);
+      
+      // Generate title
+      try {
+        const aiTitle = await generateMeetingTitle(transcriptText);
+        setMeetingName(aiTitle);
+      } catch (e) {
+        setMeetingName("Testmöte");
+      }
+      
+      toast({
+        title: "Testläge klart",
+        description: result.processing_time 
+          ? `Transkribering klar på ${result.processing_time.toFixed(1)}s`
+          : "Transkribering av testljud klar.",
+      });
     } catch (error: any) {
       console.error('❌ Test mode error:', error?.message || error);
-      toast({
-        title: 'Testfel',
-        description: error?.message || 'Kunde inte transkribera testljudet.',
-        variant: 'destructive',
-      });
-      setViewState('recording');
-      startRecording();
+      setTranscriptionError(error?.message || 'Kunde inte transkribera testljudet');
+      setViewState('error');
     } finally {
       setIsTestMode(false);
     }
