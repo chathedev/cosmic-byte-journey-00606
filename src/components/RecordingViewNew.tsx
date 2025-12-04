@@ -256,9 +256,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         createdAt: now,
         updatedAt: now,
         userId: user?.uid || '',
-        isCompleted: true, // Mark as completed so it gets created
+        isCompleted: true,
         source: 'live' as const,
         transcriptionStatus: 'processing' as const,
+        forceCreate: true, // CRITICAL: Force CREATE, never UPDATE
       };
 
       const testMeetingId = await meetingStorage.saveMeeting(meetingData as any);
@@ -374,9 +375,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         createdAt: createdAtRef.current,
         updatedAt: now,
         userId: user.uid,
-        isCompleted: true, // Mark as completed so it gets created
+        isCompleted: true,
         source: 'live' as const,
         transcriptionStatus: 'processing' as const,
+        forceCreate: true, // CRITICAL: Force CREATE, never UPDATE
       };
 
       const meetingId = await meetingStorage.saveMeeting(meetingData as any);
