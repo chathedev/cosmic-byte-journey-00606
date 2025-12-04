@@ -1508,6 +1508,167 @@ class ApiClient {
     return response.json();
   }
 
+  // Get transcription status for a meeting (polling endpoint)
+  async getTranscriptionStatus(meetingId: string): Promise<{
+    success: boolean;
+    status: 'processing' | 'done' | 'failed';
+    transcript?: string;
+    path?: string;
+    jsonPath?: string;
+    duration?: number;
+    processing_time?: number;
+    notified?: boolean;
+    error?: string;
+    updatedAt?: string;
+  }> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/transcription`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || 'Failed to get transcription status' };
+      }
+      return {
+        success: false,
+        status: 'failed',
+        error: errorData.error || 'transcription_status_failed'
+      };
+    }
+
+    return response.json();
+  }
+
+  // Upload audio for transcription (Library-first flow)
+  async uploadForTranscription(
+    audioFile: File | Blob,
+    meetingId: string,
+    options?: {
+      meetingTitle?: string;
+      language?: string;
+      modelSize?: 'tiny' | 'base' | 'small' | 'medium' | 'large';
+      onProgress?: (progress: number) => void;
+    }
+  ): Promise<{
+    success: boolean;
+    status?: 'processing' | 'done' | 'failed';
+    transcript?: string;
+    path?: string;
+    jsonPath?: string;
+    duration?: number;
+    processing_time?: number;
+    error?: string;
+  }> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const fileSizeMB = ((audioFile as File).size || (audioFile as Blob).size) / 1024 / 1024;
+    const fileName = (audioFile as File).name || 'audio.wav';
+
+    console.log('📤 Uploading audio for transcription:', {
+      fileName,
+      fileSize: `${fileSizeMB.toFixed(2)}MB`,
+      fileType: audioFile.type,
+      meetingId,
+      language: options?.language || 'sv'
+    });
+
+    // Validate file size (250MB limit)
+    if (fileSizeMB > 250) {
+      throw new Error('File size exceeds 250MB limit');
+    }
+
+    const formData = new FormData();
+    formData.append('audioFile', audioFile, fileName);
+    formData.append('file', audioFile, fileName); // Alternative field name
+    formData.append('meetingId', meetingId);
+    formData.append('language', options?.language || 'sv');
+    if (options?.meetingTitle) {
+      formData.append('meetingTitle', options.meetingTitle);
+    }
+    if (options?.modelSize) {
+      formData.append('modelSize', options.modelSize);
+    }
+
+    try {
+      options?.onProgress?.(10);
+
+      const response = await fetch(`${API_BASE_URL}/transcribe`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      options?.onProgress?.(50);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Upload for transcription failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText
+        });
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to upload for transcription' };
+        }
+
+        return {
+          success: false,
+          status: 'failed',
+          error: errorData.error || 'upload_failed'
+        };
+      }
+
+      const data = await response.json();
+      options?.onProgress?.(100);
+
+      console.log('✅ Upload successful:', {
+        status: data.status,
+        path: data.path
+      });
+
+      return {
+        success: true,
+        status: data.status || 'processing',
+        transcript: data.transcript,
+        path: data.path,
+        jsonPath: data.jsonPath,
+        duration: data.duration,
+        processing_time: data.processing_time
+      };
+    } catch (error: any) {
+      console.error('❌ Upload error:', error);
+      return {
+        success: false,
+        status: 'failed',
+        error: error.message || 'Network error during upload'
+      };
+    }
+  }
+
   // Transcription API - Enhanced with meetingId support and retry
   async transcribeAudio(
     audioFile: File | Blob, 

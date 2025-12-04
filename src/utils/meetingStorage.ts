@@ -14,6 +14,7 @@ export interface MeetingSession {
   protocolCount?: number;
   agendaId?: string;
   source?: 'live' | 'upload'; // Indikerar om mötet är från live-inspelning eller uppladdad fil
+  transcriptionStatus?: 'processing' | 'done' | 'failed'; // Status för transkribering
 }
 
 export interface MeetingFolder {
@@ -38,6 +39,8 @@ const mapMeeting = (m: any, userIdHint?: string): MeetingSession => ({
   isCompleted: !!(m.isCompleted ?? m.completed ?? false),
   protocolCount: Number(m.protocolCount ?? 0),
   agendaId: m.agendaId || m.agendaid || undefined,
+  source: m.source || undefined,
+  transcriptionStatus: m.transcriptionStatus || (m.transcript ? 'done' : undefined),
 });
 
 export const meetingStorage = {
