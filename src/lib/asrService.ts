@@ -1,7 +1,8 @@
 // Direct ASR Service - Frontend handles transcription directly
-// Flow: 1) Send audio to ASR service 2) Save transcript to backend
+// Flow: 1) Send audio to ASR service 2) Save transcript to backend 3) Send email notification
 
 import { debugLog, debugError } from './debugLogger';
+import { sendTranscriptionCompleteEmail } from './emailNotification';
 
 const ASR_ENDPOINT = 'https://asr.api.tivly.se/transcribe';
 const BACKEND_API_URL = 'https://api.tivly.se';
@@ -229,10 +230,12 @@ export async function transcribeAndSave(
   meetingId: string,
   options: ASROptions & { 
     meetingTitle?: string;
+    userEmail?: string;
+    userName?: string;
     onTranscriptReady?: (transcript: string) => void;
   }
 ): Promise<ASRResult> {
-  const { onTranscriptReady, meetingTitle, ...asrOptions } = options;
+  const { onTranscriptReady, meetingTitle, userEmail, userName, ...asrOptions } = options;
   
   debugLog('🚀 ========== TRANSCRIPTION FLOW START ==========');
   debugLog('📋 Meeting ID:', meetingId);
@@ -260,6 +263,24 @@ export async function transcribeAndSave(
   
   if (saveResult.success) {
     debugLog('✅ Step 2 SUCCESS: Transcript saved to backend');
+    
+    // Step 3: Send email notification
+    if (userEmail) {
+      debugLog('📧 Step 3: Sending email notification to', userEmail);
+      sendTranscriptionCompleteEmail({
+        userEmail,
+        userName,
+        meetingTitle: meetingTitle || 'Ditt möte',
+        meetingId,
+      }).then(emailSent => {
+        if (emailSent) {
+          debugLog('✅ Step 3 SUCCESS: Email notification sent');
+        } else {
+          debugError('⚠️ Step 3: Email notification failed (non-blocking)');
+        }
+      });
+    }
+    
     debugLog('🚀 ========== TRANSCRIPTION FLOW COMPLETE ==========');
   } else {
     debugError('❌ FLOW FAILED at Step 2: Could not save transcript:', saveResult.error);

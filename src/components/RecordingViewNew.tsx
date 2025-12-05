@@ -440,6 +440,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
       transcribeAndSave(audioBlob, testMeetingId, {
         language: 'sv',
         meetingTitle: 'Testmöte',
+        userEmail: user?.email,
+        userName: user?.displayName,
         onProgress: (stage, percent) => {
           console.log(`🎤 Test ASR: ${stage} ${percent}%`);
         },
@@ -614,6 +616,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           transcribeAndSave(blob, meetingId, {
             language: 'sv',
             meetingTitle: meetingName,
+            userEmail: user.email,
+            userName: user.displayName,
             onProgress: (stage, percent) => {
               console.log(`🎤 ASR: ${stage} ${percent}%`);
             },
