@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink } from "lucide-react";
+import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
@@ -22,54 +22,60 @@ interface Message {
   };
 }
 
-const TypewriterText = ({ text }: { text: string }) => {
+// Thinking/typing animation dots
+const ThinkingIndicator = () => {
+  return (
+    <div className="flex items-center gap-1.5 py-2">
+      <span className="text-sm text-muted-foreground">Tänker</span>
+      <div className="flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"
+            style={{ animationDelay: `${i * 0.15}s`, animationDuration: '0.6s' }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Quick loading animation
-    const loadingTimer = setTimeout(() => {
-      setIsLoading(false);
-    }, 400);
-
-    return () => clearTimeout(loadingTimer);
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading && currentIndex < text.length) {
-      // Fast, smooth typing animation
+    if (currentIndex < text.length) {
+      // Fast, smooth typing animation - faster for longer texts
+      const delay = text.length > 200 ? 8 : 12;
       const timeout = setTimeout(() => {
-        setDisplayedText(text.slice(0, currentIndex + 1));
-        setCurrentIndex(currentIndex + 1);
-      }, 15);
+        // Type multiple characters at once for longer texts
+        const charsToAdd = text.length > 300 ? 3 : text.length > 100 ? 2 : 1;
+        const newIndex = Math.min(currentIndex + charsToAdd, text.length);
+        setDisplayedText(text.slice(0, newIndex));
+        setCurrentIndex(newIndex);
+      }, delay);
       return () => clearTimeout(timeout);
+    } else if (onComplete && currentIndex === text.length && text.length > 0) {
+      onComplete();
     }
-  }, [text, currentIndex, isLoading]);
+  }, [text, currentIndex, onComplete]);
 
-  if (isLoading) {
-    return (
-      <span className="inline-block min-w-[60px] h-5 rounded-md bg-muted/60 animate-pulse" 
-        style={{ 
-          animationDuration: '0.8s',
-          animationTimingFunction: 'ease-in-out'
-        }} 
-      />
-    );
-  }
+  const formatText = (content: string) => {
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm font-mono">$1</code>')
+      .replace(/\n/g, '<br>');
+  };
 
   return (
-    <div 
-      className="whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert inline"
-      dangerouslySetInnerHTML={{ 
-        __html: displayedText
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.*?)\*/g, '<em>$1</em>')
-          .replace(/`(.*?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm">$1</code>')
-          .replace(/\n/g, '<br>') + 
-          (currentIndex < text.length ? '<span class="inline-block w-0.5 h-5 bg-primary ml-1 animate-pulse"></span>' : '')
-      }}
-    />
+    <div className="whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert inline">
+      <span dangerouslySetInnerHTML={{ __html: formatText(displayedText) }} />
+      {currentIndex < text.length && (
+        <span className="inline-block w-0.5 h-5 bg-primary ml-0.5 animate-pulse" />
+      )}
+    </div>
   );
 };
 
@@ -86,8 +92,18 @@ export const Chat = () => {
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [streamingIndex, setStreamingIndex] = useState<number | null>(null);
   const [controller, setController] = useState<AbortController | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isPlusUser = hasPlusAccess(user, userPlan);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isThinking]);
 
   useEffect(() => {
     loadMeetings();
@@ -122,6 +138,7 @@ export const Chat = () => {
     const newMessages = [...messages, { role: "user" as const, content: userMessage }];
     setMessages(newMessages);
     setIsLoading(true);
+    setIsThinking(true);
 
     try {
       let transcriptContext = "";
@@ -186,6 +203,7 @@ export const Chat = () => {
       let assistantContent = "";
 
       setStreamingIndex(newMessages.length);
+      setIsThinking(false); // Stop thinking when first content arrives
 
       while (!streamDone) {
         const { done, value } = await reader.read();
@@ -231,6 +249,7 @@ export const Chat = () => {
 
       setStreamingIndex(null);
       setIsLoading(false);
+      setIsThinking(false);
       setController(null);
 
     } catch (error) {
@@ -243,6 +262,7 @@ export const Chat = () => {
       setMessages(messages);
       setStreamingIndex(null);
       setIsLoading(false);
+      setIsThinking(false);
       setController(null);
     }
   };
@@ -352,12 +372,12 @@ export const Chat = () => {
         </div>
 
         {/* Chat Messages */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1" ref={scrollAreaRef}>
           <div className="p-5 space-y-5 max-w-3xl mx-auto w-full">
             {meetings.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                  <MessageCircle className="w-8 h-8 text-primary" />
+                  <Sparkles className="w-8 h-8 text-primary" />
                 </div>
                 <h2 className="text-xl font-semibold mb-2">Inga möten att chatta om</h2>
                 <p className="text-base text-muted-foreground mb-6 max-w-md">
@@ -374,76 +394,96 @@ export const Chat = () => {
               </div>
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                  <MessageCircle className="w-8 h-8 text-primary" />
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-5">
+                  <Sparkles className="w-10 h-10 text-primary" />
                 </div>
-                <p className="text-base text-muted-foreground mb-8">
-                  Ställ frågor om dina möten
+                <h2 className="text-lg font-semibold mb-2">Fråga mig om dina möten</h2>
+                <p className="text-sm text-muted-foreground mb-8 max-w-xs">
+                  Jag kan sammanfatta, hitta beslut och ge förslag baserat på dina möten
                 </p>
-                <div className="grid grid-cols-1 gap-3 w-full max-w-md">
+                <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
                   {[
-                    "Sammanfatta senaste mötet",
-                    "Vilka beslut togs?",
-                    "Visa åtgärdspunkter"
-                  ].map((text) => (
+                    { text: "Sammanfatta senaste mötet", icon: "📋" },
+                    { text: "Vilka beslut togs?", icon: "✅" },
+                    { text: "Föreslå nästa steg", icon: "💡" },
+                    { text: "Vad borde vi prata om i nästa möte?", icon: "📌" }
+                  ].map(({ text, icon }) => (
                     <Button 
                       key={text} 
                       variant="outline" 
                       onClick={() => setInput(text)}
-                      className="h-auto py-3 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                      className="h-auto py-3 px-4 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all group"
                     >
+                      <span className="mr-2 group-hover:scale-110 transition-transform">{icon}</span>
                       {text}
                     </Button>
                   ))}
                 </div>
               </div>
             ) : (
-              messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  {msg.role === "assistant" && (
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <MessageCircle className="w-4 h-4 text-primary" />
-                    </div>
-                  )}
-                  
+              <>
+                {messages.map((msg, idx) => (
                   <div
-                    className={`max-w-[80%] rounded-xl px-4 py-3 text-base ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/50 text-foreground border border-border/50"
-                    }`}
+                    key={idx}
+                    className={`flex gap-3 animate-fade-in ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    {msg.role === "assistant" && streamingIndex === idx ? (
-                      <TypewriterText text={msg.content} />
-                    ) : (
-                      <div 
-                        className="whitespace-pre-wrap leading-relaxed prose prose-sm max-w-none dark:prose-invert"
-                        dangerouslySetInnerHTML={{ 
-                          __html: msg.content
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                            .replace(/`(.*?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm">$1</code>')
-                            .replace(/\n/g, '<br>')
-                        }}
-                      />
+                    {msg.role === "assistant" && (
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 mt-1">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                      </div>
                     )}
-                    {msg.meetingReference && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mt-2 w-full text-sm h-8 hover:bg-primary/10 hover:text-primary"
-                        onClick={() => navigate(`/library?highlight=${msg.meetingReference?.meetingId}`)}
-                      >
-                        <ExternalLink className="w-3 h-3 mr-1.5" />
-                        {msg.meetingReference.meetingTitle}
-                      </Button>
-                    )}
+                    
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-base shadow-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-md"
+                          : "bg-muted/50 text-foreground border border-border/30 rounded-bl-md"
+                      }`}
+                    >
+                      {msg.role === "assistant" && streamingIndex === idx ? (
+                        <TypewriterText text={msg.content} onComplete={() => setStreamingIndex(null)} />
+                      ) : (
+                        <div 
+                          className="whitespace-pre-wrap leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+                          dangerouslySetInnerHTML={{ 
+                            __html: msg.content
+                              .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+                              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                              .replace(/`(.*?)`/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm font-mono">$1</code>')
+                              .replace(/\n/g, '<br>')
+                          }}
+                        />
+                      )}
+                      {msg.meetingReference && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 w-full text-sm h-8 hover:bg-primary/10 hover:text-primary"
+                          onClick={() => navigate(`/library?highlight=${msg.meetingReference?.meetingId}`)}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1.5" />
+                          {msg.meetingReference.meetingTitle}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+                
+                {/* Thinking indicator */}
+                {isThinking && (
+                  <div className="flex gap-3 justify-start animate-fade-in">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                    </div>
+                    <div className="bg-muted/50 border border-border/30 rounded-2xl rounded-bl-md px-4 py-2">
+                      <ThinkingIndicator />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
+              </>
             )}
           </div>
         </ScrollArea>
