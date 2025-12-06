@@ -28,6 +28,7 @@ const AdminBackend = () => {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
+  const [maintenancePending, setMaintenancePending] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     action: 'cleanup' | 'restart' | 'maintenance' | null;
@@ -122,15 +123,36 @@ const AdminBackend = () => {
   };
 
   const handleMaintenanceToggle = async () => {
-    setIsActionLoading('maintenance');
+    const previousState = maintenance?.enabled ?? false;
+    const newState = !previousState;
+    
+    // Optimistic update - show new state immediately
+    setMaintenancePending(true);
+    setMaintenance(prev => prev ? { ...prev, enabled: newState } : { enabled: newState });
+    
     try {
       const result = await apiClient.toggleMaintenance();
       setMaintenance(result.maintenance);
       toast.success(result.maintenance.enabled ? 'Underhållsläge aktiverat' : 'Underhållsläge avaktiverat');
+      
+      // Verify with backend after 5 seconds to ensure state is correct
+      setTimeout(async () => {
+        try {
+          const verifyResult = await apiClient.getMaintenanceStatus();
+          if (verifyResult.success) {
+            setMaintenance(verifyResult.maintenance);
+          }
+        } catch (e) {
+          // Silent fail on verification
+        } finally {
+          setMaintenancePending(false);
+        }
+      }, 5000);
     } catch (error) {
+      // Revert on error
+      setMaintenance(prev => prev ? { ...prev, enabled: previousState } : { enabled: previousState });
+      setMaintenancePending(false);
       toast.error('Kunde inte ändra underhållsläge');
-    } finally {
-      setIsActionLoading(null);
     }
   };
 
@@ -573,6 +595,12 @@ const AdminBackend = () => {
                   <Badge variant={maintenance?.enabled ? 'secondary' : 'default'}>
                     {maintenance?.enabled ? 'AKTIVT' : 'INAKTIVT'}
                   </Badge>
+                  {maintenancePending && (
+                    <Badge variant="outline" className="gap-1 text-xs">
+                      <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" />
+                      Verifierar...
+                    </Badge>
+                  )}
                 </div>
                 {maintenance?.updatedAt && (
                   <p className="text-xs text-muted-foreground">
@@ -583,15 +611,11 @@ const AdminBackend = () => {
               </div>
               <Button
                 onClick={() => openConfirmDialog('maintenance')}
-                disabled={isActionLoading !== null}
+                disabled={isActionLoading !== null || maintenancePending}
                 variant={maintenance?.enabled ? 'default' : 'destructive'}
                 className="gap-2"
               >
-                {isActionLoading === 'maintenance' ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Construction className="w-4 h-4" />
-                )}
+                <Construction className="w-4 h-4" />
                 {maintenance?.enabled ? 'Avaktivera' : 'Aktivera'}
               </Button>
             </div>
