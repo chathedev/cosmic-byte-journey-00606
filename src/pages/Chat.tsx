@@ -131,14 +131,24 @@ export const Chat = () => {
 
     try {
       let transcriptContext = "";
+      let selectedMeetingTitle = "";
+      
       if (selectedMeetingId === "all") {
-        transcriptContext = meetings.map(m => `[${m.title}]: ${m.transcript}`).join("\n\n");
+        // Include all meetings with their titles
+        transcriptContext = meetings.map(m => `[Möte: ${m.title}]\n${m.transcript}`).join("\n\n---\n\n");
+        selectedMeetingTitle = "alla möten";
       } else {
         const meeting = meetings.find(m => m.id === selectedMeetingId);
         if (meeting) {
-          transcriptContext = meeting.transcript || "";
+          transcriptContext = `[Valt möte: ${meeting.title}]\n${meeting.transcript || ""}`;
+          selectedMeetingTitle = meeting.title;
         }
       }
+      
+      // Add context about selected meeting to help AI remember
+      const contextPrefix = selectedMeetingId !== "all" && selectedMeetingTitle 
+        ? `[KONTEXT: Användaren har valt mötet "${selectedMeetingTitle}". Svara baserat på detta möte, fråga INTE vilket möte igen.]\n\n` 
+        : "";
 
       const abort = new AbortController();
       setController(abort);
@@ -153,7 +163,8 @@ export const Chat = () => {
           },
           body: JSON.stringify({
             messages: newMessages,
-            transcript: transcriptContext,
+            transcript: contextPrefix + transcriptContext,
+            meetingSelected: selectedMeetingId !== "all",
           }),
           signal: abort.signal,
         }
