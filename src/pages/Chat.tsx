@@ -8,14 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles } from "lucide-react";
+import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  showMeetingPicker?: boolean;
   meetingReference?: {
     meetingId: string;
     meetingTitle: string;
@@ -234,6 +236,18 @@ export const Chat = () => {
         }
       }
 
+      // Check if AI asked for meeting selection
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.content.includes("[ASK_MEETING]")) {
+          const cleanContent = last.content.replace("[ASK_MEETING]", "").trim();
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: cleanContent, showMeetingPicker: true } : m
+          );
+        }
+        return prev;
+      });
+
       setStreamingIndex(null);
       setIsLoading(false);
       setIsThinking(false);
@@ -259,6 +273,20 @@ export const Chat = () => {
     setIsLoading(false);
     setStreamingIndex(null);
     setController(null);
+  };
+
+  const handleMeetingSelect = (meetingId: string, meetingTitle: string) => {
+    setSelectedMeetingId(meetingId);
+    // Update the last message to hide picker and add confirmation
+    setMessages((prev) => {
+      const updated = prev.map((m, i) => 
+        i === prev.length - 1 ? { ...m, showMeetingPicker: false } : m
+      );
+      return [
+        ...updated,
+        { role: "assistant" as const, content: `Perfekt! Jag tittar nu på **${meetingTitle}**. Vad vill du veta om det mötet? 📋` }
+      ];
+    });
   };
 
   if (planLoading) return (
@@ -441,6 +469,35 @@ export const Chat = () => {
                           }}
                         />
                       )}
+                      
+                      {/* Inline meeting picker */}
+                      {msg.showMeetingPicker && (
+                        <AnimatePresence>
+                          <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="mt-3 pt-3 border-t border-border/30"
+                          >
+                            <p className="text-xs text-muted-foreground mb-2">Välj ett möte:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {meetings.slice(0, 5).map((meeting, i) => (
+                                <motion.button
+                                  key={meeting.id}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: i * 0.05 }}
+                                  onClick={() => handleMeetingSelect(meeting.id, meeting.title)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-background border border-border rounded-full hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all"
+                                >
+                                  <FileText className="w-3 h-3" />
+                                  <span className="max-w-[120px] truncate">{meeting.title}</span>
+                                </motion.button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        </AnimatePresence>
+                      )}
+                      
                       {msg.meetingReference && (
                         <Button
                           variant="ghost"
