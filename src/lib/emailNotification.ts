@@ -47,7 +47,7 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
             </p>
           </div>
         `,
-        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna mötet: ${meetingUrl}\n\nMed vänliga hälsningar,\nTivly`,
+        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna mötet i Tivly: ${WEB_APP_URL}/library\n\nMed vänliga hälsningar,\nTivly`,
         category: 'transcription-complete',
         metadata: { meetingId: data.meetingId },
       }),
