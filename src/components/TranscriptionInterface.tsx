@@ -103,18 +103,12 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   const handleOpenDigitalMeeting = async () => {
-    const { allowed, reason } = await canCreateMeeting();
-    if (!allowed) {
-      setUpgradeReason(reason || 'Du har nått din gräns för möten');
-      setShowUpgradeDialog(true);
-      return;
-    }
-
+    // Dialog handles plan restrictions and shows upgrade prompt for free users
     setShowDigitalMeetingDialog(true);
   };
 
-  // Check if user has Pro or Enterprise plan
-  const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'unlimited' || userPlan.plan === 'enterprise');
+  // Check if user has Pro or Enterprise plan (for upload access)
+  const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'plus' || userPlan.plan === 'unlimited' || userPlan.plan === 'enterprise');
 
 
   const handleFileUpload = async (file: File) => {
@@ -278,22 +272,25 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
                 </p>
               </div>
               
-              {hasProAccess && (
-                <div className="flex-1 max-w-xs">
-                  <Button
-                    onClick={handleOpenDigitalMeeting}
-                    variant="outline"
-                    size="lg"
-                    className="w-full px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-                  >
-                    <Upload className="mr-2 h-5 w-5" />
-                    Ladda upp inspelning
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    <span className="font-semibold text-accent">För alla möten</span> – fysiska & digitala (Teams, Zoom, etc.)
-                  </p>
-                </div>
-              )}
+              <div className="flex-1 max-w-xs">
+                <Button
+                  onClick={handleOpenDigitalMeeting}
+                  variant="outline"
+                  size="lg"
+                  className="w-full px-6 py-5 text-base font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                >
+                  <Upload className="mr-2 h-5 w-5" />
+                  Ladda upp inspelning
+                </Button>
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  {hasProAccess ? (
+                    <span className="font-semibold text-accent">För alla möten</span>
+                  ) : (
+                    <span className="font-semibold text-muted-foreground">Pro/Enterprise</span>
+                  )}
+                  {' '}– fysiska & digitala (Teams, Zoom, etc.)
+                </p>
+              </div>
             </div>
             
             {/* Clear explanation banner */}

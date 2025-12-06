@@ -1,10 +1,16 @@
 import { useState, useRef } from "react";
-import { Upload, FileAudio, X, Loader2, AlertCircle } from "lucide-react";
+import { Upload, FileAudio, X, Loader2, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { transcribeDirectly } from "@/lib/asrService";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { transcribeAndSave, saveTranscriptToBackend } from "@/lib/asrService";
+import { convertToWav, needsConversion } from "@/lib/audioConverter";
+import { meetingStorage } from "@/utils/meetingStorage";
+import { useNavigate } from "react-router-dom";
+import { debugLog, debugError } from "@/lib/debugLogger";
 
 interface DigitalMeetingDialogProps {
   open: boolean;
@@ -24,6 +30,18 @@ export const DigitalMeetingDialog = ({
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Check if user has upload access (Pro, Enterprise, Unlimited, or Admin)
+  const hasUploadAccess = userPlan && (
+    userPlan.plan === 'pro' || 
+    userPlan.plan === 'enterprise' || 
+    userPlan.plan === 'unlimited' ||
+    userPlan.plan === 'plus' ||
+    isAdmin
+  );
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -68,7 +86,7 @@ export const DigitalMeetingDialog = ({
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !user) return;
 
     setIsUploading(true);
 
@@ -76,18 +94,90 @@ export const DigitalMeetingDialog = ({
       // Map language code to ASR format
       const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
       
-      // Direct ASR - no backend proxy = much faster!
-      const result = await transcribeDirectly(selectedFile, {
+      debugLog('📤 Upload: Starting upload flow', {
+        fileName: selectedFile.name,
+        fileType: selectedFile.type,
+        fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`
+      });
+
+      // Step 1: Convert to WAV if needed
+      let audioBlob: Blob = selectedFile;
+      if (needsConversion(selectedFile)) {
+        setUploadProgress('Konverterar ljud...');
+        debugLog('🔄 Converting audio to WAV...');
+        audioBlob = await convertToWav(selectedFile);
+        debugLog('✅ Conversion complete');
+      }
+
+      // Step 2: Create meeting in library with 'processing' status
+      const meetingId = crypto.randomUUID();
+      const meetingTitle = selectedFile.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
+      
+      debugLog('📝 Creating meeting placeholder', { meetingId, meetingTitle });
+      setUploadProgress('Skapar möte...');
+
+      // Get user display name safely
+      const userName = (user as any).displayName || (user as any).name || undefined;
+
+      // Save meeting placeholder to backend
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      // Create meeting with processing status
+      await fetch('https://api.tivly.se/meetings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: meetingId,
+          title: meetingTitle,
+          transcript: '',
+          transcriptionStatus: 'processing',
+          folder: 'general',
+          source: 'upload',
+        }),
+      });
+
+      // Increment meeting count
+      await incrementMeetingCount(meetingId);
+
+      // Step 3: Send to ASR and save transcript (same flow as Enterprise recording)
+      setUploadProgress('Transkriberar...');
+      debugLog('🎤 Sending to ASR service...');
+
+      const result = await transcribeAndSave(audioBlob, meetingId, {
         language: languageCode,
+        meetingTitle,
+        userEmail: user.email || undefined,
+        userName,
+        authToken: token,
         onProgress: (stage, percent) => {
-          console.log(`🎤 Upload ASR: ${stage} ${percent}%`);
+          debugLog(`🎤 ASR Progress: ${stage} ${percent}%`);
           if (stage === 'uploading') setUploadProgress('Laddar upp...');
           else if (stage === 'processing') setUploadProgress('Transkriberar...');
           else setUploadProgress('');
+        },
+        onTranscriptReady: (transcript) => {
+          debugLog('✅ Transcript received, length:', transcript.length);
         }
       });
-      
+
       if (!result.success) {
+        // Update meeting status to failed
+        await fetch(`https://api.tivly.se/meetings/${meetingId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transcriptionStatus: 'failed',
+          }),
+        });
         throw new Error(result.error || 'transcription_failed');
       }
 
@@ -96,19 +186,21 @@ export const DigitalMeetingDialog = ({
       if (!transcript.trim()) {
         throw new Error('no_speech_detected');
       }
+
+      debugLog('✅ Upload complete, redirecting to library');
       
       toast({
         title: "Transkribering klar!",
-        description: result.processing_time 
-          ? `Transkriberat på ${(result.processing_time / 1000).toFixed(1)}s` 
-          : "Ditt möte har transkriberats.",
+        description: "Ditt möte har sparats i biblioteket.",
       });
 
-      onTranscriptReady(transcript);
+      // Close dialog and redirect to library
       onOpenChange(false);
       setSelectedFile(null);
+      navigate(`/library/${meetingId}`);
+
     } catch (error: any) {
-      console.error('Upload error:', error);
+      debugError('Upload error:', error);
       
       let errorMessage = "Ett fel uppstod vid transkribering av filen.";
       let errorDetails = "";
@@ -128,6 +220,9 @@ export const DigitalMeetingDialog = ({
       } else if (error.message?.includes('Authentication required')) {
         errorMessage = "Du måste vara inloggad.";
         errorDetails = "Ladda om sidan och logga in igen.";
+      } else if (error.message?.includes('Could not convert audio')) {
+        errorMessage = "Kunde inte konvertera ljudfilen.";
+        errorDetails = "Prova att konvertera filen till WAV-format manuellt.";
       } else {
         errorDetails = error.message || "Ett okänt fel uppstod.";
       }
@@ -150,6 +245,58 @@ export const DigitalMeetingDialog = ({
       fileInputRef.current.value = '';
     }
   };
+
+  // Show upgrade prompt if user doesn't have access
+  if (!hasUploadAccess) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              Uppladdning av möten
+            </DialogTitle>
+            <DialogDescription>
+              Denna funktion kräver Pro eller Enterprise-plan
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p className="font-medium">Uppgradera för att ladda upp möten</p>
+                  <p className="text-sm text-muted-foreground">
+                    Med Pro eller Enterprise kan du ladda upp inspelade ljudfiler (MP3, WAV, M4A) 
+                    och få dem automatiskt transkriberade med hög kvalitet.
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground mt-2">
+                    <li>Stöd för MP3, WAV, M4A och fler format</li>
+                    <li>Automatisk konvertering</li>
+                    <li>Sparas i ditt bibliotek</li>
+                    <li>E-postnotifikation när klart</li>
+                  </ul>
+                </div>
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Stäng
+              </Button>
+              <Button onClick={() => {
+                onOpenChange(false);
+                // Trigger upgrade dialog - handled by parent
+              }}>
+                Uppgradera till Pro
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,7 +321,7 @@ export const DigitalMeetingDialog = ({
                   <li>Ladda upp filen här för automatisk transkribering</li>
                 </ol>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Max filstorlek: 500MB. Endast ljudfiler accepteras (inga videofiler).
+                  Max filstorlek: 500MB. MP3-filer konverteras automatiskt. Du får ett mejl när transkriberingen är klar.
                 </p>
               </div>
             </AlertDescription>
@@ -214,6 +361,9 @@ export const DigitalMeetingDialog = ({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      {needsConversion(selectedFile) && (
+                        <span className="ml-2 text-amber-600">• Kommer konverteras till WAV</span>
+                      )}
                     </p>
                   </div>
                 </div>
