@@ -42,7 +42,7 @@ serve(async (req) => {
       );
     }
 
-    const { messages, transcript, meetingSelected } = await req.json();
+    const { messages, transcript, meetingSelected, meetingCount } = await req.json();
     
     if (!Array.isArray(messages)) {
       throw new Error("Messages array is required");
@@ -54,6 +54,8 @@ serve(async (req) => {
     }
 
     const hasTranscript = transcript && transcript.trim().length > 20;
+    const onlyOneMeeting = meetingCount === 1;
+    const shouldAnswerDirectly = hasTranscript || meetingSelected || onlyOneMeeting;
     
     // Build system prompt based on context
     let systemPrompt = `Du är Tivly AI - en specialiserad mötesassistent. Du hjälper ENDAST med frågor om Tivly-appen och användarens möten.
@@ -69,19 +71,19 @@ Om användaren frågar om NÅGOT ANNAT (uppsatser, kodning, recept, allmän kuns
 
 `;
 
-    if (hasTranscript || meetingSelected) {
+    if (shouldAnswerDirectly) {
       // Meeting context available - answer directly
       systemPrompt += `MÖTESINNEHÅLL:
 ${transcript}
 
 INSTRUKTIONER:
-- Användaren har redan valt ett möte - fråga ALDRIG vilket möte de menar
-- Svara direkt baserat på mötesinnehållet ovan
+- Fråga ALDRIG vilket möte användaren menar - svara direkt baserat på innehållet
 - Var hjälpsam och koncis
-- Använd punktlistor och **fetstil** för viktigt`;
+- Använd punktlistor och **fetstil** för viktigt
+- Svara på svenska`;
     } else {
-      // No meeting selected - ask which meeting
-      systemPrompt += `VIKTIGT: Inget möte är valt ännu.
+      // Multiple meetings but none selected - ask which meeting
+      systemPrompt += `VIKTIGT: Användaren har flera möten men har inte valt något specifikt.
 
 Om användaren frågar något om mötesinnehåll (sammanfattning, beslut, vad pratades det om, etc.), svara EXAKT:
 "[ASK_MEETING]Vilket möte vill du att jag ska hjälpa dig med?"

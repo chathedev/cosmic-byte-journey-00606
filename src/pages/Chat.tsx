@@ -132,13 +132,20 @@ export const Chat = () => {
     try {
       let transcriptContext = "";
       let selectedMeetingTitle = "";
+      let effectiveMeetingId = selectedMeetingId;
       
-      if (selectedMeetingId === "all") {
+      // Auto-select if only one meeting exists
+      if (selectedMeetingId === "all" && meetings.length === 1) {
+        effectiveMeetingId = meetings[0].id;
+        setSelectedMeetingId(meetings[0].id); // Update UI to show selection
+      }
+      
+      if (effectiveMeetingId === "all") {
         // Include all meetings with their titles
         transcriptContext = meetings.map(m => `[Möte: ${m.title}]\n${m.transcript}`).join("\n\n---\n\n");
         selectedMeetingTitle = "alla möten";
       } else {
-        const meeting = meetings.find(m => m.id === selectedMeetingId);
+        const meeting = meetings.find(m => m.id === effectiveMeetingId);
         if (meeting) {
           transcriptContext = `[Valt möte: ${meeting.title}]\n${meeting.transcript || ""}`;
           selectedMeetingTitle = meeting.title;
@@ -146,7 +153,8 @@ export const Chat = () => {
       }
       
       // Add context about selected meeting to help AI remember
-      const contextPrefix = selectedMeetingId !== "all" && selectedMeetingTitle 
+      const hasMeetingContext = effectiveMeetingId !== "all" || meetings.length === 1;
+      const contextPrefix = hasMeetingContext && selectedMeetingTitle 
         ? `[KONTEXT: Användaren har valt mötet "${selectedMeetingTitle}". Svara baserat på detta möte, fråga INTE vilket möte igen.]\n\n` 
         : "";
 
@@ -164,7 +172,8 @@ export const Chat = () => {
           body: JSON.stringify({
             messages: newMessages,
             transcript: contextPrefix + transcriptContext,
-            meetingSelected: selectedMeetingId !== "all",
+            meetingSelected: hasMeetingContext,
+            meetingCount: meetings.length,
           }),
           signal: abort.signal,
         }
