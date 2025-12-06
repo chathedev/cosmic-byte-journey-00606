@@ -16,6 +16,7 @@ import { RecordingInstructions } from "./RecordingInstructions";
 import { simulateMeetingAudio } from "@/utils/testMeetingAudio";
 import { isUserAdmin } from "@/lib/accessCheck";
 import { isNativeApp } from "@/utils/capacitorDetection";
+import { sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from "@/lib/emailNotification";
 
 
 interface AIActionItem {
@@ -1083,6 +1084,16 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
           if (wasCounted) {
             console.log('📊 Exit save - counting new meeting:', finalId);
             await incrementMeetingCount(finalId);
+            
+            // Send first meeting feedback email if this is the user's first meeting
+            if (isFirstMeetingEmailNeeded() && user?.email) {
+              const authToken = localStorage.getItem('authToken') || '';
+              sendFirstMeetingFeedbackEmail({
+                userEmail: user.email,
+                userName: user.displayName || undefined,
+                authToken,
+              });
+            }
           } else {
             console.log('⏭️ Exit save - meeting already counted:', finalId);
           }

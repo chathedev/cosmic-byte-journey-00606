@@ -2,7 +2,7 @@
 // Flow: 1) Send audio to ASR service 2) Save transcript to backend 3) Send email notification
 
 import { debugLog, debugError } from './debugLogger';
-import { sendTranscriptionCompleteEmail } from './emailNotification';
+import { sendTranscriptionCompleteEmail, sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from './emailNotification';
 
 const ASR_ENDPOINT = 'https://asr.api.tivly.se/transcribe';
 const BACKEND_API_URL = 'https://api.tivly.se';
@@ -281,6 +281,22 @@ export async function transcribeAndSave(
           debugError('⚠️ Step 3: Email notification failed (non-blocking)');
         }
       });
+      
+      // Step 4: Send first meeting feedback email (if this is their first meeting)
+      if (isFirstMeetingEmailNeeded()) {
+        debugLog('📧 Step 4: Sending first meeting feedback email');
+        sendFirstMeetingFeedbackEmail({
+          userEmail,
+          userName,
+          authToken,
+        }).then(feedbackSent => {
+          if (feedbackSent) {
+            debugLog('✅ Step 4 SUCCESS: First meeting feedback email sent');
+          } else {
+            debugLog('ℹ️ Step 4: Feedback email not sent (already sent or failed)');
+          }
+        });
+      }
     }
     
     debugLog('🚀 ========== TRANSCRIPTION FLOW COMPLETE ==========');

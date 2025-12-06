@@ -7,6 +7,8 @@ import { meetingStorage } from "@/utils/meetingStorage";
 import { useToast } from "@/hooks/use-toast";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from "@/lib/emailNotification";
 
 interface TranscriptPreviewProps {
   transcript: string;
@@ -16,6 +18,7 @@ interface TranscriptPreviewProps {
 
 export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: TranscriptPreviewProps) => {
   const { userPlan, incrementMeetingCount } = useSubscription();
+  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
@@ -58,6 +61,16 @@ export const TranscriptPreview = ({ transcript, onBack, onGenerateProtocol }: Tr
       if (wasCounted) {
         console.log('📊 Uploaded meeting saved - counting:', meetingId);
         await incrementMeetingCount(meetingId);
+      }
+
+      // Send first meeting feedback email if this is the user's first meeting
+      if (isFirstMeetingEmailNeeded() && user?.email) {
+        const authToken = localStorage.getItem('authToken') || '';
+        sendFirstMeetingFeedbackEmail({
+          userEmail: user.email,
+          userName: user.displayName || undefined,
+          authToken,
+        });
       }
 
       toast({
