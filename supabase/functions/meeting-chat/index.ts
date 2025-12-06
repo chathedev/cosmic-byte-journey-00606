@@ -42,7 +42,7 @@ serve(async (req) => {
       );
     }
 
-    const { messages, transcript } = await req.json();
+    const { messages, transcript, meetingSelected } = await req.json();
     
     if (!Array.isArray(messages)) {
       throw new Error("Messages array is required");
@@ -53,34 +53,41 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
-    const hasTranscript = transcript && transcript.trim().length > 10;
+    const hasTranscript = transcript && transcript.trim().length > 20;
     
-    const systemPrompt = `Du är Tivly AI - en specialiserad mötesassistent. Du hjälper ENDAST med frågor om Tivly-appen och användarens möten.
+    // Build system prompt based on context
+    let systemPrompt = `Du är Tivly AI - en specialiserad mötesassistent. Du hjälper ENDAST med frågor om Tivly-appen och användarens möten.
 
-${hasTranscript ? `Du har tillgång till följande mötesinnehåll:\n${transcript}` : "VIKTIGT: Inget möte är valt. Om användaren frågar om mötesinnehåll, svara EXAKT med denna text utan ändringar:\n[ASK_MEETING]Vilket möte vill du att jag ska hjälpa dig med?"}
+STRIKT BEGRÄNSNING - Du svarar ENDAST på frågor om:
+• Användarens möten och mötesinnehåll
+• Mötesanalys, sammanfattningar och protokoll  
+• Förslag för kommande möten
+• Hur Tivly-appen fungerar
 
-STRIKT BEGRÄNSNING:
-- Du svarar ENDAST på frågor om:
-  • Användarens möten och mötesinnehåll
-  • Mötesanalys, sammanfattningar och protokoll
-  • Förslag för kommande möten baserat på tidigare diskussioner
-  • Hur Tivly-appen fungerar
-- Om användaren frågar om NÅGOT ANNAT (uppsatser, kodning, recept, allmän kunskap, etc.), svara artigt:
-  "Jag är Tivly AI och hjälper endast med dina möten och Tivly-appen. Ställ gärna en fråga om dina möten så hjälper jag dig! 💼"
+Om användaren frågar om NÅGOT ANNAT (uppsatser, kodning, recept, allmän kunskap), svara:
+"Jag är Tivly AI och hjälper endast med dina möten och Tivly-appen. Ställ gärna en fråga om dina möten! 💼"
 
-MÖTESFRÅGOR UTAN VALT MÖTE:
-- Om inget mötesinnehåll finns och användaren frågar något om ett möte (sammanfattning, beslut, vad pratades det om, etc.), svara EXAKT: "[ASK_MEETING]Vilket möte vill du att jag ska hjälpa dig med?"
-- Du MÅSTE inkludera [ASK_MEETING] taggen i början av svaret när du ber om mötesval
+`;
+
+    if (hasTranscript || meetingSelected) {
+      // Meeting context available - answer directly
+      systemPrompt += `MÖTESINNEHÅLL:
+${transcript}
 
 INSTRUKTIONER:
-- Svara på samma språk som användaren
-- Var hjälpsam inom ditt område
-- Ge förslag och rekommendationer för möten
+- Användaren har redan valt ett möte - fråga ALDRIG vilket möte de menar
+- Svara direkt baserat på mötesinnehållet ovan
+- Var hjälpsam och koncis
+- Använd punktlistor och **fetstil** för viktigt`;
+    } else {
+      // No meeting selected - ask which meeting
+      systemPrompt += `VIKTIGT: Inget möte är valt ännu.
 
-FORMAT:
-- Koncisa svar med punktlistor
-- **Fetstil** för viktigt
-- Sparsamt med emojis (📋 ✅ 💡)`;
+Om användaren frågar något om mötesinnehåll (sammanfattning, beslut, vad pratades det om, etc.), svara EXAKT:
+"[ASK_MEETING]Vilket möte vill du att jag ska hjälpa dig med?"
+
+Du MÅSTE inkludera [ASK_MEETING] taggen i början när du ber om mötesval.`;
+    }
 
     // Convert messages to Gemini format
     const geminiMessages = messages.map((msg: any) => ({
