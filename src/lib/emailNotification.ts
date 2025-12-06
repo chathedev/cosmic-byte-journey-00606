@@ -1,12 +1,13 @@
 // Email notification helper using the Tivly backend endpoint
 
-const EMAIL_ENDPOINT = 'https://api.tivly.se/send-kontakt-email';
+const EMAIL_ENDPOINT = 'https://api.tivly.se/notifications/email';
 
 export interface TranscriptionEmailData {
   userEmail: string;
   userName?: string;
   meetingTitle: string;
   meetingId: string;
+  authToken: string;
 }
 
 export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailData): Promise<boolean> {
@@ -17,28 +18,40 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${data.authToken}`,
       },
       body: JSON.stringify({
+        recipients: [data.userEmail],
         subject: `✅ Din transkribering är klar: ${data.meetingTitle}`,
-        message: `Hej${data.userName ? ` ${data.userName}` : ''}!
-
-Din transkribering för mötet "${data.meetingTitle}" är nu klar.
-
-Du kan nu visa ditt möte och generera protokoll i Tivly.
-
-Klicka här för att öppna: https://app.tivly.se/library/${data.meetingId}
-
-Med vänliga hälsningar,
-Tivly`,
-        replyTo: data.userEmail,
-        name: data.userName || 'Tivly-användare',
-        projectType: 'transcription_complete',
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1a1a1a; margin-bottom: 16px;">Hej${data.userName ? ` ${data.userName}` : ''}!</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              Din transkribering för mötet <strong>"${data.meetingTitle}"</strong> är nu klar.
+            </p>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              Du kan nu visa ditt möte och generera protokoll i Tivly.
+            </p>
+            <a href="https://app.tivly.se/library/${data.meetingId}" 
+               style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 500; margin: 16px 0;">
+              Öppna mötet
+            </a>
+            <p style="color: #666; font-size: 14px; margin-top: 24px;">
+              Med vänliga hälsningar,<br/>
+              <strong>Tivly</strong>
+            </p>
+          </div>
+        `,
+        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna mötet: https://app.tivly.se/library/${data.meetingId}\n\nMed vänliga hälsningar,\nTivly`,
+        category: 'transcription-complete',
+        metadata: { meetingId: data.meetingId },
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Failed to send transcription email:', response.status, errorText);
+    const result = await response.json();
+    
+    if (!response.ok || !result.ok) {
+      console.error('❌ Failed to send transcription email:', response.status, result.message || result);
       return false;
     }
 

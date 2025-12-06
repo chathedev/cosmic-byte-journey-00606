@@ -232,10 +232,11 @@ export async function transcribeAndSave(
     meetingTitle?: string;
     userEmail?: string;
     userName?: string;
+    authToken?: string;
     onTranscriptReady?: (transcript: string) => void;
   }
 ): Promise<ASRResult> {
-  const { onTranscriptReady, meetingTitle, userEmail, userName, ...asrOptions } = options;
+  const { onTranscriptReady, meetingTitle, userEmail, userName, authToken, ...asrOptions } = options;
   
   debugLog('🚀 ========== TRANSCRIPTION FLOW START ==========');
   debugLog('📋 Meeting ID:', meetingId);
@@ -265,13 +266,14 @@ export async function transcribeAndSave(
     debugLog('✅ Step 2 SUCCESS: Transcript saved to backend');
     
     // Step 3: Send email notification
-    if (userEmail) {
+    if (userEmail && authToken) {
       debugLog('📧 Step 3: Sending email notification to', userEmail);
       sendTranscriptionCompleteEmail({
         userEmail,
         userName,
         meetingTitle: meetingTitle || 'Ditt möte',
         meetingId,
+        authToken,
       }).then(emailSent => {
         if (emailSent) {
           debugLog('✅ Step 3 SUCCESS: Email notification sent');
