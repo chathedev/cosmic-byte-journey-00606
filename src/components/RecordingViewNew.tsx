@@ -14,6 +14,7 @@ import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { AudioVisualizationBars } from "./AudioVisualizationBars";
 import { transcribeAndSave } from "@/lib/asrService";
+import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface RecordingViewNewProps {
@@ -442,6 +443,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         meetingTitle: 'Testmöte',
         userEmail: user?.email,
         userName: user?.displayName,
+        authToken: apiClient.getAuthToken() || undefined,
         onProgress: (stage, percent) => {
           console.log(`🎤 Test ASR: ${stage} ${percent}%`);
         },
@@ -618,6 +620,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
             meetingTitle: meetingName,
             userEmail: user.email,
             userName: user.displayName,
+            authToken: apiClient.getAuthToken() || undefined,
             onProgress: (stage, percent) => {
               console.log(`🎤 ASR: ${stage} ${percent}%`);
             },
