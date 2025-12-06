@@ -2,6 +2,9 @@
 
 const EMAIL_ENDPOINT = 'https://api.tivly.se/notifications/email';
 
+// Always use app.tivly.se for email links - emails open in web browsers, not native apps
+const WEB_APP_URL = 'https://app.tivly.se';
+
 export interface TranscriptionEmailData {
   userEmail: string;
   userName?: string;
@@ -13,6 +16,8 @@ export interface TranscriptionEmailData {
 export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailData): Promise<boolean> {
   try {
     console.log('📧 Sending transcription complete email to:', data.userEmail);
+    
+    const meetingUrl = `${WEB_APP_URL}/library/${data.meetingId}`;
     
     const response = await fetch(EMAIL_ENDPOINT, {
       method: 'POST',
@@ -32,7 +37,7 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
             <p style="color: #333; font-size: 16px; line-height: 1.6;">
               Du kan nu visa ditt möte och generera protokoll i Tivly.
             </p>
-            <a href="https://app.tivly.se/library/${data.meetingId}" 
+            <a href="${meetingUrl}" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 500; margin: 16px 0;">
               Öppna mötet
             </a>
@@ -42,7 +47,7 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
             </p>
           </div>
         `,
-        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna mötet: https://app.tivly.se/library/${data.meetingId}\n\nMed vänliga hälsningar,\nTivly`,
+        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna mötet: ${meetingUrl}\n\nMed vänliga hälsningar,\nTivly`,
         category: 'transcription-complete',
         metadata: { meetingId: data.meetingId },
       }),
