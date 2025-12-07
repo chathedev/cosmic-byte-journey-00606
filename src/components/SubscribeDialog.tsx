@@ -418,9 +418,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                   <p className="text-sm text-muted-foreground">
                     Hantera din prenumeration via ditt konto.
                   </p>
-                  <p className="text-xs text-muted-foreground mt-4 bg-muted/50 rounded-lg p-3">
-                    Gå till <span className="font-medium">app.tivly.se</span> i din webbläsare för att uppgradera, sedan kommer funktionerna automatiskt låsas upp här.
-                  </p>
                 </div>
               </>
             )}
