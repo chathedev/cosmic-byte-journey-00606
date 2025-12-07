@@ -151,7 +151,8 @@ export const DigitalMeetingDialog = ({
         description: 'Transkribering pågår i bakgrunden.',
       });
 
-      navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
+      // Redirect to library (not specific meeting URL)
+      navigate('/library', { state: { fromRecording: true, pendingMeetingId: meetingId } });
 
       // Step 2: Convert audio in background (if needed) and transcribe
       processUploadInBackground(file, meetingId, meetingTitle, languageCode, token);

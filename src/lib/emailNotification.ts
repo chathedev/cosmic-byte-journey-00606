@@ -26,7 +26,8 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
   try {
     console.log('📧 Sending transcription complete email to:', data.userEmail);
     
-    const meetingUrl = `${WEB_APP_URL}/library/${data.meetingId}`;
+    // Use simple /library URL - no meeting ID in URL
+    const libraryUrl = `${WEB_APP_URL}/library`;
     
     const response = await fetch(EMAIL_ENDPOINT, {
       method: 'POST',
@@ -46,9 +47,9 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
             <p style="color: #333; font-size: 16px; line-height: 1.6;">
               Du kan nu visa ditt möte och generera protokoll i Tivly.
             </p>
-            <a href="${meetingUrl}" 
+            <a href="${libraryUrl}" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 500; margin: 16px 0;">
-              Öppna mötet
+              Öppna biblioteket
             </a>
             <p style="color: #666; font-size: 14px; margin-top: 24px;">
               Med vänliga hälsningar,<br/>
@@ -56,7 +57,7 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
             </p>
           </div>
         `,
-        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna mötet i Tivly: ${WEB_APP_URL}/library\n\nMed vänliga hälsningar,\nTivly`,
+        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna biblioteket: ${libraryUrl}\n\nMed vänliga hälsningar,\nTivly`,
         category: 'transcription-complete',
         metadata: { meetingId: data.meetingId },
       }),
