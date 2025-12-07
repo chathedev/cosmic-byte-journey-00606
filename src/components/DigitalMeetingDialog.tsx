@@ -320,23 +320,32 @@ export const DigitalMeetingDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Instructions */}
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <p className="font-medium">Så här går du tillväga:</p>
-                <ol className="list-decimal list-inside space-y-1 text-sm">
-                  <li>Spela in ditt digitala möte med din dators eller telefonens ljudinspelare</li>
-                  <li>Spara filen som MP3, WAV, M4A eller annat ljudformat</li>
-                  <li>Ladda upp filen här för automatisk transkribering</li>
-                </ol>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Max filstorlek: 500MB. MP3-filer konverteras automatiskt. Du får ett mejl när transkriberingen är klar.
+        {/* Instructions */}
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-3">
+              <p className="font-medium">Så här går du tillväga:</p>
+              <ol className="list-decimal list-inside space-y-1 text-sm">
+                <li>Spela in ditt digitala möte med din dators eller telefonens ljudinspelare</li>
+                <li>Spara filen som MP3, WAV, M4A eller annat ljudformat</li>
+                <li>Ladda upp filen här för automatisk transkribering</li>
+              </ol>
+              
+              <div className="bg-primary/5 border border-primary/20 rounded-md p-3 mt-2">
+                <p className="font-medium text-sm text-primary mb-1">💡 Tips för digitala möten med högtalare</p>
+                <p className="text-xs text-muted-foreground">
+                  Ladda ner en röst-/ljudinspelningsapp på din iPhone eller Android (t.ex. "Röstmemon" på iPhone eller "Röstinspelning" på Android). 
+                  Lägg mobilen bredvid högtalaren under mötet för bästa ljudkvalitet.
                 </p>
               </div>
-            </AlertDescription>
-          </Alert>
+              
+              <p className="text-xs text-muted-foreground">
+                Max filstorlek: 500MB. MP3-filer konverteras automatiskt. Du får ett mejl när transkriberingen är klar.
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
 
           {/* File upload area */}
           {!selectedFile ? (
