@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, Activity, HardDrive, Zap, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Shield, Globe, Download, Trash2, RefreshCw, FileText, TrendingUp, Users, Folder, FileCode, Construction } from "lucide-react";
+import { Database, Activity, HardDrive, Zap, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Shield, Globe, Download, Trash2, RefreshCw, FileText, TrendingUp, Users, Folder, FileCode, Construction, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface ASRHealth {
+  status: string;
+  active: boolean;
+  engine: string;
+  model: string;
+  device: string;
+  compute_type: string;
+  loaded: boolean;
+  uptime_seconds: number;
+  timestamp: string;
+  message?: string;
+}
+
 const AdminBackend = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [health, setHealth] = useState<HealthCheck | null>(null);
@@ -29,6 +42,8 @@ const AdminBackend = () => {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [maintenancePending, setMaintenancePending] = useState(false);
+  const [asrHealth, setAsrHealth] = useState<ASRHealth | null>(null);
+  const [asrError, setAsrError] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     action: 'cleanup' | 'restart' | 'maintenance' | null;
@@ -40,6 +55,28 @@ const AdminBackend = () => {
     title: '',
     description: '',
   });
+
+  const fetchAsrHealth = async () => {
+    try {
+      const response = await fetch('https://asr.api.tivly.se/health');
+      if (response.ok) {
+        const data = await response.json();
+        setAsrHealth(data);
+        setAsrError(false);
+      } else {
+        setAsrError(true);
+      }
+    } catch {
+      setAsrError(true);
+    }
+  };
+
+  const formatUptime = (seconds: number): string => {
+    if (seconds < 60) return `${Math.floor(seconds)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+    return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+  };
 
   const fetchData = async () => {
     try {
@@ -54,6 +91,9 @@ const AdminBackend = () => {
         setMaintenance(maintenanceData.maintenance);
       }
       setLastUpdate(new Date());
+      
+      // Fetch ASR health separately (won't block main data)
+      fetchAsrHealth();
     } catch (error) {
       console.error('Failed to fetch backend data:', error);
       toast.error('Kunde inte hämta backend-data');
@@ -448,7 +488,57 @@ const AdminBackend = () => {
                 <p className="text-2xl font-bold">{dashboard.database.collections.roles}</p>
                 <p className="text-sm text-muted-foreground">Roller</p>
               </div>
+
+              {/* ASR Server */}
+              <div className="flex items-center justify-between p-4 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <Mic className="w-8 h-8 text-emerald-500" />
+                  <div>
+                    <p className="font-semibold">ASR Transcription</p>
+                    <p className="text-sm text-muted-foreground">
+                      {asrHealth ? `${asrHealth.engine} (${asrHealth.model})` : 'asr.api.tivly.se'}
+                    </p>
+                  </div>
+                </div>
+                {asrError ? (
+                  <Badge variant="destructive">offline</Badge>
+                ) : asrHealth ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant={asrHealth.active ? 'default' : 'secondary'}>
+                      {asrHealth.status}
+                    </Badge>
+                  </div>
+                ) : (
+                  <Badge variant="outline">loading...</Badge>
+                )}
+              </div>
             </div>
+
+            {/* ASR Details Row */}
+            {asrHealth && !asrError && (
+              <div className="mt-4 p-3 rounded-lg bg-muted/30 grid grid-cols-2 md:grid-cols-5 gap-3 text-center text-xs">
+                <div>
+                  <p className="text-muted-foreground mb-1">Device</p>
+                  <p className="font-mono font-semibold">{asrHealth.device}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Compute</p>
+                  <p className="font-mono font-semibold">{asrHealth.compute_type}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Model Loaded</p>
+                  <p className="font-semibold">{asrHealth.loaded ? '✓ Yes' : '○ No'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Uptime</p>
+                  <p className="font-mono font-semibold">{formatUptime(asrHealth.uptime_seconds)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Last Check</p>
+                  <p className="font-mono font-semibold">{new Date(asrHealth.timestamp).toLocaleTimeString('sv-SE')}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
