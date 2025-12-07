@@ -436,7 +436,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         description: 'Transkribering pågår i bakgrunden.',
       });
       
-      navigate(`/library/${testMeetingId}`, { state: { fromRecording: true } });
+      navigate('/library', { state: { fromRecording: true, pendingMeetingId: testMeetingId } });
       
       transcribeAndSave(audioBlob, testMeetingId, {
         language: 'sv',
@@ -611,7 +611,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           description: useAsrMode ? 'Transkribering pågår i bakgrunden.' : 'Transkribering klar!',
         });
         
-        navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
+        // Redirect to library (not specific meeting URL)
+        navigate('/library', { state: { fromRecording: true, pendingMeetingId: meetingId } });
 
         // Only use ASR for enterprise/plus/unlimited plans
         if (useAsrMode) {
