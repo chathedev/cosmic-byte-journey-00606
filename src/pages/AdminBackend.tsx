@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, Activity, HardDrive, Zap, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Shield, Globe, Download, Trash2, RefreshCw, FileText, TrendingUp, Users, Folder, FileCode, Construction, Mic } from "lucide-react";
+import { Database, Activity, HardDrive, Zap, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Shield, Globe, Download, Trash2, RefreshCw, FileText, TrendingUp, Users, Folder, FileCode, Construction, Mic, Cpu, Thermometer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,26 @@ interface ASRHealth {
   uptime_seconds: number;
   timestamp: string;
   message?: string;
+  resources?: {
+    memory?: {
+      total_bytes: number;
+      used_bytes: number;
+      available_bytes: number;
+      percent: number;
+    };
+    storage?: {
+      total_bytes: number;
+      used_bytes: number;
+      free_bytes: number;
+    };
+    gpu?: Array<{
+      name: string;
+      memory_total_mb: number;
+      memory_used_mb: number;
+      memory_free_mb: number;
+      temperature_c: number;
+    }>;
+  };
 }
 
 const AdminBackend = () => {
@@ -76,6 +96,13 @@ const AdminBackend = () => {
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
     return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   };
 
   const fetchData = async () => {
@@ -488,55 +515,138 @@ const AdminBackend = () => {
                 <p className="text-2xl font-bold">{dashboard.database.collections.roles}</p>
                 <p className="text-sm text-muted-foreground">Roller</p>
               </div>
-
-              {/* ASR Server */}
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <Mic className="w-8 h-8 text-emerald-500" />
-                  <div>
-                    <p className="font-semibold">ASR Transcription</p>
-                    <p className="text-sm text-muted-foreground">
-                      {asrHealth ? `${asrHealth.engine} (${asrHealth.model})` : 'asr.api.tivly.se'}
-                    </p>
-                  </div>
-                </div>
-                {asrError ? (
-                  <Badge variant="destructive">offline</Badge>
-                ) : asrHealth ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant={asrHealth.active ? 'default' : 'secondary'}>
-                      {asrHealth.status}
-                    </Badge>
-                  </div>
-                ) : (
-                  <Badge variant="outline">loading...</Badge>
-                )}
-              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* ASR Details Row */}
-            {asrHealth && !asrError && (
-              <div className="mt-4 p-3 rounded-lg bg-muted/30 grid grid-cols-2 md:grid-cols-5 gap-3 text-center text-xs">
-                <div>
-                  <p className="text-muted-foreground mb-1">Device</p>
-                  <p className="font-mono font-semibold">{asrHealth.device}</p>
+        {/* ASR Server Card */}
+        <Card className="border-l-4" style={{ borderLeftColor: asrError ? '#ef4444' : asrHealth?.active ? '#10b981' : '#f59e0b' }}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Mic className="w-5 h-5 text-emerald-500" />
+                  ASR Server
+                </CardTitle>
+                <CardDescription>asr.api.tivly.se • Whisper Transcription</CardDescription>
+              </div>
+              {asrError ? (
+                <Badge variant="destructive" className="gap-1">
+                  <span className="w-2 h-2 rounded-full bg-red-300 animate-pulse" />
+                  OFFLINE
+                </Badge>
+              ) : asrHealth ? (
+                <Badge variant={asrHealth.active ? 'default' : 'secondary'} className="gap-1">
+                  <span className={`w-2 h-2 rounded-full ${asrHealth.active ? 'bg-green-300' : 'bg-yellow-300'} animate-pulse`} />
+                  {asrHealth.status.toUpperCase()}
+                </Badge>
+              ) : (
+                <Badge variant="outline">loading...</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {asrHealth && !asrError ? (
+              <>
+                {/* Main Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground mb-1">Engine</p>
+                    <p className="font-semibold">{asrHealth.engine}</p>
+                    <p className="text-xs text-muted-foreground">{asrHealth.model}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground mb-1">Device</p>
+                    <p className="font-mono font-semibold">{asrHealth.device}</p>
+                    <p className="text-xs text-muted-foreground">{asrHealth.compute_type}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground mb-1">Model</p>
+                    <p className="font-semibold">{asrHealth.loaded ? '✓ Loaded' : '○ Cold'}</p>
+                    <p className="text-xs text-muted-foreground">{asrHealth.loaded ? 'Ready' : 'Use /warmup'}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xs text-muted-foreground mb-1">Uptime</p>
+                    <p className="font-mono font-semibold">{formatUptime(asrHealth.uptime_seconds)}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(asrHealth.timestamp).toLocaleTimeString('sv-SE')}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Compute</p>
-                  <p className="font-mono font-semibold">{asrHealth.compute_type}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Model Loaded</p>
-                  <p className="font-semibold">{asrHealth.loaded ? '✓ Yes' : '○ No'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Uptime</p>
-                  <p className="font-mono font-semibold">{formatUptime(asrHealth.uptime_seconds)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground mb-1">Last Check</p>
-                  <p className="font-mono font-semibold">{new Date(asrHealth.timestamp).toLocaleTimeString('sv-SE')}</p>
-                </div>
+
+                {/* GPU Stats */}
+                {asrHealth.resources?.gpu && asrHealth.resources.gpu.length > 0 && (
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-background border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Cpu className="w-4 h-4 text-emerald-500" />
+                      <span className="font-semibold text-sm">GPU</span>
+                    </div>
+                    {asrHealth.resources.gpu.map((gpu, i) => (
+                      <div key={i} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">{gpu.name}</span>
+                          <div className="flex items-center gap-2">
+                            <Thermometer className="w-3 h-3 text-orange-500" />
+                            <span className="font-mono text-xs">{gpu.temperature_c}°C</span>
+                          </div>
+                        </div>
+                        <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all"
+                            style={{ width: `${(gpu.memory_used_mb / gpu.memory_total_mb) * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{gpu.memory_used_mb.toFixed(0)} MB used</span>
+                          <span>{gpu.memory_free_mb.toFixed(0)} MB free / {(gpu.memory_total_mb / 1024).toFixed(0)} GB total</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Memory & Storage */}
+                {asrHealth.resources && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {asrHealth.resources.memory && (
+                      <div className="p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">System RAM</span>
+                          <span className="text-xs font-mono">{asrHealth.resources.memory.percent.toFixed(1)}%</span>
+                        </div>
+                        <Progress value={asrHealth.resources.memory.percent} className="h-1.5" />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatBytes(asrHealth.resources.memory.used_bytes)} / {formatBytes(asrHealth.resources.memory.total_bytes)}
+                        </p>
+                      </div>
+                    )}
+                    {asrHealth.resources.storage && (
+                      <div className="p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">Storage</span>
+                          <span className="text-xs font-mono">
+                            {((asrHealth.resources.storage.used_bytes / asrHealth.resources.storage.total_bytes) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(asrHealth.resources.storage.used_bytes / asrHealth.resources.storage.total_bytes) * 100} 
+                          className="h-1.5" 
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatBytes(asrHealth.resources.storage.free_bytes)} free / {formatBytes(asrHealth.resources.storage.total_bytes)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : asrError ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-destructive" />
+                <p>Kunde inte ansluta till ASR-servern</p>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p>Laddar ASR-status...</p>
               </div>
             )}
           </CardContent>
