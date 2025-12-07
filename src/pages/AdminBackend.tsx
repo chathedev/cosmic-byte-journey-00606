@@ -79,7 +79,8 @@ const AdminBackend = () => {
 
   const fetchAsrHealth = async () => {
     try {
-      const response = await fetch('https://asr.api.tivly.se/health');
+      // Use backend proxy to avoid CORS issues
+      const response = await fetch('https://api.tivly.se/asr/health');
       if (response.ok) {
         const data = await response.json();
         setAsrHealth(data);
@@ -913,7 +914,7 @@ const AdminBackend = () => {
                       onClick={async () => {
                         setIsActionLoading('asr-reload');
                         try {
-                          const res = await fetch('https://asr.api.tivly.se/reload');
+                          const res = await fetch('https://api.tivly.se/asr/reload');
                           if (res.ok) {
                             toast.success('ASR server reloading...');
                             fetchAsrHealth();
@@ -1150,7 +1151,7 @@ const AdminBackend = () => {
                     onClick={async () => {
                       setIsActionLoading('asr-warmup');
                       try {
-                        const res = await fetch('https://asr.api.tivly.se/warmup', { method: 'POST' });
+                        const res = await fetch('https://api.tivly.se/asr/warmup', { method: 'POST' });
                         if (res.ok) {
                           toast.success('ASR model warming up...');
                         } else {
@@ -1186,7 +1187,7 @@ const AdminBackend = () => {
                     onClick={async () => {
                       setIsActionLoading('asr-reload');
                       try {
-                        const res = await fetch('https://asr.api.tivly.se/reload');
+                        const res = await fetch('https://api.tivly.se/asr/reload');
                         if (res.ok) {
                           toast.success('ASR server reloading...');
                           fetchAsrHealth();
