@@ -530,19 +530,45 @@ const AdminBackend = () => {
                 </CardTitle>
                 <CardDescription>asr.api.tivly.se • Whisper Transcription</CardDescription>
               </div>
-              {asrError ? (
-                <Badge variant="destructive" className="gap-1">
-                  <span className="w-2 h-2 rounded-full bg-red-300 animate-pulse" />
-                  OFFLINE
-                </Badge>
-              ) : asrHealth ? (
-                <Badge variant={asrHealth.active ? 'default' : 'secondary'} className="gap-1">
-                  <span className={`w-2 h-2 rounded-full ${asrHealth.active ? 'bg-green-300' : 'bg-yellow-300'} animate-pulse`} />
-                  {asrHealth.status.toUpperCase()}
-                </Badge>
-              ) : (
-                <Badge variant="outline">loading...</Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={async () => {
+                    setIsActionLoading('asr-reload');
+                    try {
+                      const res = await fetch('https://asr.api.tivly.se/reload');
+                      if (res.ok) {
+                        toast.success('ASR server reloading...');
+                        fetchAsrHealth();
+                      } else {
+                        toast.error('Kunde inte ladda om ASR-servern');
+                      }
+                    } catch {
+                      toast.error('Kunde inte ansluta till ASR-servern');
+                    } finally {
+                      setIsActionLoading(null);
+                    }
+                  }}
+                  disabled={isActionLoading === 'asr-reload'}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1 ${isActionLoading === 'asr-reload' ? 'animate-spin' : ''}`} />
+                  Reload
+                </Button>
+                {asrError ? (
+                  <Badge variant="destructive" className="gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-300 animate-pulse" />
+                    OFFLINE
+                  </Badge>
+                ) : asrHealth ? (
+                  <Badge variant={asrHealth.active ? 'default' : 'secondary'} className="gap-1">
+                    <span className={`w-2 h-2 rounded-full ${asrHealth.active ? 'bg-green-300' : 'bg-yellow-300'} animate-pulse`} />
+                    {asrHealth.status.toUpperCase()}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">loading...</Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
