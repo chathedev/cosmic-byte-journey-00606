@@ -54,15 +54,6 @@ interface ASRHealth {
   };
 }
 
-interface ServerStatus {
-  name: string;
-  domain: string;
-  status: 'online' | 'offline' | 'degraded';
-  type: 'api' | 'asr' | 'cloud';
-  uptime?: string;
-  lastCheck: Date;
-}
-
 const AdminBackend = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [health, setHealth] = useState<HealthCheck | null>(null);
@@ -74,11 +65,6 @@ const AdminBackend = () => {
   const [asrHealth, setAsrHealth] = useState<ASRHealth | null>(null);
   const [asrError, setAsrError] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [serverStatuses, setServerStatuses] = useState<ServerStatus[]>([
-    { name: 'API Server', domain: 'api.tivly.se', status: 'offline', type: 'api', lastCheck: new Date() },
-    { name: 'ASR Server', domain: 'asr.api.tivly.se', status: 'offline', type: 'asr', lastCheck: new Date() },
-    { name: 'Cloud Database', domain: 'supabase', status: 'online', type: 'cloud', lastCheck: new Date() },
-  ]);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     action: 'cleanup' | 'restart' | 'maintenance' | null;
@@ -98,20 +84,11 @@ const AdminBackend = () => {
         const data = await response.json();
         setAsrHealth(data);
         setAsrError(false);
-        setServerStatuses(prev => prev.map(s => 
-          s.type === 'asr' ? { ...s, status: 'online', uptime: formatUptime(data.uptime_seconds), lastCheck: new Date() } : s
-        ));
       } else {
         setAsrError(true);
-        setServerStatuses(prev => prev.map(s => 
-          s.type === 'asr' ? { ...s, status: 'offline', lastCheck: new Date() } : s
-        ));
       }
     } catch {
       setAsrError(true);
-      setServerStatuses(prev => prev.map(s => 
-        s.type === 'asr' ? { ...s, status: 'offline', lastCheck: new Date() } : s
-      ));
     }
   };
 
@@ -139,16 +116,6 @@ const AdminBackend = () => {
       setDashboard(dashboardData);
       setHealth(healthData);
       
-      // Update API server status
-      setServerStatuses(prev => prev.map(s => 
-        s.type === 'api' ? { 
-          ...s, 
-          status: dashboardData.status === 'online' ? 'online' : 'offline',
-          uptime: dashboardData.uptime.formatted,
-          lastCheck: new Date() 
-        } : s
-      ));
-      
       if (maintenanceData.success) {
         setMaintenance(maintenanceData.maintenance);
       }
@@ -158,9 +125,6 @@ const AdminBackend = () => {
       fetchAsrHealth();
     } catch (error) {
       console.error('Failed to fetch backend data:', error);
-      setServerStatuses(prev => prev.map(s => 
-        s.type === 'api' ? { ...s, status: 'offline', lastCheck: new Date() } : s
-      ));
       toast.error('Kunde inte hämta backend-data');
     } finally {
       setIsLoading(false);
@@ -313,35 +277,20 @@ const AdminBackend = () => {
     }
   };
 
-  const getServerIcon = (type: 'api' | 'asr' | 'cloud') => {
-    switch (type) {
-      case 'api':
-        return <Server className="w-5 h-5" />;
-      case 'asr':
-        return <Mic className="w-5 h-5" />;
-      case 'cloud':
-        return <Cloud className="w-5 h-5" />;
-    }
-  };
+  // Compute combined server status
+  const apiOnline = dashboard?.status === 'online';
+  const asrOnline = asrHealth && !asrError;
+  const servicesOnline = (apiOnline ? 1 : 0) + (asrOnline ? 1 : 0) + 1; // +1 for Cloud which is always on
+  const totalServices = 3;
 
-  const getServerColor = (type: 'api' | 'asr' | 'cloud') => {
-    switch (type) {
-      case 'api':
-        return 'text-blue-500';
-      case 'asr':
-        return 'text-emerald-500';
-      case 'cloud':
-        return 'text-purple-500';
-    }
-  };
-
-  const memoryPercentage = dashboard?.memory?.system?.usagePercent 
+  // Use ASR server memory/GPU as primary since it has more detailed stats
+  const systemMemory = asrHealth?.resources?.memory;
+  const memoryPercentage = systemMemory?.percent ?? (dashboard?.memory?.system?.usagePercent 
     ?? (dashboard?.memory?.system 
       ? (dashboard.memory.system.used.bytes / dashboard.memory.system.total.bytes) * 100 
-      : 0);
-
-  const onlineServers = serverStatuses.filter(s => s.status === 'online').length;
-  const totalServers = serverStatuses.length;
+      : 0));
+  
+  const gpuInfo = asrHealth?.resources?.gpu?.[0];
 
   if (isLoading) {
     return (
@@ -356,7 +305,7 @@ const AdminBackend = () => {
 
   return (
     <>
-      {/* Enhanced Header with Infrastructure Status */}
+      {/* Enhanced Header with Unified Server Status */}
       <div className="sticky top-0 z-40 bg-gradient-to-r from-background via-primary/5 to-background backdrop-blur-sm border-b border-border">
         <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -364,37 +313,40 @@ const AdminBackend = () => {
               <Layers className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Server Infrastructure</h1>
+              <h1 className="text-xl font-bold">Tivly Server</h1>
               <p className="text-xs text-muted-foreground">
-                {lastUpdate.toLocaleTimeString('sv-SE')} • Auto-sync 1s
+                {lastUpdate.toLocaleTimeString('sv-SE')} • Kombinerad infrastruktur
               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Server Status Pills */}
+            {/* Unified Status Pills */}
             <div className="hidden md:flex items-center gap-2">
-              {serverStatuses.map(server => (
-                <div 
-                  key={server.domain}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border ${
-                    server.status === 'online' 
-                      ? 'bg-green-500/10 text-green-600 border-green-500/20' 
-                      : 'bg-red-500/10 text-red-600 border-red-500/20'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${server.status === 'online' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
-                  {server.name.split(' ')[0]}
-                </div>
-              ))}
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border ${
+                apiOnline ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${apiOnline ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+                API
+              </div>
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border ${
+                asrOnline ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${asrOnline ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+                ASR
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border bg-green-500/10 text-green-600 border-green-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                Cloud
+              </div>
             </div>
             
             <Badge 
-              variant={onlineServers === totalServers ? 'default' : 'destructive'} 
+              variant={servicesOnline === totalServices ? 'default' : 'destructive'} 
               className="gap-2"
             >
-              <Radio className={`w-3 h-3 ${onlineServers === totalServers ? 'animate-pulse' : ''}`} />
-              {onlineServers}/{totalServers} Online
+              <Radio className={`w-3 h-3 ${servicesOnline === totalServices ? 'animate-pulse' : ''}`} />
+              {servicesOnline}/{totalServices} Online
             </Badge>
           </div>
         </div>
@@ -402,10 +354,9 @@ const AdminBackend = () => {
         {/* Tab Navigation */}
         <div className="px-4 pb-2">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-4 w-full max-w-md">
+            <TabsList className="grid grid-cols-3 w-full max-w-sm">
               <TabsTrigger value="overview" className="text-xs">Översikt</TabsTrigger>
-              <TabsTrigger value="api" className="text-xs">API Server</TabsTrigger>
-              <TabsTrigger value="asr" className="text-xs">ASR Server</TabsTrigger>
+              <TabsTrigger value="resources" className="text-xs">Resurser</TabsTrigger>
               <TabsTrigger value="actions" className="text-xs">Åtgärder</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -413,44 +364,151 @@ const AdminBackend = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Combined Server Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {serverStatuses.map(server => (
-            <Card 
-              key={server.domain}
-              className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${
-                server.status === 'online' ? 'border-l-green-500' : 'border-l-red-500'
-              }`}
-              onClick={() => setActiveTab(server.type === 'cloud' ? 'overview' : server.type)}
-            >
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-muted ${getServerColor(server.type)}`}>
-                      {getServerIcon(server.type)}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{server.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{server.domain}</p>
-                    </div>
-                  </div>
-                  <Badge 
-                    variant={server.status === 'online' ? 'default' : 'destructive'}
-                    className="text-xs"
-                  >
-                    {server.status.toUpperCase()}
-                  </Badge>
+        {/* Unified Server Card - Combined Stats */}
+        <Card className="border-2 border-primary/20 bg-gradient-to-br from-background to-muted/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
+                  <Server className="w-8 h-8 text-primary" />
                 </div>
-                {server.uptime && (
-                  <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Uptime</span>
-                    <span className="font-mono">{server.uptime}</span>
-                  </div>
+                <div>
+                  <CardTitle className="text-2xl">Tivly Server</CardTitle>
+                  <CardDescription className="font-mono text-xs">api.tivly.se • asr.api.tivly.se</CardDescription>
+                </div>
+              </div>
+              <div className="text-right">
+                <Badge variant={apiOnline && asrOnline ? 'default' : 'destructive'} className="gap-2 text-sm px-3 py-1">
+                  <span className={`w-2 h-2 rounded-full ${apiOnline && asrOnline ? 'bg-green-300' : 'bg-red-300'} animate-pulse`} />
+                  {apiOnline && asrOnline ? 'ONLINE' : 'DEGRADED'}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* GPU Status */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border border-yellow-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  <span className="text-xs font-medium text-muted-foreground">GPU</span>
+                </div>
+                {gpuInfo ? (
+                  <>
+                    <p className="font-bold text-lg">{asrHealth?.device?.toUpperCase() || 'CUDA'}</p>
+                    <p className="text-xs text-muted-foreground">{gpuInfo.name.split(' ').slice(0, 2).join(' ')}</p>
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <Thermometer className="w-3 h-3 text-orange-500" />
+                      <span className="font-mono">{gpuInfo.temperature_c}°C</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-lg">{asrHealth?.device?.toUpperCase() || '--'}</p>
+                    <p className="text-xs text-muted-foreground">GPU Acceleration</p>
+                  </>
                 )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+
+              {/* RAM Usage */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/5 border border-blue-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <HardDrive className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-medium text-muted-foreground">RAM</span>
+                </div>
+                <p className="font-bold text-lg">{memoryPercentage.toFixed(0)}%</p>
+                <p className="text-xs text-muted-foreground">
+                  {systemMemory ? formatBytes(systemMemory.used_bytes) : dashboard?.memory?.system?.used.formatted || '--'}
+                </p>
+                <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all"
+                    style={{ width: `${memoryPercentage}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* VRAM Usage */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-green-500/5 border border-emerald-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Cpu className="w-4 h-4 text-emerald-500" />
+                  <span className="text-xs font-medium text-muted-foreground">VRAM</span>
+                </div>
+                {gpuInfo ? (
+                  <>
+                    <p className="font-bold text-lg">{((gpuInfo.memory_used_mb / gpuInfo.memory_total_mb) * 100).toFixed(0)}%</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(gpuInfo.memory_used_mb / 1024).toFixed(1)} / {(gpuInfo.memory_total_mb / 1024).toFixed(0)} GB
+                    </p>
+                    <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-500 to-green-500 transition-all"
+                        style={{ width: `${(gpuInfo.memory_used_mb / gpuInfo.memory_total_mb) * 100}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-lg">--</p>
+                    <p className="text-xs text-muted-foreground">GPU Memory</p>
+                  </>
+                )}
+              </div>
+
+              {/* Uptime */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/5 border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-purple-500" />
+                  <span className="text-xs font-medium text-muted-foreground">Uptime</span>
+                </div>
+                <p className="font-bold text-lg">
+                  {asrHealth ? formatUptime(asrHealth.uptime_seconds) : dashboard?.uptime.formatted || '--'}
+                </p>
+                <p className="text-xs text-muted-foreground">Server drift</p>
+              </div>
+            </div>
+
+            {/* Service Status Row */}
+            <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-4">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                <div className={`p-2 rounded-lg ${apiOnline ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
+                  <Globe className={`w-5 h-5 ${apiOnline ? 'text-blue-500' : 'text-red-500'}`} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">API Server</p>
+                  <p className="text-xs text-muted-foreground font-mono">api.tivly.se</p>
+                </div>
+                <Badge variant={apiOnline ? 'default' : 'destructive'} className="text-xs">
+                  {apiOnline ? 'ON' : 'OFF'}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                <div className={`p-2 rounded-lg ${asrOnline ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                  <Mic className={`w-5 h-5 ${asrOnline ? 'text-emerald-500' : 'text-red-500'}`} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">ASR Server</p>
+                  <p className="text-xs text-muted-foreground font-mono">asr.api.tivly.se</p>
+                </div>
+                <Badge variant={asrOnline ? 'default' : 'destructive'} className="text-xs">
+                  {asrOnline ? 'ON' : 'OFF'}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <Cloud className="w-5 h-5 text-purple-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">Lovable Cloud</p>
+                  <p className="text-xs text-muted-foreground">Database & Auth</p>
+                </div>
+                <Badge variant="default" className="text-xs">ON</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           {/* Overview Tab */}
