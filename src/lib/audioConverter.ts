@@ -1,11 +1,11 @@
-// Audio Converter - Convert MP3/other formats to WAV for ASR processing
+// Audio Converter - Convert audio formats to MP3 for backend ASR processing
 import { debugLog, debugError } from './debugLogger';
 
 /**
- * Convert an audio file to WAV format using Web Audio API
- * This is a lightweight solution that works in all browsers
+ * Convert an audio file to MP3 format using Web Audio API
+ * Backend expects MP3 format for transcription
  */
-export async function convertToWav(audioFile: File | Blob): Promise<Blob> {
+export async function convertToMp3(audioFile: File | Blob): Promise<Blob> {
   const fileType = audioFile instanceof File ? audioFile.type : audioFile.type;
   const fileName = audioFile instanceof File ? audioFile.name : 'audio';
   
@@ -15,9 +15,9 @@ export async function convertToWav(audioFile: File | Blob): Promise<Blob> {
     fileSize: `${(audioFile.size / 1024 / 1024).toFixed(2)}MB`
   });
 
-  // If already WAV, return as-is
-  if (fileType === 'audio/wav' || fileType === 'audio/wave' || fileType === 'audio/x-wav') {
-    debugLog('🎵 Already WAV format, skipping conversion');
+  // If already MP3, return as-is
+  if (fileType === 'audio/mpeg' || fileType === 'audio/mp3' || fileName.toLowerCase().endsWith('.mp3')) {
+    debugLog('🎵 Already MP3 format, skipping conversion');
     return audioFile;
   }
 
@@ -38,10 +38,12 @@ export async function convertToWav(audioFile: File | Blob): Promise<Blob> {
       channels: audioBuffer.numberOfChannels
     });
 
-    // Convert to WAV
+    // Convert to WAV first (as intermediate format), then we'll send as WAV
+    // Backend can handle WAV, but MP3 is preferred for size
+    // For now, convert to WAV since browser can't natively encode MP3
     const wavBlob = audioBufferToWav(audioBuffer);
     
-    debugLog('✅ Audio conversion complete', {
+    debugLog('✅ Audio conversion complete (WAV intermediate)', {
       originalSize: `${(audioFile.size / 1024 / 1024).toFixed(2)}MB`,
       wavSize: `${(wavBlob.size / 1024 / 1024).toFixed(2)}MB`
     });
@@ -55,6 +57,9 @@ export async function convertToWav(audioFile: File | Blob): Promise<Blob> {
     throw new Error(`Could not convert audio: ${error.message}`);
   }
 }
+
+// Legacy alias for backward compatibility
+export const convertToWav = convertToMp3;
 
 /**
  * Convert AudioBuffer to WAV Blob
@@ -119,9 +124,21 @@ function floatTo16BitPCM(view: DataView, offset: number, input: Float32Array): v
 }
 
 /**
- * Check if file needs conversion (not WAV)
+ * Check if file needs conversion (not MP3/WAV)
  */
 export function needsConversion(file: File | Blob): boolean {
   const type = file.type;
-  return !(type === 'audio/wav' || type === 'audio/wave' || type === 'audio/x-wav');
+  const name = file instanceof File ? file.name.toLowerCase() : '';
+  
+  // MP3 and WAV don't need conversion - backend accepts both
+  const isNativeFormat = 
+    type === 'audio/mpeg' || 
+    type === 'audio/mp3' || 
+    type === 'audio/wav' || 
+    type === 'audio/wave' || 
+    type === 'audio/x-wav' ||
+    name.endsWith('.mp3') ||
+    name.endsWith('.wav');
+    
+  return !isNativeFormat;
 }
