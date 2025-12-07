@@ -450,7 +450,6 @@ const App = () => {
                             <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
                             <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
                             <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                            <Route path="/library/:meetingId" element={<ProtectedRoute><Library /></ProtectedRoute>} />
                             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
                             <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
                             <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />

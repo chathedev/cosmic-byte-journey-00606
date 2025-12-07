@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,7 +25,6 @@ import { apiClient } from "@/lib/api";
 
 const Library = () => {
   const { user } = useAuth();
-  const { meetingId: urlMeetingId } = useParams<{ meetingId?: string }>();
   const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting } = useSubscription();
   const [meetings, setMeetings] = useState<MeetingSession[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
@@ -59,14 +58,15 @@ const Library = () => {
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
 
-  // Load pending meeting from URL param or sessionStorage (when navigating from recording)
+  // Load pending meeting from state (when navigating from recording)
   useEffect(() => {
     const fromRecording = location.state?.fromRecording === true;
+    const pendingMeetingId = location.state?.pendingMeetingId;
     
-    // If we have a meetingId in URL, track it for polling
-    if (urlMeetingId) {
-      pendingMeetingIdRef.current = urlMeetingId;
-      console.log('📌 Tracking meeting from URL:', urlMeetingId);
+    // Track meeting ID for polling from state (NOT URL)
+    if (pendingMeetingId) {
+      pendingMeetingIdRef.current = pendingMeetingId;
+      console.log('📌 Tracking pending meeting from state:', pendingMeetingId);
     }
     
     if (fromRecording) {
@@ -83,11 +83,12 @@ const Library = () => {
         }
       }
       sessionStorage.removeItem('pendingMeeting');
-      window.history.replaceState({}, document.title, urlMeetingId ? `/library/${urlMeetingId}` : '/library');
+      // Always use clean /library URL - never include meeting ID
+      window.history.replaceState({}, document.title, '/library');
     } else {
       sessionStorage.removeItem('pendingMeeting');
     }
-  }, [location.state, urlMeetingId]);
+  }, [location.state]);
 
   useEffect(() => {
     loadData();
@@ -104,7 +105,7 @@ const Library = () => {
   useEffect(() => {
     if (!user) return;
     
-    const pendingId = pendingMeetingIdRef.current || urlMeetingId;
+    const pendingId = pendingMeetingIdRef.current;
     if (!pendingId) return;
 
     const pollInterval = setInterval(async () => {
@@ -114,7 +115,7 @@ const Library = () => {
         return;
       }
       
-      const currentPendingId = pendingMeetingIdRef.current || urlMeetingId;
+      const currentPendingId = pendingMeetingIdRef.current;
       if (!currentPendingId) {
         clearInterval(pollInterval);
         return;
@@ -165,7 +166,7 @@ const Library = () => {
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [user, urlMeetingId]);
+  }, [user]);
 
   // Listen for direct ASR completion event - immediate update
   useEffect(() => {
