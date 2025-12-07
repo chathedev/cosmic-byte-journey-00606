@@ -408,15 +408,12 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               </>
             ) : (
               <>
-                <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-primary" />
+                <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <div className="space-y-2">
-                  <p className="font-medium text-foreground">
-                    Uppgradering tillgänglig
-                  </p>
                   <p className="text-sm text-muted-foreground">
-                    Hantera din prenumeration via ditt konto.
+                    Gå till ditt konto på webben för att hantera din prenumeration.
                   </p>
                 </div>
               </>
