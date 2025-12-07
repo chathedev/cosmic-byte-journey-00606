@@ -4,7 +4,7 @@ import { useSubscription, getPaymentDomain } from '@/contexts/SubscriptionContex
 import { subscriptionService } from '@/lib/subscription';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Check, Loader2, AlertTriangle } from 'lucide-react';
+import { Check, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { toast as sonnerToast } from 'sonner';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
@@ -378,6 +378,64 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     );
   }
 
+  // iOS domain: Show simple upgrade message, no payment
+  if (isIOSDomain) {
+    const isPaid = userPlan && userPlan.plan !== 'free';
+    
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg">
+              {isPaid ? 'Din prenumeration' : 'Uppgradering tillgänglig'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-6 text-center space-y-4">
+            {isPaid ? (
+              <>
+                <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                  <Check className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">
+                    Du har {userPlan.plan === 'pro' ? 'Pro' : userPlan.plan === 'enterprise' ? 'Enterprise' : userPlan.plan}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Alla funktioner är upplåsta.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <p className="font-medium text-foreground">
+                    Uppgradering tillgänglig
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Hantera din prenumeration via ditt konto.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-4 bg-muted/50 rounded-lg p-3">
+                    Gå till <span className="font-medium">app.tivly.se</span> i din webbläsare för att uppgradera, sedan kommer funktionerna automatiskt låsas upp här.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-center">
+            <Button onClick={() => onOpenChange(false)} variant="outline">
+              Stäng
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm sm:max-w-4xl">
@@ -389,16 +447,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             </DialogDescription>
           )}
         </DialogHeader>
-
-        {/* iOS error display */}
-        {isIOSDomain && storeKitError && (
-          <div className="mb-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <div className="flex items-center gap-2 text-destructive text-xs">
-              <AlertTriangle className="h-4 w-4" />
-              <span>{storeKitError}</span>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 py-3">
           {plans.map((plan, index) => (
@@ -456,15 +504,15 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                   </Button>
                 ) : plan.name === 'Enterprise' ? (
                   <Button
-                    onClick={() => window.open('mailto:kontakt@tivly.se', '_blank')}
                     variant={plan.variant}
-                    className="w-full"
                     size="sm"
+                    className="w-full"
+                    onClick={() => window.open('mailto:kontakt@tivly.se?subject=Enterprise-förfrågan', '_blank')}
                   >
                     {plan.cta}
                   </Button>
                 ) : (
-                  <Button variant={plan.variant} className="w-full" size="sm" disabled>
+                  <Button variant={plan.variant} size="sm" className="w-full" disabled>
                     {plan.cta}
                   </Button>
                 )}
@@ -472,37 +520,6 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
             </Card>
           ))}
         </div>
-
-        {/* StoreKit Error Display for io.tivly.se */}
-        {isIOSDomain && storeKitError && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4 mb-4 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-destructive">{storeKitError}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Kontakta support om problemet kvarstår.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Restore Purchases button for io.tivly.se */}
-        {isIOSDomain && (
-          <div className="flex justify-center pb-4 animate-fade-in">
-            <Button
-              variant="ghost"
-              onClick={handleRestorePurchases}
-              disabled={isLoading}
-              size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground transition-all duration-200"
-            >
-              Återställ tidigare köp
-            </Button>
-          </div>
-        )}
-
       </DialogContent>
     </Dialog>
   );

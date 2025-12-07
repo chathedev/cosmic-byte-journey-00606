@@ -66,9 +66,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   // Determine transcription mode based on plan
   const useAsrMode = hasAsrAccess(userPlan?.plan);
   
-  // Test access for admins and specific user
+  // Test access for admins and specific user - NEVER on iOS domain
   const allowedTestEmail = 'charlie.wretling@icloud.com';
-  const hasTestAccess = isAdmin || user?.email?.toLowerCase() === allowedTestEmail.toLowerCase();
+  const isIOSDomain = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
+  const hasTestAccess = !isIOSDomain && (isAdmin || user?.email?.toLowerCase() === allowedTestEmail.toLowerCase());
   
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
