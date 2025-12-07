@@ -1,10 +1,10 @@
-// Direct ASR Service - Frontend handles transcription directly
-// Flow: 1) Send audio to ASR service 2) Save transcript to backend 3) Send email notification
+// ASR Service - Uses backend /asr/transcribe endpoint
+// Flow: 1) Send audio to backend 2) Backend calls Deepgram 3) Save transcript 4) Send email notification
 
 import { debugLog, debugError } from './debugLogger';
 import { sendTranscriptionCompleteEmail, sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from './emailNotification';
+import { convertToMp3, needsConversion } from './audioConverter';
 
-const ASR_ENDPOINT = 'https://asr.api.tivly.se/transcribe';
 const BACKEND_API_URL = 'https://api.tivly.se';
 
 export interface ASRResult {
@@ -15,6 +15,10 @@ export interface ASRResult {
   path?: string;
   jsonPath?: string;
   error?: string;
+  // Enhanced fields from Deepgram
+  confidence?: number;
+  words?: number;
+  segments?: number;
 }
 
 export interface ASROptions {
@@ -23,35 +27,52 @@ export interface ASROptions {
 }
 
 /**
- * Parse ASR response - extract text from JSON if needed
+ * Parse ASR response - extract transcript from backend response
+ * Backend returns: { status: "ok", transcript: "...", raw: { ... } }
  */
-function parseTranscriptResponse(data: any): string {
-  // If data is a string that looks like JSON, parse it
+function parseTranscriptResponse(data: any): { transcript: string; metadata?: any } {
+  // Handle string response
   if (typeof data === 'string') {
     try {
       const parsed = JSON.parse(data);
-      if (parsed.text) return parsed.text;
-      if (parsed.transcript) return parsed.transcript;
-      return data;
+      return parseTranscriptResponse(parsed);
     } catch {
-      return data;
+      return { transcript: data };
     }
   }
   
-  // If data has text or transcript field, use that
-  if (data?.text) return data.text;
-  if (data?.transcript) return data.transcript;
+  // Backend format: { status: "ok", transcript: "...", raw: {...} }
+  if (data?.status === 'ok' && typeof data?.transcript === 'string') {
+    return {
+      transcript: data.transcript,
+      metadata: data.raw
+    };
+  }
   
-  // Return as-is if it's already a string
-  if (typeof data === 'string') return data;
+  // Direct transcript field
+  if (data?.transcript) {
+    return { transcript: data.transcript, metadata: data.raw };
+  }
   
-  // Last resort: stringify if it's an object
-  return '';
+  // Legacy text field
+  if (data?.text) {
+    return { transcript: data.text };
+  }
+  
+  // Deepgram nested format
+  if (data?.raw?.result?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
+    return {
+      transcript: data.raw.result.results.channels[0].alternatives[0].transcript,
+      metadata: data.raw
+    };
+  }
+  
+  return { transcript: '' };
 }
 
 /**
- * Step 1: Send audio to ASR service and get transcript back
- * Endpoint: https://asr.api.tivly.se/transcribe
+ * Step 1: Send audio to backend /asr/transcribe endpoint
+ * Backend proxies to Deepgram and returns transcript
  */
 export async function transcribeDirectly(
   audioBlob: Blob,
@@ -60,7 +81,7 @@ export async function transcribeDirectly(
   const { language = 'sv', onProgress } = options;
   
   const fileSizeMB = audioBlob.size / 1024 / 1024;
-  debugLog('🎤 ASR Step 1: Sending audio to asr.api.tivly.se', {
+  debugLog('🎤 ASR Step 1: Sending audio to backend /asr/transcribe', {
     fileSize: `${fileSizeMB.toFixed(2)}MB`,
     fileType: audioBlob.type,
     language
@@ -73,28 +94,54 @@ export async function transcribeDirectly(
 
   onProgress?.('uploading', 10);
 
-  // Build FormData with 'audio' field (required by ASR service)
+  // Convert to MP3/WAV if needed
+  let processedBlob = audioBlob;
+  if (needsConversion(audioBlob)) {
+    debugLog('🔄 Converting audio format...');
+    try {
+      processedBlob = await convertToMp3(audioBlob);
+      debugLog('✅ Audio conversion complete');
+    } catch (conversionError: any) {
+      debugError('❌ Audio conversion failed:', conversionError);
+      // Continue with original blob - backend might still accept it
+      processedBlob = audioBlob;
+    }
+  }
+
+  onProgress?.('uploading', 30);
+
+  // Build FormData with 'audio' field (required by backend /asr/transcribe)
   const formData = new FormData();
-  const fileName = audioBlob.type.includes('webm') ? 'audio.webm' : 
-                   audioBlob.type.includes('mp4') ? 'audio.m4a' : 'audio.wav';
-  formData.append('audio', audioBlob, fileName);
-  formData.append('language', language);
+  const fileName = processedBlob.type.includes('wav') ? 'audio.wav' : 
+                   processedBlob.type.includes('mp3') || processedBlob.type.includes('mpeg') ? 'audio.mp3' : 
+                   processedBlob.type.includes('webm') ? 'audio.webm' : 
+                   processedBlob.type.includes('mp4') ? 'audio.m4a' : 'audio.mp3';
+  
+  formData.append('audio', processedBlob, fileName);
 
   try {
-    onProgress?.('uploading', 30);
+    onProgress?.('uploading', 50);
     
     const startTime = Date.now();
     
-    const response = await fetch(ASR_ENDPOINT, {
+    // Use backend /asr/transcribe endpoint (not direct ASR)
+    const token = localStorage.getItem('authToken');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(`${BACKEND_API_URL}/asr/transcribe`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
-    onProgress?.('processing', 60);
+    onProgress?.('processing', 70);
 
     if (!response.ok) {
       const errorText = await response.text();
-      debugError('❌ ASR service error:', {
+      debugError('❌ Backend ASR error:', {
         status: response.status,
         error: errorText
       });
@@ -109,31 +156,40 @@ export async function transcribeDirectly(
     
     onProgress?.('complete', 100);
 
-    // Parse transcript - extract text from JSON response
-    const transcript = parseTranscriptResponse(data);
+    // Parse transcript from backend response
+    const { transcript, metadata } = parseTranscriptResponse(data);
     
     if (!transcript) {
-      debugError('❌ ASR returned empty transcript:', data);
+      debugError('❌ Backend returned empty transcript:', data);
       return {
         success: false,
-        error: 'ASR returned empty transcript'
+        error: 'Backend returned empty transcript'
       };
     }
     
-    debugLog('✅ ASR Step 1 complete: Got transcript', {
+    // Extract duration from Deepgram metadata
+    const duration = metadata?.result?.metadata?.duration || data.duration;
+    const words = metadata?.result?.results?.channels?.[0]?.alternatives?.[0]?.words?.length;
+    const confidence = metadata?.result?.results?.channels?.[0]?.alternatives?.[0]?.confidence;
+    
+    debugLog('✅ ASR Step 1 complete: Got transcript from backend', {
       transcriptLength: transcript.length,
       processingTime: `${processingTime}ms`,
-      duration: data.duration
+      duration: duration ? `${duration.toFixed(1)}s` : 'unknown',
+      words,
+      confidence: confidence ? `${(confidence * 100).toFixed(1)}%` : 'unknown'
     });
 
     return {
       success: true,
       transcript,
-      duration: data.duration,
-      processing_time: processingTime
+      duration,
+      processing_time: processingTime,
+      confidence,
+      words
     };
   } catch (error: any) {
-    debugError('❌ ASR network error:', error);
+    debugError('❌ Backend ASR network error:', error);
     return {
       success: false,
       error: error.message || 'Network error during transcription'
@@ -161,8 +217,8 @@ export async function saveTranscriptToBackend(
     return { success: false, error: 'Authentication required' };
   }
 
-  // Ensure transcript is clean text, not JSON
-  const cleanTranscript = parseTranscriptResponse(transcript);
+  // Ensure transcript is clean text
+  const { transcript: cleanTranscript } = parseTranscriptResponse(transcript);
 
   debugLog('📝 ASR Step 2: Saving transcript to api.tivly.se', {
     meetingId,
@@ -219,11 +275,12 @@ export async function saveTranscriptToBackend(
 export const persistTranscript = saveTranscriptToBackend;
 
 /**
- * Complete flow: Transcribe audio via ASR, then save to backend
+ * Complete flow: Transcribe audio via backend, then save to meeting
  * 
  * Flow:
- * 1. Send audio to asr.api.tivly.se/transcribe → get transcript
+ * 1. Send audio to api.tivly.se/asr/transcribe → backend calls Deepgram → get transcript
  * 2. Save transcript to api.tivly.se/meetings/:id → update meeting
+ * 3. Send email notifications
  */
 export async function transcribeAndSave(
   audioBlob: Blob,
@@ -240,8 +297,9 @@ export async function transcribeAndSave(
   
   debugLog('🚀 ========== TRANSCRIPTION FLOW START ==========');
   debugLog('📋 Meeting ID:', meetingId);
+  debugLog('📁 File size:', `${(audioBlob.size / 1024 / 1024).toFixed(2)}MB`);
   
-  // Step 1: Transcribe via ASR service
+  // Step 1: Transcribe via backend /asr/transcribe
   const asrResult = await transcribeDirectly(audioBlob, asrOptions);
   
   if (!asrResult.success || !asrResult.transcript) {
@@ -249,7 +307,7 @@ export async function transcribeAndSave(
     return asrResult;
   }
   
-  debugLog('✅ Step 1 SUCCESS: Got transcript from ASR');
+  debugLog('✅ Step 1 SUCCESS: Got transcript from backend');
   
   // Notify that transcript is ready (for UI updates)
   onTranscriptReady?.(asrResult.transcript);

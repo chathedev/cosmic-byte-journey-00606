@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { transcribeAndSave } from "@/lib/asrService";
-import { convertToWav, needsConversion } from "@/lib/audioConverter";
+import { convertToMp3, needsConversion } from "@/lib/audioConverter";
 import { useNavigate } from "react-router-dom";
 import { debugLog, debugError } from "@/lib/debugLogger";
 
@@ -176,11 +176,11 @@ export const DigitalMeetingDialog = ({
     token: string
   ) => {
     try {
-      // Convert to WAV if needed
+      // Convert audio if needed (backend accepts MP3/WAV)
       let audioBlob: Blob = file;
       if (needsConversion(file)) {
-        debugLog('🔄 Background: Converting audio to WAV...');
-        audioBlob = await convertToWav(file);
+        debugLog('🔄 Background: Converting audio format...');
+        audioBlob = await convertToMp3(file);
         debugLog('✅ Background: Conversion complete');
       }
 
@@ -381,8 +381,8 @@ export const DigitalMeetingDialog = ({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      {needsConversion(selectedFile) && (
-                        <span className="ml-2 text-amber-600">• Kommer konverteras till WAV</span>
+                    {needsConversion(selectedFile) && (
+                        <span className="ml-2 text-amber-600">• Kommer konverteras automatiskt</span>
                       )}
                     </p>
                   </div>
