@@ -1,5 +1,5 @@
-// ASR Service - Uses backend /asr/transcribe endpoint
-// Flow: 1) Send audio to backend 2) Backend calls Deepgram 3) Save transcript 4) Send email notification
+// ASR Service - Uses backend /asr/transcribe endpoint (Vertex AI Speech v2)
+// Flow: 1) Send audio to backend 2) Backend calls Vertex AI 3) Save transcript 4) Send email notification
 
 import { debugLog, debugError } from './debugLogger';
 import { sendTranscriptionCompleteEmail, sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from './emailNotification';
@@ -15,10 +15,7 @@ export interface ASRResult {
   path?: string;
   jsonPath?: string;
   error?: string;
-  // Enhanced fields from Deepgram
-  confidence?: number;
-  words?: number;
-  segments?: number;
+  engine?: string;
 }
 
 export interface ASROptions {
@@ -27,10 +24,11 @@ export interface ASROptions {
 }
 
 /**
- * Parse ASR response - extract transcript from backend response
- * Backend returns: { status: "ok", transcript: "...", raw: { ... } }
+ * Parse ASR response from Vertex AI backend
+ * Success: { status: "ok", transcript: "...", metadata: { engine: "vertex-v2" } }
+ * Error: { error: "error_code", details: "Human readable error message" }
  */
-function parseTranscriptResponse(data: any): { transcript: string; metadata?: any } {
+function parseTranscriptResponse(data: any): { transcript: string; engine?: string; error?: string } {
   // Handle string response
   if (typeof data === 'string') {
     try {
@@ -41,30 +39,30 @@ function parseTranscriptResponse(data: any): { transcript: string; metadata?: an
     }
   }
   
-  // Backend format: { status: "ok", transcript: "...", raw: {...} }
-  if (data?.status === 'ok' && typeof data?.transcript === 'string') {
-    return {
-      transcript: data.transcript,
-      metadata: data.raw
+  // Check for error response
+  if (data?.error) {
+    return { 
+      transcript: '', 
+      error: data.details || data.error 
     };
   }
   
-  // Direct transcript field
+  // Vertex AI backend format: { status: "ok", transcript: "...", metadata: { engine: "vertex-v2" } }
+  if (data?.status === 'ok' && typeof data?.transcript === 'string') {
+    return {
+      transcript: data.transcript,
+      engine: data.metadata?.engine || 'vertex-v2'
+    };
+  }
+  
+  // Direct transcript field (fallback)
   if (data?.transcript) {
-    return { transcript: data.transcript, metadata: data.raw };
+    return { transcript: data.transcript, engine: data.metadata?.engine };
   }
   
   // Legacy text field
   if (data?.text) {
     return { transcript: data.text };
-  }
-  
-  // Deepgram nested format
-  if (data?.raw?.result?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
-    return {
-      transcript: data.raw.result.results.channels[0].alternatives[0].transcript,
-      metadata: data.raw
-    };
   }
   
   return { transcript: '' };
@@ -156,37 +154,36 @@ export async function transcribeDirectly(
     
     onProgress?.('complete', 100);
 
-    // Parse transcript from backend response
-    const { transcript, metadata } = parseTranscriptResponse(data);
+    // Parse transcript from Vertex AI backend response
+    const { transcript, engine, error: parseError } = parseTranscriptResponse(data);
+    
+    if (parseError) {
+      debugError('❌ Backend returned error:', parseError);
+      return {
+        success: false,
+        error: parseError
+      };
+    }
     
     if (!transcript) {
       debugError('❌ Backend returned empty transcript:', data);
       return {
         success: false,
-        error: 'Backend returned empty transcript'
+        error: 'No speech detected in audio'
       };
     }
     
-    // Extract duration from Deepgram metadata
-    const duration = metadata?.result?.metadata?.duration || data.duration;
-    const words = metadata?.result?.results?.channels?.[0]?.alternatives?.[0]?.words?.length;
-    const confidence = metadata?.result?.results?.channels?.[0]?.alternatives?.[0]?.confidence;
-    
-    debugLog('✅ ASR Step 1 complete: Got transcript from backend', {
+    debugLog('✅ ASR Step 1 complete: Got transcript from Vertex AI backend', {
       transcriptLength: transcript.length,
       processingTime: `${processingTime}ms`,
-      duration: duration ? `${duration.toFixed(1)}s` : 'unknown',
-      words,
-      confidence: confidence ? `${(confidence * 100).toFixed(1)}%` : 'unknown'
+      engine: engine || 'vertex-v2'
     });
 
     return {
       success: true,
       transcript,
-      duration,
       processing_time: processingTime,
-      confidence,
-      words
+      engine: engine || 'vertex-v2'
     };
   } catch (error: any) {
     debugError('❌ Backend ASR network error:', error);
