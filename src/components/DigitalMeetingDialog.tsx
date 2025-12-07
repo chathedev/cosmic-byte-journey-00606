@@ -1,14 +1,13 @@
 import { useState, useRef } from "react";
-import { Upload, FileAudio, X, Loader2, AlertCircle, Lock } from "lucide-react";
+import { Upload, FileAudio, X, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { transcribeAndSave, saveTranscriptToBackend } from "@/lib/asrService";
+import { transcribeAndSave } from "@/lib/asrService";
 import { convertToWav, needsConversion } from "@/lib/audioConverter";
-import { meetingStorage } from "@/utils/meetingStorage";
 import { useNavigate } from "react-router-dom";
 import { debugLog, debugError } from "@/lib/debugLogger";
 
@@ -26,8 +25,6 @@ export const DigitalMeetingDialog = ({
   selectedLanguage 
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
@@ -88,44 +85,31 @@ export const DigitalMeetingDialog = ({
   const handleUpload = async () => {
     if (!selectedFile || !user) return;
 
-    setIsUploading(true);
+    // Immediately close dialog and redirect - don't wait for upload
+    const file = selectedFile;
+    const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
+    const meetingId = crypto.randomUUID();
+    const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
+    
+    debugLog('📤 Upload: Starting instant redirect flow', {
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      meetingId
+    });
+
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      toast({
+        title: "Autentisering krävs",
+        description: "Ladda om sidan och logga in igen.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      // Map language code to ASR format
-      const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
-      
-      debugLog('📤 Upload: Starting upload flow', {
-        fileName: selectedFile.name,
-        fileType: selectedFile.type,
-        fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`
-      });
-
-      // Step 1: Convert to WAV if needed
-      let audioBlob: Blob = selectedFile;
-      if (needsConversion(selectedFile)) {
-        setUploadProgress('Konverterar ljud...');
-        debugLog('🔄 Converting audio to WAV...');
-        audioBlob = await convertToWav(selectedFile);
-        debugLog('✅ Conversion complete');
-      }
-
-      // Step 2: Create meeting in library with 'processing' status
-      const meetingId = crypto.randomUUID();
-      const meetingTitle = selectedFile.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
-      
-      debugLog('📝 Creating meeting placeholder', { meetingId, meetingTitle });
-      setUploadProgress('Skapar möte...');
-
-      // Get user display name safely
-      const userName = (user as any).displayName || (user as any).name || undefined;
-
-      // Save meeting placeholder to backend
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      // Create meeting with processing status
+      // Step 1: Create meeting placeholder with 'processing' status
       await fetch('https://api.tivly.se/meetings', {
         method: 'POST',
         headers: {
@@ -145,28 +129,94 @@ export const DigitalMeetingDialog = ({
       // Increment meeting count
       await incrementMeetingCount(meetingId);
 
-      // Step 3: Send to ASR and save transcript (same flow as Enterprise recording)
-      setUploadProgress('Transkriberar...');
-      debugLog('🎤 Sending to ASR service...');
+      // Save pending meeting to sessionStorage for instant display
+      const pendingMeeting = {
+        id: meetingId,
+        title: meetingTitle,
+        transcript: '',
+        transcriptionStatus: 'processing',
+        folder: 'general',
+        source: 'upload',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
+      // Close dialog and redirect IMMEDIATELY
+      onOpenChange(false);
+      setSelectedFile(null);
+      
+      toast({
+        title: 'Möte sparat',
+        description: 'Transkribering pågår i bakgrunden.',
+      });
+
+      navigate(`/library/${meetingId}`, { state: { fromRecording: true } });
+
+      // Step 2: Convert audio in background (if needed) and transcribe
+      processUploadInBackground(file, meetingId, meetingTitle, languageCode, token);
+
+    } catch (error: any) {
+      debugError('Upload initialization error:', error);
+      toast({
+        title: "Kunde inte starta uppladdning",
+        description: error.message || "Försök igen.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Background processing function - runs after redirect
+  const processUploadInBackground = async (
+    file: File,
+    meetingId: string,
+    meetingTitle: string,
+    languageCode: string,
+    token: string
+  ) => {
+    try {
+      // Convert to WAV if needed
+      let audioBlob: Blob = file;
+      if (needsConversion(file)) {
+        debugLog('🔄 Background: Converting audio to WAV...');
+        audioBlob = await convertToWav(file);
+        debugLog('✅ Background: Conversion complete');
+      }
+
+      // Get user display name safely
+      const userName = (user as any)?.displayName || (user as any)?.name || undefined;
+
+      // Send to ASR and save transcript
+      debugLog('🎤 Background: Sending to ASR service...');
+      
       const result = await transcribeAndSave(audioBlob, meetingId, {
         language: languageCode,
         meetingTitle,
-        userEmail: user.email || undefined,
+        userEmail: user?.email || undefined,
         userName,
         authToken: token,
         onProgress: (stage, percent) => {
-          debugLog(`🎤 ASR Progress: ${stage} ${percent}%`);
-          if (stage === 'uploading') setUploadProgress('Laddar upp...');
-          else if (stage === 'processing') setUploadProgress('Transkriberar...');
-          else setUploadProgress('');
+          debugLog(`🎤 Background ASR: ${stage} ${percent}%`);
         },
         onTranscriptReady: (transcript) => {
-          debugLog('✅ Transcript received, length:', transcript.length);
+          debugLog('✅ Background: Transcript received, length:', transcript.length);
+          
+          // Extract clean text if JSON
+          let cleanTranscript = transcript;
+          try {
+            const parsed = JSON.parse(transcript);
+            if (parsed.text) cleanTranscript = parsed.text;
+          } catch { /* not JSON */ }
+          
+          // Dispatch event to update Library UI
+          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+            detail: { meetingId, transcript: cleanTranscript } 
+          }));
         }
       });
 
       if (!result.success) {
+        debugError('Background ASR failed:', result.error);
         // Update meeting status to failed
         await fetch(`https://api.tivly.se/meetings/${meetingId}`, {
           method: 'PUT',
@@ -178,64 +228,24 @@ export const DigitalMeetingDialog = ({
             transcriptionStatus: 'failed',
           }),
         });
-        throw new Error(result.error || 'transcription_failed');
       }
-
-      const transcript = result.transcript || '';
-      
-      if (!transcript.trim()) {
-        throw new Error('no_speech_detected');
-      }
-
-      debugLog('✅ Upload complete, redirecting to library');
-      
-      toast({
-        title: "Transkribering klar!",
-        description: "Ditt möte har sparats i biblioteket.",
-      });
-
-      // Close dialog and redirect to library
-      onOpenChange(false);
-      setSelectedFile(null);
-      navigate(`/library/${meetingId}`);
 
     } catch (error: any) {
-      debugError('Upload error:', error);
-      
-      let errorMessage = "Ett fel uppstod vid transkribering av filen.";
-      let errorDetails = "";
-      
-      if (error.message?.includes('no_speech_detected')) {
-        errorMessage = "Inget tal kunde detekteras i ljudfilen.";
-        errorDetails = "Kontrollera att filen innehåller tal och att rätt språk är valt.";
-      } else if (error.message?.includes('file_too_large') || error.message?.includes('250MB')) {
-        errorMessage = "Filen är för stor.";
-        errorDetails = "Maximal filstorlek är 250MB.";
-      } else if (error.message?.includes('transcription_backend_missing')) {
-        errorMessage = "Transkriptionstjänsten är inte tillgänglig just nu.";
-        errorDetails = "Försök igen om en stund eller kontakta support.";
-      } else if (error.message?.includes('transcription_failed') || error.message?.includes('asr_failed')) {
-        errorMessage = "Transkriberingen misslyckades.";
-        errorDetails = "Kontrollera att filen är ett giltigt ljudformat och innehåller tydligt tal. Försök igen.";
-      } else if (error.message?.includes('Authentication required')) {
-        errorMessage = "Du måste vara inloggad.";
-        errorDetails = "Ladda om sidan och logga in igen.";
-      } else if (error.message?.includes('Could not convert audio')) {
-        errorMessage = "Kunde inte konvertera ljudfilen.";
-        errorDetails = "Prova att konvertera filen till WAV-format manuellt.";
-      } else {
-        errorDetails = error.message || "Ett okänt fel uppstod.";
+      debugError('Background processing error:', error);
+      // Update meeting status to failed
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        await fetch(`https://api.tivly.se/meetings/${meetingId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transcriptionStatus: 'failed',
+          }),
+        });
       }
-
-      toast({
-        title: errorMessage,
-        description: errorDetails,
-        variant: "destructive",
-        duration: 6000,
-      });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress('');
     }
   };
 
@@ -371,7 +381,6 @@ export const DigitalMeetingDialog = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleRemoveFile}
-                  disabled={isUploading}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -384,25 +393,15 @@ export const DigitalMeetingDialog = ({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isUploading}
             >
               Avbryt
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!selectedFile || isUploading}
+              disabled={!selectedFile}
             >
-              {isUploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {uploadProgress || 'Transkriberar...'}
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Ladda upp och transkribera
-                </>
-              )}
+              <Upload className="mr-2 h-4 w-4" />
+              Ladda upp och transkribera
             </Button>
           </div>
         </div>
