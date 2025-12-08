@@ -1,4 +1,4 @@
-import { AlertCircle, Globe } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import tivlyLogo from '@/assets/tivly-logo.png';
@@ -48,7 +48,7 @@ const NoAppAccessScreen = ({ onLogout }: NoAppAccessScreenProps) => {
               Åtkomst saknas
             </CardTitle>
             <CardDescription className="text-base">
-              Ditt konto saknar åtkomst till mobilappen
+              Mobilappen är tillgänglig för betalande användare
             </CardDescription>
           </div>
         </CardHeader>
@@ -61,17 +61,8 @@ const NoAppAccessScreen = ({ onLogout }: NoAppAccessScreenProps) => {
             
             <div className="space-y-4 w-full text-center">
               <p className="text-sm text-muted-foreground px-4">
-                För att använda Tivly-appen behöver du ett Pro- eller Enterprise-konto.
+                Uppgradera till Pro eller Enterprise för att använda Tivly-appen på din mobil.
               </p>
-
-              <div className="p-4 bg-muted/30 rounded-xl space-y-3">
-                <div className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <Globe className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <span className="text-left">
-                    Ändringar av din plan görs på din kontosida på webben.
-                  </span>
-                </div>
-              </div>
               
               <div className="flex flex-col gap-3 pt-2">
                 <Button 
