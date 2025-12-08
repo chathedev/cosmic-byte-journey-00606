@@ -77,6 +77,9 @@ export const FreeUserProtocolDialog = ({
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [showContent, setShowContent] = useState(false);
   const { toast } = useToast();
+  
+  // Check if running on iOS app domain
+  const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
 
   useEffect(() => {
     if (!open) return;
@@ -412,11 +415,13 @@ export const FreeUserProtocolDialog = ({
                     )}
                   </div>
 
-                  {/* Free user watermark */}
+                  {/* Free user watermark - different text for iOS */}
                   <div className="pt-6 border-t text-center space-y-2">
                     <p className="text-sm font-bold text-primary">TIVLY - GRATIS PLAN</p>
                     <p className="text-xs text-muted-foreground">
-                      Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel
+                      {isIosApp 
+                        ? 'Ändringar av din plan görs på din kontosida på webben.'
+                        : 'Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel'}
                     </p>
                   </div>
 

@@ -7,6 +7,9 @@ import { SubscribeDialog } from './SubscribeDialog';
 export const UpgradeBanner = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { userPlan, isLoading } = useSubscription();
+  
+  // Check if running on iOS app domain
+  const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
 
   // Don't render until we have loaded the plan data
   if (isLoading || !userPlan) return null;
@@ -32,18 +35,6 @@ export const UpgradeBanner = () => {
       default:
         return 'Din Plan';
     }
-  };
-
-  const getPlanMessage = () => {
-    if (userPlan.plan === 'free') {
-      return `Du har använt ${userPlan.meetingsUsed} av ${displayLimit} gratis möte. Uppgradera till Pro för fler möten och AI-protokoll!`;
-    }
-    if (userPlan.plan === 'pro') {
-      const remaining = displayLimit - userPlan.meetingsUsed;
-      return `Du har ${remaining} möten kvar av ${displayLimit} möten denna månad.`;
-    }
-    // For unlimited plans: show unlimited access
-    return `Du har obegränsad tillgång till möten och funktioner.`;
   };
 
   return (
@@ -72,7 +63,8 @@ export const UpgradeBanner = () => {
               )}
             </div>
           </div>
-          {(userPlan.plan === 'free') && (
+          {/* iOS: Never show upgrade button - Apple compliance */}
+          {!isIosApp && (userPlan.plan === 'free') && (
             <Button 
               onClick={() => setDialogOpen(true)}
               size="sm"

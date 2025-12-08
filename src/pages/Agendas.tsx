@@ -156,11 +156,16 @@ export default function Agendas() {
                     </div>
                     <h3 className="text-2xl font-bold mb-3">Agendor är låsta</h3>
                     <p className="text-muted-foreground text-center max-w-md mb-6">
-                      Uppgradera till Tivly Pro eller Plus för att skapa och hantera mötesagendor som används för att strukturera dina protokoll.
+                      {typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se'
+                        ? 'Ändringar av din plan görs på din kontosida på webben.'
+                        : 'Uppgradera till Tivly Pro eller Plus för att skapa och hantera mötesagendor som används för att strukturera dina protokoll.'}
                     </p>
-                    <Button onClick={() => setShowSubscribeDialog(true)} size="lg">
-                      Uppgradera till Pro
-                    </Button>
+                    {/* iOS: Never show upgrade button - Apple compliance */}
+                    {!(typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se') && (
+                      <Button onClick={() => setShowSubscribeDialog(true)} size="lg">
+                        Uppgradera till Pro
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </div>
