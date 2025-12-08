@@ -11,11 +11,16 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import tivlyLogo from '@/assets/tivly-logo.png';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import NoAppAccessScreen from '@/components/NoAppAccessScreen';
 
 /**
  * Auth - Email + PIN authentication
  * Works on both app.tivly.se and io.tivly.se domains
  * Users receive 6-digit codes via email
+ * 
+ * iOS App (io.tivly.se):
+ * - No account creation allowed (must create on web)
+ * - Login only for Pro/Enterprise users
  */
 
 declare global {
@@ -24,7 +29,7 @@ declare global {
   }
 }
 
-type ViewMode = 'welcome' | 'email' | 'code-entry';
+type ViewMode = 'welcome' | 'email' | 'code-entry' | 'no-access';
 
 // Email sanitization
 function sanitizeEmail(email: string | undefined): string | null {
@@ -39,7 +44,7 @@ function isAppDomain(): boolean {
   return window.location.hostname.includes('app.tivly.se');
 }
 
-// Detect if running on io.tivly.se (auto-proceed to setup)
+// Detect if running on io.tivly.se (iOS app - login only, no signup)
 function isIoDomain(): boolean {
   if (typeof window === 'undefined') return false;
   return window.location.hostname.includes('io.tivly.se');
@@ -48,6 +53,26 @@ function isIoDomain(): boolean {
 // Determine which base URL to use for auth-related backend calls
 function getAuthBaseUrl(): string {
   return 'https://api.tivly.se';
+}
+
+// Check if user has app access (Pro, Plus, Unlimited, or Enterprise)
+function hasAppAccess(userData: any): boolean {
+  if (!userData) return false;
+  
+  // Check for admin role
+  const isAdmin = userData.role === 'admin' || userData.role === 'owner';
+  if (isAdmin) return true;
+  
+  // Check plan type
+  const planType = typeof userData.plan === 'string' ? userData.plan : userData.plan?.plan;
+  const validPlans = ['pro', 'plus', 'unlimited', 'enterprise'];
+  if (validPlans.includes(planType?.toLowerCase())) return true;
+  
+  // Check enterprise membership
+  if (userData.enterprise?.active || userData.enterprise?.companyName) return true;
+  if (userData.company?.planTier === 'enterprise') return true;
+  
+  return false;
 }
 
 export default function Auth() {
@@ -59,6 +84,10 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // iOS app: skip welcome, go directly to email entry (login only)
+    if (isIoDomain()) {
+      return 'email';
+    }
     const hasSeenWelcome = localStorage.getItem('tivly_seen_welcome') === 'true';
     if (isAppDomain() || hasSeenWelcome) {
       return 'email';
@@ -222,10 +251,12 @@ export default function Auth() {
       if (response.ok) {
         console.log(`[Auth] ✅ Login successful (${platform}), processing response...`);
 
+        let userData = null;
         if (responseText && responseText.trim().length > 0) {
           try {
             const data = JSON.parse(responseText);
             console.log('[Auth] 📊 Parsed login response:', { hasToken: !!data.token, hasUser: !!data.user });
+            userData = data.user;
             
             if (data.token) {
               console.log('[Auth] 🔑 Applying JWT token from response');
@@ -236,6 +267,32 @@ export default function Auth() {
           }
         } else {
           console.log('[Auth] 🍪 Empty response body, using cookie-based authentication');
+        }
+
+        // iOS app: Check if user has Pro/Enterprise plan
+        if (isIoDomain()) {
+          console.log('[Auth] 📱 iOS app - checking plan access...');
+          
+          // Fetch user data if not in response
+          if (!userData) {
+            try {
+              userData = await apiClient.getMe();
+            } catch (e) {
+              console.error('[Auth] Failed to fetch user data for access check:', e);
+            }
+          }
+          
+          console.log('[Auth] 📋 User plan data:', userData?.plan);
+          
+          if (!hasAppAccess(userData)) {
+            console.log('[Auth] ❌ User does not have app access - showing no-access screen');
+            setViewMode('no-access');
+            setVerifying(false);
+            verifyingRef.current = false;
+            return;
+          }
+          
+          console.log('[Auth] ✅ User has app access, proceeding...');
         }
 
         console.log('[Auth] 🚀 Redirecting to dashboard...');
@@ -298,6 +355,19 @@ export default function Auth() {
     const secs = seconds % 60;
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
+
+  // Show no-access screen for iOS users without Pro/Enterprise
+  if (viewMode === 'no-access') {
+    return (
+      <NoAppAccessScreen 
+        onLogout={() => {
+          setViewMode('email');
+          setEmail('');
+          setPinCode('');
+        }} 
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
@@ -489,7 +559,8 @@ export default function Auth() {
                   )}
                 </AnimatePresence>
 
-                {!isAppDomain() && (
+                {/* Only show back button on web (not iOS app) */}
+                {!isAppDomain() && !isIoDomain() && (
                   <Button
                     variant="ghost"
                     onClick={handleBackToWelcome}
@@ -498,6 +569,13 @@ export default function Auth() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Tillbaka
                   </Button>
+                )}
+
+                {/* iOS app notice - no signup available */}
+                {isIoDomain() && (
+                  <p className="text-xs text-center text-muted-foreground pt-2">
+                    Skapa konto på app.tivly.se via webben
+                  </p>
                 )}
               </CardContent>
             </motion.div>
