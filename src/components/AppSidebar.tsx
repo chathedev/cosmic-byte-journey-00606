@@ -385,8 +385,9 @@ export function AppSidebar() {
           </nav>
         </div>
 
-        {/* Upgrade Section - Only for Free users */}
-        {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && (
+        {/* Upgrade Section - Only for Free users, never on iOS (Apple compliance) */}
+        {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && 
+         !(typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se') && (
           <div className="shrink-0 p-3 border-t border-border">
             <div className="text-xs text-muted-foreground mb-2 px-1">
               {meetingsLeft} möten kvar

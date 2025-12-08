@@ -18,6 +18,9 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
   const { userPlan, isLoading: planLoading, refreshPlan } = useSubscription();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Check if running on iOS app domain
+  const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
 
   // Check admin status and refresh plan on mount
   useEffect(() => {
@@ -120,7 +123,8 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
           {used} / obegränsat
         </span>
       )}
-      {userPlan.plan === 'free' && !isUnlimited && !userPlan.planCancelledAt && used >= limit && (
+      {/* On iOS app, never show upgrade button - Apple compliance */}
+      {!isIosApp && userPlan.plan === 'free' && !isUnlimited && !userPlan.planCancelledAt && used >= limit && (
         <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant="default">
           <TrendingUp className="mr-1 h-3 w-3" /> Uppgradera
         </Button>

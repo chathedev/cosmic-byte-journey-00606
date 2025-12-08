@@ -1,4 +1,4 @@
-import { MessageSquare, Sparkles } from "lucide-react";
+import { MessageSquare, Sparkles, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,9 @@ export const ChatUpgradeBanner = ({ onUpgrade }: ChatUpgradeBannerProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { userPlan } = useSubscription();
+  
+  // Check if running on iOS app domain
+  const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
 
   // Hide banner for Pro/Unlimited/Enterprise users
   if (hasPlusAccess(user, userPlan)) return null;
@@ -25,6 +28,27 @@ export const ChatUpgradeBanner = ({ onUpgrade }: ChatUpgradeBannerProps) => {
       navigate('/subscribe');
     }
   };
+
+  // iOS version - show neutral message without payment buttons (Apple compliance)
+  if (isIosApp) {
+    return (
+      <Card className="border border-border bg-card/50 p-4 animate-fade-in">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+            <MessageSquare className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-medium text-sm text-foreground">
+              Chatta om dina möten
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Ändringar av din plan görs på din kontosida på webben.
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 p-6 animate-fade-in">

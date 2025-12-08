@@ -541,6 +541,8 @@ const Library = () => {
 
   // Show locked library screen only for free users
   if (isLibraryLocked) {
+    const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
+    
     return (
       <>
         <div className="flex items-center justify-center min-h-[70vh] px-4 animate-fade-in">
@@ -551,12 +553,14 @@ const Library = () => {
               </div>
               <CardTitle className="text-2xl">Biblioteket är låst</CardTitle>
               <CardDescription className="text-base mt-2">
-                Uppgradera till Tivly Pro eller Plus för att få tillgång till biblioteket och alla dess funktioner!
+                {isIosApp 
+                  ? 'Ändringar av din plan görs på din kontosida på webben.'
+                  : 'Uppgradera till Tivly Pro eller Plus för att få tillgång till biblioteket och alla dess funktioner!'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-muted rounded-lg p-4 space-y-2">
-                <p className="text-sm font-medium">Med en uppgradering får du:</p>
+                <p className="text-sm font-medium">Med en prenumeration får du:</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>✓ Tillgång till biblioteket</li>
                   <li>✓ Skapa fler möten</li>
@@ -564,14 +568,17 @@ const Library = () => {
                   <li>✓ Organisera i mappar</li>
                 </ul>
               </div>
-              <Button 
-                className="w-full" 
-                size="lg"
-                onClick={() => setShowSubscribeDialog(true)}
-              >
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Uppgradera till Pro
-              </Button>
+              {/* iOS: Never show upgrade button - Apple compliance */}
+              {!isIosApp && (
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => setShowSubscribeDialog(true)}
+                >
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  Uppgradera till Pro
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 className="w-full"

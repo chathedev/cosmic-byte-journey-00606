@@ -53,6 +53,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [isCanceling, setIsCanceling] = useState(false);
   const [isDowngrading, setIsDowngrading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  
+  // Check if running on iOS app domain
+  const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
 
   // Refresh plan when dialog opens
   useEffect(() => {
@@ -356,6 +359,36 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                       {planLoading ? (
                         <div className="text-center py-3 text-muted-foreground text-sm">
                           Laddar...
+                        </div>
+                      ) : isIosApp ? (
+                        // iOS app: Apple-compliant neutral message - no payment buttons/links
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-muted/30">
+                            <div>
+                              <p className="text-[10px] text-muted-foreground">Möten</p>
+                              <p className="text-sm font-semibold">
+                                {userPlan?.meetingsLimit === null
+                                  ? '∞'
+                                  : `${userPlan?.meetingsUsed || 0}/${userPlan?.meetingsLimit || 1}`}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-muted-foreground">Status</p>
+                              <div className="flex items-center gap-1">
+                                {userPlan?.plan === 'free' ? (
+                                  <span className="text-xs font-medium text-muted-foreground">Gratis</span>
+                                ) : (
+                                  <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                    <span className="text-xs font-medium">Aktiv</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center py-2">
+                            Ändringar av din plan görs på din kontosida på webben.
+                          </p>
                         </div>
                       ) : (
                           <>
