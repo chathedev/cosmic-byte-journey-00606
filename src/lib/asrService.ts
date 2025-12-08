@@ -103,36 +103,34 @@ export async function transcribeDirectly(
 
   onProgress?.('uploading', 10);
 
-  // Convert to MP3/WAV if needed
+  // ALWAYS convert to WAV for backend compatibility
   let processedBlob = audioBlob;
-  if (needsConversion(audioBlob)) {
-    console.log('🔄 Converting audio format...');
-    try {
-      processedBlob = await convertToMp3(audioBlob);
-      console.log('✅ Audio conversion complete');
-      console.log('  - Converted blob size:', processedBlob.size, 'bytes');
-      console.log('  - Converted blob type:', processedBlob.type);
-    } catch (conversionError: any) {
-      console.error('❌ Audio conversion failed:', conversionError);
-      // Continue with original blob - backend might still accept it
-      processedBlob = audioBlob;
-    }
+  console.log('🔄 Converting audio to WAV format...');
+  try {
+    processedBlob = await convertToMp3(audioBlob); // convertToMp3 now converts to WAV
+    console.log('✅ WAV conversion complete');
+    console.log('  - Converted blob size:', processedBlob.size, 'bytes');
+    console.log('  - Converted blob type:', processedBlob.type);
+  } catch (conversionError: any) {
+    console.error('❌ Audio conversion failed:', conversionError);
+    return { success: false, error: `Audio conversion failed: ${conversionError.message}` };
+  }
+  
+  // Validate converted blob
+  if (processedBlob.size < 1000) {
+    console.error('❌ Converted blob is too small:', processedBlob.size, 'bytes');
+    return { success: false, error: 'Audio conversion resulted in empty file' };
   }
 
   onProgress?.('uploading', 30);
 
-  // Build FormData with 'audio' field (required by backend /asr/transcribe)
+  // Build FormData with 'audio' field - always use .wav extension
   const formData = new FormData();
-  const fileName = processedBlob.type.includes('wav') ? 'audio.wav' : 
-                   processedBlob.type.includes('mp3') || processedBlob.type.includes('mpeg') ? 'audio.mp3' : 
-                   processedBlob.type.includes('webm') ? 'meeting.webm' : 
-                   processedBlob.type.includes('mp4') ? 'audio.m4a' : 'audio.mp3';
-  
-  formData.append('audio', processedBlob, fileName);
+  formData.append('audio', processedBlob, 'meeting.wav');
   
   console.log('📦 FormData prepared:');
   console.log('  - Field name: "audio"');
-  console.log('  - File name:', fileName);
+  console.log('  - File name: meeting.wav');
   console.log('  - Blob size being sent:', processedBlob.size, 'bytes');
 
   try {

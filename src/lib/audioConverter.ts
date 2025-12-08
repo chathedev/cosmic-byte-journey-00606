@@ -1,24 +1,23 @@
-// Audio Converter - Convert audio formats to MP3 for backend ASR processing
-import { debugLog, debugError } from './debugLogger';
+// Audio Converter - Convert ALL audio formats to WAV for backend ASR processing
+// Backend expects WAV format for transcription (Vertex AI Speech v2)
 
 /**
- * Convert an audio file to MP3 format using Web Audio API
- * Backend expects MP3 format for transcription
+ * Convert an audio file to WAV format using Web Audio API
+ * Backend requires WAV format for transcription
+ * ALWAYS converts - even if already WAV (to ensure proper encoding)
  */
-export async function convertToMp3(audioFile: File | Blob): Promise<Blob> {
+export async function convertToWav(audioFile: File | Blob): Promise<Blob> {
   const fileType = audioFile instanceof File ? audioFile.type : audioFile.type;
   const fileName = audioFile instanceof File ? audioFile.name : 'audio';
   
-  debugLog('🎵 Audio conversion: Starting', {
-    fileName,
-    fileType,
-    fileSize: `${(audioFile.size / 1024 / 1024).toFixed(2)}MB`
-  });
+  console.log('🎵 Audio conversion: Starting WAV conversion');
+  console.log('  - File name:', fileName);
+  console.log('  - File type:', fileType);
+  console.log('  - File size:', audioFile.size, 'bytes', `(${(audioFile.size / 1024 / 1024).toFixed(2)}MB)`);
 
-  // If already MP3, return as-is
-  if (fileType === 'audio/mpeg' || fileType === 'audio/mp3' || fileName.toLowerCase().endsWith('.mp3')) {
-    debugLog('🎵 Already MP3 format, skipping conversion');
-    return audioFile;
+  // Validate input
+  if (audioFile.size < 100) {
+    throw new Error('Audio file is empty');
   }
 
   try {
@@ -29,37 +28,33 @@ export async function convertToMp3(audioFile: File | Blob): Promise<Blob> {
     const arrayBuffer = await audioFile.arrayBuffer();
     
     // Decode audio data
-    debugLog('🎵 Decoding audio data...');
+    console.log('🎵 Decoding audio data...');
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
-    debugLog('🎵 Audio decoded', {
-      duration: `${audioBuffer.duration.toFixed(2)}s`,
-      sampleRate: audioBuffer.sampleRate,
-      channels: audioBuffer.numberOfChannels
-    });
+    console.log('🎵 Audio decoded:');
+    console.log('  - Duration:', audioBuffer.duration.toFixed(2), 's');
+    console.log('  - Sample rate:', audioBuffer.sampleRate);
+    console.log('  - Channels:', audioBuffer.numberOfChannels);
 
-    // Convert to WAV first (as intermediate format), then we'll send as WAV
-    // Backend can handle WAV, but MP3 is preferred for size
-    // For now, convert to WAV since browser can't natively encode MP3
+    // Convert to WAV
     const wavBlob = audioBufferToWav(audioBuffer);
     
-    debugLog('✅ Audio conversion complete (WAV intermediate)', {
-      originalSize: `${(audioFile.size / 1024 / 1024).toFixed(2)}MB`,
-      wavSize: `${(wavBlob.size / 1024 / 1024).toFixed(2)}MB`
-    });
+    console.log('✅ Audio conversion complete (WAV)');
+    console.log('  - Original size:', audioFile.size, 'bytes');
+    console.log('  - WAV size:', wavBlob.size, 'bytes');
 
     // Close audio context
     await audioContext.close();
 
     return wavBlob;
   } catch (error: any) {
-    debugError('❌ Audio conversion failed:', error);
+    console.error('❌ Audio conversion failed:', error);
     throw new Error(`Could not convert audio: ${error.message}`);
   }
 }
 
 // Legacy alias for backward compatibility
-export const convertToWav = convertToMp3;
+export const convertToMp3 = convertToWav;
 
 /**
  * Convert AudioBuffer to WAV Blob
@@ -124,21 +119,11 @@ function floatTo16BitPCM(view: DataView, offset: number, input: Float32Array): v
 }
 
 /**
- * Check if file needs conversion (not MP3/WAV)
+ * Check if file needs conversion
+ * ALWAYS returns true - we always convert to WAV for consistent backend processing
  */
 export function needsConversion(file: File | Blob): boolean {
-  const type = file.type;
-  const name = file instanceof File ? file.name.toLowerCase() : '';
-  
-  // MP3 and WAV don't need conversion - backend accepts both
-  const isNativeFormat = 
-    type === 'audio/mpeg' || 
-    type === 'audio/mp3' || 
-    type === 'audio/wav' || 
-    type === 'audio/wave' || 
-    type === 'audio/x-wav' ||
-    name.endsWith('.mp3') ||
-    name.endsWith('.wav');
-    
-  return !isNativeFormat;
+  // Always convert to WAV for backend compatibility
+  // This ensures consistent format regardless of source (recording, upload, etc.)
+  return true;
 }
