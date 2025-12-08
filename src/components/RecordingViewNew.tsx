@@ -283,15 +283,29 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       });
       streamRef.current = stream;
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4',
-      });
+      // Determine best supported mimeType with codecs for reliable recording
+      let mimeType = 'audio/webm; codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/mp4';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = ''; // Let browser choose
+          }
+        }
+      }
+      
+      console.log('🎤 MediaRecorder mimeType:', mimeType || 'browser default');
+
+      const recorderOptions: MediaRecorderOptions = mimeType ? { mimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       
       audioChunksRef.current = [];
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          console.log(`📦 Audio chunk received: ${event.data.size} bytes (total chunks: ${audioChunksRef.current.length})`);
         }
       };
 
@@ -306,7 +320,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         startSpeechRecognition();
       }
       
-      console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)');
+      console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -534,18 +548,42 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
       // Combine live transcript with any interim text
       const finalTranscript = (liveTranscript + ' ' + interimText).trim();
       
-      // For ASR mode, we need the audio blob
-      const blob = new Blob(audioChunksRef.current, { 
-        type: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' 
-      });
+      // Get mimeType from MediaRecorder if available, fallback to detection
+      const recorderMimeType = mediaRecorderRef.current?.mimeType;
+      let blobMimeType = recorderMimeType || 'audio/webm';
+      if (!recorderMimeType) {
+        // Fallback detection
+        if (MediaRecorder.isTypeSupported('audio/webm; codecs=opus')) {
+          blobMimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          blobMimeType = 'audio/webm';
+        } else {
+          blobMimeType = 'audio/mp4';
+        }
+      }
       
-      console.log('Audio blob size:', blob.size, 'bytes');
+      // For ASR mode, we need the audio blob
+      const blob = new Blob(audioChunksRef.current, { type: blobMimeType });
+      
+      // Detailed logging for debugging
+      console.log('🎤 Recording complete:');
+      console.log('  - Total chunks:', audioChunksRef.current.length);
+      console.log('  - Blob size:', blob.size, 'bytes');
+      console.log('  - Blob type:', blob.type);
+      console.log('  - Expected min size for real recording: 50000+ bytes');
+      
+      if (blob.size < 100) {
+        console.error('❌ CRITICAL: Blob is essentially empty! Recording failed.');
+      } else if (blob.size < 50000) {
+        console.warn('⚠️ WARNING: Blob is very small, may not contain real audio.');
+      }
 
-      // Only check blob size for ASR mode
-      if (useAsrMode && blob.size < 1000) {
+      // Only check blob size for ASR mode - require at least 50KB for real meeting
+      if (useAsrMode && blob.size < 50000) {
+        console.error('❌ Audio blob too small for ASR:', blob.size, 'bytes');
         toast({
           title: 'Ljudfilen är för liten',
-          description: 'Försök spela in igen.',
+          description: 'Inspelningen verkar vara tom. Kontrollera mikrofonen och försök igen.',
           variant: 'destructive',
         });
         isSavingRef.current = false;
