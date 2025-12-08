@@ -79,11 +79,22 @@ export async function transcribeDirectly(
   const { language = 'sv', onProgress } = options;
   
   const fileSizeMB = audioBlob.size / 1024 / 1024;
-  debugLog('🎤 ASR Step 1: Sending audio to backend /asr/transcribe', {
-    fileSize: `${fileSizeMB.toFixed(2)}MB`,
-    fileType: audioBlob.type,
-    language
-  });
+  
+  // Detailed logging for debugging audio issues
+  console.log('🎤 ASR Step 1: Preparing audio for backend /asr/transcribe');
+  console.log('  - Input blob size:', audioBlob.size, 'bytes', `(${fileSizeMB.toFixed(2)}MB)`);
+  console.log('  - Input blob type:', audioBlob.type);
+  console.log('  - Language:', language);
+  
+  // Validate blob is not empty
+  if (audioBlob.size < 100) {
+    console.error('❌ CRITICAL: Audio blob is empty or nearly empty!');
+    return { success: false, error: 'Audio blob is empty - recording failed' };
+  }
+  
+  if (audioBlob.size < 50000) {
+    console.warn('⚠️ WARNING: Audio blob is very small, may not contain real audio');
+  }
 
   // Validate file size (250MB limit)
   if (fileSizeMB > 250) {
@@ -95,12 +106,14 @@ export async function transcribeDirectly(
   // Convert to MP3/WAV if needed
   let processedBlob = audioBlob;
   if (needsConversion(audioBlob)) {
-    debugLog('🔄 Converting audio format...');
+    console.log('🔄 Converting audio format...');
     try {
       processedBlob = await convertToMp3(audioBlob);
-      debugLog('✅ Audio conversion complete');
+      console.log('✅ Audio conversion complete');
+      console.log('  - Converted blob size:', processedBlob.size, 'bytes');
+      console.log('  - Converted blob type:', processedBlob.type);
     } catch (conversionError: any) {
-      debugError('❌ Audio conversion failed:', conversionError);
+      console.error('❌ Audio conversion failed:', conversionError);
       // Continue with original blob - backend might still accept it
       processedBlob = audioBlob;
     }
@@ -112,10 +125,15 @@ export async function transcribeDirectly(
   const formData = new FormData();
   const fileName = processedBlob.type.includes('wav') ? 'audio.wav' : 
                    processedBlob.type.includes('mp3') || processedBlob.type.includes('mpeg') ? 'audio.mp3' : 
-                   processedBlob.type.includes('webm') ? 'audio.webm' : 
+                   processedBlob.type.includes('webm') ? 'meeting.webm' : 
                    processedBlob.type.includes('mp4') ? 'audio.m4a' : 'audio.mp3';
   
   formData.append('audio', processedBlob, fileName);
+  
+  console.log('📦 FormData prepared:');
+  console.log('  - Field name: "audio"');
+  console.log('  - File name:', fileName);
+  console.log('  - Blob size being sent:', processedBlob.size, 'bytes');
 
   try {
     onProgress?.('uploading', 50);

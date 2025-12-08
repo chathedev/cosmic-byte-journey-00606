@@ -91,12 +91,26 @@ export const DigitalMeetingDialog = ({
     const meetingId = crypto.randomUUID();
     const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
     
-    debugLog('📤 Upload: Starting instant redirect flow', {
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-      meetingId
-    });
+    // Detailed logging for upload debugging
+    console.log('📤 Upload: Starting instant redirect flow');
+    console.log('  - File name:', file.name);
+    console.log('  - File type:', file.type);
+    console.log('  - File size:', file.size, 'bytes', `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+    console.log('  - Meeting ID:', meetingId);
+    
+    if (file.size < 1000) {
+      console.error('❌ CRITICAL: Selected file is essentially empty!');
+      toast({
+        title: "Filen är tom",
+        description: "Den valda filen verkar vara tom. Välj en annan fil.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (file.size < 50000) {
+      console.warn('⚠️ WARNING: File is very small, may not contain real audio.');
+    }
 
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -178,17 +192,29 @@ export const DigitalMeetingDialog = ({
     try {
       // Convert audio if needed (backend accepts MP3/WAV)
       let audioBlob: Blob = file;
+      
+      console.log('🎤 Background upload processing:');
+      console.log('  - Original file size:', file.size, 'bytes');
+      console.log('  - Original file type:', file.type);
+      
       if (needsConversion(file)) {
-        debugLog('🔄 Background: Converting audio format...');
+        console.log('🔄 Background: Converting audio format...');
         audioBlob = await convertToMp3(file);
-        debugLog('✅ Background: Conversion complete');
+        console.log('✅ Background: Conversion complete');
+        console.log('  - Converted blob size:', audioBlob.size, 'bytes');
+        console.log('  - Converted blob type:', audioBlob.type);
+      }
+      
+      if (audioBlob.size < 1000) {
+        console.error('❌ CRITICAL: Audio blob is empty after processing!');
+        throw new Error('Audio file is empty after processing');
       }
 
       // Get user display name safely
       const userName = (user as any)?.displayName || (user as any)?.name || undefined;
 
       // Send to ASR and save transcript
-      debugLog('🎤 Background: Sending to ASR service...');
+      console.log('🎤 Background: Sending to ASR service, blob size:', audioBlob.size, 'bytes');
       
       const result = await transcribeAndSave(audioBlob, meetingId, {
         language: languageCode,
