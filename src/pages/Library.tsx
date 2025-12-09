@@ -22,6 +22,8 @@ import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiClient } from "@/lib/api";
+import { ProcessingMeetingCard } from "@/components/ProcessingMeetingCard";
+import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
 
 const Library = () => {
   const { user } = useAuth();
@@ -74,7 +76,13 @@ const Library = () => {
       if (pendingMeetingJson) {
         try {
           const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
-          pendingMeeting.transcriptionStatus = 'processing';
+          // Check if we have background upload in progress
+          const uploadStatus = getUploadStatus(pendingMeeting.id);
+          if (uploadStatus) {
+            pendingMeeting.transcriptionStatus = uploadStatus.status === 'complete' ? 'processing' : 'uploading';
+          } else {
+            pendingMeeting.transcriptionStatus = 'uploading';
+          }
           pendingMeetingIdRef.current = pendingMeeting.id;
           setMeetings([pendingMeeting]);
           setIsLoading(false);
@@ -89,6 +97,30 @@ const Library = () => {
       sessionStorage.removeItem('pendingMeeting');
     }
   }, [location.state]);
+
+  // Subscribe to background upload status changes
+  useEffect(() => {
+    const unsubscribe = subscribeToUpload((meetingId, status) => {
+      console.log('📤 Upload status update:', meetingId, status.status, status.progress);
+      
+      setMeetings(prev => prev.map(m => {
+        if (m.id !== meetingId) return m;
+        
+        if (status.status === 'complete') {
+          // Upload done, now processing
+          return { ...m, transcriptionStatus: 'processing' as const };
+        } else if (status.status === 'error') {
+          return { ...m, transcriptionStatus: 'failed' as const };
+        } else {
+          return { ...m, transcriptionStatus: 'uploading' as const };
+        }
+      }));
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -703,10 +735,34 @@ const Library = () => {
           <div className="grid gap-4">
             <AnimatePresence mode="popLayout">
             {filteredMeetings.map((meeting, index) => {
-              // Consider processing if explicitly marked OR if transcript is empty/missing
+              // Check if this is an uploading/processing meeting
+              const isUploading = meeting.transcriptionStatus === 'uploading';
               const isProcessing = meeting.transcriptionStatus === 'processing' || 
                 (!meeting.transcript || meeting.transcript.trim().length === 0);
+              const isFailed = meeting.transcriptionStatus === 'failed';
               const hasTranscript = meeting.transcript && meeting.transcript.trim().length > 0;
+              
+              // Show special card for uploading/processing meetings
+              if (isUploading || (isProcessing && !hasTranscript)) {
+                return (
+                  <motion.div
+                    key={meeting.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    layout
+                  >
+                    <ProcessingMeetingCard
+                      meetingId={meeting.id}
+                      title={meeting.title || 'Nytt möte'}
+                      transcriptionStatus={isUploading ? 'uploading' : 'processing'}
+                      createdAt={meeting.createdAt}
+                    />
+                  </motion.div>
+                );
+              }
+              
               return (
               <motion.div
                 key={meeting.id}
@@ -739,23 +795,15 @@ const Library = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                        {isProcessing && !hasTranscript ? (
-                            <div className="flex items-center gap-2">
-                              <CardTitle className="text-lg text-muted-foreground">{meeting.title || 'Nytt möte'}</CardTitle>
-                            </div>
-                          ) : (
-                            <>
-                              <CardTitle className="text-lg">{meeting.title}</CardTitle>
-                              <Button
-                                onClick={() => handleStartEdit(meeting)}
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </Button>
-                            </>
-                          )}
+                          <CardTitle className="text-lg">{meeting.title}</CardTitle>
+                          <Button
+                            onClick={() => handleStartEdit(meeting)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
                         </div>
                       )}
                       <CardDescription className="mt-2 flex items-center gap-4 text-xs flex-wrap">
@@ -785,16 +833,7 @@ const Library = () => {
                             </Badge>
                           </>
                         )}
-                        {isProcessing && !hasTranscript && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <Badge variant="outline" className="flex items-center gap-1 text-xs bg-primary/10 border-primary/30">
-                              <RefreshCw className="w-3 h-3 animate-spin" />
-                              Transkriberar...
-                            </Badge>
-                          </>
-                        )}
-                        {meeting.transcriptionStatus === 'failed' && (
+                        {isFailed && (
                           <>
                             <span className="text-muted-foreground">•</span>
                             <Badge variant="destructive" className="flex items-center gap-1 text-xs">
@@ -807,56 +846,17 @@ const Library = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <AnimatePresence mode="wait">
-                    {isProcessing && !hasTranscript ? (
-                      <motion.div
-                        key="processing"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="mb-4 space-y-3"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                          <span className="text-sm text-muted-foreground">Transkribering pågår...</span>
-                        </div>
-                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground">Du får ett mejl när det är klart</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Stäng gärna sidan – vi meddelar dig via e-post när transkriberingen är färdig.
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ) : meeting.transcriptionStatus === 'failed' ? (
-                      <motion.div
-                        key="failed"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex items-center gap-2 mb-4 text-destructive"
-                      >
-                        <span>✕</span>
-                        <span className="text-sm">Transkribering misslyckades</span>
-                      </motion.div>
-                    ) : (
-                      <motion.p
-                        key="transcript"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="text-sm text-muted-foreground line-clamp-2 mb-4"
-                      >
-                        {meeting.transcript}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
+                  {/* Transcript preview - only shown for completed meetings */}
+                  {isFailed ? (
+                    <div className="flex items-center gap-2 mb-4 text-destructive">
+                      <span>✕</span>
+                      <span className="text-sm">Transkribering misslyckades</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                      {meeting.transcript}
+                    </p>
+                  )}
                   
                   {/* Protocol Status Badge */}
                   {protocolStatus[meeting.id] && (

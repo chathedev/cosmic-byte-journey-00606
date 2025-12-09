@@ -3,13 +3,11 @@ import { Upload, FileAudio, X, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { uploadAudioForTranscription } from "@/lib/asrService";
+import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { useNavigate } from "react-router-dom";
-import { debugLog, debugError } from "@/lib/debugLogger";
 
 interface DigitalMeetingDialogProps {
   open: boolean;
@@ -40,8 +38,7 @@ export const DigitalMeetingDialog = ({
   selectedLanguage 
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
@@ -79,8 +76,8 @@ export const DigitalMeetingDialog = ({
       return;
     }
 
-    // Check file size (max 100MB)
-    const maxSizeMB = 100;
+    // Check file size (max 500MB for background upload)
+    const maxSizeMB = 500;
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       toast({
@@ -92,21 +89,19 @@ export const DigitalMeetingDialog = ({
     }
 
     setSelectedFile(file);
-    setUploadProgress(0);
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !user || isUploading) return;
+    if (!selectedFile || !user || isSubmitting) return;
 
-    setIsUploading(true);
-    setUploadProgress(0);
+    setIsSubmitting(true);
     
     const file = selectedFile;
     const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
     const meetingId = crypto.randomUUID();
     const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
     
-    console.log('📤 Upload: Starting async transcription flow');
+    console.log('📤 Starting instant upload flow');
     console.log('  - File:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     console.log('  - Meeting ID:', meetingId);
     
@@ -116,7 +111,7 @@ export const DigitalMeetingDialog = ({
         description: "Den valda filen verkar vara tom. Välj en annan fil.",
         variant: "destructive",
       });
-      setIsUploading(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -127,12 +122,12 @@ export const DigitalMeetingDialog = ({
         description: "Ladda om sidan och logga in igen.",
         variant: "destructive",
       });
-      setIsUploading(false);
+      setIsSubmitting(false);
       return;
     }
 
     try {
-      // Step 1: Create meeting placeholder with 'processing' status
+      // Step 1: Create meeting placeholder FAST
       const createResponse = await fetch('https://api.tivly.se/meetings', {
         method: 'POST',
         headers: {
@@ -143,7 +138,7 @@ export const DigitalMeetingDialog = ({
           id: meetingId,
           title: meetingTitle,
           transcript: '',
-          transcriptionStatus: 'processing',
+          transcriptionStatus: 'uploading',
           folder: 'general',
           source: 'upload',
         }),
@@ -156,35 +151,15 @@ export const DigitalMeetingDialog = ({
       // Increment meeting count
       await incrementMeetingCount(meetingId);
 
-      // Step 2: Upload audio file for transcription
-      const uploadResult = await uploadAudioForTranscription(file, meetingId, {
-        language: languageCode,
-        onUploadProgress: (percent) => {
-          setUploadProgress(percent);
-          debugLog(`📤 Upload progress: ${percent}%`);
-        }
-      });
+      // Step 2: Start background upload (non-blocking!)
+      startBackgroundUpload(file, meetingId, languageCode);
 
-      if (!uploadResult.success) {
-        // Update meeting status to failed
-        await fetch(`https://api.tivly.se/meetings/${meetingId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ transcriptionStatus: 'failed' }),
-        });
-        
-        throw new Error(uploadResult.error || 'Upload failed');
-      }
-
-      // Save pending meeting to sessionStorage for instant display
+      // Step 3: Save pending meeting to sessionStorage for instant display
       const pendingMeeting = {
         id: meetingId,
         title: meetingTitle,
         transcript: '',
-        transcriptionStatus: 'processing',
+        transcriptionStatus: 'uploading',
         folder: 'general',
         source: 'upload',
         createdAt: new Date().toISOString(),
@@ -192,15 +167,14 @@ export const DigitalMeetingDialog = ({
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Close dialog and redirect
+      // Step 4: Close dialog and redirect IMMEDIATELY
       onOpenChange(false);
       setSelectedFile(null);
-      setIsUploading(false);
-      setUploadProgress(0);
+      setIsSubmitting(false);
       
       toast({
-        title: 'Uppladdning klar',
-        description: 'Analyserar... Du får ett mejl när det är klart.',
+        title: 'Uppladdning startad',
+        description: 'Filen laddas upp i bakgrunden.',
       });
 
       // Redirect to library with pending meeting info
@@ -212,11 +186,10 @@ export const DigitalMeetingDialog = ({
       });
 
     } catch (error: any) {
-      debugError('Upload error:', error);
-      setIsUploading(false);
-      setUploadProgress(0);
+      console.error('Upload init error:', error);
+      setIsSubmitting(false);
       toast({
-        title: "Uppladdning misslyckades",
+        title: "Något gick fel",
         description: error.message || "Försök igen.",
         variant: "destructive",
       });
@@ -225,7 +198,6 @@ export const DigitalMeetingDialog = ({
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
-    setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -299,7 +271,7 @@ export const DigitalMeetingDialog = ({
               <div className="space-y-3">
                 <p className="font-medium">Ladda upp din ljudfil</p>
                 <p className="text-sm text-muted-foreground">
-                  Stöder MP3, WAV och M4A. Max 100MB.
+                  Stöder MP3, WAV och M4A. Max 500MB. Uppladdning sker i bakgrunden.
                 </p>
               </div>
             </AlertDescription>
@@ -308,7 +280,7 @@ export const DigitalMeetingDialog = ({
           {/* File upload area */}
           {!selectedFile ? (
             <div 
-              onClick={() => !isUploading && fileInputRef.current?.click()}
+              onClick={() => !isSubmitting && fileInputRef.current?.click()}
               className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary hover:bg-accent/5 transition-colors"
             >
               <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -316,7 +288,7 @@ export const DigitalMeetingDialog = ({
                 Klicka för att välja ljudfil
               </p>
               <p className="text-xs text-muted-foreground">
-                MP3, WAV eller M4A (max 100MB)
+                MP3, WAV eller M4A (max 500MB)
               </p>
               <input
                 ref={fileInputRef}
@@ -327,7 +299,7 @@ export const DigitalMeetingDialog = ({
               />
             </div>
           ) : (
-            <div className="border border-border rounded-lg p-4 space-y-3">
+            <div className="border border-border rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -342,7 +314,7 @@ export const DigitalMeetingDialog = ({
                     </p>
                   </div>
                 </div>
-                {!isUploading && (
+                {!isSubmitting && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -352,18 +324,6 @@ export const DigitalMeetingDialog = ({
                   </Button>
                 )}
               </div>
-              
-              {/* Upload progress bar */}
-              {isUploading && (
-                <div className="space-y-2">
-                  <Progress value={uploadProgress} className="h-2" />
-                  <p className="text-xs text-muted-foreground text-center">
-                    {uploadProgress < 100 
-                      ? `Laddar upp... ${uploadProgress}%` 
-                      : 'Analyserar...'}
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
@@ -372,25 +332,16 @@ export const DigitalMeetingDialog = ({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isUploading}
+              disabled={isSubmitting}
             >
               Avbryt
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!selectedFile || isUploading}
+              disabled={!selectedFile || isSubmitting}
             >
-              {isUploading ? (
-                <>
-                  <Upload className="mr-2 h-4 w-4 animate-pulse" />
-                  {uploadProgress < 100 ? 'Laddar upp...' : 'Analyserar...'}
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Ladda upp och transkribera
-                </>
-              )}
+              <Upload className="mr-2 h-4 w-4" />
+              {isSubmitting ? 'Startar...' : 'Ladda upp'}
             </Button>
           </div>
         </div>
