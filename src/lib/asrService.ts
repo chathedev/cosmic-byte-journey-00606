@@ -96,9 +96,10 @@ export async function transcribeDirectly(
     console.warn('⚠️ WARNING: Audio blob is very small, may not contain real audio');
   }
 
-  // Validate file size (250MB limit)
-  if (fileSizeMB > 250) {
-    return { success: false, error: 'File size exceeds 250MB limit' };
+  // Validate file size (2GB limit - only reject truly massive files)
+  const fileSizeGB = fileSizeMB / 1024;
+  if (fileSizeGB > 2) {
+    return { success: false, error: `Filen är för stor (${fileSizeGB.toFixed(1)}GB). Max 2GB.` };
   }
 
   onProgress?.('uploading', 10);
