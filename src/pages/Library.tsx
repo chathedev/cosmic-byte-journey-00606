@@ -132,12 +132,14 @@ const Library = () => {
   // Track if transcription was completed via direct event (to stop polling)
   const transcriptionDoneRef = useRef(false);
 
-  // Polling for transcription status - only if direct event hasn't fired
+  // Polling for transcription status - poll meeting data directly
   useEffect(() => {
     if (!user) return;
     
     const pendingId = pendingMeetingIdRef.current;
     if (!pendingId) return;
+
+    console.log('🔄 Starting transcription polling for:', pendingId);
 
     const pollInterval = setInterval(async () => {
       // Stop if transcription was completed via direct event
@@ -153,27 +155,20 @@ const Library = () => {
       }
 
       try {
-        // Poll using meetingId
-        const status = await apiClient.getTranscriptionStatus(currentPendingId);
+        // Poll meeting data directly - no /asr/status endpoint needed
+        const meeting = await meetingStorage.getMeeting(currentPendingId);
         
-        const isComplete = status.success && (status.status === 'done' || status.status === 'completed') && status.transcript;
-        
-        if (isComplete) {
+        if (meeting && meeting.transcript && meeting.transcript.trim().length > 0) {
+          // Transcript is ready!
+          console.log('✅ Transcript found via polling');
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
           
-          // Parse transcript if it's JSON
-          let cleanTranscript = status.transcript;
-          try {
-            const parsed = JSON.parse(status.transcript);
-            if (parsed.text) cleanTranscript = parsed.text;
-          } catch { /* not JSON */ }
-          
           setMeetings(prev => prev.map(m => 
             m.id === currentPendingId 
-              ? { ...m, transcript: cleanTranscript, transcriptionStatus: 'done' as const } 
+              ? { ...m, transcript: meeting.transcript, transcriptionStatus: 'done' as const } 
               : m
           ));
           
@@ -181,7 +176,8 @@ const Library = () => {
             title: 'Transkribering klar',
             description: 'Ditt möte har transkriberats.',
           });
-        } else if (status.status === 'failed' || status.status === 'error') {
+        } else if (meeting?.transcriptionStatus === 'failed') {
+          // Transcription failed
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           clearInterval(pollInterval);
@@ -192,12 +188,16 @@ const Library = () => {
           
           toast({
             title: 'Transkribering misslyckades',
-            description: status.error || 'Försök igen.',
+            description: 'Försök igen.',
             variant: 'destructive',
           });
         }
-      } catch { /* silent */ }
-    }, 3000); // Poll every 3 seconds per spec
+        // Otherwise keep polling silently
+      } catch { 
+        // Silent - keep polling
+        console.log('🔄 Polling... (waiting for transcript)');
+      }
+    }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(pollInterval);
   }, [user]);
