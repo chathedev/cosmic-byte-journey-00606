@@ -13,6 +13,7 @@ interface PendingUpload {
   progress: number;
   error?: string;
   retryCount: number;
+  startedAt: number; // Timestamp when upload started
 }
 
 // In-memory store for pending uploads
@@ -31,7 +32,26 @@ function notifyListeners(meetingId: string, status: PendingUpload) {
 }
 
 export function getUploadStatus(meetingId: string): PendingUpload | undefined {
-  return pendingUploads.get(meetingId);
+  const upload = pendingUploads.get(meetingId);
+  if (!upload) return undefined;
+  
+  // If stuck at 0% for more than 30 seconds, consider it stale
+  const now = Date.now();
+  const isStale = upload.progress === 0 && upload.status === 'uploading' && (now - upload.startedAt > 30000);
+  if (isStale) {
+    return { ...upload, status: 'error', error: 'Uppladdningen verkar ha fastnat. Försök igen.' };
+  }
+  
+  return upload;
+}
+
+export function isUploadStale(meetingId: string): boolean {
+  const upload = pendingUploads.get(meetingId);
+  if (!upload) return true;
+  
+  const now = Date.now();
+  // Stale if: stuck at 0% for 30s, or no progress for 2 minutes
+  return (upload.progress === 0 && upload.status === 'uploading' && (now - upload.startedAt > 30000));
 }
 
 export function getAllPendingUploads(): PendingUpload[] {
@@ -53,6 +73,7 @@ export function startBackgroundUpload(
     status: 'pending',
     progress: 0,
     retryCount: 0,
+    startedAt: Date.now(),
   };
   
   pendingUploads.set(meetingId, upload);
