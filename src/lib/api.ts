@@ -1516,23 +1516,72 @@ class ApiClient {
   }
 
   // Get transcription status for a meeting (polling endpoint)
-  async getTranscriptionStatus(meetingId: string): Promise<{
+  // Supports both legacy meeting-based polling and new jobId-based polling
+  async getTranscriptionStatus(meetingId: string, jobId?: string): Promise<{
     success: boolean;
-    status: 'processing' | 'done' | 'failed';
+    status: 'queued' | 'processing' | 'done' | 'completed' | 'failed' | 'error';
     transcript?: string;
     path?: string;
     jsonPath?: string;
     duration?: number;
     processing_time?: number;
+    progress?: number;
     notified?: boolean;
     error?: string;
     updatedAt?: string;
+    jobId?: string;
   }> {
     const token = this.getToken();
     if (!token) {
       throw new Error('Authentication required');
     }
 
+    // If jobId provided, use new /asr/status endpoint
+    if (jobId) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/asr/status?jobId=${encodeURIComponent(jobId)}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          return {
+            success: false,
+            status: 'failed',
+            error: 'Status check failed'
+          };
+        }
+
+        const data = await response.json();
+        
+        // Normalize status values
+        let normalizedStatus = data.status;
+        if (normalizedStatus === 'completed') normalizedStatus = 'done';
+        
+        return {
+          success: true,
+          status: normalizedStatus,
+          transcript: data.transcript,
+          progress: data.progress,
+          duration: data.duration,
+          processing_time: data.processing_time,
+          error: data.error,
+          jobId
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          status: 'failed',
+          error: error.message || 'Network error'
+        };
+      }
+    }
+
+    // Legacy: poll by meetingId
     const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/transcription`, {
       method: 'GET',
       credentials: 'include',
