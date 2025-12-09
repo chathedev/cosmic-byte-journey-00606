@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2 } from "lucide-react";
+import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
@@ -22,7 +22,6 @@ import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiClient } from "@/lib/api";
-import { ProcessingMeetingCard } from "@/components/ProcessingMeetingCard";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
 
 const Library = () => {
@@ -735,33 +734,12 @@ const Library = () => {
           <div className="grid gap-4">
             <AnimatePresence mode="popLayout">
             {filteredMeetings.map((meeting, index) => {
-              // Check if this is an uploading/processing meeting
-              const isUploading = meeting.transcriptionStatus === 'uploading';
-              const isProcessing = meeting.transcriptionStatus === 'processing' || 
+              // Check status - treat uploading same as processing
+              const isProcessing = meeting.transcriptionStatus === 'uploading' || 
+                meeting.transcriptionStatus === 'processing' || 
                 (!meeting.transcript || meeting.transcript.trim().length === 0);
               const isFailed = meeting.transcriptionStatus === 'failed';
               const hasTranscript = meeting.transcript && meeting.transcript.trim().length > 0;
-              
-              // Show special card for uploading/processing meetings
-              if (isUploading || (isProcessing && !hasTranscript)) {
-                return (
-                  <motion.div
-                    key={meeting.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    layout
-                  >
-                    <ProcessingMeetingCard
-                      meetingId={meeting.id}
-                      title={meeting.title || 'Nytt möte'}
-                      transcriptionStatus={isUploading ? 'uploading' : 'processing'}
-                      createdAt={meeting.createdAt}
-                    />
-                  </motion.div>
-                );
-              }
               
               return (
               <motion.div
@@ -846,11 +824,22 @@ const Library = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Transcript preview - only shown for completed meetings */}
+                  {/* Content based on status */}
                   {isFailed ? (
                     <div className="flex items-center gap-2 mb-4 text-destructive">
                       <span>✕</span>
                       <span className="text-sm">Transkribering misslyckades</span>
+                    </div>
+                  ) : isProcessing && !hasTranscript ? (
+                    <div className="mb-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                        <span className="text-sm font-medium text-primary">Analyserar ljudfil...</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                        <Mail className="w-4 h-4 text-primary" />
+                        <span>Du får ett mejl när det är klart</span>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
