@@ -1,9 +1,8 @@
 // ASR Service - Async polling flow for transcription
-// Flow: 1) Submit MP3 to backend → get jobId 2) Poll status 3) Get transcript when complete
-// NOTE: MP3 only - no conversion in browser for maximum speed
+// Flow: 1) Upload file to backend → 2) Poll status by meetingId → 3) Get transcript when complete
+// Accepts: MP3, WAV, M4A - backend handles all conversion
 
 import { debugLog, debugError } from './debugLogger';
-import { sendTranscriptionCompleteEmail, sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from './emailNotification';
 
 const BACKEND_API_URL = 'https://api.tivly.se';
 const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
@@ -14,147 +13,152 @@ export interface ASRResult {
   transcript?: string;
   duration?: number;
   processing_time?: number;
-  path?: string;
-  jsonPath?: string;
   error?: string;
-  engine?: string;
-  jobId?: string;
   meetingId?: string;
 }
 
-export interface ASRJobStatus {
+export interface ASRStatus {
   status: 'queued' | 'processing' | 'completed' | 'error' | 'failed';
   progress?: number;
   transcript?: string;
   error?: string;
-  engine?: string;
   duration?: number;
-  processing_time?: number;
 }
 
-export interface ASROptions {
-  language?: string;
-  onProgress?: (stage: 'uploading' | 'queued' | 'processing' | 'complete', percent: number) => void;
-  onStatusChange?: (status: ASRJobStatus) => void;
+export interface UploadProgress {
+  stage: 'uploading' | 'processing' | 'complete' | 'error';
+  percent: number;
 }
 
 /**
- * Submit audio file for async transcription
- * Returns jobId for polling
+ * Upload audio file for async transcription
+ * Returns meetingId for polling
  */
-export async function submitASRJob(
-  audioBlob: Blob,
+export async function uploadAudioForTranscription(
+  file: File,
   meetingId: string,
-  options: ASROptions = {}
-): Promise<{ success: boolean; jobId?: string; meetingId?: string; error?: string }> {
-  const { language = 'sv', onProgress } = options;
+  options: {
+    language?: string;
+    onUploadProgress?: (percent: number) => void;
+  } = {}
+): Promise<{ success: boolean; meetingId?: string; error?: string }> {
+  const { language = 'sv', onUploadProgress } = options;
   
-  const fileSizeMB = audioBlob.size / 1024 / 1024;
+  const fileSizeMB = file.size / 1024 / 1024;
   
-  console.log('🎤 ASR: Submitting MP3 for async transcription');
-  console.log('  - Blob size:', audioBlob.size, 'bytes', `(${fileSizeMB.toFixed(2)}MB)`);
+  console.log('🎤 ASR: Uploading audio for transcription');
+  console.log('  - File:', file.name, `(${fileSizeMB.toFixed(2)}MB)`);
+  console.log('  - Type:', file.type);
   console.log('  - Meeting ID:', meetingId);
   console.log('  - Language:', language);
   
-  // Validate blob is not empty
-  if (audioBlob.size < 100) {
-    console.error('❌ CRITICAL: Audio blob is empty!');
-    return { success: false, error: 'Audio blob is empty - recording failed' };
+  // Validate file is not empty
+  if (file.size < 100) {
+    console.error('❌ CRITICAL: Audio file is empty!');
+    return { success: false, error: 'Filen är tom' };
   }
 
-  // Validate file size (500MB limit for MP3)
-  if (fileSizeMB > 500) {
-    return { success: false, error: `Filen är för stor (${fileSizeMB.toFixed(0)}MB). Max 500MB.` };
+  // Validate file size (100MB limit)
+  if (fileSizeMB > 100) {
+    return { success: false, error: `Filen är för stor (${fileSizeMB.toFixed(0)}MB). Max 100MB.` };
   }
 
-  onProgress?.('uploading', 10);
+  onUploadProgress?.(10);
 
-  // Build FormData - MP3 direct
+  // Build FormData
   const formData = new FormData();
-  formData.append('audio', audioBlob, 'meeting.mp3');
+  formData.append('audio', file);
   formData.append('meetingId', meetingId);
   formData.append('language', language);
-  formData.append('async', 'true'); // Request async processing
 
   try {
-    onProgress?.('uploading', 50);
-    
     const token = localStorage.getItem('authToken');
     const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch(`${BACKEND_API_URL}/asr/transcribe`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-
-    onProgress?.('uploading', 90);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      debugError('❌ ASR submit error:', {
-        status: response.status,
-        error: errorText
+    // Use XMLHttpRequest for upload progress tracking
+    const result = await new Promise<{ success: boolean; meetingId?: string; error?: string }>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 90); // 0-90% for upload
+          onUploadProgress?.(percent);
+        }
       });
       
-      if (response.status === 413) {
-        return { 
-          success: false, 
-          error: `Inspelningen är för lång. Försök med en kortare inspelning eller kontakta support.` 
-        };
+      xhr.addEventListener('load', () => {
+        onUploadProgress?.(100);
+        
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            
+            // Expected response: { status: "queued", meetingId }
+            if (data.status === 'queued' || data.status === 'processing') {
+              debugLog('✅ ASR: Upload successful, processing started');
+              resolve({
+                success: true,
+                meetingId: data.meetingId || meetingId
+              });
+            } else if (data.error) {
+              resolve({ success: false, error: data.error });
+            } else {
+              resolve({ success: true, meetingId: meetingId });
+            }
+          } catch {
+            resolve({ success: false, error: 'Invalid response from server' });
+          }
+        } else if (xhr.status === 413) {
+          resolve({ 
+            success: false, 
+            error: 'Filen är för stor. Max 100MB.' 
+          });
+        } else {
+          let errorMsg = 'Upload failed';
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            errorMsg = errorData.error || errorData.message || errorMsg;
+          } catch { /* ignore */ }
+          resolve({ success: false, error: errorMsg });
+        }
+      });
+      
+      xhr.addEventListener('error', () => {
+        resolve({ success: false, error: 'Network error during upload' });
+      });
+      
+      xhr.addEventListener('timeout', () => {
+        resolve({ success: false, error: 'Upload timed out' });
+      });
+      
+      xhr.open('POST', `${BACKEND_API_URL}/asr/transcribe`);
+      xhr.timeout = 600000; // 10 minute timeout for large files
+      
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
       
-      return {
-        success: false,
-        error: `ASR submit failed: ${response.status} - ${errorText}`
-      };
-    }
-
-    const data = await response.json();
+      xhr.send(formData);
+    });
     
-    onProgress?.('queued', 100);
-    
-    // Expected response: { status: "queued", meetingId, jobId }
-    if (data.status === 'queued' && data.jobId) {
-      debugLog('✅ ASR job submitted:', { jobId: data.jobId, meetingId: data.meetingId });
-      return {
-        success: true,
-        jobId: data.jobId,
-        meetingId: data.meetingId || meetingId
-      };
-    }
-    
-    // Legacy sync response - handle for backwards compatibility
-    if (data.status === 'ok' && data.transcript) {
-      debugLog('✅ ASR completed synchronously (legacy)');
-      return {
-        success: true,
-        jobId: 'sync-complete',
-        meetingId
-      };
-    }
-    
-    return {
-      success: false,
-      error: data.error || 'Unexpected response from ASR service'
-    };
+    return result;
     
   } catch (error: any) {
-    debugError('❌ ASR submit network error:', error);
+    debugError('❌ ASR upload error:', error);
     return {
       success: false,
-      error: error.message || 'Network error during upload'
+      error: error.message || 'Upload failed'
     };
   }
 }
 
 /**
- * Poll ASR job status
+ * Poll ASR status by meetingId
  */
-export async function pollASRStatus(jobId: string): Promise<ASRJobStatus> {
+export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
   const token = localStorage.getItem('authToken');
   const headers: HeadersInit = {
     'Content-Type': 'application/json'
@@ -164,7 +168,7 @@ export async function pollASRStatus(jobId: string): Promise<ASRJobStatus> {
   }
   
   try {
-    const response = await fetch(`${BACKEND_API_URL}/asr/status?jobId=${encodeURIComponent(jobId)}`, {
+    const response = await fetch(`${BACKEND_API_URL}/asr/status?meetingId=${encodeURIComponent(meetingId)}`, {
       method: 'GET',
       headers,
     });
@@ -184,57 +188,57 @@ export async function pollASRStatus(jobId: string): Promise<ASRJobStatus> {
       progress: data.progress,
       transcript: data.transcript,
       error: data.error,
-      engine: data.engine,
       duration: data.duration,
-      processing_time: data.processing_time
     };
   } catch (error: any) {
     debugError('❌ ASR status poll network error:', error);
     return {
       status: 'error',
-      error: error.message || 'Network error during status check'
+      error: error.message || 'Network error'
     };
   }
 }
 
 /**
- * Wait for ASR job to complete with polling
+ * Wait for ASR completion with polling
  */
 export async function waitForASRCompletion(
-  jobId: string,
-  options: ASROptions = {}
+  meetingId: string,
+  options: {
+    onProgress?: (status: ASRStatus) => void;
+    signal?: AbortSignal;
+  } = {}
 ): Promise<ASRResult> {
-  const { onProgress, onStatusChange } = options;
+  const { onProgress, signal } = options;
   
   let attempts = 0;
   
   while (attempts < MAX_POLL_ATTEMPTS) {
+    if (signal?.aborted) {
+      return { success: false, error: 'Cancelled' };
+    }
+    
     attempts++;
     
-    const status = await pollASRStatus(jobId);
-    onStatusChange?.(status);
+    const status = await pollASRStatus(meetingId);
+    onProgress?.(status);
     
     switch (status.status) {
       case 'queued':
-        onProgress?.('queued', 10);
         debugLog('🔄 ASR status: queued');
         break;
         
       case 'processing':
-        const progress = status.progress || Math.min(20 + attempts * 2, 90);
-        onProgress?.('processing', progress);
-        debugLog('🔄 ASR status: processing', progress + '%');
+        debugLog('🔄 ASR status: processing', status.progress ? `${status.progress}%` : '');
         break;
         
       case 'completed':
-        onProgress?.('complete', 100);
         debugLog('✅ ASR completed!');
         return {
           success: true,
           transcript: status.transcript,
-          engine: status.engine,
           duration: status.duration,
-          processing_time: status.processing_time
+          meetingId
         };
         
       case 'error':
@@ -242,7 +246,8 @@ export async function waitForASRCompletion(
         debugError('❌ ASR failed:', status.error);
         return {
           success: false,
-          error: status.error || 'Transcription failed'
+          error: status.error || 'Transcription failed',
+          meetingId
         };
     }
     
@@ -252,228 +257,93 @@ export async function waitForASRCompletion(
   
   return {
     success: false,
-    error: 'Transcription timed out'
+    error: 'Transcription timed out',
+    meetingId
   };
 }
 
 /**
- * Save transcript to backend via PUT /meetings/:id
+ * Complete transcription flow: Upload + Poll + Return transcript
+ * Used by recording flow for background transcription
  */
-export async function saveTranscriptToBackend(
-  meetingId: string,
-  transcript: string,
-  options?: {
-    duration?: number;
-    processing_time?: number;
-    language?: string;
-    meetingTitle?: string;
-  }
-): Promise<ASRResult> {
-  const token = localStorage.getItem('authToken');
-  if (!token) {
-    debugError('❌ No auth token for saving transcript');
-    return { success: false, error: 'Authentication required' };
-  }
-
-  debugLog('📝 Saving transcript to backend', {
-    meetingId,
-    transcriptLength: transcript.length
-  });
-
-  try {
-    const response = await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        transcript,
-        transcriptionStatus: 'done',
-        duration: options?.duration,
-        processing_time: options?.processing_time,
-        language: options?.language || 'sv',
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      debugError('❌ Backend save error:', response.status, errorText);
-      return {
-        success: false,
-        error: `Save failed: ${response.status}`
-      };
-    }
-
-    const data = await response.json();
-    debugLog('✅ Transcript saved to backend');
-
-    return {
-      success: true,
-      transcript,
-      path: data.path,
-      jsonPath: data.jsonPath,
-      duration: data.duration,
-      processing_time: data.processing_time
-    };
-  } catch (error: any) {
-    debugError('❌ Backend save network error:', error);
-    return {
-      success: false,
-      error: error.message || 'Network error during save'
-    };
-  }
-}
-
-// Alias for backwards compatibility
-export const persistTranscript = saveTranscriptToBackend;
-
-/**
- * Store jobId in meeting metadata for resume on page reload
- */
-export async function storeJobIdInMeeting(meetingId: string, jobId: string): Promise<void> {
-  const token = localStorage.getItem('authToken');
-  if (!token) return;
-  
-  try {
-    await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jobId,
-        transcriptionStatus: 'processing'
-      }),
-    });
-    debugLog('✅ Stored jobId in meeting:', { meetingId, jobId });
-  } catch (error) {
-    debugError('❌ Failed to store jobId:', error);
-  }
-}
-
-/**
- * Complete async flow: Submit audio, poll for completion, save result
- */
-export async function transcribeAsync(
+export async function transcribeAndSave(
   audioBlob: Blob,
   meetingId: string,
-  options: ASROptions & { 
+  options: {
+    language?: string;
     meetingTitle?: string;
     userEmail?: string;
     userName?: string;
     authToken?: string;
+    onProgress?: (stage: 'uploading' | 'queued' | 'processing' | 'complete', percent: number) => void;
     onTranscriptReady?: (transcript: string) => void;
-  }
+  } = {}
 ): Promise<ASRResult> {
-  const { onTranscriptReady, meetingTitle, userEmail, userName, authToken, ...asrOptions } = options;
+  const { onProgress, onTranscriptReady, language = 'sv' } = options;
   
-  debugLog('🚀 ========== ASYNC TRANSCRIPTION FLOW START ==========');
+  debugLog('🚀 ========== TRANSCRIPTION FLOW START ==========');
   debugLog('📋 Meeting ID:', meetingId);
   debugLog('📁 File size:', `${(audioBlob.size / 1024 / 1024).toFixed(2)}MB`);
   
-  // Step 1: Submit job
-  const submitResult = await submitASRJob(audioBlob, meetingId, asrOptions);
+  // Convert Blob to File if needed
+  const file = audioBlob instanceof File 
+    ? audioBlob 
+    : new File([audioBlob], 'recording.mp3', { type: audioBlob.type || 'audio/mpeg' });
   
-  if (!submitResult.success || !submitResult.jobId) {
-    debugError('❌ FLOW FAILED at Step 1: Job submission failed');
-    return { success: false, error: submitResult.error };
-  }
+  // Step 1: Upload audio
+  onProgress?.('uploading', 10);
   
-  const jobId = submitResult.jobId;
-  debugLog('✅ Step 1 SUCCESS: Job submitted', { jobId });
-  
-  // Store jobId in meeting for resume capability
-  await storeJobIdInMeeting(meetingId, jobId);
-  
-  // Step 2: Poll for completion
-  const pollResult = await waitForASRCompletion(jobId, asrOptions);
-  
-  if (!pollResult.success || !pollResult.transcript) {
-    debugError('❌ FLOW FAILED at Step 2: Transcription failed');
-    // Update meeting status to failed
-    await updateMeetingStatus(meetingId, 'failed', pollResult.error);
-    return pollResult;
-  }
-  
-  debugLog('✅ Step 2 SUCCESS: Got transcript');
-  
-  // Notify UI that transcript is ready
-  onTranscriptReady?.(pollResult.transcript);
-  
-  // Step 3: Save transcript to backend (may already be saved by backend)
-  const saveResult = await saveTranscriptToBackend(meetingId, pollResult.transcript, {
-    duration: pollResult.duration,
-    processing_time: pollResult.processing_time,
-    language: asrOptions.language,
-    meetingTitle,
+  const uploadResult = await uploadAudioForTranscription(file, meetingId, {
+    language,
+    onUploadProgress: (percent) => {
+      onProgress?.('uploading', Math.min(percent, 40));
+    }
   });
   
-  if (saveResult.success) {
-    debugLog('✅ Step 3 SUCCESS: Transcript saved');
-    
-    // Step 4: Send email notification
-    if (userEmail && authToken) {
-      debugLog('📧 Step 4: Sending email notification');
-      sendTranscriptionCompleteEmail({
-        userEmail,
-        userName,
-        meetingTitle: meetingTitle || 'Ditt möte',
-        meetingId,
-        authToken,
-      }).then(emailSent => {
-        debugLog(emailSent ? '✅ Email sent' : '⚠️ Email failed');
-      });
-      
-      // First meeting feedback email
-      if (isFirstMeetingEmailNeeded()) {
-        sendFirstMeetingFeedbackEmail({
-          userEmail,
-          userName,
-          authToken,
-        });
-      }
-    }
-    
-    debugLog('🚀 ========== ASYNC TRANSCRIPTION FLOW COMPLETE ==========');
-  } else {
-    debugError('❌ FLOW FAILED at Step 3: Could not save transcript:', saveResult.error);
+  if (!uploadResult.success) {
+    debugError('❌ Upload failed:', uploadResult.error);
+    return { success: false, error: uploadResult.error, meetingId };
   }
   
+  debugLog('✅ Upload successful, polling for completion...');
+  onProgress?.('queued', 50);
+  
+  // Step 2: Poll for completion
+  const pollResult = await waitForASRCompletion(meetingId, {
+    onProgress: (status) => {
+      if (status.status === 'queued') {
+        onProgress?.('queued', 50);
+      } else if (status.status === 'processing') {
+        onProgress?.('processing', 50 + (status.progress || 0) * 0.4);
+      }
+    }
+  });
+  
+  if (!pollResult.success || !pollResult.transcript) {
+    debugError('❌ Transcription failed:', pollResult.error);
+    return { success: false, error: pollResult.error || 'Transcription failed', meetingId };
+  }
+  
+  debugLog('✅ Transcription complete!');
+  onProgress?.('complete', 100);
+  
+  // Notify callback
+  onTranscriptReady?.(pollResult.transcript);
+  
+  debugLog('🚀 ========== TRANSCRIPTION FLOW COMPLETE ==========');
+  
   return {
-    ...pollResult,
-    jobId,
-    meetingId,
-    path: saveResult.path,
-    jsonPath: saveResult.jsonPath,
+    success: true,
+    transcript: pollResult.transcript,
+    duration: pollResult.duration,
+    meetingId
   };
 }
 
-/**
- * Update meeting transcription status
- */
-async function updateMeetingStatus(meetingId: string, status: string, error?: string): Promise<void> {
-  const token = localStorage.getItem('authToken');
-  if (!token) return;
-  
-  try {
-    await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        transcriptionStatus: status,
-        transcriptionError: error
-      }),
-    });
-  } catch (e) {
-    debugError('Failed to update meeting status:', e);
-  }
-}
-
 // Legacy exports for backwards compatibility
-export const transcribeDirectly = submitASRJob;
-export const transcribeAndSave = transcribeAsync;
+export const submitASRJob = uploadAudioForTranscription;
+export const transcribeDirectly = uploadAudioForTranscription;
+export const storeJobIdInMeeting = async (meetingId: string, jobId: string) => {
+  // No longer needed - backend tracks by meetingId
+  debugLog('storeJobIdInMeeting is deprecated, backend uses meetingId');
+};
