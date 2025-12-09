@@ -160,6 +160,16 @@ export async function transcribeDirectly(
         status: response.status,
         error: errorText
       });
+      
+      // Handle 413 specifically - this is a backend server limit (nginx/server config)
+      if (response.status === 413) {
+        const durationMinutes = Math.round(fileSizeMB / 1.3); // ~1.3MB per minute for WAV
+        return { 
+          success: false, 
+          error: `Inspelningen är för lång (~${durationMinutes} min). Försök med en kortare inspelning eller kontakta support.` 
+        };
+      }
+      
       return {
         success: false,
         error: `ASR failed: ${response.status} - ${errorText}`
