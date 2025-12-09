@@ -330,7 +330,7 @@ export const DigitalMeetingDialog = ({
               <p className="font-medium">Så här går du tillväga:</p>
               <ol className="list-decimal list-inside space-y-1 text-sm">
                 <li>Spela in ditt digitala möte</li>
-                <li>Konvertera till <strong>MP3</strong> (använd gratis CloudConvert.com)</li>
+                <li>Konvertera till <strong>MP3</strong> (använd gratis <a href="https://cloudconvert.com" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">CloudConvert.com</a>)</li>
                 <li>Ladda upp MP3-filen här</li>
               </ol>
               
