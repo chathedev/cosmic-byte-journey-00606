@@ -6,9 +6,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { transcribeAndSave } from "@/lib/asrService";
+import { submitASRJob, storeJobIdInMeeting } from "@/lib/asrService";
 import { useNavigate } from "react-router-dom";
 import { debugLog, debugError } from "@/lib/debugLogger";
+
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,6 +24,7 @@ export const DigitalMeetingDialog = ({
   selectedLanguage 
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
@@ -70,33 +72,27 @@ export const DigitalMeetingDialog = ({
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !user) return;
+    if (!selectedFile || !user || isUploading) return;
 
-    // Immediately close dialog and redirect - don't wait for upload
+    setIsUploading(true);
+    
     const file = selectedFile;
     const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
     const meetingId = crypto.randomUUID();
     const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
     
-    // Detailed logging for upload debugging
-    console.log('📤 Upload: Starting instant redirect flow');
-    console.log('  - File name:', file.name);
-    console.log('  - File type:', file.type);
-    console.log('  - File size:', file.size, 'bytes', `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+    console.log('📤 Upload: Starting async transcription flow');
+    console.log('  - File:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     console.log('  - Meeting ID:', meetingId);
     
     if (file.size < 1000) {
-      console.error('❌ CRITICAL: Selected file is essentially empty!');
       toast({
         title: "Filen är tom",
         description: "Den valda filen verkar vara tom. Välj en annan fil.",
         variant: "destructive",
       });
+      setIsUploading(false);
       return;
-    }
-    
-    if (file.size < 50000) {
-      console.warn('⚠️ WARNING: File is very small, may not contain real audio.');
     }
 
     const token = localStorage.getItem('authToken');
@@ -106,12 +102,13 @@ export const DigitalMeetingDialog = ({
         description: "Ladda om sidan och logga in igen.",
         variant: "destructive",
       });
+      setIsUploading(false);
       return;
     }
 
     try {
       // Step 1: Create meeting placeholder with 'processing' status
-      await fetch('https://api.tivly.se/meetings', {
+      const createResponse = await fetch('https://api.tivly.se/meetings', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -127,100 +124,22 @@ export const DigitalMeetingDialog = ({
         }),
       });
 
+      if (!createResponse.ok) {
+        throw new Error('Failed to create meeting');
+      }
+
       // Increment meeting count
       await incrementMeetingCount(meetingId);
 
-      // Save pending meeting to sessionStorage for instant display
-      const pendingMeeting = {
-        id: meetingId,
-        title: meetingTitle,
-        transcript: '',
-        transcriptionStatus: 'processing',
-        folder: 'general',
-        source: 'upload',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
-
-      // Close dialog and redirect IMMEDIATELY
-      onOpenChange(false);
-      setSelectedFile(null);
-      
-      toast({
-        title: 'Möte sparat',
-        description: 'Transkribering pågår i bakgrunden.',
-      });
-
-      // Redirect to library (not specific meeting URL)
-      navigate('/library', { state: { fromRecording: true, pendingMeetingId: meetingId } });
-
-      // Step 2: Convert audio in background (if needed) and transcribe
-      processUploadInBackground(file, meetingId, meetingTitle, languageCode, token);
-
-    } catch (error: any) {
-      debugError('Upload initialization error:', error);
-      toast({
-        title: "Kunde inte starta uppladdning",
-        description: error.message || "Försök igen.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Background processing function - runs after redirect
-  const processUploadInBackground = async (
-    file: File,
-    meetingId: string,
-    meetingTitle: string,
-    languageCode: string,
-    token: string
-  ) => {
-    try {
-      // MP3 only - no conversion needed, direct upload for speed
-      console.log('🎤 Background upload processing (MP3 direct):');
-      console.log('  - File size:', file.size, 'bytes', `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
-      console.log('  - File type:', file.type);
-      
-      if (file.size < 1000) {
-        console.error('❌ CRITICAL: File is empty!');
-        throw new Error('Audio file is empty');
-      }
-
-      // Get user display name safely
-      const userName = (user as any)?.displayName || (user as any)?.name || undefined;
-
-      // Send MP3 directly to ASR (no conversion)
-      console.log('🎤 Background: Sending MP3 to ASR, size:', file.size, 'bytes');
-      
-      const result = await transcribeAndSave(file, meetingId, {
+      // Step 2: Submit audio for async transcription
+      const submitResult = await submitASRJob(file, meetingId, {
         language: languageCode,
-        meetingTitle,
-        userEmail: user?.email || undefined,
-        userName,
-        authToken: token,
         onProgress: (stage, percent) => {
-          debugLog(`🎤 Background ASR: ${stage} ${percent}%`);
-        },
-        onTranscriptReady: (transcript) => {
-          debugLog('✅ Background: Transcript received, length:', transcript.length);
-          
-          // Extract clean text if JSON
-          let cleanTranscript = transcript;
-          try {
-            const parsed = JSON.parse(transcript);
-            if (parsed.text) cleanTranscript = parsed.text;
-          } catch { /* not JSON */ }
-          
-          // Dispatch event to update Library UI
-          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-            detail: { meetingId, transcript: cleanTranscript } 
-          }));
+          debugLog(`📤 Upload progress: ${stage} ${percent}%`);
         }
       });
 
-      if (!result.success) {
-        debugError('Background ASR failed:', result.error);
+      if (!submitResult.success) {
         // Update meeting status to failed
         await fetch(`https://api.tivly.se/meetings/${meetingId}`, {
           method: 'PUT',
@@ -228,28 +147,58 @@ export const DigitalMeetingDialog = ({
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            transcriptionStatus: 'failed',
-          }),
+          body: JSON.stringify({ transcriptionStatus: 'failed' }),
         });
+        
+        throw new Error(submitResult.error || 'Upload failed');
       }
 
-    } catch (error: any) {
-      debugError('Background processing error:', error);
-      // Update meeting status to failed
-      const token = localStorage.getItem('authToken');
-      if (token) {
-        await fetch(`https://api.tivly.se/meetings/${meetingId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            transcriptionStatus: 'failed',
-          }),
-        });
+      // Step 3: Store jobId in meeting for polling resume
+      if (submitResult.jobId) {
+        await storeJobIdInMeeting(meetingId, submitResult.jobId);
       }
+
+      // Save pending meeting to sessionStorage for instant display
+      const pendingMeeting = {
+        id: meetingId,
+        title: meetingTitle,
+        transcript: '',
+        transcriptionStatus: 'processing',
+        jobId: submitResult.jobId,
+        folder: 'general',
+        source: 'upload',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
+
+      // Close dialog and redirect
+      onOpenChange(false);
+      setSelectedFile(null);
+      setIsUploading(false);
+      
+      toast({
+        title: 'Uppladdning klar',
+        description: 'Transkribering pågår. Du får ett mejl när det är klart.',
+      });
+
+      // Redirect to library with pending meeting info
+      navigate('/library', { 
+        state: { 
+          fromRecording: true, 
+          pendingMeetingId: meetingId,
+          jobId: submitResult.jobId 
+        } 
+      });
+
+    } catch (error: any) {
+      debugError('Upload error:', error);
+      setIsUploading(false);
+      toast({
+        title: "Uppladdning misslyckades",
+        description: error.message || "Försök igen.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -300,7 +249,6 @@ export const DigitalMeetingDialog = ({
               </Button>
               <Button onClick={() => {
                 onOpenChange(false);
-                // Trigger upgrade dialog - handled by parent
               }}>
                 Uppgradera till Pro
               </Button>
@@ -344,7 +292,7 @@ export const DigitalMeetingDialog = ({
           {/* File upload area */}
           {!selectedFile ? (
             <div 
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !isUploading && fileInputRef.current?.click()}
               className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary hover:bg-accent/5 transition-colors"
             >
               <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -375,17 +323,19 @@ export const DigitalMeetingDialog = ({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      <span className="ml-2 text-green-600">⚡ Redo för direktuppladdning</span>
+                      <span className="ml-2 text-green-600">⚡ Redo för uppladdning</span>
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleRemoveFile}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                {!isUploading && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRemoveFile}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -395,15 +345,25 @@ export const DigitalMeetingDialog = ({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isUploading}
             >
               Avbryt
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!selectedFile}
+              disabled={!selectedFile || isUploading}
             >
-              <Upload className="mr-2 h-4 w-4" />
-              Ladda upp och transkribera
+              {isUploading ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-pulse" />
+                  Laddar upp...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Ladda upp och transkribera
+                </>
+              )}
             </Button>
           </div>
         </div>

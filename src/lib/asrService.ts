@@ -1,11 +1,13 @@
-// ASR Service - Uses backend /asr/transcribe endpoint (Vertex AI Speech v2)
-// Flow: 1) Send MP3 audio to backend 2) Backend calls Vertex AI 3) Save transcript 4) Send email notification
+// ASR Service - Async polling flow for transcription
+// Flow: 1) Submit MP3 to backend → get jobId 2) Poll status 3) Get transcript when complete
 // NOTE: MP3 only - no conversion in browser for maximum speed
 
 import { debugLog, debugError } from './debugLogger';
 import { sendTranscriptionCompleteEmail, sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from './emailNotification';
 
 const BACKEND_API_URL = 'https://api.tivly.se';
+const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
+const MAX_POLL_ATTEMPTS = 600; // Max 30 minutes of polling
 
 export interface ASRResult {
   success: boolean;
@@ -16,74 +18,42 @@ export interface ASRResult {
   jsonPath?: string;
   error?: string;
   engine?: string;
+  jobId?: string;
+  meetingId?: string;
+}
+
+export interface ASRJobStatus {
+  status: 'queued' | 'processing' | 'completed' | 'error' | 'failed';
+  progress?: number;
+  transcript?: string;
+  error?: string;
+  engine?: string;
+  duration?: number;
+  processing_time?: number;
 }
 
 export interface ASROptions {
   language?: string;
-  onProgress?: (stage: 'uploading' | 'processing' | 'complete', percent: number) => void;
+  onProgress?: (stage: 'uploading' | 'queued' | 'processing' | 'complete', percent: number) => void;
+  onStatusChange?: (status: ASRJobStatus) => void;
 }
 
 /**
- * Parse ASR response from Vertex AI backend
- * Success: { status: "ok", transcript: "...", metadata: { engine: "vertex-v2" } }
- * Error: { error: "error_code", details: "Human readable error message" }
+ * Submit audio file for async transcription
+ * Returns jobId for polling
  */
-function parseTranscriptResponse(data: any): { transcript: string; engine?: string; error?: string } {
-  // Handle string response
-  if (typeof data === 'string') {
-    try {
-      const parsed = JSON.parse(data);
-      return parseTranscriptResponse(parsed);
-    } catch {
-      return { transcript: data };
-    }
-  }
-  
-  // Check for error response
-  if (data?.error) {
-    return { 
-      transcript: '', 
-      error: data.details || data.error 
-    };
-  }
-  
-  // Vertex AI backend format: { status: "ok", transcript: "...", metadata: { engine: "vertex-v2" } }
-  if (data?.status === 'ok' && typeof data?.transcript === 'string') {
-    return {
-      transcript: data.transcript,
-      engine: data.metadata?.engine || 'vertex-v2'
-    };
-  }
-  
-  // Direct transcript field (fallback)
-  if (data?.transcript) {
-    return { transcript: data.transcript, engine: data.metadata?.engine };
-  }
-  
-  // Legacy text field
-  if (data?.text) {
-    return { transcript: data.text };
-  }
-  
-  return { transcript: '' };
-}
-
-/**
- * Step 1: Send MP3 audio to backend /asr/transcribe endpoint
- * MP3 ONLY - no conversion for maximum speed
- */
-export async function transcribeDirectly(
+export async function submitASRJob(
   audioBlob: Blob,
+  meetingId: string,
   options: ASROptions = {}
-): Promise<ASRResult> {
+): Promise<{ success: boolean; jobId?: string; meetingId?: string; error?: string }> {
   const { language = 'sv', onProgress } = options;
   
   const fileSizeMB = audioBlob.size / 1024 / 1024;
   
-  // Detailed logging
-  console.log('🎤 ASR: Direct MP3 upload to /asr/transcribe');
+  console.log('🎤 ASR: Submitting MP3 for async transcription');
   console.log('  - Blob size:', audioBlob.size, 'bytes', `(${fileSizeMB.toFixed(2)}MB)`);
-  console.log('  - Blob type:', audioBlob.type);
+  console.log('  - Meeting ID:', meetingId);
   console.log('  - Language:', language);
   
   // Validate blob is not empty
@@ -91,32 +61,24 @@ export async function transcribeDirectly(
     console.error('❌ CRITICAL: Audio blob is empty!');
     return { success: false, error: 'Audio blob is empty - recording failed' };
   }
-  
-  if (audioBlob.size < 50000) {
-    console.warn('⚠️ WARNING: Audio blob is very small');
-  }
 
   // Validate file size (500MB limit for MP3)
   if (fileSizeMB > 500) {
     return { success: false, error: `Filen är för stor (${fileSizeMB.toFixed(0)}MB). Max 500MB.` };
   }
 
-  onProgress?.('uploading', 20);
+  onProgress?.('uploading', 10);
 
-  // Build FormData - MP3 direct, no conversion
+  // Build FormData - MP3 direct
   const formData = new FormData();
   formData.append('audio', audioBlob, 'meeting.mp3');
-  
-  console.log('📦 FormData prepared (MP3 direct):');
-  console.log('  - File: meeting.mp3');
-  console.log('  - Size:', fileSizeMB.toFixed(2), 'MB');
+  formData.append('meetingId', meetingId);
+  formData.append('language', language);
+  formData.append('async', 'true'); // Request async processing
 
   try {
     onProgress?.('uploading', 50);
     
-    const startTime = Date.now();
-    
-    // Use backend /asr/transcribe endpoint (not direct ASR)
     const token = localStorage.getItem('authToken');
     const headers: HeadersInit = {};
     if (token) {
@@ -129,78 +91,173 @@ export async function transcribeDirectly(
       body: formData,
     });
 
-    onProgress?.('processing', 70);
+    onProgress?.('uploading', 90);
 
     if (!response.ok) {
       const errorText = await response.text();
-      debugError('❌ Backend ASR error:', {
+      debugError('❌ ASR submit error:', {
         status: response.status,
         error: errorText
       });
       
-      // Handle 413 specifically - this is a backend server limit (nginx/server config)
       if (response.status === 413) {
-        const durationMinutes = Math.round(fileSizeMB / 1.3); // ~1.3MB per minute for WAV
         return { 
           success: false, 
-          error: `Inspelningen är för lång (~${durationMinutes} min). Försök med en kortare inspelning eller kontakta support.` 
+          error: `Inspelningen är för lång. Försök med en kortare inspelning eller kontakta support.` 
         };
       }
       
       return {
         success: false,
-        error: `ASR failed: ${response.status} - ${errorText}`
+        error: `ASR submit failed: ${response.status} - ${errorText}`
       };
     }
 
     const data = await response.json();
-    const processingTime = Date.now() - startTime;
     
-    onProgress?.('complete', 100);
-
-    // Parse transcript from Vertex AI backend response
-    const { transcript, engine, error: parseError } = parseTranscriptResponse(data);
+    onProgress?.('queued', 100);
     
-    if (parseError) {
-      debugError('❌ Backend returned error:', parseError);
+    // Expected response: { status: "queued", meetingId, jobId }
+    if (data.status === 'queued' && data.jobId) {
+      debugLog('✅ ASR job submitted:', { jobId: data.jobId, meetingId: data.meetingId });
       return {
-        success: false,
-        error: parseError
+        success: true,
+        jobId: data.jobId,
+        meetingId: data.meetingId || meetingId
       };
     }
     
-    if (!transcript) {
-      debugError('❌ Backend returned empty transcript:', data);
+    // Legacy sync response - handle for backwards compatibility
+    if (data.status === 'ok' && data.transcript) {
+      debugLog('✅ ASR completed synchronously (legacy)');
       return {
-        success: false,
-        error: 'No speech detected in audio'
+        success: true,
+        jobId: 'sync-complete',
+        meetingId
       };
     }
     
-    debugLog('✅ ASR Step 1 complete: Got transcript from Vertex AI backend', {
-      transcriptLength: transcript.length,
-      processingTime: `${processingTime}ms`,
-      engine: engine || 'vertex-v2'
-    });
-
-    return {
-      success: true,
-      transcript,
-      processing_time: processingTime,
-      engine: engine || 'vertex-v2'
-    };
-  } catch (error: any) {
-    debugError('❌ Backend ASR network error:', error);
     return {
       success: false,
-      error: error.message || 'Network error during transcription'
+      error: data.error || 'Unexpected response from ASR service'
+    };
+    
+  } catch (error: any) {
+    debugError('❌ ASR submit network error:', error);
+    return {
+      success: false,
+      error: error.message || 'Network error during upload'
     };
   }
 }
 
 /**
- * Step 2: Save transcript to backend via PUT /meetings/:id
- * This updates the meeting with the transcript
+ * Poll ASR job status
+ */
+export async function pollASRStatus(jobId: string): Promise<ASRJobStatus> {
+  const token = localStorage.getItem('authToken');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const response = await fetch(`${BACKEND_API_URL}/asr/status?jobId=${encodeURIComponent(jobId)}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      debugError('❌ ASR status poll error:', response.status, errorText);
+      return {
+        status: 'error',
+        error: `Status check failed: ${response.status}`
+      };
+    }
+
+    const data = await response.json();
+    return {
+      status: data.status || 'queued',
+      progress: data.progress,
+      transcript: data.transcript,
+      error: data.error,
+      engine: data.engine,
+      duration: data.duration,
+      processing_time: data.processing_time
+    };
+  } catch (error: any) {
+    debugError('❌ ASR status poll network error:', error);
+    return {
+      status: 'error',
+      error: error.message || 'Network error during status check'
+    };
+  }
+}
+
+/**
+ * Wait for ASR job to complete with polling
+ */
+export async function waitForASRCompletion(
+  jobId: string,
+  options: ASROptions = {}
+): Promise<ASRResult> {
+  const { onProgress, onStatusChange } = options;
+  
+  let attempts = 0;
+  
+  while (attempts < MAX_POLL_ATTEMPTS) {
+    attempts++;
+    
+    const status = await pollASRStatus(jobId);
+    onStatusChange?.(status);
+    
+    switch (status.status) {
+      case 'queued':
+        onProgress?.('queued', 10);
+        debugLog('🔄 ASR status: queued');
+        break;
+        
+      case 'processing':
+        const progress = status.progress || Math.min(20 + attempts * 2, 90);
+        onProgress?.('processing', progress);
+        debugLog('🔄 ASR status: processing', progress + '%');
+        break;
+        
+      case 'completed':
+        onProgress?.('complete', 100);
+        debugLog('✅ ASR completed!');
+        return {
+          success: true,
+          transcript: status.transcript,
+          engine: status.engine,
+          duration: status.duration,
+          processing_time: status.processing_time
+        };
+        
+      case 'error':
+      case 'failed':
+        debugError('❌ ASR failed:', status.error);
+        return {
+          success: false,
+          error: status.error || 'Transcription failed'
+        };
+    }
+    
+    // Wait before next poll
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+  
+  return {
+    success: false,
+    error: 'Transcription timed out'
+  };
+}
+
+/**
+ * Save transcript to backend via PUT /meetings/:id
  */
 export async function saveTranscriptToBackend(
   meetingId: string,
@@ -218,16 +275,12 @@ export async function saveTranscriptToBackend(
     return { success: false, error: 'Authentication required' };
   }
 
-  // Ensure transcript is clean text
-  const { transcript: cleanTranscript } = parseTranscriptResponse(transcript);
-
-  debugLog('📝 ASR Step 2: Saving transcript to api.tivly.se', {
+  debugLog('📝 Saving transcript to backend', {
     meetingId,
-    transcriptLength: cleanTranscript.length
+    transcriptLength: transcript.length
   });
 
   try {
-    // Update the meeting with the transcript
     const response = await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
       method: 'PUT',
       headers: {
@@ -235,7 +288,7 @@ export async function saveTranscriptToBackend(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        transcript: cleanTranscript,
+        transcript,
         transcriptionStatus: 'done',
         duration: options?.duration,
         processing_time: options?.processing_time,
@@ -253,11 +306,11 @@ export async function saveTranscriptToBackend(
     }
 
     const data = await response.json();
-    debugLog('✅ ASR Step 2 complete: Transcript saved to backend');
+    debugLog('✅ Transcript saved to backend');
 
     return {
       success: true,
-      transcript: cleanTranscript,
+      transcript,
       path: data.path,
       jsonPath: data.jsonPath,
       duration: data.duration,
@@ -272,18 +325,38 @@ export async function saveTranscriptToBackend(
   }
 }
 
-// Keep old function name for backwards compatibility
+// Alias for backwards compatibility
 export const persistTranscript = saveTranscriptToBackend;
 
 /**
- * Complete flow: Transcribe audio via backend, then save to meeting
- * 
- * Flow:
- * 1. Send audio to api.tivly.se/asr/transcribe → backend calls Deepgram → get transcript
- * 2. Save transcript to api.tivly.se/meetings/:id → update meeting
- * 3. Send email notifications
+ * Store jobId in meeting metadata for resume on page reload
  */
-export async function transcribeAndSave(
+export async function storeJobIdInMeeting(meetingId: string, jobId: string): Promise<void> {
+  const token = localStorage.getItem('authToken');
+  if (!token) return;
+  
+  try {
+    await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jobId,
+        transcriptionStatus: 'processing'
+      }),
+    });
+    debugLog('✅ Stored jobId in meeting:', { meetingId, jobId });
+  } catch (error) {
+    debugError('❌ Failed to store jobId:', error);
+  }
+}
+
+/**
+ * Complete async flow: Submit audio, poll for completion, save result
+ */
+export async function transcribeAsync(
   audioBlob: Blob,
   meetingId: string,
   options: ASROptions & { 
@@ -296,37 +369,53 @@ export async function transcribeAndSave(
 ): Promise<ASRResult> {
   const { onTranscriptReady, meetingTitle, userEmail, userName, authToken, ...asrOptions } = options;
   
-  debugLog('🚀 ========== TRANSCRIPTION FLOW START ==========');
+  debugLog('🚀 ========== ASYNC TRANSCRIPTION FLOW START ==========');
   debugLog('📋 Meeting ID:', meetingId);
   debugLog('📁 File size:', `${(audioBlob.size / 1024 / 1024).toFixed(2)}MB`);
   
-  // Step 1: Transcribe via backend /asr/transcribe
-  const asrResult = await transcribeDirectly(audioBlob, asrOptions);
+  // Step 1: Submit job
+  const submitResult = await submitASRJob(audioBlob, meetingId, asrOptions);
   
-  if (!asrResult.success || !asrResult.transcript) {
-    debugError('❌ FLOW FAILED at Step 1: ASR transcription failed');
-    return asrResult;
+  if (!submitResult.success || !submitResult.jobId) {
+    debugError('❌ FLOW FAILED at Step 1: Job submission failed');
+    return { success: false, error: submitResult.error };
   }
   
-  debugLog('✅ Step 1 SUCCESS: Got transcript from backend');
+  const jobId = submitResult.jobId;
+  debugLog('✅ Step 1 SUCCESS: Job submitted', { jobId });
   
-  // Notify that transcript is ready (for UI updates)
-  onTranscriptReady?.(asrResult.transcript);
+  // Store jobId in meeting for resume capability
+  await storeJobIdInMeeting(meetingId, jobId);
   
-  // Step 2: Save transcript to backend
-  const saveResult = await saveTranscriptToBackend(meetingId, asrResult.transcript, {
-    duration: asrResult.duration,
-    processing_time: asrResult.processing_time,
+  // Step 2: Poll for completion
+  const pollResult = await waitForASRCompletion(jobId, asrOptions);
+  
+  if (!pollResult.success || !pollResult.transcript) {
+    debugError('❌ FLOW FAILED at Step 2: Transcription failed');
+    // Update meeting status to failed
+    await updateMeetingStatus(meetingId, 'failed', pollResult.error);
+    return pollResult;
+  }
+  
+  debugLog('✅ Step 2 SUCCESS: Got transcript');
+  
+  // Notify UI that transcript is ready
+  onTranscriptReady?.(pollResult.transcript);
+  
+  // Step 3: Save transcript to backend (may already be saved by backend)
+  const saveResult = await saveTranscriptToBackend(meetingId, pollResult.transcript, {
+    duration: pollResult.duration,
+    processing_time: pollResult.processing_time,
     language: asrOptions.language,
     meetingTitle,
   });
   
   if (saveResult.success) {
-    debugLog('✅ Step 2 SUCCESS: Transcript saved to backend');
+    debugLog('✅ Step 3 SUCCESS: Transcript saved');
     
-    // Step 3: Send email notification
+    // Step 4: Send email notification
     if (userEmail && authToken) {
-      debugLog('📧 Step 3: Sending email notification to', userEmail);
+      debugLog('📧 Step 4: Sending email notification');
       sendTranscriptionCompleteEmail({
         userEmail,
         userName,
@@ -334,38 +423,57 @@ export async function transcribeAndSave(
         meetingId,
         authToken,
       }).then(emailSent => {
-        if (emailSent) {
-          debugLog('✅ Step 3 SUCCESS: Email notification sent');
-        } else {
-          debugError('⚠️ Step 3: Email notification failed (non-blocking)');
-        }
+        debugLog(emailSent ? '✅ Email sent' : '⚠️ Email failed');
       });
       
-      // Step 4: Send first meeting feedback email (if this is their first meeting)
+      // First meeting feedback email
       if (isFirstMeetingEmailNeeded()) {
-        debugLog('📧 Step 4: Sending first meeting feedback email');
         sendFirstMeetingFeedbackEmail({
           userEmail,
           userName,
           authToken,
-        }).then(feedbackSent => {
-          if (feedbackSent) {
-            debugLog('✅ Step 4 SUCCESS: First meeting feedback email sent');
-          } else {
-            debugLog('ℹ️ Step 4: Feedback email not sent (already sent or failed)');
-          }
         });
       }
     }
     
-    debugLog('🚀 ========== TRANSCRIPTION FLOW COMPLETE ==========');
+    debugLog('🚀 ========== ASYNC TRANSCRIPTION FLOW COMPLETE ==========');
   } else {
-    debugError('❌ FLOW FAILED at Step 2: Could not save transcript:', saveResult.error);
+    debugError('❌ FLOW FAILED at Step 3: Could not save transcript:', saveResult.error);
   }
   
   return {
-    ...asrResult,
+    ...pollResult,
+    jobId,
+    meetingId,
     path: saveResult.path,
     jsonPath: saveResult.jsonPath,
   };
 }
+
+/**
+ * Update meeting transcription status
+ */
+async function updateMeetingStatus(meetingId: string, status: string, error?: string): Promise<void> {
+  const token = localStorage.getItem('authToken');
+  if (!token) return;
+  
+  try {
+    await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        transcriptionStatus: status,
+        transcriptionError: error
+      }),
+    });
+  } catch (e) {
+    debugError('Failed to update meeting status:', e);
+  }
+}
+
+// Legacy exports for backwards compatibility
+export const transcribeDirectly = submitASRJob;
+export const transcribeAndSave = transcribeAsync;
