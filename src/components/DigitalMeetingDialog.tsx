@@ -7,10 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { transcribeAndSave } from "@/lib/asrService";
-import { convertToMp3, needsConversion } from "@/lib/audioConverter";
 import { useNavigate } from "react-router-dom";
 import { debugLog, debugError } from "@/lib/debugLogger";
-
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,24 +42,13 @@ export const DigitalMeetingDialog = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type (audio only)
-    const validAudioTypes = [
-      'audio/mpeg', // mp3
-      'audio/mp3',
-      'audio/wav',
-      'audio/wave',
-      'audio/x-wav',
-      'audio/m4a',
-      'audio/mp4',
-      'audio/x-m4a',
-      'audio/webm',
-      'audio/ogg'
-    ];
+    // Validate file type - MP3 ONLY for instant upload (no conversion needed)
+    const isMp3 = file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3');
 
-    if (!validAudioTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|m4a|ogg|webm)$/i)) {
+    if (!isMp3) {
       toast({
-        title: "Ogiltigt filformat",
-        description: "Endast ljudfiler är tillåtna (MP3, WAV, M4A, OGG, WebM). Videofiler stöds inte.",
+        title: "Endast MP3-filer",
+        description: "Konvertera din fil till MP3 först för snabbast uppladdning. Du kan använda gratis verktyg som CloudConvert eller Audacity.",
         variant: "destructive",
       });
       return;
@@ -190,33 +177,23 @@ export const DigitalMeetingDialog = ({
     token: string
   ) => {
     try {
-      // Convert audio if needed (backend accepts MP3/WAV)
-      let audioBlob: Blob = file;
+      // MP3 only - no conversion needed, direct upload for speed
+      console.log('🎤 Background upload processing (MP3 direct):');
+      console.log('  - File size:', file.size, 'bytes', `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      console.log('  - File type:', file.type);
       
-      console.log('🎤 Background upload processing:');
-      console.log('  - Original file size:', file.size, 'bytes');
-      console.log('  - Original file type:', file.type);
-      
-      if (needsConversion(file)) {
-        console.log('🔄 Background: Converting audio format...');
-        audioBlob = await convertToMp3(file);
-        console.log('✅ Background: Conversion complete');
-        console.log('  - Converted blob size:', audioBlob.size, 'bytes');
-        console.log('  - Converted blob type:', audioBlob.type);
-      }
-      
-      if (audioBlob.size < 1000) {
-        console.error('❌ CRITICAL: Audio blob is empty after processing!');
-        throw new Error('Audio file is empty after processing');
+      if (file.size < 1000) {
+        console.error('❌ CRITICAL: File is empty!');
+        throw new Error('Audio file is empty');
       }
 
       // Get user display name safely
       const userName = (user as any)?.displayName || (user as any)?.name || undefined;
 
-      // Send to ASR and save transcript
-      console.log('🎤 Background: Sending to ASR service, blob size:', audioBlob.size, 'bytes');
+      // Send MP3 directly to ASR (no conversion)
+      console.log('🎤 Background: Sending MP3 to ASR, size:', file.size, 'bytes');
       
-      const result = await transcribeAndSave(audioBlob, meetingId, {
+      const result = await transcribeAndSave(file, meetingId, {
         language: languageCode,
         meetingTitle,
         userEmail: user?.email || undefined,
@@ -305,12 +282,11 @@ export const DigitalMeetingDialog = ({
                 <div className="space-y-2">
                   <p className="font-medium">Uppgradera för att ladda upp möten</p>
                   <p className="text-sm text-muted-foreground">
-                    Med Pro eller Enterprise kan du ladda upp inspelade ljudfiler (MP3, WAV, M4A) 
+                    Med Pro eller Enterprise kan du ladda upp inspelade MP3-filer 
                     och få dem automatiskt transkriberade med hög kvalitet.
                   </p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground mt-2">
-                    <li>Stöd för MP3, WAV, M4A och fler format</li>
-                    <li>Automatisk konvertering</li>
+                    <li>Snabb direktuppladdning av MP3</li>
                     <li>Sparas i ditt bibliotek</li>
                     <li>E-postnotifikation när klart</li>
                   </ul>
@@ -353,21 +329,13 @@ export const DigitalMeetingDialog = ({
             <div className="space-y-3">
               <p className="font-medium">Så här går du tillväga:</p>
               <ol className="list-decimal list-inside space-y-1 text-sm">
-                <li>Spela in ditt digitala möte med din dators eller telefonens ljudinspelare</li>
-                <li>Spara filen som MP3, WAV, M4A eller annat ljudformat</li>
-                <li>Ladda upp filen här för automatisk transkribering</li>
+                <li>Spela in ditt digitala möte</li>
+                <li>Konvertera till <strong>MP3</strong> (använd gratis CloudConvert.com)</li>
+                <li>Ladda upp MP3-filen här</li>
               </ol>
               
-              <div className="bg-primary/5 border border-primary/20 rounded-md p-3 mt-2">
-                <p className="font-medium text-sm text-primary mb-1">💡 Tips för digitala möten med högtalare</p>
-                <p className="text-xs text-muted-foreground">
-                  Ladda ner en röst-/ljudinspelningsapp på din iPhone eller Android (t.ex. "Röstmemon" på iPhone eller "Röstinspelning" på Android). 
-                  Lägg mobilen bredvid högtalaren under mötet för bästa ljudkvalitet.
-                </p>
-              </div>
-              
               <p className="text-xs text-muted-foreground">
-                Max filstorlek: 500MB. MP3-filer konverteras automatiskt. Du får ett mejl när transkriberingen är klar.
+                ⚡ Max 500MB. Endast MP3-filer accepteras för snabbast uppladdning. Du får ett mejl när transkriberingen är klar.
               </p>
             </div>
           </AlertDescription>
@@ -381,15 +349,15 @@ export const DigitalMeetingDialog = ({
             >
               <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm font-medium text-foreground mb-1">
-                Klicka för att välja ljudfil
+                Klicka för att välja MP3-fil
               </p>
               <p className="text-xs text-muted-foreground">
-                MP3, WAV, M4A, OGG, WebM (max 500MB)
+                ⚡ Endast MP3 (max 500MB)
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm"
+                accept=".mp3,audio/mpeg,audio/mp3"
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -407,9 +375,7 @@ export const DigitalMeetingDialog = ({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    {needsConversion(selectedFile) && (
-                        <span className="ml-2 text-amber-600">• Kommer konverteras automatiskt</span>
-                      )}
+                      <span className="ml-2 text-green-600">⚡ Redo för direktuppladdning</span>
                     </p>
                   </div>
                 </div>

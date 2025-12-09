@@ -1,9 +1,9 @@
 // ASR Service - Uses backend /asr/transcribe endpoint (Vertex AI Speech v2)
-// Flow: 1) Send audio to backend 2) Backend calls Vertex AI 3) Save transcript 4) Send email notification
+// Flow: 1) Send MP3 audio to backend 2) Backend calls Vertex AI 3) Save transcript 4) Send email notification
+// NOTE: MP3 only - no conversion in browser for maximum speed
 
 import { debugLog, debugError } from './debugLogger';
 import { sendTranscriptionCompleteEmail, sendFirstMeetingFeedbackEmail, isFirstMeetingEmailNeeded } from './emailNotification';
-import { convertToMp3, needsConversion } from './audioConverter';
 
 const BACKEND_API_URL = 'https://api.tivly.se';
 
@@ -69,8 +69,8 @@ function parseTranscriptResponse(data: any): { transcript: string; engine?: stri
 }
 
 /**
- * Step 1: Send audio to backend /asr/transcribe endpoint
- * Backend proxies to Deepgram and returns transcript
+ * Step 1: Send MP3 audio to backend /asr/transcribe endpoint
+ * MP3 ONLY - no conversion for maximum speed
  */
 export async function transcribeDirectly(
   audioBlob: Blob,
@@ -80,60 +80,36 @@ export async function transcribeDirectly(
   
   const fileSizeMB = audioBlob.size / 1024 / 1024;
   
-  // Detailed logging for debugging audio issues
-  console.log('🎤 ASR Step 1: Preparing audio for backend /asr/transcribe');
-  console.log('  - Input blob size:', audioBlob.size, 'bytes', `(${fileSizeMB.toFixed(2)}MB)`);
-  console.log('  - Input blob type:', audioBlob.type);
+  // Detailed logging
+  console.log('🎤 ASR: Direct MP3 upload to /asr/transcribe');
+  console.log('  - Blob size:', audioBlob.size, 'bytes', `(${fileSizeMB.toFixed(2)}MB)`);
+  console.log('  - Blob type:', audioBlob.type);
   console.log('  - Language:', language);
   
   // Validate blob is not empty
   if (audioBlob.size < 100) {
-    console.error('❌ CRITICAL: Audio blob is empty or nearly empty!');
+    console.error('❌ CRITICAL: Audio blob is empty!');
     return { success: false, error: 'Audio blob is empty - recording failed' };
   }
   
   if (audioBlob.size < 50000) {
-    console.warn('⚠️ WARNING: Audio blob is very small, may not contain real audio');
+    console.warn('⚠️ WARNING: Audio blob is very small');
   }
 
-  // Validate file size (2GB limit - only reject truly massive files)
-  const fileSizeGB = fileSizeMB / 1024;
-  if (fileSizeGB > 2) {
-    return { success: false, error: `Filen är för stor (${fileSizeGB.toFixed(1)}GB). Max 2GB.` };
+  // Validate file size (500MB limit for MP3)
+  if (fileSizeMB > 500) {
+    return { success: false, error: `Filen är för stor (${fileSizeMB.toFixed(0)}MB). Max 500MB.` };
   }
 
-  onProgress?.('uploading', 10);
+  onProgress?.('uploading', 20);
 
-  // ALWAYS convert to MP3 for smaller file size (avoids 413 errors)
-  let processedBlob = audioBlob;
-  console.log('🔄 Converting audio to MP3 format...');
-  try {
-    processedBlob = await convertToMp3(audioBlob);
-    console.log('✅ MP3 conversion complete');
-    console.log('  - Converted blob size:', processedBlob.size, 'bytes', `(${(processedBlob.size / 1024 / 1024).toFixed(2)}MB)`);
-    console.log('  - Converted blob type:', processedBlob.type);
-  } catch (conversionError: any) {
-    console.error('❌ Audio conversion failed:', conversionError);
-    return { success: false, error: `Audio conversion failed: ${conversionError.message}` };
-  }
-  
-  // Validate converted blob
-  if (processedBlob.size < 1000) {
-    console.error('❌ Converted blob is too small:', processedBlob.size, 'bytes');
-    return { success: false, error: 'Audio conversion resulted in empty file' };
-  }
-
-  onProgress?.('uploading', 30);
-
-  // Build FormData with 'audio' field - use appropriate extension based on type
+  // Build FormData - MP3 direct, no conversion
   const formData = new FormData();
-  const fileName = processedBlob.type.includes('mpeg') || processedBlob.type.includes('mp3') ? 'meeting.mp3' : 'meeting.wav';
-  formData.append('audio', processedBlob, fileName);
+  formData.append('audio', audioBlob, 'meeting.mp3');
   
-  console.log('📦 FormData prepared:');
-  console.log('  - Field name: "audio"');
-  console.log('  - File name:', fileName);
-  console.log('  - Blob size being sent:', processedBlob.size, 'bytes', `(${(processedBlob.size / 1024 / 1024).toFixed(2)}MB)`);
+  console.log('📦 FormData prepared (MP3 direct):');
+  console.log('  - File: meeting.mp3');
+  console.log('  - Size:', fileSizeMB.toFixed(2), 'MB');
 
   try {
     onProgress?.('uploading', 50);
