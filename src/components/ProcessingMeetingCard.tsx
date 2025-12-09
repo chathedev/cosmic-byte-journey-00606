@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Loader2, Upload, AlertCircle, RefreshCw, FileAudio } from 'lucide-react';
-import { getUploadStatus, subscribeToUpload, retryUpload } from '@/lib/backgroundUploader';
+import { Loader2, Upload, AlertCircle, RefreshCw, Mail } from 'lucide-react';
+import { getUploadStatus, subscribeToUpload, retryUpload, isUploadStale } from '@/lib/backgroundUploader';
 import { cn } from '@/lib/utils';
 
 interface ProcessingMeetingCardProps {
@@ -23,6 +23,7 @@ export function ProcessingMeetingCard({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'pending' | 'uploading' | 'complete' | 'error'>('pending');
   const [uploadError, setUploadError] = useState<string | undefined>();
+  const [isStale, setIsStale] = useState(false);
 
   useEffect(() => {
     // Check initial upload status
@@ -32,6 +33,9 @@ export function ProcessingMeetingCard({
       setUploadStatus(status.status);
       setUploadError(status.error);
     }
+    
+    // Check if stale
+    setIsStale(isUploadStale(meetingId));
 
     // Subscribe to upload updates
     const unsubscribe = subscribeToUpload((id, newStatus) => {
@@ -39,95 +43,125 @@ export function ProcessingMeetingCard({
         setUploadProgress(newStatus.progress);
         setUploadStatus(newStatus.status);
         setUploadError(newStatus.error);
+        setIsStale(false); // Reset stale flag on any update
       }
     });
 
+    // Check for staleness periodically
+    const staleCheck = setInterval(() => {
+      if (isUploadStale(meetingId)) {
+        setIsStale(true);
+        const status = getUploadStatus(meetingId);
+        if (status) {
+          setUploadStatus(status.status);
+          setUploadError(status.error);
+        }
+      }
+    }, 5000);
+
     return () => {
       unsubscribe();
+      clearInterval(staleCheck);
     };
   }, [meetingId]);
 
   const handleRetry = () => {
+    setIsStale(false);
     retryUpload(meetingId);
   };
+
+  // Don't show if stale and stuck at 0%
+  if (isStale && uploadProgress === 0 && !uploadError) {
+    return null;
+  }
 
   const isUploading = uploadStatus === 'uploading' || uploadStatus === 'pending';
   const isUploadComplete = uploadStatus === 'complete';
   const isUploadError = uploadStatus === 'error';
   const isFailed = transcriptionStatus === 'failed' || isUploadError;
+  const isProcessing = isUploadComplete || transcriptionStatus === 'processing';
 
   const getStatusText = () => {
-    if (isFailed) return 'Transkribering misslyckades';
-    if (isUploading) return uploadProgress < 100 ? `Laddar upp... ${uploadProgress}%` : 'Laddar upp...';
-    if (isUploadComplete || transcriptionStatus === 'processing') return 'Analyserar ljudfil...';
+    if (isFailed) return uploadError || 'Uppladdning misslyckades';
+    if (isUploading && uploadProgress > 0) return `Laddar upp... ${uploadProgress}%`;
+    if (isUploading) return 'Förbereder uppladdning...';
+    if (isProcessing) return 'Analyserar ljudfil...';
     return 'Bearbetar...';
   };
 
-  const getProgressValue = () => {
-    if (isFailed) return 0;
-    if (isUploading) return uploadProgress;
-    // After upload, show indeterminate progress for processing
-    return undefined;
-  };
-
-  const progressValue = getProgressValue();
-
   return (
     <Card className={cn(
-      "border-2 transition-all duration-300",
-      isFailed ? "border-destructive/50 bg-destructive/5" : "border-primary/30 bg-primary/5"
+      "border-2 transition-all duration-300 overflow-hidden",
+      isFailed ? "border-destructive/50 bg-destructive/5" : "border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10"
     )}>
-      <CardContent className="p-4">
+      <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          {/* Icon */}
+          {/* Icon with animation */}
           <div className={cn(
-            "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0",
-            isFailed ? "bg-destructive/10" : "bg-primary/10"
+            "w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 relative",
+            isFailed ? "bg-destructive/10" : "bg-primary/15"
           )}>
             {isFailed ? (
-              <AlertCircle className="w-6 h-6 text-destructive" />
+              <AlertCircle className="w-7 h-7 text-destructive" />
             ) : isUploading ? (
-              <Upload className="w-6 h-6 text-primary animate-pulse" />
+              <>
+                <Upload className="w-7 h-7 text-primary" />
+                <div className="absolute inset-0 rounded-xl border-2 border-primary/30 animate-ping" style={{ animationDuration: '2s' }} />
+              </>
             ) : (
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <>
+                <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                <div className="absolute -inset-1 rounded-xl bg-primary/10 animate-pulse" />
+              </>
             )}
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="font-medium text-foreground truncate">{title}</h3>
-              <span className="text-xs text-muted-foreground flex-shrink-0">
+              <h3 className="font-semibold text-foreground truncate text-lg">{title}</h3>
+              <span className="text-xs text-muted-foreground flex-shrink-0 bg-background/50 px-2 py-1 rounded">
                 {new Date(createdAt).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
 
-            {/* Status text */}
-            <p className={cn(
-              "text-sm",
-              isFailed ? "text-destructive" : "text-muted-foreground"
-            )}>
-              {getStatusText()}
-            </p>
+            {/* Status text with icon */}
+            <div className="flex items-center gap-2">
+              {!isFailed && isUploading && uploadProgress > 0 && (
+                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              )}
+              <p className={cn(
+                "text-sm font-medium",
+                isFailed ? "text-destructive" : "text-primary"
+              )}>
+                {getStatusText()}
+              </p>
+            </div>
 
-            {/* Error message */}
-            {isFailed && uploadError && (
-              <p className="text-xs text-destructive/80">{uploadError}</p>
+            {/* Progress bar - only show when uploading with progress */}
+            {!isFailed && isUploading && uploadProgress > 0 && (
+              <div className="space-y-1">
+                <Progress value={uploadProgress} className="h-2" />
+              </div>
             )}
 
-            {/* Progress bar */}
-            {!isFailed && (
-              <div className="space-y-1">
-                {progressValue !== undefined ? (
-                  <Progress value={progressValue} className="h-1.5" />
-                ) : (
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/50 w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite]" 
-                         style={{ 
-                           animation: 'shimmer 1.5s ease-in-out infinite',
-                         }} />
-                  </div>
-                )}
+            {/* Processing shimmer animation */}
+            {!isFailed && isProcessing && (
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-transparent via-primary/40 to-transparent w-1/2"
+                  style={{ 
+                    animation: 'shimmer 1.5s ease-in-out infinite',
+                  }} 
+                />
+              </div>
+            )}
+
+            {/* Email notification hint for processing */}
+            {!isFailed && isProcessing && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-background/50 rounded-lg px-3 py-2">
+                <Mail className="w-4 h-4 text-primary" />
+                <span>Du får ett mejl när det är klart</span>
               </div>
             )}
 
@@ -137,7 +171,7 @@ export function ProcessingMeetingCard({
                 variant="outline" 
                 size="sm" 
                 onClick={handleRetry}
-                className="mt-2"
+                className="mt-1"
               >
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Försök igen
@@ -146,6 +180,14 @@ export function ProcessingMeetingCard({
           </div>
         </div>
       </CardContent>
+
+      {/* Add shimmer keyframes */}
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(300%); }
+        }
+      `}</style>
     </Card>
   );
 }
