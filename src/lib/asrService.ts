@@ -104,13 +104,13 @@ export async function transcribeDirectly(
 
   onProgress?.('uploading', 10);
 
-  // ALWAYS convert to WAV for backend compatibility
+  // ALWAYS convert to MP3 for smaller file size (avoids 413 errors)
   let processedBlob = audioBlob;
-  console.log('🔄 Converting audio to WAV format...');
+  console.log('🔄 Converting audio to MP3 format...');
   try {
-    processedBlob = await convertToMp3(audioBlob); // convertToMp3 now converts to WAV
-    console.log('✅ WAV conversion complete');
-    console.log('  - Converted blob size:', processedBlob.size, 'bytes');
+    processedBlob = await convertToMp3(audioBlob);
+    console.log('✅ MP3 conversion complete');
+    console.log('  - Converted blob size:', processedBlob.size, 'bytes', `(${(processedBlob.size / 1024 / 1024).toFixed(2)}MB)`);
     console.log('  - Converted blob type:', processedBlob.type);
   } catch (conversionError: any) {
     console.error('❌ Audio conversion failed:', conversionError);
@@ -125,14 +125,15 @@ export async function transcribeDirectly(
 
   onProgress?.('uploading', 30);
 
-  // Build FormData with 'audio' field - always use .wav extension
+  // Build FormData with 'audio' field - use appropriate extension based on type
   const formData = new FormData();
-  formData.append('audio', processedBlob, 'meeting.wav');
+  const fileName = processedBlob.type.includes('mpeg') || processedBlob.type.includes('mp3') ? 'meeting.mp3' : 'meeting.wav';
+  formData.append('audio', processedBlob, fileName);
   
   console.log('📦 FormData prepared:');
   console.log('  - Field name: "audio"');
-  console.log('  - File name: meeting.wav');
-  console.log('  - Blob size being sent:', processedBlob.size, 'bytes');
+  console.log('  - File name:', fileName);
+  console.log('  - Blob size being sent:', processedBlob.size, 'bytes', `(${(processedBlob.size / 1024 / 1024).toFixed(2)}MB)`);
 
   try {
     onProgress?.('uploading', 50);
