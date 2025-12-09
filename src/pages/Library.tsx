@@ -54,7 +54,6 @@ const Library = () => {
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
   const pendingMeetingIdRef = useRef<string | null>(null);
-  const pendingJobIdRef = useRef<string | null>(null);
   
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
@@ -63,28 +62,20 @@ const Library = () => {
   useEffect(() => {
     const fromRecording = location.state?.fromRecording === true;
     const pendingMeetingId = location.state?.pendingMeetingId;
-    const jobId = location.state?.jobId;
     
-    // Track meeting ID and jobId for polling
+    // Track meeting ID for polling
     if (pendingMeetingId) {
       pendingMeetingIdRef.current = pendingMeetingId;
       console.log('📌 Tracking pending meeting:', pendingMeetingId);
-    }
-    if (jobId) {
-      pendingJobIdRef.current = jobId;
-      console.log('📌 Tracking jobId:', jobId);
     }
     
     if (fromRecording) {
       const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
       if (pendingMeetingJson) {
         try {
-          const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession & { jobId?: string };
+          const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
           pendingMeeting.transcriptionStatus = 'processing';
           pendingMeetingIdRef.current = pendingMeeting.id;
-          if (pendingMeeting.jobId) {
-            pendingJobIdRef.current = pendingMeeting.jobId;
-          }
           setMeetings([pendingMeeting]);
           setIsLoading(false);
         } catch (e) {
@@ -131,16 +122,14 @@ const Library = () => {
       }
 
       try {
-        // Use jobId if available (new async flow), otherwise meetingId
-        const currentJobId = pendingJobIdRef.current;
-        const status = await apiClient.getTranscriptionStatus(currentPendingId, currentJobId || undefined);
+        // Poll using meetingId
+        const status = await apiClient.getTranscriptionStatus(currentPendingId);
         
         const isComplete = status.success && (status.status === 'done' || status.status === 'completed') && status.transcript;
         
         if (isComplete) {
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
-          pendingJobIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
           
@@ -164,7 +153,6 @@ const Library = () => {
         } else if (status.status === 'failed' || status.status === 'error') {
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
-          pendingJobIdRef.current = null;
           clearInterval(pollInterval);
           
           setMeetings(prev => prev.map(m => 
