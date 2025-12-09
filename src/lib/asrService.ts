@@ -157,6 +157,7 @@ export async function uploadAudioForTranscription(
 
 /**
  * Poll ASR status by meetingId
+ * Handles 404 gracefully (job not registered yet)
  */
 export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
   const token = localStorage.getItem('authToken');
@@ -173,16 +174,36 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       headers,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      debugError('❌ ASR status poll error:', response.status, errorText);
+    // 404 = job not registered yet, treat as queued
+    if (response.status === 404) {
+      debugLog('📊 ASR status: 404 - treating as queued');
       return {
-        status: 'error',
-        error: `Status check failed: ${response.status}`
+        status: 'queued',
+        progress: 0,
+      };
+    }
+
+    // 202 = accepted, processing
+    if (response.status === 202) {
+      const data = await response.json().catch(() => ({}));
+      return {
+        status: data.status || 'processing',
+        progress: data.progress || 0,
+      };
+    }
+
+    // Other non-OK status - keep polling as queued
+    if (!response.ok) {
+      debugLog('📊 ASR status check:', response.status, '- treating as queued');
+      return {
+        status: 'queued',
+        progress: 0,
       };
     }
 
     const data = await response.json();
+    debugLog('📊 ASR status:', data.status, data.progress ? `${data.progress}%` : '');
+    
     return {
       status: data.status || 'queued',
       progress: data.progress,
@@ -191,10 +212,11 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       duration: data.duration,
     };
   } catch (error: any) {
-    debugError('❌ ASR status poll network error:', error);
+    // Network error - keep polling as queued
+    debugLog('📊 ASR status network error - treating as queued');
     return {
-      status: 'error',
-      error: error.message || 'Network error'
+      status: 'queued',
+      progress: 0,
     };
   }
 }

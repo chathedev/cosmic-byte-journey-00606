@@ -1544,12 +1544,34 @@ class ApiClient {
         },
       });
 
+      // Handle specific HTTP status codes
+      if (response.status === 404) {
+        // Job not found yet - treat as queued (still being registered)
+        console.log('📊 ASR status: 404 - job not registered yet, treating as queued');
+        return {
+          success: true,
+          status: 'queued',
+          progress: 0,
+        };
+      }
+
+      if (response.status === 202) {
+        // Accepted but still processing
+        const data = await response.json().catch(() => ({}));
+        return {
+          success: true,
+          status: data.status || 'processing',
+          progress: data.progress || 0,
+        };
+      }
+
       if (!response.ok) {
-        // Retry on network errors
+        // Other errors - keep polling but log
+        console.warn('📊 ASR status check failed:', response.status);
         return {
           success: false,
-          status: 'processing', // Keep polling
-          error: 'Status check failed'
+          status: 'queued', // Assume still queued, keep polling
+          error: `Status check returned ${response.status}`
         };
       }
 
@@ -1558,6 +1580,8 @@ class ApiClient {
       // Normalize status values
       let normalizedStatus = data.status;
       if (normalizedStatus === 'completed') normalizedStatus = 'done';
+      
+      console.log('📊 ASR status:', normalizedStatus, data.progress ? `${data.progress}%` : '');
       
       return {
         success: true,
@@ -1569,10 +1593,11 @@ class ApiClient {
         error: data.error,
       };
     } catch (error: any) {
-      // On network error, continue polling
+      // On network error, assume still queued and continue polling
+      console.warn('📊 ASR status network error:', error.message);
       return {
         success: false,
-        status: 'processing',
+        status: 'queued',
         error: error.message || 'Network error'
       };
     }
