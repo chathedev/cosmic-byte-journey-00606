@@ -87,48 +87,41 @@ export function generateDemoFolders(): string[] {
 const DEMO_PROTOCOL_HTML_1 = `
 <h1>Mötesprotokoll - Styrelsemöte Q4 2024</h1>
 <p><strong>Datum:</strong> ${new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE')}</p>
-<p><strong>Närvarande:</strong> Maria Lindqvist (ordförande), Erik Johansson, Anna Bergström, Johan Nilsson, Lisa Andersson</p>
+<p><strong>Tid:</strong> 09:00 - 12:30</p>
+<p><strong>Plats:</strong> Huvudkontoret, Konferensrum Vega</p>
+<p><strong>Närvarande:</strong> Maria Lindqvist (ordförande), Erik Johansson (VD), Anna Bergström (CFO), Johan Nilsson (CTO), Lisa Andersson (HR-direktör)</p>
+<p><strong>Protokollförare:</strong> Lisa Andersson</p>
 
-<h2>1. Mötets öppnande</h2>
-<p>Mötet öppnades kl 09:00 av ordförande Maria Lindqvist.</p>
+<h2>1. Mötets öppnande och godkännande av dagordning</h2>
+<p>Ordförande Maria Lindqvist hälsade samtliga styrelseledamöter välkomna till årets sista ordinarie styrelsemöte. Hon inledde med att tacka för ett framgångsrikt år och betonade vikten av de strategiska beslut som fattats under året. Dagordningen hade distribuerats i förväg och godkändes enhälligt efter att Johan Nilsson föreslog att punkten om IT-infrastruktur skulle flyttas upp på agendan med hänsyn till dess brådskande karaktär. Samtliga ledamöter bekräftade att de tagit del av det utskickade underlaget och var redo att behandla de planerade ärendena. Ordföranden noterade att mötet var beslutsmässigt med samtliga ordinarie ledamöter närvarande.</p>
 
-<h2>2. Dagordning</h2>
-<p>Dagordningen godkändes utan ändringar.</p>
+<h2>2. Ekonomisk rapport och resultatgenomgång</h2>
+<p>CFO Anna Bergström presenterade en omfattande genomgång av bolagets ekonomiska ställning per Q3 2024. Omsättningen uppgick till 47,3 miljoner kronor, vilket innebär en ökning med 12% jämfört med motsvarande period föregående år. Rörelsemarginalen förbättrades till 18,4% från tidigare 15,2%, primärt drivet av effektiviseringar inom produktionskedjan och en mer fördelaktig produktmix. Kassaflödet från den löpande verksamheten var starkt positivt och uppgick till 8,2 miljoner kronor. Bergström framhöll särskilt att kundanskaffningskostnaden minskat med 23% tack vare de digitala marknadsföringsinsatserna som implementerades under våren. Prognosen för helåret 2024 justerades upp med 4% baserat på det starka Q3-resultatet och den positiva orderingången under oktober månad.</p>
 
-<h2>3. Ekonomisk rapport</h2>
-<p>Erik Johansson presenterade Q3-resultatet som visade en omsättningsökning på 12% jämfört med föregående år.</p>
+<h2>3. Strategisk investering i CRM-system</h2>
+<p>VD Erik Johansson presenterade förslaget om investering i ett nytt kundhanteringssystem (CRM) för att stödja bolagets tillväxtambitioner. Den nuvarande lösningen har nått sina kapacitetsgränser och begränsar möjligheterna till avancerad kundanalys och automatiserad marknadsföring. Efter en gedigen utvärderingsprocess där fyra leverantörer deltog, rekommenderade ledningsgruppen Salesforce Enterprise som det mest lämpliga alternativet. Implementeringen beräknas ta sex månader och omfattar integration med befintliga system för ekonomi, lager och e-handel. Kostnaden uppgår till 500 000 kronor för implementering samt 180 000 kronor i årlig licensavgift. Styrelsen fattade enhälligt beslut om att godkänna investeringen, med villkoret att en detaljerad implementeringsplan presenteras vid nästa styrelsemöte. Erik Johansson utsågs till projektägare med ansvar för att tillsätta en intern projektgrupp.</p>
 
-<h2>4. Beslut</h2>
-<ul>
-<li>Beslut fattades om att investera 500 000 kr i nytt CRM-system.</li>
-</ul>
-
-<h2>5. Nästa möte</h2>
-<p>Nästa möte planerades till den 15 januari 2025.</p>
-
-<h2>6. Avslutning</h2>
-<p>Mötet avslutades kl 11:30.</p>
+<h2>4. Avslutning och nästa möte</h2>
+<p>Ordföranden tackade samtliga för ett konstruktivt och framåtblickande möte. Hon sammanfattade de viktigaste besluten: godkännande av CRM-investeringen, uppdaterad budget för 2025 samt den reviderade expansionsstrategin för nordiska marknaden. Nästa ordinarie styrelsemöte fastställdes till den 15 januari 2025 klockan 09:00 på huvudkontoret. Vid det mötet kommer bland annat årsbokslut, revisionsrapport och förslag till utdelning att behandlas. Ordföranden avslutade mötet klockan 12:30 och önskade samtliga en god jul och ett gott nytt år.</p>
 `;
 
 const DEMO_PROTOCOL_HTML_3 = `
 <h1>Mötesprotokoll - Kundmöte Acme AB</h1>
 <p><strong>Datum:</strong> ${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE')}</p>
-<p><strong>Deltagare:</strong> Acme AB representanter, Säljteamet</p>
+<p><strong>Tid:</strong> 14:00 - 15:45</p>
+<p><strong>Plats:</strong> Microsoft Teams</p>
+<p><strong>Deltagare från Acme AB:</strong> Magnus Eriksson (IT-chef), Sara Lindgren (Inköpsansvarig), Per Olofsson (Projektledare)</p>
+<p><strong>Deltagare från oss:</strong> Henrik Svensson (Key Account Manager), Emma Karlsson (Teknisk specialist)</p>
+<p><strong>Protokollförare:</strong> Henrik Svensson</p>
 
-<h2>1. Syfte</h2>
-<p>Möte angående förnyelse av årligt avtal.</p>
+<h2>1. Bakgrund och nuvarande samarbete</h2>
+<p>Henrik Svensson inledde mötet med en översikt av det pågående samarbetet mellan våra organisationer. Acme AB har varit kund sedan mars 2022 och använder idag vår Standard-licens med 45 aktiva användare fördelade på tre avdelningar: ekonomi, HR och marknadsföring. Under de senaste 18 månaderna har användningen ökat stadigt och kundnöjdheten har varit genomgående hög, vilket bekräftades av de senaste NPS-mätningarna där Acme AB gav betyget 9 av 10. Magnus Eriksson uttryckte sin tillfredsställelse med plattformens stabilitet och den responsiva supporten, särskilt vid den kritiska systemuppgraderingen i september då vårt team arbetade över helgen för att minimera störningar i Acme AB:s verksamhet.</p>
 
-<h2>2. Kundens feedback</h2>
-<p>Kunden är nöjd med tjänsten och önskar utöka användningen till fler avdelningar.</p>
+<h2>2. Expansion och utökade behov</h2>
+<p>Sara Lindgren presenterade Acme AB:s planer på att expandera användningen till ytterligare fyra avdelningar: produktion, logistik, försäljning och kundtjänst. Detta skulle innebära en ökning från nuvarande 45 till cirka 220 användare under första halvåret 2025. Per Olofsson beskrev de specifika behoven för de nya avdelningarna, inklusive avancerade rapporteringsfunktioner, integration med deras SAP-system samt möjlighet till anpassade arbetsflöden för produktionsavdelningen. Emma Karlsson bekräftade att samtliga dessa krav kan tillgodoses inom ramen för vår Enterprise-licens och presenterade en teknisk översikt av integrationsmöjligheterna. Diskussionen landade i att en pilot med 30 användare från produktionsavdelningen skulle kunna startas redan i januari för att validera arbetsflödena innan full utrullning.</p>
 
-<h2>3. Diskussion</h2>
-<ul>
-<li>Enterprise-funktioner och prissättning för 200+ användare</li>
-<li>Kunden bad om referenscase från liknande organisationer</li>
-</ul>
-
-<h2>4. Nästa steg</h2>
-<p>Uppföljningsmöte bokades till nästa vecka för att presentera offert.</p>
+<h2>3. Prisförslag och avtalsvillkor</h2>
+<p>Henrik Svensson presenterade ett preliminärt prisförslag för Enterprise-licensen baserat på 200+ användare. Förslaget inkluderar volymbrabatt, dedikerad kundansvarig, prioriterad support med garanterad svarstid på max 2 timmar samt kvartalsvisa strategimöten. Sara Lindgren bad om referenscase från liknande organisationer inom tillverkningsindustrin, vilket Henrik åtog sig att ta fram till nästa möte. Magnus Eriksson lyfte frågan om datamigration från det parallella system som produktionsavdelningen använder idag, och Emma Karlsson föreslog en workshop för att kartlägga datastrukturen och planera migrationen. Ett uppföljningsmöte bokades till nästa vecka tisdag klockan 10:00 då ett formellt offertdokument kommer att presenteras tillsammans med de efterfrågade referenscasen och en detaljerad implementeringsplan.</p>
 `;
 
 // Generate demo protocol status for test accounts
