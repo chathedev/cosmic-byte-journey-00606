@@ -23,7 +23,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiClient } from "@/lib/api";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
-import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus } from "@/utils/demoData";
+import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus, getDemoProtocol } from "@/utils/demoData";
 
 const Library = () => {
   const { user } = useAuth();
@@ -894,12 +894,23 @@ const Library = () => {
                             onClick={async () => {
                               setLoadingProtocol(meeting.id);
                               try {
-                                const data = await backendApi.getProtocol(meeting.id);
-                                if (data?.protocol) {
-                                  setViewingProtocol({
-                                    meetingId: meeting.id,
-                                    protocol: data.protocol
-                                  });
+                                // For demo accounts, use demo protocol data
+                                if (isDemoAccount) {
+                                  const demoData = getDemoProtocol(meeting.id);
+                                  if (demoData?.protocol) {
+                                    setViewingProtocol({
+                                      meetingId: meeting.id,
+                                      protocol: demoData.protocol
+                                    });
+                                  }
+                                } else {
+                                  const data = await backendApi.getProtocol(meeting.id);
+                                  if (data?.protocol) {
+                                    setViewingProtocol({
+                                      meetingId: meeting.id,
+                                      protocol: data.protocol
+                                    });
+                                  }
                                 }
                               } catch (error: any) {
                                 toast({
@@ -925,6 +936,16 @@ const Library = () => {
                           </Button>
                           <Button
                             onClick={async () => {
+                              // Demo accounts can view but not download real files
+                              if (isDemoAccount) {
+                                toast({
+                                  title: "Demo-protokoll",
+                                  description: "Klicka på ögat för att visa protokollet.",
+                                  duration: 2000,
+                                });
+                                return;
+                              }
+                              
                               setLoadingProtocol(meeting.id);
                               try {
                                 const data = await backendApi.getProtocol(meeting.id);

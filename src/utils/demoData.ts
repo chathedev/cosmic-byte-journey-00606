@@ -83,6 +83,54 @@ export function generateDemoFolders(): string[] {
   return ['Styrelsemöten', 'Produktmöten', 'Kundmöten', 'Marketing', 'HR'];
 }
 
+// Demo protocol HTML content for preview
+const DEMO_PROTOCOL_HTML_1 = `
+<h1>Mötesprotokoll - Styrelsemöte Q4 2024</h1>
+<p><strong>Datum:</strong> ${new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE')}</p>
+<p><strong>Närvarande:</strong> Maria Lindqvist (ordförande), Erik Johansson, Anna Bergström, Johan Nilsson, Lisa Andersson</p>
+
+<h2>1. Mötets öppnande</h2>
+<p>Mötet öppnades kl 09:00 av ordförande Maria Lindqvist.</p>
+
+<h2>2. Dagordning</h2>
+<p>Dagordningen godkändes utan ändringar.</p>
+
+<h2>3. Ekonomisk rapport</h2>
+<p>Erik Johansson presenterade Q3-resultatet som visade en omsättningsökning på 12% jämfört med föregående år.</p>
+
+<h2>4. Beslut</h2>
+<ul>
+<li>Beslut fattades om att investera 500 000 kr i nytt CRM-system.</li>
+</ul>
+
+<h2>5. Nästa möte</h2>
+<p>Nästa möte planerades till den 15 januari 2025.</p>
+
+<h2>6. Avslutning</h2>
+<p>Mötet avslutades kl 11:30.</p>
+`;
+
+const DEMO_PROTOCOL_HTML_3 = `
+<h1>Mötesprotokoll - Kundmöte Acme AB</h1>
+<p><strong>Datum:</strong> ${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE')}</p>
+<p><strong>Deltagare:</strong> Acme AB representanter, Säljteamet</p>
+
+<h2>1. Syfte</h2>
+<p>Möte angående förnyelse av årligt avtal.</p>
+
+<h2>2. Kundens feedback</h2>
+<p>Kunden är nöjd med tjänsten och önskar utöka användningen till fler avdelningar.</p>
+
+<h2>3. Diskussion</h2>
+<ul>
+<li>Enterprise-funktioner och prissättning för 200+ användare</li>
+<li>Kunden bad om referenscase från liknande organisationer</li>
+</ul>
+
+<h2>4. Nästa steg</h2>
+<p>Uppföljningsmöte bokades till nästa vecka för att presentera offert.</p>
+`;
+
 // Generate demo protocol status for test accounts
 export function generateDemoProtocolStatus(): Record<string, any> {
   return {
@@ -97,4 +145,33 @@ export function generateDemoProtocolStatus(): Record<string, any> {
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     },
   };
+}
+
+// Get demo protocol data for viewing (returns protocol object similar to backend)
+export function getDemoProtocol(meetingId: string): { protocol: any } | null {
+  if (meetingId === 'demo-meeting-1') {
+    return {
+      protocol: {
+        fileName: 'Styrelsemote_Q4_2024.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        storedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        size: 15234,
+        blob: '', // Empty blob, but we have HTML for preview
+        htmlContent: DEMO_PROTOCOL_HTML_1,
+      }
+    };
+  }
+  if (meetingId === 'demo-meeting-3') {
+    return {
+      protocol: {
+        fileName: 'Kundmote_Acme_AB.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        storedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        size: 12456,
+        blob: '', // Empty blob, but we have HTML for preview
+        htmlContent: DEMO_PROTOCOL_HTML_3,
+      }
+    };
+  }
+  return null;
 }
