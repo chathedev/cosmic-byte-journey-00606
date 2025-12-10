@@ -26,16 +26,18 @@ interface RecordingViewNewProps {
 
 type ViewState = 'recording';
 
-// Check if user has ASR access for LIVE recording (Enterprise only)
+// Check if user has ASR access for LIVE recording (Enterprise or Admin)
 // Free and Pro use browser-based transcription for live recording
 // Pro gets ASR only via file upload
-const hasAsrAccess = (plan: string | undefined): boolean => {
+const hasAsrAccess = (plan: string | undefined, isAdmin: boolean): boolean => {
+  if (isAdmin) return true;
   if (!plan) return false;
   return plan.toLowerCase() === 'enterprise';
 };
 
-// Check if user has library access (Pro and Enterprise)
-const hasLibraryAccess = (plan: string | undefined): boolean => {
+// Check if user has library access (Pro, Enterprise, or Admin)
+const hasLibraryAccess = (plan: string | undefined, isAdmin: boolean): boolean => {
+  if (isAdmin) return true;
   if (!plan) return false;
   return ['pro', 'enterprise'].includes(plan.toLowerCase());
 };
@@ -66,7 +68,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [interimText, setInterimText] = useState<string>("");
   
   // Determine transcription mode based on plan
-  const useAsrMode = hasAsrAccess(userPlan?.plan);
+  const useAsrMode = hasAsrAccess(userPlan?.plan, isAdmin);
   
   // Test access for admins and specific user - NEVER on iOS domain
   const allowedTestEmail = 'charlie.wretling@icloud.com';
@@ -605,7 +607,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
       const meeting = { ...meetingData, id: meetingId };
       
       // Determine user flow based on plan
-      const canAccessLibrary = hasLibraryAccess(userPlan?.plan);
+      const canAccessLibrary = hasLibraryAccess(userPlan?.plan, isAdmin);
       
       if (canAccessLibrary) {
         // Pro/Enterprise/Plus/Unlimited - redirect to library
