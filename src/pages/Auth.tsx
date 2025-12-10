@@ -55,7 +55,7 @@ function getAuthBaseUrl(): string {
   return 'https://api.tivly.se';
 }
 
-// Check if user has app access (Pro, Plus, Unlimited, or Enterprise)
+// Check if user has app access - ENTERPRISE ONLY for iOS app
 function hasAppAccess(userData: any): boolean {
   if (!userData) return false;
   
@@ -63,10 +63,9 @@ function hasAppAccess(userData: any): boolean {
   const isAdmin = userData.role === 'admin' || userData.role === 'owner';
   if (isAdmin) return true;
   
-  // Check plan type
+  // Check plan type - ONLY enterprise allowed on iOS app
   const planType = typeof userData.plan === 'string' ? userData.plan : userData.plan?.plan;
-  const validPlans = ['pro', 'plus', 'unlimited', 'enterprise'];
-  if (validPlans.includes(planType?.toLowerCase())) return true;
+  if (planType?.toLowerCase() === 'enterprise') return true;
   
   // Check enterprise membership
   if (userData.enterprise?.active || userData.enterprise?.companyName) return true;
@@ -496,11 +495,11 @@ export default function Auth() {
                 
                 <div className="space-y-2">
                   <CardTitle className="text-2xl font-bold">
-                    {platform === 'ios' ? 'Logga in i Tivly' : 'Logga in'}
+                    {platform === 'ios' ? 'Tivly Enterprise' : 'Logga in'}
                   </CardTitle>
                   <CardDescription>
                     {platform === 'ios' 
-                      ? 'Ange din e-postadress så skickar vi en 6-siffrig kod'
+                      ? 'Appen är endast tillgänglig för Enterprise-konton'
                       : 'Ange din e-post för att fortsätta'}
                   </CardDescription>
                 </div>
@@ -571,10 +570,10 @@ export default function Auth() {
                   </Button>
                 )}
 
-                {/* iOS app notice - no signup available */}
+                {/* iOS app notice - enterprise only */}
                 {isIoDomain() && (
                   <p className="text-xs text-center text-muted-foreground pt-2">
-                    Skapa konto på app.tivly.se via webben
+                    Endast för Enterprise-användare
                   </p>
                 )}
               </CardContent>

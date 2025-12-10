@@ -197,7 +197,7 @@ export const IOSWelcomeScreen = ({ onComplete }: IOSWelcomeScreenProps) => {
                       ) : (
                         <>
                           <Mic className="mr-2 h-5 w-5" />
-                          Tillåt mikrofon
+                          Fortsätt
                         </>
                       )}
                     </Button>
