@@ -97,38 +97,47 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
     }
   };
 
+  // ASR is available for Pro, Plus, Unlimited, Enterprise, and Admins
+  // Free plan uses browser-based transcription only
+  const hasASR = isAdmin || ['pro', 'plus', 'unlimited', 'enterprise'].includes(userPlan.plan);
+
   return (
-    <div className={cn('inline-flex items-center gap-2 rounded-md border border-border bg-card/80 text-card-foreground px-3 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/70', className)}>
-      {isAdmin ? (
-        <Shield className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-      ) : (
-        <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-      )}
-      <span className="text-xs font-medium whitespace-nowrap">{getPlanTitle()}</span>
-      {!isUnlimited && (
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-            {limit - used} kvar
-          </span>
-          <div className="w-16 h-1.5 bg-secondary/30 rounded-sm overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-sm transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+    <div className={cn('inline-flex flex-col gap-0.5', className)}>
+      <div className="inline-flex items-center gap-2 rounded-md border border-border bg-card/80 text-card-foreground px-3 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/70">
+        {isAdmin ? (
+          <Shield className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+        ) : (
+          <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+        )}
+        <span className="text-xs font-medium whitespace-nowrap">{getPlanTitle()}</span>
+        {!isUnlimited && (
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+              {limit - used} kvar
+            </span>
+            <div className="w-16 h-1.5 bg-secondary/30 rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-sm transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
-        </div>
-      )}
-      {isUnlimited && (
-        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-          {used} / obegränsat
-        </span>
-      )}
-      {/* On iOS app, never show upgrade button - Apple compliance */}
-      {!isIosApp && userPlan.plan === 'free' && !isUnlimited && !userPlan.planCancelledAt && used >= limit && (
-        <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant="default">
-          <TrendingUp className="mr-1 h-3 w-3" /> Uppgradera
-        </Button>
-      )}
+        )}
+        {isUnlimited && (
+          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+            {used} / obegränsat
+          </span>
+        )}
+        {/* On iOS app, never show upgrade button - Apple compliance */}
+        {!isIosApp && userPlan.plan === 'free' && !isUnlimited && !userPlan.planCancelledAt && used >= limit && (
+          <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => setDialogOpen(true)} variant="default">
+            <TrendingUp className="mr-1 h-3 w-3" /> Uppgradera
+          </Button>
+        )}
+      </div>
+      <span className="text-[10px] text-muted-foreground/70 pl-1">
+        {hasASR ? 'Server-transkribering' : 'Webbläsar-transkribering'}
+      </span>
       <SubscribeDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
