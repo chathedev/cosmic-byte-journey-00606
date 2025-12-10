@@ -362,12 +362,8 @@ const Library = () => {
     // Use canCreateMeeting from context instead of canGenerateProtocol
   };
   const handleDeleteMeeting = async (id: string) => {
-    // Demo accounts can't delete
+    // Demo accounts can't delete - just silently ignore
     if (isDemoAccount) {
-      toast({
-        title: 'Demo-läge',
-        description: 'I demo-läge kan du inte ta bort möten. Skapa ett riktigt konto för full funktionalitet.',
-      });
       return;
     }
     
@@ -412,12 +408,8 @@ const Library = () => {
   };
 
   const handleAddFolder = async () => {
-    // Demo accounts can't add folders
+    // Demo accounts can't add folders - just silently ignore
     if (isDemoAccount) {
-      toast({
-        title: 'Demo-läge',
-        description: 'I demo-läge kan du inte skapa mappar. Skapa ett riktigt konto för full funktionalitet.',
-      });
       setNewFolderName("");
       setIsAddingFolder(false);
       return;
