@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Loader2, CheckCircle2, XCircle, Mic, Upload, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -18,36 +18,27 @@ export const TranscriptionStatusWidget = ({
   onComplete,
   onRetry,
 }: TranscriptionStatusWidgetProps) => {
-  const [progress, setProgress] = useState(0);
-  const [showCompleteAnimation, setShowCompleteAnimation] = useState(false);
+  const [dots, setDots] = useState(1);
   const completedRef = useRef(false);
 
-  // Simulate progress based on status
+  // Animate dots for processing
   useEffect(() => {
-    if (status === 'uploading') {
-      setProgress(25);
-    } else if (status === 'processing') {
-      // Animate progress from 30 to 90 over time
+    if (status === 'processing' || status === 'uploading') {
       const interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) return 90;
-          return prev + Math.random() * 5;
-        });
-      }, 2000);
-      setProgress(30);
+        setDots(prev => (prev % 3) + 1);
+      }, 500);
       return () => clearInterval(interval);
-    } else if (status === 'done' && !completedRef.current) {
+    }
+  }, [status]);
+
+  // Notify completion
+  useEffect(() => {
+    if (status === 'done' && !completedRef.current) {
       completedRef.current = true;
-      setProgress(100);
-      setShowCompleteAnimation(true);
-      
-      // Notify completion after animation
       const timer = setTimeout(() => {
         onComplete?.();
-      }, 1500);
+      }, 1000);
       return () => clearTimeout(timer);
-    } else if (status === 'failed') {
-      setProgress(0);
     }
   }, [status, onComplete]);
 
@@ -55,136 +46,72 @@ export const TranscriptionStatusWidget = ({
     switch (status) {
       case 'uploading':
         return {
-          icon: Upload,
-          label: 'Laddar upp...',
-          sublabel: 'Förbereder ljud för transkribering',
+          label: `Laddar upp${'.'.repeat(dots)}`,
           color: 'text-blue-500',
-          bgColor: 'bg-blue-500/10',
-          borderColor: 'border-blue-500/30',
+          bgColor: 'bg-blue-500/5',
         };
       case 'processing':
         return {
-          icon: Mic,
-          label: 'Transkriberar...',
-          sublabel: 'AI analyserar ditt möte',
+          label: `Transkriberar${'.'.repeat(dots)}`,
           color: 'text-primary',
-          bgColor: 'bg-primary/10',
-          borderColor: 'border-primary/30',
+          bgColor: 'bg-primary/5',
         };
       case 'done':
         return {
-          icon: CheckCircle2,
-          label: 'Klart!',
-          sublabel: 'Din transkribering är redo',
+          label: 'Klar',
           color: 'text-green-500',
-          bgColor: 'bg-green-500/10',
-          borderColor: 'border-green-500/30',
+          bgColor: 'bg-green-500/5',
         };
       case 'failed':
         return {
-          icon: XCircle,
           label: 'Misslyckades',
-          sublabel: 'Något gick fel',
           color: 'text-destructive',
-          bgColor: 'bg-destructive/10',
-          borderColor: 'border-destructive/30',
+          bgColor: 'bg-destructive/5',
         };
       default:
         return {
-          icon: Clock,
           label: 'Väntar...',
-          sublabel: '',
           color: 'text-muted-foreground',
-          bgColor: 'bg-muted/10',
-          borderColor: 'border-muted/30',
+          bgColor: 'bg-muted/5',
         };
     }
   };
 
   const config = getStatusConfig();
-  const Icon = config.icon;
-  const circumference = 2 * Math.PI * 20;
-  const offset = circumference - (progress / 100) * circumference;
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: -10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: -10 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        key={status}
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 5 }}
+        transition={{ duration: 0.2 }}
         className={cn(
-          "flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-300",
-          config.bgColor,
-          config.borderColor,
-          showCompleteAnimation && "ring-2 ring-green-500/50"
+          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
+          config.bgColor
         )}
       >
-        {/* Circular Progress */}
-        <div className="relative w-12 h-12 flex-shrink-0">
-          <svg className="w-12 h-12 transform -rotate-90">
-            {/* Background circle */}
-            <circle
-              cx="24"
-              cy="24"
-              r="20"
-              stroke="currentColor"
-              strokeWidth="3"
-              fill="none"
-              className="text-muted/20"
-            />
-            {/* Progress circle */}
-            <circle
-              cx="24"
-              cy="24"
-              r="20"
-              stroke="currentColor"
-              strokeWidth="3"
-              fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              className={cn("transition-all duration-500 ease-out", config.color)}
-              strokeLinecap="round"
-            />
-          </svg>
-          {/* Center icon */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {status === 'done' ? (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 15 }}
-              >
-                <CheckCircle2 className={cn("w-6 h-6", config.color)} />
-              </motion.div>
-            ) : status === 'failed' ? (
-              <XCircle className={cn("w-6 h-6", config.color)} />
-            ) : (
-              <Loader2 className={cn("w-5 h-5 animate-spin", config.color)} />
-            )}
-          </div>
-        </div>
-
-        {/* Text */}
-        <div className="flex-1 min-w-0">
-          <p className={cn("text-sm font-semibold", config.color)}>
-            {config.label}
-          </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {meetingTitle || config.sublabel}
-          </p>
-          {status === 'processing' && (
-            <p className="text-xs text-muted-foreground/70 mt-0.5">
-              {Math.round(progress)}% bearbetat
-            </p>
-          )}
-        </div>
-
-        {/* Retry button for failed */}
+        {status === 'done' ? (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 500, damping: 20 }}
+          >
+            <CheckCircle2 className={cn("w-3.5 h-3.5", config.color)} />
+          </motion.div>
+        ) : status === 'failed' ? (
+          <XCircle className={cn("w-3.5 h-3.5", config.color)} />
+        ) : (
+          <Loader2 className={cn("w-3.5 h-3.5 animate-spin", config.color)} />
+        )}
+        
+        <span className={config.color}>{config.label}</span>
+        
         {status === 'failed' && onRetry && (
           <button
             onClick={onRetry}
-            className="text-xs text-primary hover:underline font-medium px-2 py-1"
+            className="ml-1 text-primary hover:underline"
           >
             Försök igen
           </button>
