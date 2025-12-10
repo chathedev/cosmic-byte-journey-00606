@@ -97,9 +97,10 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
     }
   };
 
-  // ASR is available for Pro (via upload) and Enterprise plans, plus Admins
-  // Free, Plus, Unlimited use browser-based transcription
-  const hasASR = isAdmin || ['pro', 'enterprise'].includes(userPlan.plan);
+  // ASR for live recording: Enterprise only (and Admins)
+  // Pro gets ASR only via file upload, not live recording
+  // Free, Plus, Unlimited use browser-based transcription for live recording
+  const hasASR = isAdmin || userPlan.plan === 'enterprise';
 
   return (
     <div className={cn('inline-flex flex-col gap-0.5', className)}>

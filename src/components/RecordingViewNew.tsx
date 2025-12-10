@@ -26,10 +26,12 @@ interface RecordingViewNewProps {
 
 type ViewState = 'recording';
 
-// Check if user has ASR access (enterprise/plus/unlimited)
+// Check if user has ASR access for LIVE recording (Enterprise only)
+// Free, Plus, Unlimited, and Pro use browser-based transcription for live recording
+// Pro gets ASR only via file upload
 const hasAsrAccess = (plan: string | undefined): boolean => {
   if (!plan) return false;
-  return ['enterprise', 'plus', 'unlimited'].includes(plan.toLowerCase());
+  return plan.toLowerCase() === 'enterprise';
 };
 
 // Check if user has library access (pro and above)
