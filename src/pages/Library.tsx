@@ -28,6 +28,50 @@ import { TranscriptionStatusWidget } from "@/components/TranscriptionStatusWidge
 import { pollASRStatus } from "@/lib/asrService";
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { supabase } from "@/integrations/supabase/client";
+
+// Component to show "Transkribering klar" message that auto-hides after 10 seconds
+const TranscriptionCompleteMessage = ({ meetingId, status }: { meetingId: string; status?: string }) => {
+  const [show, setShow] = useState(true);
+  
+  useEffect(() => {
+    // Only show if status is 'done'
+    if (status !== 'done') {
+      setShow(false);
+      return;
+    }
+    
+    // Check if we've already shown and hidden this message (use sessionStorage per meeting)
+    const hiddenKey = `transcription-msg-hidden-${meetingId}`;
+    if (sessionStorage.getItem(hiddenKey)) {
+      setShow(false);
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      setShow(false);
+      sessionStorage.setItem(hiddenKey, 'true');
+    }, 10000);
+    
+    return () => clearTimeout(timer);
+  }, [meetingId, status]);
+  
+  if (!show || status !== 'done') return null;
+  
+  return (
+    <AnimatePresence>
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className="flex items-center gap-2 text-green-600 mb-2"
+      >
+        <CheckCircle2 className="w-4 h-4" />
+        <span className="text-xs font-medium">Transkribering klar</span>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const Library = () => {
   const { user } = useAuth();
   const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting } = useSubscription();
@@ -973,16 +1017,7 @@ const Library = () => {
                     </div>
                   ) : (
                     <div className="mb-4">
-                      {meeting.transcriptionStatus === 'done' && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center gap-2 text-green-600 mb-2"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span className="text-xs font-medium">Transkribering klar</span>
-                        </motion.div>
-                      )}
+                      <TranscriptionCompleteMessage meetingId={meeting.id} status={meeting.transcriptionStatus} />
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {meeting.transcript}
                       </p>
