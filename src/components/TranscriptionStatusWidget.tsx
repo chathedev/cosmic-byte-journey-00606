@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface TranscriptionStatusWidgetProps {
   meetingId: string;
@@ -21,68 +20,34 @@ export const TranscriptionStatusWidget = ({
   useEffect(() => {
     if (status === 'done' && !completedRef.current) {
       completedRef.current = true;
-      const timer = setTimeout(() => {
-        onComplete?.();
-      }, 800);
-      return () => clearTimeout(timer);
+      setTimeout(() => onComplete?.(), 500);
     }
   }, [status, onComplete]);
 
-  const getLabel = () => {
-    switch (status) {
-      case 'uploading':
-        return 'Laddar upp...';
-      case 'processing':
-        return 'Transkriberar...';
-      case 'done':
-        return 'Klar';
-      case 'failed':
-        return 'Misslyckades';
-      default:
-        return 'Väntar...';
-    }
-  };
+  if (status === 'done') {
+    return (
+      <span className="text-xs text-green-600 flex items-center gap-1">
+        <Check className="w-3 h-3" /> Klar
+      </span>
+    );
+  }
 
-  const isActive = status === 'uploading' || status === 'processing';
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={status}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="flex items-center gap-2 text-sm"
-      >
-        {status === 'done' ? (
-          <CheckCircle2 className="w-4 h-4 text-green-500" />
-        ) : status === 'failed' ? (
-          <XCircle className="w-4 h-4 text-destructive" />
-        ) : (
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-          </span>
-        )}
-        
-        <span className={cn(
-          "font-medium",
-          status === 'done' && "text-green-500",
-          status === 'failed' && "text-destructive",
-          isActive && "text-muted-foreground"
-        )}>
-          {getLabel()}
-        </span>
-        
-        {status === 'failed' && onRetry && (
-          <button
-            onClick={onRetry}
-            className="text-xs text-primary hover:underline ml-1"
-          >
+  if (status === 'failed') {
+    return (
+      <span className="text-xs text-destructive">
+        Misslyckades
+        {onRetry && (
+          <button onClick={onRetry} className="ml-1 underline">
             Försök igen
           </button>
         )}
-      </motion.div>
-    </AnimatePresence>
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-xs text-muted-foreground">
+      {status === 'uploading' ? 'Laddar upp...' : 'Transkriberar...'}
+    </span>
   );
 };
