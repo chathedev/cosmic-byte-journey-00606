@@ -668,34 +668,8 @@ const Library = () => {
   return (
     <div className="animate-fade-in">
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Mina möten</h1>
-          {isDemoAccount && (
-            <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
-              Demo-läge
-            </Badge>
-          )}
-        </div>
+        <h1 className="text-lg font-semibold">Mina möten</h1>
       </div>
-
-      {/* Demo Banner for test accounts */}
-      {isDemoAccount && (
-        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border-b border-amber-500/20 px-4 py-3">
-          <div className="max-w-4xl mx-auto flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-              <span className="text-amber-600 text-sm">🎯</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                Detta är ett testkonto
-              </p>
-              <p className="text-xs text-amber-600/80 dark:text-amber-400/70">
-                Du ser exempeldata för att utforska funktionerna. Skapa ett riktigt konto för att börja spela in.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Loading bar */}
       {isLoading && (
