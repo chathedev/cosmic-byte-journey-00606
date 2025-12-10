@@ -45,12 +45,10 @@ export const DigitalMeetingDialog = ({
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Check if user has upload access (Pro, Enterprise, Unlimited, or Admin)
+  // Check if user has upload access (Pro, Enterprise, or Admin)
   const hasUploadAccess = userPlan && (
     userPlan.plan === 'pro' || 
     userPlan.plan === 'enterprise' || 
-    userPlan.plan === 'unlimited' ||
-    userPlan.plan === 'plus' ||
     isAdmin
   );
 

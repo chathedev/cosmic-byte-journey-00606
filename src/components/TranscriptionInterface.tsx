@@ -108,7 +108,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   // Check if user has Pro or Enterprise plan (for upload access)
-  const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'plus' || userPlan.plan === 'unlimited' || userPlan.plan === 'enterprise');
+  const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'enterprise');
 
 
   const handleFileUpload = async (file: File) => {
