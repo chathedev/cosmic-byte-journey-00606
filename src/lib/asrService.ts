@@ -18,7 +18,7 @@ export interface ASRResult {
 }
 
 export interface ASRStatus {
-  status: 'queued' | 'processing' | 'completed' | 'error' | 'failed';
+  status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
   progress?: number;
   transcript?: string;
   error?: string;
@@ -255,6 +255,7 @@ export async function waitForASRCompletion(
         break;
         
       case 'completed':
+      case 'done':
         debugLog('✅ ASR completed!');
         return {
           success: true,

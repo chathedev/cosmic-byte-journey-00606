@@ -164,13 +164,23 @@ const Library = () => {
         // First try the ASR status endpoint for real-time progress
         const asrStatus = await pollASRStatus(currentPendingId);
         
-        if (asrStatus.status === 'completed' && asrStatus.transcript) {
+        if ((asrStatus.status === 'completed' || asrStatus.status === 'done') && asrStatus.transcript) {
           // ASR completed with transcript!
-          console.log('✅ Transcript found via ASR status');
+          console.log('✅ Transcript found via ASR status:', asrStatus.transcript.substring(0, 100));
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
+          
+          // Save transcript to backend via apiClient
+          try {
+            await apiClient.updateMeeting(currentPendingId, {
+              transcript: asrStatus.transcript,
+            });
+            console.log('✅ Transcript saved to backend');
+          } catch (saveError) {
+            console.error('Failed to save transcript:', saveError);
+          }
           
           setMeetings(prev => prev.map(m => 
             m.id === currentPendingId 
@@ -180,7 +190,7 @@ const Library = () => {
           
           toast({
             title: 'Transkribering klar!',
-            description: 'Ditt möte har transkriberats och är redo.',
+            description: 'Ditt möte har transkriberats och sparats.',
           });
           
           // Dispatch event for other listeners
