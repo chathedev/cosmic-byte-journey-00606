@@ -97,9 +97,9 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
     }
   };
 
-  // ASR is available for Pro, Plus, Unlimited, Enterprise, and Admins
-  // Free plan uses browser-based transcription only
-  const hasASR = isAdmin || ['pro', 'plus', 'unlimited', 'enterprise'].includes(userPlan.plan);
+  // ASR is available for Pro (via upload) and Enterprise plans, plus Admins
+  // Free, Plus, Unlimited use browser-based transcription
+  const hasASR = isAdmin || ['pro', 'enterprise'].includes(userPlan.plan);
 
   return (
     <div className={cn('inline-flex flex-col gap-0.5', className)}>
