@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2, Mail } from "lucide-react";
+import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
@@ -24,6 +24,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiClient } from "@/lib/api";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
 import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus, getDemoProtocol } from "@/utils/demoData";
+import { TranscriptionStatusWidget } from "@/components/TranscriptionStatusWidget";
+import { pollASRStatus } from "@/lib/asrService";
 
 const Library = () => {
   const { user } = useAuth();
@@ -136,14 +138,14 @@ const Library = () => {
   // Track if transcription was completed via direct event (to stop polling)
   const transcriptionDoneRef = useRef(false);
 
-  // Polling for transcription status - poll meeting data directly
+  // Enhanced polling for transcription status - uses both ASR endpoint and meeting data
   useEffect(() => {
     if (!user) return;
     
     const pendingId = pendingMeetingIdRef.current;
     if (!pendingId) return;
 
-    console.log('🔄 Starting transcription polling for:', pendingId);
+    console.log('🔄 Starting enhanced transcription polling for:', pendingId);
 
     const pollInterval = setInterval(async () => {
       // Stop if transcription was completed via direct event
@@ -159,12 +161,60 @@ const Library = () => {
       }
 
       try {
-        // Poll meeting data directly - no /asr/status endpoint needed
+        // First try the ASR status endpoint for real-time progress
+        const asrStatus = await pollASRStatus(currentPendingId);
+        
+        if (asrStatus.status === 'completed' && asrStatus.transcript) {
+          // ASR completed with transcript!
+          console.log('✅ Transcript found via ASR status');
+          transcriptionDoneRef.current = true;
+          pendingMeetingIdRef.current = null;
+          sessionStorage.removeItem('pendingMeeting');
+          clearInterval(pollInterval);
+          
+          setMeetings(prev => prev.map(m => 
+            m.id === currentPendingId 
+              ? { ...m, transcript: asrStatus.transcript!, transcriptionStatus: 'done' as const } 
+              : m
+          ));
+          
+          toast({
+            title: 'Transkribering klar!',
+            description: 'Ditt möte har transkriberats och är redo.',
+          });
+          
+          // Dispatch event for other listeners
+          window.dispatchEvent(new CustomEvent('transcriptionComplete', {
+            detail: { meetingId: currentPendingId, transcript: asrStatus.transcript }
+          }));
+          return;
+        }
+
+        if (asrStatus.status === 'error' || asrStatus.status === 'failed') {
+          // ASR failed
+          console.log('❌ Transcription failed via ASR status');
+          transcriptionDoneRef.current = true;
+          pendingMeetingIdRef.current = null;
+          clearInterval(pollInterval);
+          
+          setMeetings(prev => prev.map(m => 
+            m.id === currentPendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
+          ));
+          
+          toast({
+            title: 'Transkribering misslyckades',
+            description: asrStatus.error || 'Försök igen.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // Also check meeting data directly as backup
         const meeting = await meetingStorage.getMeeting(currentPendingId);
         
-        if (meeting && meeting.transcript && meeting.transcript.trim().length > 0) {
-          // Transcript is ready!
-          console.log('✅ Transcript found via polling');
+        if (meeting && meeting.transcript && meeting.transcript.trim().length > 50) {
+          // Transcript is ready from meeting data!
+          console.log('✅ Transcript found via meeting data');
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
@@ -177,34 +227,23 @@ const Library = () => {
           ));
           
           toast({
-            title: 'Transkribering klar',
-            description: 'Ditt möte har transkriberats.',
+            title: 'Transkribering klar!',
+            description: 'Ditt möte har transkriberats och är redo.',
           });
-        } else if (meeting?.transcriptionStatus === 'failed') {
-          // Transcription failed
-          transcriptionDoneRef.current = true;
-          pendingMeetingIdRef.current = null;
-          clearInterval(pollInterval);
           
-          setMeetings(prev => prev.map(m => 
-            m.id === currentPendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
-          ));
-          
-          toast({
-            title: 'Transkribering misslyckades',
-            description: 'Försök igen.',
-            variant: 'destructive',
-          });
+          window.dispatchEvent(new CustomEvent('transcriptionComplete', {
+            detail: { meetingId: currentPendingId, transcript: meeting.transcript }
+          }));
         }
         // Otherwise keep polling silently
       } catch { 
         // Silent - keep polling
         console.log('🔄 Polling... (waiting for transcript)');
       }
-    }, 5000); // Poll every 5 seconds
+    }, 4000); // Poll every 4 seconds for faster updates
 
     return () => clearInterval(pollInterval);
-  }, [user]);
+  }, [user, toast]);
 
   // Listen for direct ASR completion event - immediate update
   useEffect(() => {
@@ -855,25 +894,48 @@ const Library = () => {
                 <CardContent>
                   {/* Content based on status */}
                   {isFailed ? (
-                    <div className="flex items-center gap-2 mb-4 text-destructive">
-                      <span>✕</span>
-                      <span className="text-sm">Transkribering misslyckades</span>
+                    <div className="mb-4">
+                      <TranscriptionStatusWidget
+                        meetingId={meeting.id}
+                        status="failed"
+                        meetingTitle={meeting.title}
+                        onRetry={() => {
+                          toast({
+                            title: 'Försöker igen...',
+                            description: 'Du behöver ladda upp filen igen från inspelningssidan.',
+                          });
+                          navigate('/');
+                        }}
+                      />
                     </div>
                   ) : isProcessing && !hasTranscript ? (
-                    <div className="mb-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                        <span className="text-sm font-medium text-primary">Analyserar ljudfil...</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-                        <Mail className="w-4 h-4 text-primary" />
-                        <span>Du får ett mejl när det är klart</span>
-                      </div>
+                    <div className="mb-4">
+                      <TranscriptionStatusWidget
+                        meetingId={meeting.id}
+                        status={meeting.transcriptionStatus === 'uploading' ? 'uploading' : 'processing'}
+                        meetingTitle={meeting.title}
+                        onComplete={() => {
+                          // Reload meeting data when complete
+                          loadData();
+                        }}
+                      />
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                      {meeting.transcript}
-                    </p>
+                    <div className="mb-4">
+                      {meeting.transcriptionStatus === 'done' && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-2 text-green-600 mb-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="text-xs font-medium">Transkribering klar</span>
+                        </motion.div>
+                      )}
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {meeting.transcript}
+                      </p>
+                    </div>
                   )}
                   
                   {/* Protocol Status Badge */}
