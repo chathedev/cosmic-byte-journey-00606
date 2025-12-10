@@ -132,7 +132,11 @@ class ApiClient {
 
     // Only clear token and redirect for actual authentication failures
     // Don't clear token on network errors or other issues
-    if (response.status === 401 && !suppressAuthRedirect && !(token && token.startsWith('test_unlimited_user_'))) {
+    // Don't redirect for demo or test tokens
+    const isDemoToken = token && token.startsWith('demo-token-');
+    const isTestToken = token && token.startsWith('test_unlimited_user_');
+    
+    if (response.status === 401 && !suppressAuthRedirect && !isDemoToken && !isTestToken) {
       // Only clear token if we got a proper 401 response from the server
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
@@ -433,8 +437,36 @@ class ApiClient {
   }
 
   async getMe(): Promise<User> {
-    // Handle test user - return immediately without backend call
+    // Handle demo user - return immediately without backend call
     const token = this.getToken();
+    if (token?.startsWith('demo-token-')) {
+      const storedDemoUser = localStorage.getItem('demoUser');
+      if (storedDemoUser) {
+        try {
+          return JSON.parse(storedDemoUser);
+        } catch {
+          // Fall through to create default demo user
+        }
+      }
+      const demoUser: User = {
+        id: 'demo-user-id',
+        uid: 'demo-user-id',
+        email: 'demo@tivly.se',
+        displayName: 'Demo User',
+        emailVerified: true,
+        plan: {
+          plan: 'enterprise',
+          type: 'enterprise',
+          meetingsUsed: 5,
+          meetingsLimit: null,
+          protocolsUsed: 12,
+          protocolsLimit: null,
+        }
+      };
+      return demoUser;
+    }
+    
+    // Handle test user - return immediately without backend call
     if (token?.startsWith('test_unlimited_user_')) {
       const testUser: User = {
         id: 'test-user-id',

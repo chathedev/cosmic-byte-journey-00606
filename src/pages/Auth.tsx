@@ -152,6 +152,51 @@ export default function Auth() {
       return;
     }
 
+    // DEMO ACCOUNT: Instant login without backend
+    if (sanitized === 'demo@tivly.se') {
+      console.log('[Auth] 🎯 Demo account detected - instant login');
+      setLoading(true);
+      
+      // Create a fake demo token and user
+      const demoToken = 'demo-token-' + Date.now();
+      const demoUser = {
+        id: 'demo-user-id',
+        uid: 'demo-user-id',
+        email: 'demo@tivly.se',
+        displayName: 'Demo User',
+        emailVerified: true,
+        plan: {
+          plan: 'enterprise',
+          type: 'enterprise',
+          meetingsUsed: 5,
+          meetingsLimit: null,
+          protocolsUsed: 12,
+          protocolsLimit: null,
+        },
+        enterprise: {
+          active: true,
+          companyName: 'Demo Enterprise AB',
+        }
+      };
+      
+      // Store demo token
+      localStorage.setItem('authToken', demoToken);
+      localStorage.setItem('demoUser', JSON.stringify(demoUser));
+      
+      // Brief delay for UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setIsNavigating(true);
+      await refreshUser();
+      
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 300);
+      
+      setLoading(false);
+      return;
+    }
+
     console.log(`[Auth] 📧 Email validated for ${platform.toUpperCase()} platform, requesting verification code...`);
     setLoading(true);
 
