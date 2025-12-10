@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiClient } from "@/lib/api";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
+import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus } from "@/utils/demoData";
 
 const Library = () => {
   const { user } = useAuth();
@@ -55,6 +56,9 @@ const Library = () => {
   const { toast } = useToast();
   const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
   const pendingMeetingIdRef = useRef<string | null>(null);
+  
+  // Check if this is a demo/test account
+  const isDemoAccount = isTestAccount(user?.email);
   
   // Lock library only for free users without admin-granted unlimited access
   const isLibraryLocked = checkLibraryLocked(user, userPlan);
@@ -277,6 +281,19 @@ const Library = () => {
     }
     
     try {
+      // For demo/test accounts, use demo data
+      if (isDemoAccount) {
+        const demoMeetings = generateDemoMeetings(user.uid);
+        const demoFolders = generateDemoFolders();
+        const demoProtocols = generateDemoProtocolStatus();
+        
+        setMeetings(demoMeetings);
+        setFolders(demoFolders);
+        setProtocolStatus(demoProtocols);
+        setIsLoading(false);
+        return;
+      }
+      
       const userMeetings = await meetingStorage.getMeetings(user.uid);
       // De-duplicate by meeting ID (keep latest version)
       const map = new Map<string, MeetingSession>();
@@ -345,6 +362,15 @@ const Library = () => {
     // Use canCreateMeeting from context instead of canGenerateProtocol
   };
   const handleDeleteMeeting = async (id: string) => {
+    // Demo accounts can't delete
+    if (isDemoAccount) {
+      toast({
+        title: 'Demo-läge',
+        description: 'I demo-läge kan du inte ta bort möten. Skapa ett riktigt konto för full funktionalitet.',
+      });
+      return;
+    }
+    
     if (userPlan?.plan === 'free') {
       toast({
         title: 'Kan inte ta bort',
@@ -386,6 +412,17 @@ const Library = () => {
   };
 
   const handleAddFolder = async () => {
+    // Demo accounts can't add folders
+    if (isDemoAccount) {
+      toast({
+        title: 'Demo-läge',
+        description: 'I demo-läge kan du inte skapa mappar. Skapa ett riktigt konto för full funktionalitet.',
+      });
+      setNewFolderName("");
+      setIsAddingFolder(false);
+      return;
+    }
+    
     if (!newFolderName.trim() || !user) return;
     
     const trimmedName = newFolderName.trim();
@@ -631,8 +668,34 @@ const Library = () => {
   return (
     <div className="animate-fade-in">
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-4 shadow-sm">
-        <h1 className="text-lg font-semibold">Mina möten</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold">Mina möten</h1>
+          {isDemoAccount && (
+            <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+              Demo-läge
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* Demo Banner for test accounts */}
+      {isDemoAccount && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border-b border-amber-500/20 px-4 py-3">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-amber-600 text-sm">🎯</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                Detta är ett testkonto
+              </p>
+              <p className="text-xs text-amber-600/80 dark:text-amber-400/70">
+                Du ser exempeldata för att utforska funktionerna. Skapa ett riktigt konto för att börja spela in.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading bar */}
       {isLoading && (
@@ -642,8 +705,8 @@ const Library = () => {
       )}
 
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-        {/* Chat Upgrade Banner - Show only for users without Plus access */}
-        {!hasPlusAccess(user, userPlan) && (
+        {/* Chat Upgrade Banner - Show only for users without Plus access (but not for demo accounts) */}
+        {!isDemoAccount && !hasPlusAccess(user, userPlan) && (
           <ChatUpgradeBanner onUpgrade={() => setShowSubscribeDialog(true)} />
         )}
 
