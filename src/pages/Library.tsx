@@ -26,7 +26,8 @@ import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
 import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus, getDemoProtocol } from "@/utils/demoData";
 import { TranscriptionStatusWidget } from "@/components/TranscriptionStatusWidget";
 import { pollASRStatus } from "@/lib/asrService";
-
+import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
+import { supabase } from "@/integrations/supabase/client";
 const Library = () => {
   const { user } = useAuth();
   const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting } = useSubscription();
@@ -172,6 +173,10 @@ const Library = () => {
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
           
+          // Get meeting title for email
+          const currentMeeting = meetingsRef.current.find(m => m.id === currentPendingId);
+          const meetingTitle = currentMeeting?.title || 'Möte';
+          
           // Save transcript to backend via apiClient
           try {
             await apiClient.updateMeeting(currentPendingId, {
@@ -180,6 +185,26 @@ const Library = () => {
             console.log('✅ Transcript saved to backend');
           } catch (saveError) {
             console.error('Failed to save transcript:', saveError);
+          }
+          
+          // Send email notification
+          if (user?.email) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session?.access_token) {
+              sendTranscriptionCompleteEmail({
+                userEmail: user.email,
+                userName: user.displayName || undefined,
+                meetingTitle,
+                meetingId: currentPendingId,
+                authToken: sessionData.session.access_token,
+              }).then(sent => {
+                if (sent) {
+                  console.log('📧 Transcription email sent');
+                } else {
+                  console.log('📧 Email not sent');
+                }
+              }).catch(err => console.error('📧 Email error:', err));
+            }
           }
           
           setMeetings(prev => prev.map(m => 
@@ -229,6 +254,22 @@ const Library = () => {
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
+          
+          // Send email notification
+          if (user?.email) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session?.access_token) {
+              sendTranscriptionCompleteEmail({
+                userEmail: user.email,
+                userName: user.displayName || undefined,
+                meetingTitle: meeting.title || 'Möte',
+                meetingId: currentPendingId,
+                authToken: sessionData.session.access_token,
+              }).then(sent => {
+                if (sent) console.log('📧 Transcription email sent');
+              }).catch(err => console.error('📧 Email error:', err));
+            }
+          }
           
           setMeetings(prev => prev.map(m => 
             m.id === currentPendingId 
