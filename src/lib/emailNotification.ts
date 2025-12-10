@@ -27,6 +27,7 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
     console.log('📧 Sending transcription complete email to:', data.userEmail);
     
     const libraryUrl = `${WEB_APP_URL}/library`;
+    const greeting = data.userName ? `Hej ${data.userName}!` : 'Hej!';
     
     const response = await fetch(EMAIL_ENDPOINT, {
       method: 'POST',
@@ -36,19 +37,41 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
       },
       body: JSON.stringify({
         recipients: [data.userEmail],
-        subject: `Transkribering klar`,
+        subject: `Din inspelning är klar – ${data.meetingTitle}`,
         html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px;">
-            <p style="color: #111; font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
-              ${data.meetingTitle} är nu transkriberat.
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 24px; background: #fff;">
+            
+            <p style="color: #111; font-size: 16px; line-height: 1.7; margin: 0 0 20px;">
+              ${greeting}
             </p>
-            <a href="${libraryUrl}" 
-               style="display: inline-block; background: #111; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
-              Öppna biblioteket →
-            </a>
+            
+            <p style="color: #333; font-size: 15px; line-height: 1.7; margin: 0 0 20px;">
+              Goda nyheter! Din inspelning <strong>"${data.meetingTitle}"</strong> har nu transkriberats och finns redo i ditt bibliotek.
+            </p>
+            
+            <p style="color: #333; font-size: 15px; line-height: 1.7; margin: 0 0 28px;">
+              Du kan nu läsa transkriptet, generera ett professionellt protokoll eller chatta med AI:n om mötet.
+            </p>
+            
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${libraryUrl}" 
+                 style="display: inline-block; background: #111; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 500;">
+                Öppna biblioteket →
+              </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 32px 0 0; padding-top: 24px; border-top: 1px solid #eee;">
+              Har du frågor eller feedback? Svara gärna på detta mejl – vi läser allt och hjälper dig gärna!
+            </p>
+            
+            <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 24px 0 0;">
+              Med vänliga hälsningar,<br/>
+              <strong style="color: #555;">Teamet bakom Tivly</strong>
+            </p>
+            
           </div>
         `,
-        text: `${data.meetingTitle} är nu transkriberat.\n\nÖppna biblioteket: ${libraryUrl}`,
+        text: `${greeting}\n\nGoda nyheter! Din inspelning "${data.meetingTitle}" har nu transkriberats och finns redo i ditt bibliotek.\n\nDu kan nu läsa transkriptet, generera ett professionellt protokoll eller chatta med AI:n om mötet.\n\nÖppna biblioteket: ${libraryUrl}\n\nHar du frågor eller feedback? Svara gärna på detta mejl – vi läser allt och hjälper dig gärna!\n\nMed vänliga hälsningar,\nTeamet bakom Tivly`,
         category: 'transcription-complete',
         metadata: { meetingId: data.meetingId },
       }),
