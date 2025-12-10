@@ -232,23 +232,28 @@ const Library = () => {
           }
           
           // Send email notification
+          console.log('📧 Attempting to send transcription email:', { userEmail: user?.email, hasUser: !!user });
           if (user?.email) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData?.session?.access_token) {
-              sendTranscriptionCompleteEmail({
-                userEmail: user.email,
-                userName: user.displayName || undefined,
-                meetingTitle,
-                meetingId: currentPendingId,
-                authToken: sessionData.session.access_token,
-              }).then(sent => {
-                if (sent) {
-                  console.log('📧 Transcription email sent');
-                } else {
-                  console.log('📧 Email not sent');
-                }
-              }).catch(err => console.error('📧 Email error:', err));
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              console.log('📧 Session data:', { hasSession: !!sessionData?.session, hasToken: !!sessionData?.session?.access_token });
+              if (sessionData?.session?.access_token) {
+                const emailSent = await sendTranscriptionCompleteEmail({
+                  userEmail: user.email,
+                  userName: user.displayName || undefined,
+                  meetingTitle,
+                  meetingId: currentPendingId,
+                  authToken: sessionData.session.access_token,
+                });
+                console.log('📧 Transcription email result:', emailSent ? 'sent' : 'failed');
+              } else {
+                console.log('📧 No access token available for email');
+              }
+            } catch (emailErr) {
+              console.error('📧 Email error:', emailErr);
             }
+          } else {
+            console.log('📧 No user email available');
           }
           
           setMeetings(prev => prev.map(m => 
@@ -300,18 +305,22 @@ const Library = () => {
           clearInterval(pollInterval);
           
           // Send email notification
+          console.log('📧 Attempting to send transcription email (backup):', { userEmail: user?.email });
           if (user?.email) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData?.session?.access_token) {
-              sendTranscriptionCompleteEmail({
-                userEmail: user.email,
-                userName: user.displayName || undefined,
-                meetingTitle: meeting.title || 'Möte',
-                meetingId: currentPendingId,
-                authToken: sessionData.session.access_token,
-              }).then(sent => {
-                if (sent) console.log('📧 Transcription email sent');
-              }).catch(err => console.error('📧 Email error:', err));
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (sessionData?.session?.access_token) {
+                const emailSent = await sendTranscriptionCompleteEmail({
+                  userEmail: user.email,
+                  userName: user.displayName || undefined,
+                  meetingTitle: meeting.title || 'Möte',
+                  meetingId: currentPendingId,
+                  authToken: sessionData.session.access_token,
+                });
+                console.log('📧 Transcription email result (backup):', emailSent ? 'sent' : 'failed');
+              }
+            } catch (emailErr) {
+              console.error('📧 Email error (backup):', emailErr);
             }
           }
           
