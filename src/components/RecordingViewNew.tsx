@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle, Mic } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -12,8 +12,8 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { AudioVisualizationBars } from "./AudioVisualizationBars";
-import { transcribeAndSave } from "@/lib/asrService";
+import { VoiceReactiveRing } from "./VoiceReactiveRing";
+import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -455,31 +455,9 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
       
       navigate('/library', { state: { fromRecording: true, pendingMeetingId: testMeetingId } });
       
-      transcribeAndSave(audioBlob, testMeetingId, {
-        language: 'sv',
-        meetingTitle: 'Testmöte',
-        userEmail: user?.email,
-        userName: user?.displayName,
-        authToken: apiClient.getAuthToken() || undefined,
-        onProgress: (stage, percent) => {
-          console.log(`🎤 Test ASR: ${stage} ${percent}%`);
-        },
-        onTranscriptReady: (transcript) => {
-          let cleanTranscript = transcript;
-          try {
-            const parsed = JSON.parse(transcript);
-            if (parsed.text) cleanTranscript = parsed.text;
-          } catch { /* not JSON */ }
-          
-          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-            detail: { meetingId: testMeetingId, transcript: cleanTranscript } 
-          }));
-        }
-      }).then(result => {
-        if (!result.success) {
-          console.error('❌ Test ASR failed:', result.error);
-        }
-      });
+      // Use background uploader for ASR (same as file upload)
+      const audioFile = new File([audioBlob], `test-meeting-${testMeetingId}.webm`, { type: audioBlob.type });
+      startBackgroundUpload(audioFile, testMeetingId, 'sv');
       
     } catch (error: any) {
       console.error('❌ Test mode error:', error?.message || error);
@@ -655,33 +633,11 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         // Redirect to library (not specific meeting URL)
         navigate('/library', { state: { fromRecording: true, pendingMeetingId: meetingId } });
 
-        // Only use ASR for enterprise/plus/unlimited plans
+        // For Enterprise: use background uploader (same as file upload flow)
         if (useAsrMode) {
-          transcribeAndSave(blob, meetingId, {
-            language: 'sv',
-            meetingTitle: meetingName,
-            userEmail: user.email,
-            userName: user.displayName,
-            authToken: apiClient.getAuthToken() || undefined,
-            onProgress: (stage, percent) => {
-              console.log(`🎤 ASR: ${stage} ${percent}%`);
-            },
-            onTranscriptReady: (transcript) => {
-              let cleanTranscript = transcript;
-              try {
-                const parsed = JSON.parse(transcript);
-                if (parsed.text) cleanTranscript = parsed.text;
-              } catch { /* not JSON */ }
-              
-              window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-                detail: { meetingId, transcript: cleanTranscript } 
-              }));
-            }
-          }).then(result => {
-            if (!result.success) {
-              console.error('❌ Client ASR failed:', result.error);
-            }
-          });
+          console.log('🎤 Enterprise: Starting background upload for ASR...');
+          const audioFile = new File([blob], `meeting-${meetingId}.webm`, { type: blob.type });
+          startBackgroundUpload(audioFile, meetingId, 'sv');
         } else {
           // For browser mode (Pro), dispatch completion event immediately
           window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
@@ -800,8 +756,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-full max-w-lg space-y-6">
             {/* Recording Status */}
-            <div className="bg-card rounded-xl p-6 md:p-8 border shadow-sm relative">
-              <div className="flex flex-col items-center text-center space-y-4">
+            <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-8 md:p-12 border border-border/50 shadow-xl relative">
+              <div className="flex flex-col items-center text-center space-y-6">
                 {/* Test button for allowed user */}
                 {hasTestAccess && !isTestMode && (
                   <button
@@ -812,33 +768,25 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                     Test
                   </button>
                 )}
-                <div className="relative">
-                  {!isPaused && (
-                    <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20" />
-                  )}
-                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all ${
-                    !isPaused ? 'bg-red-500 shadow-lg shadow-red-500/30' : 'bg-muted'
-                  }`}>
-                    <Mic className={`w-8 h-8 md:w-10 md:h-10 ${!isPaused ? 'text-white' : 'text-muted-foreground'}`} />
-                  </div>
-                </div>
-
-                {/* Audio Visualization (for ASR mode) or Status */}
-                {useAsrMode ? (
-                  <AudioVisualizationBars stream={streamRef.current} isActive={isRecording && !isPaused} />
-                ) : null}
+                
+                {/* Voice Reactive Ring */}
+                <VoiceReactiveRing 
+                  size={180} 
+                  stream={streamRef.current} 
+                  isActive={isRecording && !isPaused} 
+                />
 
                 {/* Status Text */}
-                <div className="space-y-1">
-                  <h2 className="text-base md:text-lg font-semibold">
-                    {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Inspelning pågår'}
+                <div className="space-y-2">
+                  <h2 className="text-lg md:text-xl font-semibold">
+                    {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Lyssnar...'}
                   </h2>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground max-w-xs">
                     {isPaused 
                       ? 'Tryck "Återuppta" för att fortsätta'
                       : useAsrMode 
-                        ? 'Ljudet spelas in för transkribering.'
-                        : 'Tala tydligt – texten visas direkt.'}
+                        ? 'Ljudet spelas in för transkribering i bakgrunden.'
+                        : 'Tala tydligt – texten visas i realtid.'}
                   </p>
                 </div>
               </div>
