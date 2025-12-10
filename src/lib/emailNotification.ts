@@ -26,7 +26,6 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
   try {
     console.log('📧 Sending transcription complete email to:', data.userEmail);
     
-    // Use simple /library URL - no meeting ID in URL
     const libraryUrl = `${WEB_APP_URL}/library`;
     
     const response = await fetch(EMAIL_ENDPOINT, {
@@ -37,27 +36,19 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
       },
       body: JSON.stringify({
         recipients: [data.userEmail],
-        subject: `✅ Din transkribering är klar: ${data.meetingTitle}`,
+        subject: `Transkribering klar`,
         html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1a1a1a; margin-bottom: 16px;">Hej${data.userName ? ` ${data.userName}` : ''}!</h2>
-            <p style="color: #333; font-size: 16px; line-height: 1.6;">
-              Din transkribering för mötet <strong>"${data.meetingTitle}"</strong> är nu klar.
-            </p>
-            <p style="color: #333; font-size: 16px; line-height: 1.6;">
-              Du kan nu visa ditt möte och generera protokoll i Tivly.
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px;">
+            <p style="color: #111; font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+              ${data.meetingTitle} är nu transkriberat.
             </p>
             <a href="${libraryUrl}" 
-               style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 500; margin: 16px 0;">
-              Öppna biblioteket
+               style="display: inline-block; background: #111; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
+              Öppna biblioteket →
             </a>
-            <p style="color: #666; font-size: 14px; margin-top: 24px;">
-              Med vänliga hälsningar,<br/>
-              <strong>Tivly</strong>
-            </p>
           </div>
         `,
-        text: `Hej${data.userName ? ` ${data.userName}` : ''}!\n\nDin transkribering för mötet "${data.meetingTitle}" är nu klar.\n\nDu kan nu visa ditt möte och generera protokoll i Tivly.\n\nÖppna biblioteket: ${libraryUrl}\n\nMed vänliga hälsningar,\nTivly`,
+        text: `${data.meetingTitle} är nu transkriberat.\n\nÖppna biblioteket: ${libraryUrl}`,
         category: 'transcription-complete',
         metadata: { meetingId: data.meetingId },
       }),

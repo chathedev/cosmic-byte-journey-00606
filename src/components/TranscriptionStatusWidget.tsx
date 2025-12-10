@@ -1,6 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface TranscriptionStatusWidgetProps {
   meetingId: string;
@@ -16,13 +15,18 @@ export const TranscriptionStatusWidget = ({
   onRetry,
 }: TranscriptionStatusWidgetProps) => {
   const completedRef = useRef(false);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     if (status === 'done' && !completedRef.current) {
       completedRef.current = true;
       setTimeout(() => onComplete?.(), 500);
+      // Hide after 10 seconds
+      setTimeout(() => setHidden(true), 10000);
     }
   }, [status, onComplete]);
+
+  if (hidden) return null;
 
   if (status === 'done') {
     return (
