@@ -18,6 +18,7 @@ interface ProtocolViewerDialogProps {
     blob: string;
     storedAt: string;
     size: number;
+    htmlContent?: string; // Pre-rendered HTML for demo protocols
   } | null;
 }
 
@@ -34,6 +35,13 @@ export const ProtocolViewerDialog = ({
   // Load preview when dialog opens
   useEffect(() => {
     const loadProtocolPreview = async () => {
+      // If protocol has pre-rendered HTML (demo protocols), use it directly
+      if (protocol?.htmlContent) {
+        setHtmlContent(protocol.htmlContent);
+        setLoading(false);
+        return;
+      }
+
       if (!protocol?.blob) return;
 
       setLoading(true);
