@@ -61,10 +61,9 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
 
   const used = userPlan.meetingsUsed;
   const limit = userPlan.meetingsLimit;
-  // Enterprise and Unlimited plans have unlimited access, but Pro (standard) has 10 meetings limit
+  // Enterprise has unlimited access, Pro has meeting limits
   const isUnlimited = isAdmin || 
     limit === null || 
-    userPlan.plan === 'unlimited' || 
     userPlan.plan === 'enterprise';
   const progress = isUnlimited ? 0 : Math.min((used / limit) * 100, 100);
 
@@ -86,10 +85,6 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
         return 'Gratis';
       case 'pro':
         return 'Pro';
-      case 'plus':
-        return 'Plus';
-      case 'unlimited':
-        return 'Unlimited';
       case 'enterprise':
         return 'Enterprise';
       default:
@@ -98,8 +93,7 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
   };
 
   // ASR for live recording: Enterprise only (and Admins)
-  // Pro gets ASR only via file upload, not live recording
-  // Free, Plus, Unlimited use browser-based transcription for live recording
+  // Pro gets ASR only via file upload, Free uses browser transcription
   const hasASR = isAdmin || userPlan.plan === 'enterprise';
 
   return (
