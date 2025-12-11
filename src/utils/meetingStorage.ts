@@ -23,6 +23,7 @@ export interface MeetingSession {
   title: string;
   transcript: string;
   transcriptSegments?: TranscriptSegment[]; // Speaker diarization data from ASR
+  speakerNames?: Record<string, string>; // Custom speaker names mapping (e.g., {"A": "Johan", "B": "Anna"})
   protocol?: string;
   folder: string; // For backward-compat we expose folder name; backend may use folderId internally
   createdAt: string;
@@ -59,6 +60,7 @@ const mapMeeting = (m: any, userIdHint?: string): MeetingSession => ({
   agendaId: m.agendaId || m.agendaid || undefined,
   source: m.source || undefined,
   transcriptSegments: m.transcriptSegments || undefined, // Speaker diarization data
+  speakerNames: m.speakerNames || undefined, // Custom speaker names
   // CRITICAL: Override status to 'done' if real transcript exists (not placeholder text)
   transcriptionStatus: (m.transcript && m.transcript.trim().length > 0 && !m.transcript.includes('Transkribering pågår')) ? 'done' : (m.transcriptionStatus || 'processing'),
 });
