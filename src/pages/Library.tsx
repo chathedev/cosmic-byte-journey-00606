@@ -75,7 +75,7 @@ const TranscriptionCompleteMessage = ({ meetingId, status }: { meetingId: string
 
 const Library = () => {
   const { user } = useAuth();
-  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting } = useSubscription();
+  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership } = useSubscription();
   const [meetings, setMeetings] = useState<MeetingSession[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("Alla");
@@ -1398,6 +1398,7 @@ const Library = () => {
         meetingTitle={viewingTranscript?.meeting.title}
         meetingId={viewingTranscript?.meeting.id}
         initialSpeakerNames={viewingTranscript?.meeting.speakerNames}
+        speakerIdentificationEnabled={enterpriseMembership?.company?.speakerIdentificationEnabled ?? false}
         onSpeakerNamesChange={(names) => {
           if (viewingTranscript?.meeting) {
             // Update local state with new speaker names

@@ -35,6 +35,7 @@ interface TranscriptViewerDialogProps {
   meetingId?: string;
   initialSpeakerNames?: Record<string, string>;
   onSpeakerNamesChange?: (names: Record<string, string>) => void;
+  speakerIdentificationEnabled?: boolean; // Controls whether to show individual speaker segments
 }
 
 // Generate consistent colors for speakers
@@ -87,6 +88,7 @@ export function TranscriptViewerDialog({
   meetingId,
   initialSpeakerNames,
   onSpeakerNamesChange,
+  speakerIdentificationEnabled = false,
 }: TranscriptViewerDialogProps) {
   const { toast } = useToast();
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>(initialSpeakerNames || {});
@@ -218,7 +220,7 @@ export function TranscriptViewerDialog({
                 {meetingTitle || "Transkript"}
               </DialogTitle>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                {uniqueSpeakers.length > 0 && (
+                {speakerIdentificationEnabled && uniqueSpeakers.length > 0 && (
                   <div className="flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5" />
                     <span>{uniqueSpeakers.length} talare</span>
@@ -233,7 +235,7 @@ export function TranscriptViewerDialog({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {hasChanges && meetingId && (
+              {speakerIdentificationEnabled && hasChanges && meetingId && (
                 <Button
                   variant="default"
                   size="sm"
@@ -258,7 +260,7 @@ export function TranscriptViewerDialog({
           </div>
           
           {/* Speaker legend with editable names */}
-          {uniqueSpeakers.length > 0 && (
+          {speakerIdentificationEnabled && uniqueSpeakers.length > 0 && (
             <div className="mt-4 space-y-2">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                 Klicka för att redigera talarnamn
@@ -329,7 +331,7 @@ export function TranscriptViewerDialog({
         {/* Content */}
         <ScrollArea className="flex-1 max-h-[60vh]">
           <div className="p-6 space-y-4">
-            {segments && segments.length > 0 ? (
+            {speakerIdentificationEnabled && segments && segments.length > 0 ? (
               // Show diarized transcript with speaker segments
               segments.map((segment, index) => (
                 <motion.div
