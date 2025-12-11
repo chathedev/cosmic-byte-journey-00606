@@ -269,19 +269,19 @@ export default function AdminEnterprise() {
       });
       
       toast({
-        title: 'Success',
-        description: 'Member added successfully',
+        title: 'Medlem tillagd',
+        description: `${preferredName || email} har lagts till i företaget`,
       });
       
       setShowAddMember(false);
       const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
       setSelectedCompany(updated.company);
       loadCompanies();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add member:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to add member',
+        title: 'Kunde inte lägga till medlem',
+        description: error?.message || 'Ett oväntat fel uppstod',
         variant: 'destructive',
       });
     } finally {
@@ -309,8 +309,8 @@ export default function AdminEnterprise() {
       });
       
       toast({
-        title: 'Success',
-        description: 'Member updated successfully',
+        title: 'Medlem uppdaterad',
+        description: `${preferredName || editingMember.email} har uppdaterats`,
       });
       
       setShowEditMember(false);
@@ -318,11 +318,11 @@ export default function AdminEnterprise() {
       const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
       setSelectedCompany(updated.company);
       loadCompanies();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update member:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update member',
+        title: 'Kunde inte uppdatera medlem',
+        description: error?.message || 'Ett oväntat fel uppstod',
         variant: 'destructive',
       });
     } finally {

@@ -1049,7 +1049,10 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to add company member');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Failed to add company member');
+    }
     return response.json();
   }
 
@@ -1067,7 +1070,10 @@ class ApiClient {
         body: JSON.stringify(data),
       }
     );
-    if (!response.ok) throw new Error('Failed to update company member');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Failed to update company member');
+    }
     return response.json();
   }
 
