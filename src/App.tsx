@@ -45,6 +45,7 @@ import AdminBackend from "./pages/AdminBackend";
 import AdminEmailCampaigns from "./pages/AdminEmailCampaigns";
 import AdminEnterprise from "./pages/AdminEnterprise";
 import AdminEnterpriseBilling from "./pages/AdminEnterpriseBilling";
+import SISRequired from "./pages/SISRequired";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -373,6 +374,48 @@ const EnterpriseTrialCheck = () => {
   );
 };
 
+// SIS Required Gate - blocks enterprise users who haven't submitted voice sample when SIS is enabled
+const EnterpriseSISGate = ({ children }: { children: React.ReactNode }) => {
+  const { enterpriseMembership, isAdmin } = useSubscription();
+  const { user } = useAuth();
+  const location = useLocation();
+  
+  // Skip check on auth routes
+  if (location.pathname === '/auth' || location.pathname === '/magic-login' || location.pathname === '/sis-required') {
+    return <>{children}</>;
+  }
+  
+  // Skip for non-authenticated users
+  if (!user) {
+    return <>{children}</>;
+  }
+  
+  // Skip for admins
+  if (isAdmin) {
+    return <>{children}</>;
+  }
+  
+  // Check if user is enterprise member with SIS enabled
+  if (!enterpriseMembership?.isMember || !enterpriseMembership.company) {
+    return <>{children}</>;
+  }
+  
+  // Check if SIS is enabled for the company
+  const sisEnabled = enterpriseMembership.company.speakerIdentificationEnabled;
+  if (!sisEnabled) {
+    return <>{children}</>;
+  }
+  
+  // Check if user has a valid SIS sample
+  const hasSample = enterpriseMembership.sisSample?.status === 'ready';
+  if (hasSample) {
+    return <>{children}</>;
+  }
+  
+  // User needs to submit SIS sample - redirect to SIS required page
+  console.log('[EnterpriseSISGate] 🎤 SIS required but no sample - blocking access');
+  return <Navigate to="/sis-required" replace />;
+};
 
 // Shared app content for all routes
 const AppContent = () => {
@@ -385,38 +428,41 @@ const AppContent = () => {
       <MaintenanceOverlay />
       <EnterpriseTrialCheck />
       <WelcomeGate>
-        <AppLayout>
-          <Suspense
-            fallback={
-              <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
-              </div>
-            }
-          >
-            <Routes>
-              <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
-              <Route path="/magic-login" element={<MagicLogin />} />
-              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/free-trial" element={<FreeTrial />} />
-              <Route path="/generate-protocol" element={<GenerateProtocol />} />
-              <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
-              <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
-              <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-              <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-              <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
-              <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
-              <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-              <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
-              <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
-              <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
-              <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
-              <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
-              <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
-              <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </AppLayout>
+        <EnterpriseSISGate>
+          <AppLayout>
+            <Suspense
+              fallback={
+                <div className="min-h-screen bg-background flex items-center justify-center">
+                  <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                <Route path="/magic-login" element={<MagicLogin />} />
+                <Route path="/sis-required" element={<ProtectedRoute><SISRequired /></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/free-trial" element={<FreeTrial />} />
+                <Route path="/generate-protocol" element={<GenerateProtocol />} />
+                <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
+                <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
+                <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+                <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
+                <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
+                <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
+                <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
+                <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
+                <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
+                <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AppLayout>
+        </EnterpriseSISGate>
       </WelcomeGate>
     </PlanGate>
   );

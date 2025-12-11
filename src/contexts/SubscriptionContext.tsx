@@ -17,6 +17,7 @@ export interface EnterpriseMembership {
     slug: string;
     status: string;
     planTier: string;
+    speakerIdentificationEnabled?: boolean;
     trial?: {
       enabled: boolean;
       startsAt: string;
@@ -35,6 +36,11 @@ export interface EnterpriseMembership {
     status: string;
     title?: string;
     joinedAt?: string;
+  };
+  sisSample?: {
+    status: 'ready' | 'processing' | 'error' | null;
+    uploadedAt?: string;
+    lastMatchScore?: number;
   };
 }
 
@@ -58,6 +64,7 @@ interface SubscriptionContextType {
   enterpriseMembership: EnterpriseMembership | null;
   isAdmin: boolean;
   refreshPlan: () => Promise<void>;
+  refreshEnterpriseMembership: () => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
   canGenerateProtocol: (meetingId: string, protocolCount: number) => Promise<{ allowed: boolean; reason?: string }>;
   incrementMeetingCount: (meetingId: string) => Promise<void>;
@@ -308,7 +315,29 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       console.log('[SubscriptionContext] 🏢 Enterprise API response:', membership);
       
       if (membership?.isMember) {
-        setEnterpriseMembership(membership);
+        // Also fetch SIS sample status if the company has SIS enabled
+        let sisSample = undefined;
+        const sisEnabled = (membership as any)?.company?.speakerIdentificationEnabled || 
+                          (membership as any)?.company?.preferences?.speakerIdentificationEnabled;
+        
+        if (sisEnabled) {
+          try {
+            const sisStatus = await apiClient.getSISSampleStatus();
+            console.log('[SubscriptionContext] 🎤 SIS sample status:', sisStatus);
+            sisSample = sisStatus?.sisSample || undefined;
+          } catch (sisError) {
+            console.log('[SubscriptionContext] 🎤 SIS sample check failed:', sisError);
+          }
+        }
+        
+        setEnterpriseMembership({
+          ...membership,
+          company: {
+            ...membership.company,
+            speakerIdentificationEnabled: sisEnabled,
+          },
+          sisSample,
+        });
         return;
       }
       
@@ -316,6 +345,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       const u: any = user;
       if (u?.enterprise?.companyName || u?.company?.name) {
         console.log('[SubscriptionContext] 🏢 Using fallback enterprise data from user object');
+        const sisEnabled = u?.enterprise?.speakerIdentificationEnabled || 
+                          u?.company?.speakerIdentificationEnabled || 
+                          u?.company?.preferences?.speakerIdentificationEnabled;
+        
+        let sisSample = undefined;
+        if (sisEnabled) {
+          try {
+            const sisStatus = await apiClient.getSISSampleStatus();
+            sisSample = sisStatus?.sisSample || undefined;
+          } catch {}
+        }
+        
         setEnterpriseMembership({
           isMember: true,
           company: {
@@ -324,6 +365,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             slug: u.enterprise?.companySlug || u.company?.slug || '',
             status: 'active',
             planTier: 'enterprise',
+            speakerIdentificationEnabled: sisEnabled,
           },
           membership: {
             role: u.enterprise?.role || u.companyRole || 'member',
@@ -331,6 +373,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             title: u.enterprise?.title || u.jobTitle,
             joinedAt: u.enterprise?.joinedAt || u.createdAt,
           },
+          sisSample,
         });
         return;
       }
@@ -350,6 +393,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             slug: u.enterprise?.companySlug || u.company?.slug || '',
             status: 'active',
             planTier: 'enterprise',
+            speakerIdentificationEnabled: u?.enterprise?.speakerIdentificationEnabled || u?.company?.speakerIdentificationEnabled,
           },
           membership: {
             role: u.enterprise?.role || u.companyRole || 'member',
@@ -522,7 +566,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );
