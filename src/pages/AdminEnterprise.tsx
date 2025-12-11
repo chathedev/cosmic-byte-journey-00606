@@ -943,25 +943,34 @@ export default function AdminEnterprise() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Title</TableHead>
+                      <TableHead>Medlem</TableHead>
+                      <TableHead>Roll</TableHead>
+                      <TableHead>Titel</TableHead>
                       <TableHead>Status</TableHead>
                       {selectedCompany.preferences?.speakerIdentificationEnabled && (
                         <TableHead>SIS</TableHead>
                       )}
-                      <TableHead>Added</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Tillagd</TableHead>
+                      <TableHead className="text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {selectedCompany.members.map((member) => (
                       <TableRow key={member.email}>
-                        <TableCell className="font-medium">{member.email}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            {member.preferredName && (
+                              <span className="font-medium">{member.preferredName}</span>
+                            )}
+                            <span className={member.preferredName ? "text-sm text-muted-foreground" : "font-medium"}>
+                              {member.email}
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">{member.role}</Badge>
                         </TableCell>
-                        <TableCell>{member.title || 'N/A'}</TableCell>
+                        <TableCell>{member.title || '-'}</TableCell>
                         <TableCell>
                           <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
                             {member.status}
@@ -1208,14 +1217,15 @@ export default function AdminEnterprise() {
                 <Input id="member-email" name="email" type="email" required placeholder="namn@foretag.se" />
               </div>
               <div>
-                <Label htmlFor="member-preferredName">Visningsnamn (för SIS)</Label>
+                <Label htmlFor="member-preferredName">Visningsnamn *</Label>
                 <Input 
                   id="member-preferredName" 
                   name="preferredName" 
                   placeholder="Johan Andersson"
+                  required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Namnet som visas vid talaridentifiering i mötesprotokoll
+                  Används i profil, hälsningar och talaridentifiering (SIS)
                 </p>
               </div>
               <div>
@@ -1264,7 +1274,7 @@ export default function AdminEnterprise() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label htmlFor="edit-member-preferredName">Visningsnamn (för SIS)</Label>
+                <Label htmlFor="edit-member-preferredName">Visningsnamn</Label>
                 <Input 
                   id="edit-member-preferredName" 
                   name="preferredName" 
@@ -1272,7 +1282,7 @@ export default function AdminEnterprise() {
                   placeholder="Johan Andersson"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Namnet som visas vid talaridentifiering i mötesprotokoll
+                  Används i profil, hälsningar och talaridentifiering (SIS)
                 </p>
               </div>
               <div>
