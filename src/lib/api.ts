@@ -1043,6 +1043,7 @@ class ApiClient {
     status?: string;
     title?: string;
     notes?: string;
+    preferredName?: string;
   }): Promise<any> {
     const response = await this.fetchWithAuth(`/admin/enterprise/companies/${companyId}/members`, {
       method: 'POST',
@@ -1057,6 +1058,7 @@ class ApiClient {
     status?: string;
     title?: string;
     notes?: string;
+    preferredName?: string;
   }): Promise<any> {
     const response = await this.fetchWithAuth(
       `/admin/enterprise/companies/${companyId}/members/${encodeURIComponent(memberEmail)}`,

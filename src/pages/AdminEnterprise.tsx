@@ -24,6 +24,7 @@ interface CompanyMember {
   status: string;
   notes?: string;
   title?: string;
+  preferredName?: string;
   addedAt: string;
   joinedAt?: string;
   updatedAt: string;
@@ -254,6 +255,7 @@ export default function AdminEnterprise() {
     const role = formData.get('role') as string;
     const title = formData.get('title') as string;
     const notes = formData.get('notes') as string;
+    const preferredName = formData.get('preferredName') as string;
 
     try {
       setIsSubmitting(true);
@@ -262,6 +264,7 @@ export default function AdminEnterprise() {
         role,
         title: title || undefined,
         notes: notes || undefined,
+        preferredName: preferredName || undefined,
         status: 'active',
       });
       
@@ -293,6 +296,7 @@ export default function AdminEnterprise() {
     const title = formData.get('title') as string;
     const notes = formData.get('notes') as string;
     const status = formData.get('status') as string;
+    const preferredName = formData.get('preferredName') as string;
 
     try {
       setIsSubmitting(true);
@@ -300,6 +304,7 @@ export default function AdminEnterprise() {
         role,
         title: title || undefined,
         notes: notes || undefined,
+        preferredName: preferredName || undefined,
         status,
       });
       
@@ -1194,44 +1199,55 @@ export default function AdminEnterprise() {
         <DialogContent>
           <form onSubmit={(e) => { e.preventDefault(); handleAddMember(new FormData(e.currentTarget)); }}>
             <DialogHeader>
-              <DialogTitle>Add Member</DialogTitle>
-              <DialogDescription>Add a new member to {selectedCompany?.name}</DialogDescription>
+              <DialogTitle>Lägg till medlem</DialogTitle>
+              <DialogDescription>Lägg till en ny medlem till {selectedCompany?.name}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label htmlFor="member-email">Email *</Label>
-                <Input id="member-email" name="email" type="email" required />
+                <Label htmlFor="member-email">E-post *</Label>
+                <Input id="member-email" name="email" type="email" required placeholder="namn@foretag.se" />
               </div>
               <div>
-                <Label htmlFor="member-role">Role *</Label>
+                <Label htmlFor="member-preferredName">Visningsnamn (för SIS)</Label>
+                <Input 
+                  id="member-preferredName" 
+                  name="preferredName" 
+                  placeholder="Johan Andersson"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Namnet som visas vid talaridentifiering i mötesprotokoll
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="member-role">Roll *</Label>
                 <Select name="role" defaultValue="member">
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="owner">Ägare</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="member">Medlem</SelectItem>
+                    <SelectItem value="viewer">Visare</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="member-title">Title</Label>
-                <Input id="member-title" name="title" placeholder="CEO, Manager, etc." />
+                <Label htmlFor="member-title">Titel</Label>
+                <Input id="member-title" name="title" placeholder="VD, Chef, etc." />
               </div>
               <div>
-                <Label htmlFor="member-notes">Notes</Label>
-                <Textarea id="member-notes" name="notes" />
+                <Label htmlFor="member-notes">Anteckningar</Label>
+                <Textarea id="member-notes" name="notes" placeholder="Interna anteckningar om medlemmen..." />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowAddMember(false)}>
-                Cancel
+                Avbryt
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Add Member
+                Lägg till
               </Button>
             </DialogFooter>
           </form>
@@ -1243,27 +1259,39 @@ export default function AdminEnterprise() {
         <DialogContent>
           <form onSubmit={(e) => { e.preventDefault(); handleUpdateMember(new FormData(e.currentTarget)); }}>
             <DialogHeader>
-              <DialogTitle>Edit Member</DialogTitle>
-              <DialogDescription>Update member information for {editingMember?.email}</DialogDescription>
+              <DialogTitle>Redigera medlem</DialogTitle>
+              <DialogDescription>Uppdatera information för {editingMember?.email}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label htmlFor="edit-member-role">Role *</Label>
+                <Label htmlFor="edit-member-preferredName">Visningsnamn (för SIS)</Label>
+                <Input 
+                  id="edit-member-preferredName" 
+                  name="preferredName" 
+                  defaultValue={editingMember?.preferredName}
+                  placeholder="Johan Andersson"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Namnet som visas vid talaridentifiering i mötesprotokoll
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="edit-member-role">Roll *</Label>
                 <Select name="role" defaultValue={editingMember?.role}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="owner">Ägare</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="member">Medlem</SelectItem>
+                    <SelectItem value="viewer">Visare</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="edit-member-title">Title</Label>
-                <Input id="edit-member-title" name="title" defaultValue={editingMember?.title} />
+                <Label htmlFor="edit-member-title">Titel</Label>
+                <Input id="edit-member-title" name="title" defaultValue={editingMember?.title} placeholder="VD, Chef, etc." />
               </div>
               <div>
                 <Label htmlFor="edit-member-status">Status</Label>
@@ -1272,23 +1300,23 @@ export default function AdminEnterprise() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="active">Aktiv</SelectItem>
+                    <SelectItem value="inactive">Inaktiv</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="edit-member-notes">Notes</Label>
-                <Textarea id="edit-member-notes" name="notes" defaultValue={editingMember?.notes} />
+                <Label htmlFor="edit-member-notes">Anteckningar</Label>
+                <Textarea id="edit-member-notes" name="notes" defaultValue={editingMember?.notes} placeholder="Interna anteckningar..." />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowEditMember(false)}>
-                Cancel
+                Avbryt
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Update Member
+                Uppdatera
               </Button>
             </DialogFooter>
           </form>
