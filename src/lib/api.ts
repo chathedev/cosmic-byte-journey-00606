@@ -986,6 +986,7 @@ class ApiClient {
       storageRegion?: 'eu' | 'us' | 'auto';
       dataRetentionDays?: number;
       allowAdminFolderLock?: boolean;
+      speakerIdentificationEnabled?: boolean;
     };
     members?: Array<{
       email: string;
@@ -1025,6 +1026,7 @@ class ApiClient {
       storageRegion?: 'eu' | 'us' | 'auto';
       dataRetentionDays?: number;
       allowAdminFolderLock?: boolean;
+      speakerIdentificationEnabled?: boolean;
     };
   }): Promise<any> {
     const response = await this.fetchWithAuth(`/admin/enterprise/companies/${companyId}`, {
@@ -1921,6 +1923,69 @@ class ApiClient {
       const error = await response.json().catch(() => ({ error: 'Failed to toggle maintenance' }));
       throw new Error((error as any).error || 'Failed to toggle maintenance');
     }
+    return response.json();
+  }
+
+  // SIS (Speaker Identification System) API methods
+  async getSISSampleStatus(): Promise<{
+    ok: boolean;
+    sisSample: {
+      status: 'ready' | 'processing' | 'error' | null;
+      uploadedAt?: string;
+      lastTranscribedAt?: string;
+      lastMatchScore?: number;
+      matches?: Array<{
+        meetingId: string;
+        score: number;
+        matchedWords: number;
+        totalSampleWords: number;
+        updatedAt: string;
+      }>;
+      error?: string | null;
+    } | null;
+  }> {
+    const response = await this.fetchWithAuth('/sis/sample');
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { ok: true, sisSample: null };
+      }
+      throw new Error('Failed to get SIS sample status');
+    }
+    return response.json();
+  }
+
+  async uploadSISSample(audioBlob: Blob): Promise<{
+    ok: boolean;
+    sisSample?: {
+      status: 'ready' | 'processing' | 'error';
+      uploadedAt?: string;
+      lastMatchScore?: number;
+      error?: string | null;
+    };
+    error?: string;
+  }> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'voice-sample.webm');
+
+    const response = await fetch(`${API_BASE_URL}/sis/sample`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to upload voice sample' }));
+      return { ok: false, error: error.error || 'Failed to upload voice sample' };
+    }
+
     return response.json();
   }
 }
