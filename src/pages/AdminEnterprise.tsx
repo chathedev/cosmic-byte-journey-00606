@@ -745,41 +745,73 @@ export default function AdminEnterprise() {
                   </div>
                 </div>
                 
-                {selectedCompany.preferences && (
-                  <div className="border-t pt-4">
-                    <Label className="text-sm font-semibold mb-2 block">Preferences</Label>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Meeting Creator Visibility</Label>
-                        <p className="text-sm">
-                          <Badge variant="outline">
-                            {selectedCompany.preferences.meetingCreatorVisibility || 'shared_only'}
-                          </Badge>
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Storage Region</Label>
-                        <p className="text-sm">
-                          <Badge variant="outline">
-                            {selectedCompany.preferences.storageRegion || 'auto'}
-                          </Badge>
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Data Retention Days</Label>
-                        <p className="text-sm">{selectedCompany.preferences.dataRetentionDays || 'Default'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Admin Folder Lock</Label>
-                        <p className="text-sm">
-                          <Badge variant={selectedCompany.preferences.allowAdminFolderLock ? 'default' : 'secondary'}>
-                            {selectedCompany.preferences.allowAdminFolderLock ? 'Allowed' : 'Not Allowed'}
-                          </Badge>
-                        </p>
-                      </div>
+                {/* Speaker Identification Section */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Talaridentifiering (SIS)</Label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={selectedCompany.preferences?.speakerIdentificationEnabled ? 'default' : 'secondary'}>
+                        {selectedCompany.preferences?.speakerIdentificationEnabled ? 'Aktiverad' : 'Inaktiverad'}
+                      </Badge>
+                      <Switch
+                        checked={selectedCompany.preferences?.speakerIdentificationEnabled ?? false}
+                        onCheckedChange={async (checked) => {
+                          try {
+                            setIsSubmitting(true);
+                            await apiClient.updateEnterpriseCompany(selectedCompany.id, {
+                              preferences: {
+                                ...selectedCompany.preferences,
+                                speakerIdentificationEnabled: checked,
+                              },
+                            });
+                            const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
+                            setSelectedCompany(updated.company);
+                            toast({
+                              title: checked ? 'SIS aktiverad' : 'SIS inaktiverad',
+                              description: checked 
+                                ? 'Talaridentifiering är nu aktiverad för detta företag' 
+                                : 'Talaridentifiering är nu inaktiverad',
+                            });
+                          } catch (error) {
+                            console.error('Failed to toggle SIS:', error);
+                            toast({
+                              title: 'Fel',
+                              description: 'Kunde inte ändra SIS-inställning',
+                              variant: 'destructive',
+                            });
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                      />
                     </div>
                   </div>
-                )}
+                  {selectedCompany.preferences?.speakerIdentificationEnabled && (
+                    <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Medlemmar kan spela in röstprov för att identifieras automatiskt i möten.
+                      </p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <span className="text-muted-foreground">
+                            {selectedCompany.members.filter(m => m.sisSample?.status === 'ready').length} verifierade
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            {selectedCompany.members.filter(m => !m.sisSample || m.sisSample?.status !== 'ready').length} ej verifierade
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Trial Section */}
                 <div className="border-t pt-4">
@@ -910,6 +942,9 @@ export default function AdminEnterprise() {
                       <TableHead>Role</TableHead>
                       <TableHead>Title</TableHead>
                       <TableHead>Status</TableHead>
+                      {selectedCompany.preferences?.speakerIdentificationEnabled && (
+                        <TableHead>SIS</TableHead>
+                      )}
                       <TableHead>Added</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -927,6 +962,26 @@ export default function AdminEnterprise() {
                             {member.status}
                           </Badge>
                         </TableCell>
+                        {selectedCompany.preferences?.speakerIdentificationEnabled && (
+                          <TableCell>
+                            {member.sisSample?.status === 'ready' ? (
+                              <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Verifierad
+                              </Badge>
+                            ) : member.sisSample?.status === 'processing' ? (
+                              <Badge variant="secondary">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Bearbetas
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-muted-foreground">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Ej verifierad
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell>{new Date(member.addedAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button
