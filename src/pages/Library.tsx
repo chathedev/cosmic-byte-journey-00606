@@ -1396,6 +1396,18 @@ const Library = () => {
         transcript={viewingTranscript?.meeting.transcript || ""}
         segments={viewingTranscript?.segments}
         meetingTitle={viewingTranscript?.meeting.title}
+        meetingId={viewingTranscript?.meeting.id}
+        initialSpeakerNames={viewingTranscript?.meeting.speakerNames}
+        onSpeakerNamesChange={(names) => {
+          if (viewingTranscript?.meeting) {
+            // Update local state with new speaker names
+            setMeetings(prev => prev.map(m => 
+              m.id === viewingTranscript.meeting.id 
+                ? { ...m, speakerNames: names }
+                : m
+            ));
+          }
+        }}
       />
     </div>
   );

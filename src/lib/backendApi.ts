@@ -312,6 +312,23 @@ export const backendApi = {
     return response.json();
   },
 
+  // Speaker Names Management
+  async saveSpeakerNames(meetingId: string, speakerNames: Record<string, string>): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ speakerNames }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to save speaker names' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
   // Admin Auth Management
   async resetUserAuth(email: string): Promise<{ ok: boolean; user: any }> {
     const response = await fetch(`${BACKEND_URL}/admin/users/auth/reset`, {

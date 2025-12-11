@@ -2,9 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, User, Clock, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Copy, User, Clock, Edit3, Save, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
+import { backendApi } from "@/lib/backendApi";
 
 export interface TranscriptWord {
   text: string;
@@ -29,6 +32,9 @@ interface TranscriptViewerDialogProps {
   transcript: string;
   segments?: TranscriptSegment[];
   meetingTitle?: string;
+  meetingId?: string;
+  initialSpeakerNames?: Record<string, string>;
+  onSpeakerNamesChange?: (names: Record<string, string>) => void;
 }
 
 // Generate consistent colors for speakers
@@ -78,17 +84,36 @@ export function TranscriptViewerDialog({
   transcript,
   segments,
   meetingTitle,
+  meetingId,
+  initialSpeakerNames,
+  onSpeakerNamesChange,
 }: TranscriptViewerDialogProps) {
   const { toast } = useToast();
-  
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>(initialSpeakerNames || {});
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Sync with initial speaker names when dialog opens
+  useEffect(() => {
+    if (open && initialSpeakerNames) {
+      setSpeakerNames(initialSpeakerNames);
+      setHasChanges(false);
+    }
+  }, [open, initialSpeakerNames]);
+
   const handleCopy = async () => {
     try {
       let textToCopy = transcript;
       
-      // If we have segments, format with speaker labels
+      // If we have segments, format with speaker labels (using custom names if available)
       if (segments && segments.length > 0) {
         textToCopy = segments
-          .map(s => `[Talare ${s.speaker}] ${s.text}`)
+          .map(s => {
+            const name = speakerNames[s.speaker] || `Talare ${s.speaker}`;
+            return `[${name}] ${s.text}`;
+          })
           .join('\n\n');
       }
       
@@ -106,6 +131,70 @@ export function TranscriptViewerDialog({
         duration: 2000,
       });
     }
+  };
+
+  const handleStartEdit = (speaker: string) => {
+    setEditingSpeaker(speaker);
+    setEditValue(speakerNames[speaker] || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSpeaker(null);
+    setEditValue("");
+  };
+
+  const handleSaveEdit = (speaker: string) => {
+    const trimmedValue = editValue.trim();
+    if (trimmedValue) {
+      setSpeakerNames(prev => ({ ...prev, [speaker]: trimmedValue }));
+      setHasChanges(true);
+    } else {
+      // If empty, remove the custom name
+      setSpeakerNames(prev => {
+        const updated = { ...prev };
+        delete updated[speaker];
+        return updated;
+      });
+      setHasChanges(true);
+    }
+    setEditingSpeaker(null);
+    setEditValue("");
+  };
+
+  const handleSaveToBackend = async () => {
+    if (!meetingId) {
+      toast({
+        title: "Kunde inte spara",
+        description: "Mötes-ID saknas.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await backendApi.saveSpeakerNames(meetingId, speakerNames);
+      setHasChanges(false);
+      onSpeakerNamesChange?.(speakerNames);
+      toast({
+        title: "Sparat!",
+        description: "Talarnamn har sparats.",
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error('Failed to save speaker names:', error);
+      toast({
+        title: "Kunde inte spara",
+        description: "Försök igen senare.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getSpeakerDisplayName = (speaker: string): string => {
+    return speakerNames[speaker] || `Talare ${speaker}`;
   };
 
   // Get unique speakers
@@ -144,6 +233,18 @@ export function TranscriptViewerDialog({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {hasChanges && meetingId && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSaveToBackend}
+                  disabled={isSaving}
+                  className="gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {isSaving ? "Sparar..." : "Spara namn"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -156,19 +257,71 @@ export function TranscriptViewerDialog({
             </div>
           </div>
           
-          {/* Speaker legend */}
-          {uniqueSpeakers.length > 1 && (
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {uniqueSpeakers.map(speaker => (
-                <Badge
-                  key={speaker}
-                  variant="outline"
-                  className={`${getSpeakerColor(speaker)} gap-1.5 py-1`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${getSpeakerBgColor(speaker)}`} />
-                  Talare {speaker}
-                </Badge>
-              ))}
+          {/* Speaker legend with editable names */}
+          {uniqueSpeakers.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                Klicka för att redigera talarnamn
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {uniqueSpeakers.map(speaker => (
+                  <AnimatePresence key={speaker} mode="wait">
+                    {editingSpeaker === speaker ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="flex items-center gap-1"
+                      >
+                        <div className={`w-3 h-3 rounded-full ${getSpeakerBgColor(speaker)} shrink-0`} />
+                        <Input
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveEdit(speaker);
+                            if (e.key === 'Escape') handleCancelEdit();
+                          }}
+                          placeholder={`Talare ${speaker}`}
+                          className="h-7 w-32 text-sm"
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleSaveEdit(speaker)}
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={handleCancelEdit}
+                        >
+                          <X className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                      >
+                        <Badge
+                          variant="outline"
+                          className={`${getSpeakerColor(speaker)} gap-1.5 py-1.5 px-3 cursor-pointer hover:opacity-80 transition-opacity group`}
+                          onClick={() => handleStartEdit(speaker)}
+                        >
+                          <div className={`w-2.5 h-2.5 rounded-full ${getSpeakerBgColor(speaker)}`} />
+                          <span className="font-medium">{getSpeakerDisplayName(speaker)}</span>
+                          <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-70 transition-opacity ml-1" />
+                        </Badge>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                ))}
+              </div>
             </div>
           )}
         </DialogHeader>
@@ -186,26 +339,28 @@ export function TranscriptViewerDialog({
                   transition={{ delay: index * 0.02, duration: 0.2 }}
                   className="group"
                 >
-                  <div className={`rounded-lg border p-4 ${getSpeakerColor(segment.speaker)} transition-all hover:shadow-sm`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-6 h-6 rounded-full ${getSpeakerBgColor(segment.speaker)} flex items-center justify-center`}>
-                        <span className="text-xs font-semibold text-white">
-                          {segment.speaker}
+                  <div className={`rounded-xl border p-4 ${getSpeakerColor(segment.speaker)} transition-all hover:shadow-md`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className={`w-8 h-8 rounded-full ${getSpeakerBgColor(segment.speaker)} flex items-center justify-center shadow-sm`}>
+                        <span className="text-xs font-bold text-white">
+                          {speakerNames[segment.speaker]?.charAt(0)?.toUpperCase() || segment.speaker}
                         </span>
                       </div>
-                      <span className="text-sm font-medium">
-                        Talare {segment.speaker}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {formatTime(segment.start)}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold">
+                          {getSpeakerDisplayName(segment.speaker)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatTime(segment.start)} - {formatTime(segment.end)}
+                        </span>
+                      </div>
                       {segment.confidence && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          {Math.round(segment.confidence * 100)}%
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-auto">
+                          {Math.round(segment.confidence * 100)}% säkerhet
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm leading-relaxed pl-8">
+                    <p className="text-sm leading-relaxed pl-10">
                       {segment.text}
                     </p>
                   </div>
