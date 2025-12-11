@@ -4,9 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Mic, MicOff, Check, AlertCircle, Loader2, Play, RotateCcw, Upload, Volume2, Building2, User } from 'lucide-react';
+import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Volume2, Building2, Shield, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -19,8 +17,6 @@ export default function SISRequired() {
   const navigate = useNavigate();
   const { enterpriseMembership, refreshEnterpriseMembership, isAdmin, isLoading } = useSubscription();
   
-  const [userName, setUserName] = useState('');
-  const [nameConfirmed, setNameConfirmed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -38,9 +34,9 @@ export default function SISRequired() {
   // Get company name for the sample sentences
   const companyName = enterpriseMembership?.company?.name || 'företaget';
   
-  // Generate sample sentences with user's name and company
-  const getSampleSentences = () => [
-    `God morgon, mitt namn är ${userName || '[ditt namn]'} och jag arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen.`,
+  // Sample sentences for recording (name is set by admin, not user input)
+  const sampleSentences = [
+    `God morgon, jag arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen.`,
     "Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt.",
     "Sammanfattningsvis tycker jag att vi har gjort stora framsteg. Låt oss boka in ett uppföljningsmöte nästa vecka för att gå igenom resultaten."
   ];
@@ -230,132 +226,105 @@ export default function SISRequired() {
 
   if (uploadComplete) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-green-500/50 bg-green-500/5">
-          <CardContent className="pt-6 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
-              <Check className="h-8 w-8 text-green-500" />
+      <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-green-500/30 bg-gradient-to-br from-green-500/10 to-green-500/5 shadow-xl shadow-green-500/10">
+          <CardContent className="pt-8 pb-8 text-center space-y-5">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mx-auto shadow-lg shadow-green-500/30">
+              <Check className="h-10 w-10 text-white" />
             </div>
-            <h2 className="text-xl font-semibold">Röstprov uppladdat!</h2>
-            <p className="text-muted-foreground">Omdirigerar dig till appen...</p>
-            <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">Röstprov uppladdat!</h2>
+              <p className="text-muted-foreground">Du är redo att använda Tivly med röstidentifiering.</p>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Omdirigerar dig...</span>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const sampleSentences = getSampleSentences();
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5 flex items-center justify-center p-4">
+      <div className="max-w-lg w-full space-y-6">
+        {/* Organization Badge */}
+        <div className="flex justify-center">
+          <Badge variant="secondary" className="gap-2 px-4 py-2 text-sm bg-primary/10 border-primary/20 hover:bg-primary/15 transition-colors">
+            <Building2 className="h-4 w-4" />
+            {enterpriseMembership?.company?.name || 'Enterprise'}
+          </Badge>
+        </div>
 
-  // Step 1: Ask for user's name
-  if (!nameConfirmed) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full space-y-6">
-          {/* Header */}
-          <div className="text-center space-y-2">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Building2 className="h-6 w-6 text-primary" />
-              <span className="font-semibold text-lg">{enterpriseMembership?.company?.name || 'Enterprise'}</span>
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl scale-150 opacity-50" />
+            <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center mx-auto shadow-xl shadow-primary/25">
+              <Shield className="h-10 w-10 text-primary-foreground" />
             </div>
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <User className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold">Välkommen!</h1>
-            <p className="text-muted-foreground">
-              Innan vi börjar, ange ditt namn så vi kan skapa ditt personliga röstprov.
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              Röstidentifiering aktiverad
+            </h1>
+            <p className="text-muted-foreground text-lg max-w-sm mx-auto">
+              Din organisation har aktiverat röstidentifiering för säkrare mötesprotokoll.
             </p>
           </div>
+        </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Ditt namn</CardTitle>
-              <CardDescription>
-                Detta kommer att användas i det röstprov du spelar in.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="userName">Förnamn och efternamn</Label>
-                <Input
-                  id="userName"
-                  placeholder="T.ex. Anna Andersson"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && userName.trim()) {
-                      setNameConfirmed(true);
-                    }
-                  }}
-                />
+        {/* Info Banner */}
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <Sparkles className="h-5 w-5 text-primary" />
+          </div>
+          <div className="text-sm">
+            <p className="font-medium text-foreground">Varför behövs detta?</p>
+            <p className="text-muted-foreground">
+              Ditt röstprov används för att identifiera dig i möten och skapa mer personliga protokoll.
+            </p>
+          </div>
+        </div>
+
+        <Card className="border-border/50 shadow-xl shadow-black/5 overflow-hidden">
+          <CardHeader className="bg-gradient-to-b from-muted/50 to-transparent pb-4">
+            <CardTitle className="text-xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mic className="h-5 w-5 text-primary" />
               </div>
-              <Button 
-                className="w-full" 
-                onClick={() => setNameConfirmed(true)}
-                disabled={!userName.trim()}
-              >
-                Fortsätt
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="max-w-lg w-full space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Building2 className="h-6 w-6 text-primary" />
-            <span className="font-semibold text-lg">{enterpriseMembership?.company?.name || 'Enterprise'}</span>
-          </div>
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-            <Volume2 className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold">Röstprov krävs</h1>
-          <p className="text-muted-foreground">
-            Hej {userName}! Spela in ett röstprov för att kunna använda Tivly.
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Mic className="h-5 w-5" />
               Spela in ditt röstprov
             </CardTitle>
-            <CardDescription>
-              Läs meningarna nedan högt och tydligt. Inspelningen används för att identifiera dig i möten.
+            <CardDescription className="text-base">
+              Läs meningarna nedan högt och tydligt i normal samtalston.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 pt-2">
             {/* Instructions */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               {sampleSentences.map((sentence, index) => (
                 <div 
                   key={index}
-                  className={`p-3 rounded-lg border text-sm transition-colors ${
+                  className={`p-4 rounded-xl border-2 text-sm transition-all duration-300 ${
                     index === currentSentence 
-                      ? 'border-primary bg-primary/5' 
+                      ? 'border-primary bg-primary/5 shadow-md shadow-primary/10' 
                       : index < currentSentence 
                         ? 'border-green-500/50 bg-green-500/5' 
-                        : 'border-border bg-muted/30'
+                        : 'border-border/50 bg-muted/20'
                   }`}
                 >
-                  <div className="flex items-start gap-2">
-                    <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                  <div className="flex items-start gap-3">
+                    <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
                       index === currentSentence 
-                        ? 'bg-primary text-primary-foreground' 
+                        ? 'bg-primary text-primary-foreground shadow-md' 
                         : index < currentSentence
                           ? 'bg-green-500 text-white'
                           : 'bg-muted text-muted-foreground'
                     }`}>
-                      {index < currentSentence ? <Check className="h-3 w-3" /> : index + 1}
+                      {index < currentSentence ? <Check className="h-4 w-4" /> : index + 1}
                     </span>
-                    <p className="leading-relaxed">{sentence}</p>
+                    <p className="leading-relaxed pt-0.5">{sentence}</p>
                   </div>
                 </div>
               ))}
@@ -367,38 +336,44 @@ export default function SISRequired() {
                 size="sm" 
                 onClick={() => setCurrentSentence(prev => Math.min(prev + 1, sampleSentences.length - 1))}
                 disabled={currentSentence >= sampleSentences.length - 1}
+                className="w-full"
               >
-                Nästa mening
+                Nästa mening →
               </Button>
             )}
 
             {/* Recording controls */}
             <div className="space-y-4">
               {(isRecording || audioBlob) && (
-                <div className="space-y-2">
+                <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/50">
                   <div className="flex items-center justify-between text-sm">
-                    <span className={isRecording ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}>
-                      {isRecording ? '⏺ Spelar in...' : 'Inspelning klar'}
+                    <span className={isRecording ? 'text-red-500 font-medium flex items-center gap-2' : 'text-muted-foreground'}>
+                      {isRecording && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                      {isRecording ? 'Spelar in...' : '✓ Inspelning klar'}
                     </span>
-                    <span className="font-mono">{formatTime(recordingTime)}</span>
+                    <span className="font-mono text-lg font-semibold">{formatTime(recordingTime)}</span>
                   </div>
                   <Progress 
                     value={(recordingTime / MAX_RECORDING_TIME) * 100} 
                     className="h-2"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Minst {MIN_RECORDING_TIME} sekunder krävs. Max {MAX_RECORDING_TIME} sekunder.
+                  <p className="text-xs text-muted-foreground text-center">
+                    Minst {MIN_RECORDING_TIME} sekunder krävs • Max {MAX_RECORDING_TIME} sekunder
                   </p>
                 </div>
               )}
 
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-3 flex-wrap">
                 {!audioBlob ? (
                   <Button
                     size="lg"
                     variant={isRecording ? 'destructive' : 'default'}
                     onClick={isRecording ? stopRecording : startRecording}
-                    className="gap-2"
+                    className={`gap-2 px-8 h-14 text-base shadow-lg transition-all ${
+                      isRecording 
+                        ? 'shadow-red-500/25' 
+                        : 'shadow-primary/25 hover:shadow-primary/40'
+                    }`}
                   >
                     {isRecording ? (
                       <>
@@ -417,7 +392,7 @@ export default function SISRequired() {
                     <Button
                       variant="outline"
                       onClick={isPlaying ? stopPlaying : playRecording}
-                      className="gap-2"
+                      className="gap-2 h-12"
                     >
                       <Play className="h-4 w-4" />
                       {isPlaying ? 'Stoppa' : 'Lyssna'}
@@ -425,22 +400,22 @@ export default function SISRequired() {
                     <Button
                       variant="outline"
                       onClick={resetRecording}
-                      className="gap-2"
+                      className="gap-2 h-12"
                     >
                       <RotateCcw className="h-4 w-4" />
-                      Spela in igen
+                      Gör om
                     </Button>
                     <Button
                       onClick={uploadSample}
                       disabled={isUploading || recordingTime < MIN_RECORDING_TIME}
-                      className="gap-2"
+                      className="gap-2 h-12 px-6 shadow-lg shadow-primary/25"
                     >
                       {isUploading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Upload className="h-4 w-4" />
                       )}
-                      Ladda upp
+                      Slutför
                     </Button>
                   </>
                 )}
@@ -448,13 +423,28 @@ export default function SISRequired() {
             </div>
 
             {/* Tips */}
-            <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
-              <p className="font-medium">Tips för bästa resultat:</p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-                <li>Välj en tyst miljö utan bakgrundsljud</li>
-                <li>Tala i normal samtalston</li>
-                <li>Håll mikrofonen på lagom avstånd</li>
-                <li>Läs alla tre meningar utan paus</li>
+            <div className="p-4 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/50">
+              <p className="font-semibold text-sm mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Tips för bästa resultat
+              </p>
+              <ul className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                  Tyst miljö
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                  Normal samtalston
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                  Lagom avstånd till mic
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                  Läs utan paus
+                </li>
               </ul>
             </div>
           </CardContent>
