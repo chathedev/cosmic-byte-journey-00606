@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield } from "lucide-react";
+import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield, User, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "./SubscribeDialog";
@@ -42,7 +44,7 @@ interface SettingsDialogProps {
 }
 
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership } = useSubscription();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -54,14 +56,47 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [isDowngrading, setIsDowngrading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
+  // Preferred name editing (enterprise-only)
+  const [preferredName, setPreferredName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  
   // Check if running on iOS app domain
   const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
+
+  // Initialize preferred name from user data
+  useEffect(() => {
+    if (user?.preferredName !== undefined) {
+      setPreferredName(user.preferredName || '');
+    }
+  }, [user?.preferredName]);
 
   // Refresh plan when dialog opens
   useEffect(() => {
     if (!open) return;
     refreshPlan();
   }, [open, refreshPlan]);
+
+  const handleSavePreferredName = async () => {
+    setIsSavingName(true);
+    try {
+      const trimmedName = preferredName.trim();
+      await apiClient.updatePreferredName(trimmedName || null);
+      await refreshUser();
+      toast({
+        title: 'Namn sparat',
+        description: trimmedName ? `Ditt visningsnamn är nu "${trimmedName}"` : 'Ditt visningsnamn har tagits bort',
+      });
+    } catch (error: any) {
+      console.error('Failed to save preferred name:', error);
+      toast({
+        title: 'Kunde inte spara namn',
+        description: error?.message || 'Ett oväntat fel uppstod',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
 
   const handleCancelClick = () => {
@@ -213,6 +248,54 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
           {userPlan?.plan === 'unlimited' || userPlan?.plan === 'enterprise' ? (
             <div className="space-y-3">
+              {/* Profile Card for Enterprise Users */}
+              {userPlan?.plan === 'enterprise' && (
+                <Card className="border-border">
+                  <CardHeader className="p-3 sm:p-4 pb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <User className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-sm sm:text-base">Profil</CardTitle>
+                        <CardDescription className="text-xs mt-0.5 truncate">
+                          {user?.email}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-2 space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="preferredName" className="text-xs">Visningsnamn</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="preferredName"
+                          value={preferredName}
+                          onChange={(e) => setPreferredName(e.target.value)}
+                          placeholder="T.ex. Johan"
+                          className="flex-1 h-9 text-sm"
+                        />
+                        <Button
+                          onClick={handleSavePreferredName}
+                          disabled={isSavingName || preferredName === (user?.preferredName || '')}
+                          size="sm"
+                          className="h-9 px-3"
+                        >
+                          {isSavingName ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            'Spara'
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Används för hälsningar, talaridentifiering (SIS) och visning i möten
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
               {userPlan?.plan === 'enterprise' && (
                 <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
                   <CardHeader className="p-3 sm:p-4 pb-2">
