@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
+import { meetingStorage, type MeetingSession, type TranscriptSegment } from "@/utils/meetingStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
@@ -27,6 +27,7 @@ import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoP
 import { TranscriptionStatusWidget } from "@/components/TranscriptionStatusWidget";
 import { pollASRStatus } from "@/lib/asrService";
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
+import { TranscriptViewerDialog } from "@/components/TranscriptViewerDialog";
 
 
 // Component to show "Transkribering klar" message that auto-hides after 10 seconds
@@ -98,6 +99,8 @@ const Library = () => {
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
+  const [viewingTranscript, setViewingTranscript] = useState<{ meeting: MeetingSession; segments?: TranscriptSegment[] } | null>(null);
+  const [loadingTranscript, setLoadingTranscript] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -1027,9 +1030,47 @@ const Library = () => {
                   ) : (
                     <div className="mb-4">
                       <TranscriptionCompleteMessage meetingId={meeting.id} status={meeting.transcriptionStatus} />
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {meeting.transcript}
-                      </p>
+                      <button
+                        onClick={async () => {
+                          setLoadingTranscript(meeting.id);
+                          try {
+                            // Try to fetch segments from ASR status
+                            const asrStatus = await pollASRStatus(meeting.id);
+                            const segments = asrStatus.transcriptSegments || meeting.transcriptSegments;
+                            setViewingTranscript({ 
+                              meeting, 
+                              segments: segments as TranscriptSegment[] | undefined 
+                            });
+                          } catch (err) {
+                            // Fallback to plain transcript
+                            setViewingTranscript({ meeting, segments: undefined });
+                          } finally {
+                            setLoadingTranscript(null);
+                          }
+                        }}
+                        disabled={loadingTranscript === meeting.id}
+                        className="text-left w-full group"
+                      >
+                        <div className="relative">
+                          <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground transition-colors">
+                            {meeting.transcript}
+                          </p>
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/80 pointer-events-none" />
+                          <span className="text-xs text-primary font-medium mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {loadingTranscript === meeting.id ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Laddar...
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3 h-3" />
+                                Visa hela transkriptet
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </button>
                     </div>
                   )}
                   
@@ -1344,6 +1385,17 @@ const Library = () => {
             setMeetingToReplaceProtocol(null);
           }
         }}
+      />
+
+      {/* Transcript Viewer Dialog */}
+      <TranscriptViewerDialog
+        open={!!viewingTranscript}
+        onOpenChange={(open) => {
+          if (!open) setViewingTranscript(null);
+        }}
+        transcript={viewingTranscript?.meeting.transcript || ""}
+        segments={viewingTranscript?.segments}
+        meetingTitle={viewingTranscript?.meeting.title}
       />
     </div>
   );
