@@ -422,16 +422,18 @@ const AppContent = () => {
   );
 };
 
-// Gate component that checks admin status before blocking web browser on iOS domain
+// Gate component that checks admin/enterprise status before blocking web browser on iOS domain
 const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading: authLoading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const { enterpriseMembership, isAdmin: subscriptionIsAdmin } = useSubscription();
+  const [isAdminRole, setIsAdminRole] = useState<boolean | null>(null);
   const [checkComplete, setCheckComplete] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAdminRole = async () => {
       if (!user?.email) {
-        setIsAdmin(false);
+        setIsAdminRole(false);
         setCheckComplete(true);
         return;
       }
@@ -439,22 +441,24 @@ const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
       try {
         const roleData = await apiClient.getUserRole(user.email.toLowerCase());
         const hasRole = roleData && (roleData.role === 'admin' || roleData.role === 'owner');
-        console.log(`🔓 AdminBypassGate: Admin check for ${user.email}: ${hasRole}`);
-        setIsAdmin(hasRole);
+        console.log(`🔓 AdminBypassGate: Admin role check for ${user.email}: ${hasRole}`);
+        setIsAdminRole(hasRole);
       } catch (err) {
-        console.log('🔓 AdminBypassGate: Role check failed, denying bypass');
-        setIsAdmin(false);
+        console.log('🔓 AdminBypassGate: Role check failed');
+        setIsAdminRole(false);
       }
       setCheckComplete(true);
     };
 
-    if (!authLoading) {
-      checkAdmin();
+    if (!authLoading && user) {
+      checkAdminRole();
+    } else if (!authLoading && !user) {
+      setCheckComplete(true);
     }
   }, [user, authLoading]);
 
   // Show loading while checking
-  if (authLoading || !checkComplete) {
+  if (authLoading || (user && !checkComplete)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -462,13 +466,29 @@ const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // If admin, allow access
-  if (isAdmin) {
-    console.log('🔓 AdminBypassGate: Admin bypass granted for io.tivly.se');
+  // If not logged in and on auth page, show auth page
+  if (!user && location.pathname === '/auth') {
+    return <>{children}</>;
+  }
+
+  // If not logged in, redirect to auth (but render children which includes the auth route)
+  if (!user) {
+    return <>{children}</>;
+  }
+
+  // Check if user has admin role OR is an enterprise member
+  const hasAdminAccess = isAdminRole || subscriptionIsAdmin;
+  const hasEnterpriseAccess = enterpriseMembership?.isMember === true;
+  const canBypass = hasAdminAccess || hasEnterpriseAccess;
+
+  if (canBypass) {
+    const reason = hasAdminAccess ? 'admin' : 'enterprise';
+    console.log(`🔓 AdminBypassGate: Access granted for io.tivly.se (${reason}: ${user.email})`);
     return <>{children}</>;
   }
 
   // Otherwise show the block screen
+  console.log(`🚫 AdminBypassGate: Access denied for ${user.email} - not admin or enterprise`);
   return <AppOnlyAccess />;
 };
 
