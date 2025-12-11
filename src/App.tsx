@@ -374,10 +374,127 @@ const EnterpriseTrialCheck = () => {
 };
 
 
+// Shared app content for all routes
+const AppContent = () => {
+  return (
+    <PlanGate>
+      <ScrollToTop />
+      <PreserveAppParam />
+      <AuthRedirectHandler />
+      <GlobalDevButton />
+      <MaintenanceOverlay />
+      <EnterpriseTrialCheck />
+      <WelcomeGate>
+        <AppLayout>
+          <Suspense
+            fallback={
+              <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+              </div>
+            }
+          >
+            <Routes>
+              <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+              <Route path="/magic-login" element={<MagicLogin />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/free-trial" element={<FreeTrial />} />
+              <Route path="/generate-protocol" element={<GenerateProtocol />} />
+              <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
+              <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
+              <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+              <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
+              <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+              <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+              <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
+              <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
+              <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
+              <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+              <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
+              <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
+              <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </AppLayout>
+      </WelcomeGate>
+    </PlanGate>
+  );
+};
+
+// Gate component that checks admin status before blocking web browser on iOS domain
+const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading: authLoading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [checkComplete, setCheckComplete] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user?.email) {
+        setIsAdmin(false);
+        setCheckComplete(true);
+        return;
+      }
+
+      try {
+        const roleData = await apiClient.getUserRole(user.email.toLowerCase());
+        const hasRole = roleData && (roleData.role === 'admin' || roleData.role === 'owner');
+        console.log(`🔓 AdminBypassGate: Admin check for ${user.email}: ${hasRole}`);
+        setIsAdmin(hasRole);
+      } catch (err) {
+        console.log('🔓 AdminBypassGate: Role check failed, denying bypass');
+        setIsAdmin(false);
+      }
+      setCheckComplete(true);
+    };
+
+    if (!authLoading) {
+      checkAdmin();
+    }
+  }, [user, authLoading]);
+
+  // Show loading while checking
+  if (authLoading || !checkComplete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // If admin, allow access
+  if (isAdmin) {
+    console.log('🔓 AdminBypassGate: Admin bypass granted for io.tivly.se');
+    return <>{children}</>;
+  }
+
+  // Otherwise show the block screen
+  return <AppOnlyAccess />;
+};
+
 const App = () => {
-  // Block web browser access to io.tivly.se domain
+  // Block web browser access to io.tivly.se domain (with admin bypass)
   if (isWebBrowserOnAppDomain()) {
-    return <AppOnlyAccess />;
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthProvider>
+                <SubscriptionProvider>
+                  <AdminBypassGate>
+                    {/* If admin bypassed, render full app */}
+                    <AppContent />
+                  </AdminBypassGate>
+                </SubscriptionProvider>
+              </AuthProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ErrorBoundary>
+      </QueryClientProvider>
+    );
   }
 
   // Block native app access to app.tivly.se domain
@@ -422,54 +539,13 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-            <BrowserRouter>
-              <AuthProvider>
-                <SubscriptionProvider>
-                    <PlanGate>
-                      <ScrollToTop />
-                      <PreserveAppParam />
-                      <AuthRedirectHandler />
-                      <GlobalDevButton />
-                      <MaintenanceOverlay />
-                      <EnterpriseTrialCheck />
-                      <WelcomeGate>
-                        <AppLayout>
-                        <Suspense
-                          fallback={
-                            <div className="min-h-screen bg-background flex items-center justify-center">
-                              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
-                            </div>
-                          }
-                        >
-                          <Routes>
-                            <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
-                            <Route path="/magic-login" element={<MagicLogin />} />
-                            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                            <Route path="/free-trial" element={<FreeTrial />} />
-                            <Route path="/generate-protocol" element={<GenerateProtocol />} />
-                            <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
-                            <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
-                            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-                            <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
-                            <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
-                            <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-                            <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
-                            <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
-                          <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
-                          <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
-                          <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
-                          <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
-                          <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
-                          <Route path="*" element={<NotFound />} />
-                          </Routes>
-                        </Suspense>
-                        </AppLayout>
-                      </WelcomeGate>
-                    </PlanGate>
-                </SubscriptionProvider>
-              </AuthProvider>
-            </BrowserRouter>
+          <BrowserRouter>
+            <AuthProvider>
+              <SubscriptionProvider>
+                <AppContent />
+              </SubscriptionProvider>
+            </AuthProvider>
+          </BrowserRouter>
         </TooltipProvider>
       </ErrorBoundary>
     </QueryClientProvider>
