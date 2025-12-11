@@ -4,16 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mic, MicOff, Check, AlertCircle, Loader2, Play, RotateCcw, Upload, Volume2, Building2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Mic, MicOff, Check, AlertCircle, Loader2, Play, RotateCcw, Upload, Volume2, Building2, User } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-
-const SAMPLE_SENTENCES = [
-  "God morgon, mitt namn är [ditt namn] och jag arbetar på [företagsnamn]. Idag ska vi diskutera de viktigaste punkterna på dagordningen.",
-  "Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt.",
-  "Sammanfattningsvis tycker jag att vi har gjort stora framsteg. Låt oss boka in ett uppföljningsmöte nästa vecka för att gå igenom resultaten."
-];
 
 const MIN_RECORDING_TIME = 10;
 const MAX_RECORDING_TIME = 30;
@@ -21,8 +17,10 @@ const MAX_RECORDING_TIME = 30;
 export default function SISRequired() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { enterpriseMembership, refreshEnterpriseMembership, isAdmin } = useSubscription();
+  const { enterpriseMembership, refreshEnterpriseMembership, isAdmin, isLoading } = useSubscription();
   
+  const [userName, setUserName] = useState('');
+  const [nameConfirmed, setNameConfirmed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -37,18 +35,31 @@ export default function SISRequired() {
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Get company name for the sample sentences
+  const companyName = enterpriseMembership?.company?.name || 'företaget';
+  
+  // Generate sample sentences with user's name and company
+  const getSampleSentences = () => [
+    `God morgon, mitt namn är ${userName || '[ditt namn]'} och jag arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen.`,
+    "Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt.",
+    "Sammanfattningsvis tycker jag att vi har gjort stora framsteg. Låt oss boka in ett uppföljningsmöte nästa vecka för att gå igenom resultaten."
+  ];
+
   // Auto-redirect if SIS is not required (toggle off, already verified, or not enterprise)
   useEffect(() => {
+    // Wait for subscription data to load
+    if (isLoading) return;
+    
     const sisEnabled = enterpriseMembership?.company?.speakerIdentificationEnabled;
     const hasSample = enterpriseMembership?.sisSample?.status === 'ready';
     const isEnterprise = enterpriseMembership?.isMember;
     
     // Redirect if: not enterprise, SIS disabled, already verified, or admin
     if (!isEnterprise || !sisEnabled || hasSample || isAdmin) {
-      console.log('[SISRequired] Redirecting - SIS not required:', { isEnterprise, sisEnabled, hasSample, isAdmin });
+      console.log('[SISRequired] Redirecting - SIS not required:', { isEnterprise, sisEnabled, hasSample, isAdmin, isLoading });
       navigate('/', { replace: true });
     }
-  }, [enterpriseMembership, isAdmin, navigate]);
+  }, [enterpriseMembership, isAdmin, navigate, isLoading]);
 
   useEffect(() => {
     return () => {
@@ -234,6 +245,64 @@ export default function SISRequired() {
     );
   }
 
+  const sampleSentences = getSampleSentences();
+
+  // Step 1: Ask for user's name
+  if (!nameConfirmed) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Building2 className="h-6 w-6 text-primary" />
+              <span className="font-semibold text-lg">{enterpriseMembership?.company?.name || 'Enterprise'}</span>
+            </div>
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <User className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold">Välkommen!</h1>
+            <p className="text-muted-foreground">
+              Innan vi börjar, ange ditt namn så vi kan skapa ditt personliga röstprov.
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Ditt namn</CardTitle>
+              <CardDescription>
+                Detta kommer att användas i det röstprov du spelar in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="userName">Förnamn och efternamn</Label>
+                <Input
+                  id="userName"
+                  placeholder="T.ex. Anna Andersson"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && userName.trim()) {
+                      setNameConfirmed(true);
+                    }
+                  }}
+                />
+              </div>
+              <Button 
+                className="w-full" 
+                onClick={() => setNameConfirmed(true)}
+                disabled={!userName.trim()}
+              >
+                Fortsätt
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-lg w-full space-y-6">
@@ -248,7 +317,7 @@ export default function SISRequired() {
           </div>
           <h1 className="text-2xl font-bold">Röstprov krävs</h1>
           <p className="text-muted-foreground">
-            Ditt företag har aktiverat talaridentifiering. Spela in ett röstprov för att kunna använda Tivly.
+            Hej {userName}! Spela in ett röstprov för att kunna använda Tivly.
           </p>
         </div>
 
@@ -265,7 +334,7 @@ export default function SISRequired() {
           <CardContent className="space-y-6">
             {/* Instructions */}
             <div className="space-y-2">
-              {SAMPLE_SENTENCES.map((sentence, index) => (
+              {sampleSentences.map((sentence, index) => (
                 <div 
                   key={index}
                   className={`p-3 rounded-lg border text-sm transition-colors ${
@@ -296,8 +365,8 @@ export default function SISRequired() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setCurrentSentence(prev => Math.min(prev + 1, SAMPLE_SENTENCES.length - 1))}
-                disabled={currentSentence >= SAMPLE_SENTENCES.length - 1}
+                onClick={() => setCurrentSentence(prev => Math.min(prev + 1, sampleSentences.length - 1))}
+                disabled={currentSentence >= sampleSentences.length - 1}
               >
                 Nästa mening
               </Button>
