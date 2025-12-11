@@ -17,10 +17,28 @@ export interface ASRResult {
   meetingId?: string;
 }
 
+export interface TranscriptWord {
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+  speaker: string;
+}
+
+export interface TranscriptSegment {
+  speaker: string;
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+  words?: TranscriptWord[];
+}
+
 export interface ASRStatus {
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
   progress?: number;
   transcript?: string;
+  transcriptSegments?: TranscriptSegment[]; // Speaker diarization data
   error?: string;
   duration?: number;
 }
@@ -208,6 +226,7 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       status: data.status || 'queued',
       progress: data.progress,
       transcript: data.transcript,
+      transcriptSegments: data.transcriptSegments, // Include speaker diarization
       error: data.error,
       duration: data.duration,
     };

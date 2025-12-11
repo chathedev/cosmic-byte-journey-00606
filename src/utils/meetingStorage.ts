@@ -1,10 +1,28 @@
 // Meeting storage using backend /meetings API (single source of truth)
 import { apiClient } from '@/lib/api';
 
+export interface TranscriptWord {
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+  speaker: string;
+}
+
+export interface TranscriptSegment {
+  speaker: string;
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+  words?: TranscriptWord[];
+}
+
 export interface MeetingSession {
   id: string;
   title: string;
   transcript: string;
+  transcriptSegments?: TranscriptSegment[]; // Speaker diarization data from ASR
   protocol?: string;
   folder: string; // For backward-compat we expose folder name; backend may use folderId internally
   createdAt: string;
@@ -40,6 +58,7 @@ const mapMeeting = (m: any, userIdHint?: string): MeetingSession => ({
   protocolCount: Number(m.protocolCount ?? 0),
   agendaId: m.agendaId || m.agendaid || undefined,
   source: m.source || undefined,
+  transcriptSegments: m.transcriptSegments || undefined, // Speaker diarization data
   // CRITICAL: Override status to 'done' if real transcript exists (not placeholder text)
   transcriptionStatus: (m.transcript && m.transcript.trim().length > 0 && !m.transcript.includes('Transkribering pågår')) ? 'done' : (m.transcriptionStatus || 'processing'),
 });
