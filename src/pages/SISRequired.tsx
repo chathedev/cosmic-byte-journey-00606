@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -19,7 +20,8 @@ const MAX_RECORDING_TIME = 30;
 
 export default function SISRequired() {
   const { toast } = useToast();
-  const { enterpriseMembership, refreshEnterpriseMembership } = useSubscription();
+  const navigate = useNavigate();
+  const { enterpriseMembership, refreshEnterpriseMembership, isAdmin } = useSubscription();
   
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -34,6 +36,19 @@ export default function SISRequired() {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Auto-redirect if SIS is not required (toggle off, already verified, or not enterprise)
+  useEffect(() => {
+    const sisEnabled = enterpriseMembership?.company?.speakerIdentificationEnabled;
+    const hasSample = enterpriseMembership?.sisSample?.status === 'ready';
+    const isEnterprise = enterpriseMembership?.isMember;
+    
+    // Redirect if: not enterprise, SIS disabled, already verified, or admin
+    if (!isEnterprise || !sisEnabled || hasSample || isAdmin) {
+      console.log('[SISRequired] Redirecting - SIS not required:', { isEnterprise, sisEnabled, hasSample, isAdmin });
+      navigate('/', { replace: true });
+    }
+  }, [enterpriseMembership, isAdmin, navigate]);
 
   useEffect(() => {
     return () => {
