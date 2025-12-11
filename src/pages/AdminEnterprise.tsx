@@ -11,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt, Volume2, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,6 +29,11 @@ interface CompanyMember {
   updatedAt: string;
   addedBy: string;
   updatedBy: string;
+  sisSample?: {
+    status: 'ready' | 'processing' | 'error' | null;
+    uploadedAt?: string;
+    lastMatchScore?: number;
+  };
 }
 
 interface Company {
@@ -59,6 +65,7 @@ interface Company {
     storageRegion?: 'eu' | 'us' | 'auto';
     dataRetentionDays?: number;
     allowAdminFolderLock?: boolean;
+    speakerIdentificationEnabled?: boolean;
   };
   createdAt: string;
   updatedAt: string;
@@ -144,6 +151,7 @@ export default function AdminEnterprise() {
     const notes = formData.get('notes') as string;
     const dataAccessMode = formData.get('dataAccessMode') as 'shared' | 'individual';
     const adminFullAccessEnabled = formData.get('adminFullAccessEnabled') === 'true';
+    const speakerIdentificationEnabled = formData.get('speakerIdentificationEnabled') === 'true';
 
     try {
       setIsSubmitting(true);
@@ -161,6 +169,7 @@ export default function AdminEnterprise() {
           storageRegion: 'eu',
           dataRetentionDays: 365,
           allowAdminFolderLock: false,
+          speakerIdentificationEnabled,
         },
       });
       
@@ -193,6 +202,7 @@ export default function AdminEnterprise() {
     const status = formData.get('status') as string;
     const dataAccessMode = formData.get('dataAccessMode') as 'shared' | 'individual';
     const adminFullAccessEnabled = formData.get('adminFullAccessEnabled') === 'true';
+    const speakerIdentificationEnabled = formData.get('speakerIdentificationEnabled') === 'true';
 
     try {
       setIsSubmitting(true);
@@ -209,6 +219,7 @@ export default function AdminEnterprise() {
           storageRegion: 'eu',
           dataRetentionDays: 365,
           allowAdminFolderLock: false,
+          speakerIdentificationEnabled,
         },
       });
       
@@ -994,6 +1005,19 @@ export default function AdminEnterprise() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Talaridentifiering (SIS)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Aktivera speaker diarization för att identifiera talare i möten
+                  </p>
+                </div>
+                <input type="hidden" name="speakerIdentificationEnabled" value="false" />
+                <Switch name="speakerIdentificationEnabled" defaultChecked={false} onCheckedChange={(checked) => {
+                  const hidden = document.querySelector('input[name="speakerIdentificationEnabled"][type="hidden"]') as HTMLInputElement;
+                  if (hidden) hidden.value = checked ? 'true' : 'false';
+                }} />
+              </div>
               <div>
                 <Label htmlFor="notes">Anteckningar (valfritt)</Label>
                 <Textarea id="notes" name="notes" placeholder="Interna noteringar om företaget..." rows={3} />
@@ -1071,6 +1095,26 @@ export default function AdminEnterprise() {
                     <SelectItem value="true">Aktiverad - Ägare/admins kan se alla möten</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium">Talaridentifiering (SIS)</Label>
+                    <Volume2 className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Aktivera speaker diarization för att identifiera talare i möten
+                  </p>
+                </div>
+                <input type="hidden" name="speakerIdentificationEnabled" value={editingCompany?.preferences?.speakerIdentificationEnabled ? 'true' : 'false'} />
+                <Switch 
+                  name="speakerIdentificationEnabled" 
+                  defaultChecked={editingCompany?.preferences?.speakerIdentificationEnabled ?? false} 
+                  onCheckedChange={(checked) => {
+                    const hidden = document.querySelector('input[name="speakerIdentificationEnabled"][type="hidden"]') as HTMLInputElement;
+                    if (hidden) hidden.value = checked ? 'true' : 'false';
+                  }} 
+                />
               </div>
               <div>
                 <Label htmlFor="edit-notes">Anteckningar (valfritt)</Label>
