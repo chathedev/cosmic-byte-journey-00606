@@ -31,6 +31,8 @@ export default function SISRequired() {
 
   const companyName = enterpriseMembership?.company?.name || 'Enterprise';
 
+  const sampleText = `Hej, jag heter... och arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen. Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt. Sammanfattningsvis tycker jag att vi har gjort stora framsteg.`;
+
   useEffect(() => {
     if (isLoading) return;
     
@@ -228,6 +230,23 @@ export default function SISRequired() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             Spela in ett kort röstprov så vi kan identifiera dig i möten.
           </p>
+        </motion.div>
+
+        {/* Sample Text Card */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="relative"
+        >
+          <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2 font-medium">
+              Läs detta högt
+            </p>
+            <p className="text-sm leading-relaxed text-foreground/80 italic">
+              "{sampleText}"
+            </p>
+          </div>
         </motion.div>
 
         {/* Recording Area */}
