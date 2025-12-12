@@ -2,12 +2,11 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Volume2, Building2, Shield, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const MIN_RECORDING_TIME = 10;
 const MAX_RECORDING_TIME = 30;
@@ -23,7 +22,6 @@ export default function SISRequired() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [currentSentence, setCurrentSentence] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -31,75 +29,49 @@ export default function SISRequired() {
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Get company name for the sample sentences
-  const companyName = enterpriseMembership?.company?.name || 'företaget';
-  
-  // Sample sentences for recording (name is set by admin, not user input)
-  const sampleSentences = [
-    `God morgon, jag arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen.`,
-    "Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt.",
-    "Sammanfattningsvis tycker jag att vi har gjort stora framsteg. Låt oss boka in ett uppföljningsmöte nästa vecka för att gå igenom resultaten."
-  ];
+  const companyName = enterpriseMembership?.company?.name || 'Enterprise';
 
-  // Auto-redirect if SIS is not required (toggle off, already verified, or not enterprise)
   useEffect(() => {
-    // Wait for subscription data to load
     if (isLoading) return;
     
     const sisEnabled = enterpriseMembership?.company?.speakerIdentificationEnabled;
     const hasSample = enterpriseMembership?.sisSample?.status === 'ready';
     const isEnterprise = enterpriseMembership?.isMember;
     
-    // Redirect if: not enterprise, SIS disabled, already verified, or admin
     if (!isEnterprise || !sisEnabled || hasSample || isAdmin) {
-      console.log('[SISRequired] Redirecting - SIS not required:', { isEnterprise, sisEnabled, hasSample, isAdmin, isLoading });
       navigate('/', { replace: true });
     }
   }, [enterpriseMembership, isAdmin, navigate, isLoading]);
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (audioRef.current) audioRef.current.pause();
     };
   }, [audioUrl]);
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
-        } 
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 } 
       });
       
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-          ? 'audio/webm;codecs=opus' 
-          : 'audio/webm'
+          ? 'audio/webm;codecs=opus' : 'audio/webm'
       });
       
       audioChunksRef.current = [];
       
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
       
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
+        setAudioUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach(track => track.stop());
       };
       
@@ -110,27 +82,23 @@ export default function SISRequired() {
       
       timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => {
-          const newTime = prev + 1;
-          if (newTime >= MAX_RECORDING_TIME) {
-            stopRecording();
-          }
-          return newTime;
+          if (prev + 1 >= MAX_RECORDING_TIME) stopRecording();
+          return prev + 1;
         });
       }, 1000);
       
     } catch (error) {
-      console.error('Failed to start recording:', error);
       toast({
         title: 'Mikrofonåtkomst nekad',
-        description: 'Tillåt mikrofonåtkomst för att spela in ett röstprov.',
+        description: 'Tillåt mikrofonåtkomst för att spela in.',
         variant: 'destructive',
       });
     }
   }, [toast]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (mediaRecorderRef.current?.state !== 'inactive') {
+      mediaRecorderRef.current?.stop();
     }
     setIsRecording(false);
     if (timerRef.current) {
@@ -141,14 +109,10 @@ export default function SISRequired() {
 
   const playRecording = useCallback(() => {
     if (!audioUrl) return;
-    
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    if (audioRef.current) audioRef.current.pause();
     
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
-    
     audio.onended = () => setIsPlaying(false);
     audio.onpause = () => setIsPlaying(false);
     audio.play();
@@ -164,22 +128,17 @@ export default function SISRequired() {
   }, []);
 
   const resetRecording = useCallback(() => {
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-    }
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingTime(0);
-    setCurrentSentence(0);
   }, [audioUrl]);
 
   const uploadSample = useCallback(async () => {
-    if (!audioBlob) return;
-    
-    if (recordingTime < MIN_RECORDING_TIME) {
+    if (!audioBlob || recordingTime < MIN_RECORDING_TIME) {
       toast({
         title: 'Inspelning för kort',
-        description: `Inspelningen måste vara minst ${MIN_RECORDING_TIME} sekunder lång.`,
+        description: `Minst ${MIN_RECORDING_TIME} sekunder krävs.`,
         variant: 'destructive',
       });
       return;
@@ -190,27 +149,17 @@ export default function SISRequired() {
       const result = await apiClient.uploadSISSample(audioBlob);
       
       if (result.ok) {
-        toast({
-          title: 'Röstprov uppladdat!',
-          description: 'Ditt röstprov har sparats. Du kan nu använda Tivly.',
-        });
+        toast({ title: 'Röstprov uppladdat!', description: 'Du är redo att använda Tivly.' });
         setUploadComplete(true);
-        // Refresh the enterprise membership to get updated SIS status
-        if (refreshEnterpriseMembership) {
-          await refreshEnterpriseMembership();
-        }
-        // Force reload to continue to app
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        await refreshEnterpriseMembership?.();
+        setTimeout(() => window.location.reload(), 1500);
       } else {
         throw new Error(result.error || 'Upload failed');
       }
     } catch (error) {
-      console.error('Failed to upload voice sample:', error);
       toast({
         title: 'Uppladdning misslyckades',
-        description: 'Kunde inte ladda upp röstprovet. Försök igen.',
+        description: 'Försök igen.',
         variant: 'destructive',
       });
     } finally {
@@ -218,238 +167,240 @@ export default function SISRequired() {
     }
   }, [audioBlob, recordingTime, toast, refreshEnterpriseMembership]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const progress = (recordingTime / MAX_RECORDING_TIME) * 100;
+  const isReady = recordingTime >= MIN_RECORDING_TIME;
 
   if (uploadComplete) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-green-500/30 bg-gradient-to-br from-green-500/10 to-green-500/5 shadow-xl shadow-green-500/10">
-          <CardContent className="pt-8 pb-8 text-center space-y-5">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mx-auto shadow-lg shadow-green-500/30">
-              <Check className="h-10 w-10 text-white" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-green-600 dark:text-green-400">Röstprov uppladdat!</h2>
-              <p className="text-muted-foreground">Du är redo att använda Tivly med röstidentifiering.</p>
-            </div>
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Omdirigerar dig...</span>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center space-y-6"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center mx-auto"
+          >
+            <Check className="h-12 w-12 text-white" />
+          </motion.div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold">Klart!</h2>
+            <p className="text-muted-foreground">Omdirigerar dig...</p>
+          </div>
+          <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5 flex items-center justify-center p-4">
-      <div className="max-w-lg w-full space-y-6">
-        {/* Organization Badge */}
-        <div className="flex justify-center">
-          <Badge variant="secondary" className="gap-2 px-4 py-2 text-sm bg-primary/10 border-primary/20 hover:bg-primary/15 transition-colors">
-            <Building2 className="h-4 w-4" />
-            {enterpriseMembership?.company?.name || 'Enterprise'}
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-sm space-y-8"
+      >
+        {/* Company Badge */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="flex justify-center"
+        >
+          <Badge variant="outline" className="gap-2 px-3 py-1.5 text-xs">
+            <Building2 className="h-3 w-3" />
+            {companyName}
           </Badge>
-        </div>
+        </motion.div>
 
         {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl scale-150 opacity-50" />
-            <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center mx-auto shadow-xl shadow-primary/25">
-              <Shield className="h-10 w-10 text-primary-foreground" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-              Röstidentifiering aktiverad
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-sm mx-auto">
-              Din organisation har aktiverat röstidentifiering för säkrare mötesprotokoll.
-            </p>
-          </div>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-center space-y-3"
+        >
+          <h1 className="text-2xl font-semibold tracking-tight">Röstidentifiering</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Spela in ett kort röstprov så vi kan identifiera dig i möten.
+          </p>
+        </motion.div>
 
-        {/* Info Banner */}
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-primary" />
-          </div>
-          <div className="text-sm">
-            <p className="font-medium text-foreground">Varför behövs detta?</p>
-            <p className="text-muted-foreground">
-              Ditt röstprov används för att identifiera dig i möten och skapa mer personliga protokoll.
-            </p>
-          </div>
-        </div>
+        {/* Recording Area */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="relative"
+        >
+          {/* Circular Progress */}
+          <div className="relative w-48 h-48 mx-auto">
+            {/* Background Circle */}
+            <svg className="w-full h-full -rotate-90">
+              <circle
+                cx="96"
+                cy="96"
+                r="88"
+                fill="none"
+                strokeWidth="4"
+                className="stroke-muted"
+              />
+              <motion.circle
+                cx="96"
+                cy="96"
+                r="88"
+                fill="none"
+                strokeWidth="4"
+                strokeLinecap="round"
+                className={isReady ? "stroke-green-500" : "stroke-primary"}
+                strokeDasharray={553}
+                strokeDashoffset={553 - (553 * progress) / 100}
+                initial={{ strokeDashoffset: 553 }}
+                animate={{ strokeDashoffset: 553 - (553 * progress) / 100 }}
+                transition={{ duration: 0.3 }}
+              />
+            </svg>
 
-        <Card className="border-border/50 shadow-xl shadow-black/5 overflow-hidden">
-          <CardHeader className="bg-gradient-to-b from-muted/50 to-transparent pb-4">
-            <CardTitle className="text-xl flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Mic className="h-5 w-5 text-primary" />
-              </div>
-              Spela in ditt röstprov
-            </CardTitle>
-            <CardDescription className="text-base">
-              Läs meningarna nedan högt och tydligt i normal samtalston.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 pt-2">
-            {/* Instructions */}
-            <div className="space-y-3">
-              {sampleSentences.map((sentence, index) => (
-                <div 
-                  key={index}
-                  className={`p-4 rounded-xl border-2 text-sm transition-all duration-300 ${
-                    index === currentSentence 
-                      ? 'border-primary bg-primary/5 shadow-md shadow-primary/10' 
-                      : index < currentSentence 
-                        ? 'border-green-500/50 bg-green-500/5' 
-                        : 'border-border/50 bg-muted/20'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                      index === currentSentence 
-                        ? 'bg-primary text-primary-foreground shadow-md' 
-                        : index < currentSentence
-                          ? 'bg-green-500 text-white'
-                          : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {index < currentSentence ? <Check className="h-4 w-4" /> : index + 1}
-                    </span>
-                    <p className="leading-relaxed pt-0.5">{sentence}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {isRecording && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setCurrentSentence(prev => Math.min(prev + 1, sampleSentences.length - 1))}
-                disabled={currentSentence >= sampleSentences.length - 1}
-                className="w-full"
-              >
-                Nästa mening →
-              </Button>
-            )}
-
-            {/* Recording controls */}
-            <div className="space-y-4">
-              {(isRecording || audioBlob) && (
-                <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/50">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={isRecording ? 'text-red-500 font-medium flex items-center gap-2' : 'text-muted-foreground'}>
-                      {isRecording && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
-                      {isRecording ? 'Spelar in...' : '✓ Inspelning klar'}
-                    </span>
-                    <span className="font-mono text-lg font-semibold">{formatTime(recordingTime)}</span>
-                  </div>
-                  <Progress 
-                    value={(recordingTime / MAX_RECORDING_TIME) * 100} 
-                    className="h-2"
-                  />
-                  <p className="text-xs text-muted-foreground text-center">
-                    Minst {MIN_RECORDING_TIME} sekunder krävs • Max {MAX_RECORDING_TIME} sekunder
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                {!audioBlob ? (
-                  <Button
-                    size="lg"
-                    variant={isRecording ? 'destructive' : 'default'}
-                    onClick={isRecording ? stopRecording : startRecording}
-                    className={`gap-2 px-8 h-14 text-base shadow-lg transition-all ${
-                      isRecording 
-                        ? 'shadow-red-500/25' 
-                        : 'shadow-primary/25 hover:shadow-primary/40'
-                    }`}
+            {/* Center Content */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <AnimatePresence mode="wait">
+                {isRecording ? (
+                  <motion.div
+                    key="recording"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="text-center"
                   >
-                    {isRecording ? (
-                      <>
-                        <MicOff className="h-5 w-5" />
-                        Stoppa inspelning
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="h-5 w-5" />
-                        Starta inspelning
-                      </>
-                    )}
-                  </Button>
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="w-3 h-3 rounded-full bg-red-500 mx-auto mb-3"
+                    />
+                    <span className="text-4xl font-light tabular-nums">{recordingTime}s</span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isReady ? 'Redo' : `${MIN_RECORDING_TIME - recordingTime}s kvar`}
+                    </p>
+                  </motion.div>
+                ) : audioBlob ? (
+                  <motion.div
+                    key="complete"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="text-center"
+                  >
+                    <Check className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <span className="text-2xl font-light tabular-nums">{recordingTime}s</span>
+                    <p className="text-xs text-muted-foreground mt-1">Inspelning klar</p>
+                  </motion.div>
                 ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={isPlaying ? stopPlaying : playRecording}
-                      className="gap-2 h-12"
-                    >
-                      <Play className="h-4 w-4" />
-                      {isPlaying ? 'Stoppa' : 'Lyssna'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={resetRecording}
-                      className="gap-2 h-12"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Gör om
-                    </Button>
-                    <Button
-                      onClick={uploadSample}
-                      disabled={isUploading || recordingTime < MIN_RECORDING_TIME}
-                      className="gap-2 h-12 px-6 shadow-lg shadow-primary/25"
-                    >
-                      {isUploading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="h-4 w-4" />
-                      )}
-                      Slutför
-                    </Button>
-                  </>
+                  <motion.div
+                    key="idle"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="text-center"
+                  >
+                    <Mic className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">Tryck för att börja</p>
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
             </div>
+          </div>
+        </motion.div>
 
-            {/* Tips */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/50">
-              <p className="font-semibold text-sm mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                Tips för bästa resultat
-              </p>
-              <ul className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                  Tyst miljö
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                  Normal samtalston
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                  Lagom avstånd till mic
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                  Läs utan paus
-                </li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Controls */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="space-y-4"
+        >
+          <AnimatePresence mode="wait">
+            {!audioBlob ? (
+              <motion.div
+                key="record-btn"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex justify-center"
+              >
+                <Button
+                  size="lg"
+                  variant={isRecording ? 'destructive' : 'default'}
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className="gap-2 h-12 px-8 rounded-full"
+                >
+                  {isRecording ? (
+                    <>
+                      <MicOff className="h-4 w-4" />
+                      Stoppa
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="h-4 w-4" />
+                      Starta inspelning
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="action-btns"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-center justify-center gap-3"
+              >
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={isPlaying ? stopPlaying : playRecording}
+                  className="h-12 w-12 rounded-full"
+                >
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={resetRecording}
+                  className="h-12 w-12 rounded-full"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={uploadSample}
+                  disabled={isUploading || !isReady}
+                  className="gap-2 h-12 px-6 rounded-full"
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  Ladda upp
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Hint */}
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-xs text-center text-muted-foreground"
+          >
+            Prata naturligt i {MIN_RECORDING_TIME}-{MAX_RECORDING_TIME} sekunder
+          </motion.p>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
