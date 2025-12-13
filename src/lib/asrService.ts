@@ -1,6 +1,15 @@
 // ASR Service - Async polling flow for transcription
 // Flow: 1) Upload file to backend → 2) Poll status by meetingId → 3) Get transcript when complete
 // Accepts: MP3, WAV, M4A - backend handles all conversion
+// 
+// API Response Format (when status: "done"):
+// - transcript: string - Full transcript text
+// - transcriptSegments: Array<{ speakerId, text, start, end }> - Speaker diarization segments
+// - sisStatus: 'queued' | 'processing' | 'done' | 'no_samples' | 'error' | 'disabled' | 'missing_owner'
+// - sisMatches: Array<SISMatch> - Speaker identification matches
+// - sisMatch: SISMatch - Best match (shortcut to sisMatches[0])
+// - sisSpeakers: Array<SISSpeaker> - Speaker payload with matches array
+// Accepts: MP3, WAV, M4A - backend handles all conversion
 
 import { debugLog, debugError } from './debugLogger';
 
@@ -17,20 +26,27 @@ export interface SISMatch {
   confidencePercent: number;
   speakerLabel?: string;
   segments?: Array<{ start: number; end: number }>;
-  durationSeconds?: number;
-  text?: string;
-  matchedWords: number;
-  totalSampleWords: number;
+  durationSeconds?: number | null;
+  text?: string | null;
+  matchedWords?: number | null;
+  totalSampleWords?: number | null;
   updatedAt: string;
+}
+
+// SIS Speaker Match Entry (used in sisSpeakers.matches array)
+export interface SISSpeakerMatch {
+  sampleOwnerEmail: string;
+  similarity: number;
 }
 
 // SpeechBrain Speaker Identification
 export interface SISSpeaker {
   label: string;
   segments: Array<{ start: number; end: number }>;
-  durationSeconds: number;
+  durationSeconds?: number | null;
   bestMatchEmail?: string;
   similarity?: number;
+  matches?: SISSpeakerMatch[];
 }
 
 // SIS Status types
@@ -70,16 +86,17 @@ export interface TranscriptWord {
   text: string;
   start: number;
   end: number;
-  confidence: number;
-  speaker: string;
+  confidence?: number;
+  speaker?: string;
 }
 
 export interface TranscriptSegment {
-  speaker: string;
+  speakerId?: string;  // ElevenLabs uses speakerId
+  speaker?: string;    // Keep for backwards compatibility
   text: string;
   start: number;
   end: number;
-  confidence: number;
+  confidence?: number;
   words?: TranscriptWord[];
 }
 
@@ -282,13 +299,17 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     if (data.sisSpeakers && data.sisSpeakers.length > 0) {
       debugLog('🗣️ SIS speakers found:', data.sisSpeakers.length);
       data.sisSpeakers.forEach((speaker: SISSpeaker) => {
-        debugLog(`   - ${speaker.label}: ${speaker.durationSeconds?.toFixed(1)}s${speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${(speaker.similarity || 0) * 100}%)` : ''}`);
+        const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
+        const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
+        const matchCount = speaker.matches?.length ? ` [${speaker.matches.length} sample(s)]` : '';
+        debugLog(`   - ${speaker.label}: ${duration}${matchInfo}${matchCount}`);
       });
     }
     if (data.sisMatches && data.sisMatches.length > 0) {
       debugLog('🎯 SIS matches found:', data.sisMatches.length, 'match(es)');
       data.sisMatches.forEach((match: SISMatch) => {
-        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}% (${match.matchedWords} words)${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}`);
+        const wordsInfo = match.matchedWords != null ? `(${match.matchedWords} words)` : '';
+        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}% ${wordsInfo}${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}`);
       });
     }
     
