@@ -28,6 +28,32 @@ interface AIProtocol {
   nextMeetingSuggestions?: string[];
 }
 
+interface SISSpeaker {
+  label: string;
+  segments: { start: number; end: number }[];
+  durationSeconds: number;
+  bestMatchEmail?: string;
+  similarity?: number;
+  matches?: {
+    sampleOwnerEmail: string;
+    similarity: number;
+  }[];
+}
+
+interface SISMatch {
+  speakerName: string;
+  speakerLabel: string;
+  confidencePercent: number;
+  segments: { start: number; end: number }[];
+}
+
+interface TranscriptSegment {
+  speakerId: string;
+  text: string;
+  start: number;
+  end: number;
+}
+
 interface AutoProtocolGeneratorProps {
   transcript: string;
   aiProtocol: AIProtocol | null;
@@ -39,6 +65,9 @@ interface AutoProtocolGeneratorProps {
   agendaId?: string;
   meetingId?: string;
   userId?: string;
+  transcriptSegments?: TranscriptSegment[];
+  sisSpeakers?: SISSpeaker[];
+  sisMatches?: SISMatch[];
 }
 
 export const AutoProtocolGenerator = ({
@@ -52,6 +81,9 @@ export const AutoProtocolGenerator = ({
   agendaId,
   meetingId,
   userId,
+  transcriptSegments,
+  sisSpeakers,
+  sisMatches,
 }: AutoProtocolGeneratorProps) => {
   const [generatedProtocol, setGeneratedProtocol] = useState<AIProtocol | null>(aiProtocol);
   const [isGenerating, setIsGenerating] = useState(!aiProtocol);
@@ -101,16 +133,81 @@ export const AutoProtocolGenerator = ({
       }, 300);
 
       try {
+        // Build speaker-attributed transcript if SIS data available
+        let formattedTranscript = transcript;
+        let speakerInfo: { name: string; segments: number }[] = [];
+        
+        if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers)) {
+          const SIS_CONFIDENCE_THRESHOLD = 0.70;
+          
+          // Build speaker name map from SIS data
+          const speakerNameMap = new Map<string, string>();
+          
+          // Use sisMatches for speaker names
+          if (sisMatches && sisMatches.length > 0) {
+            sisMatches.forEach(match => {
+              if (match.confidencePercent >= SIS_CONFIDENCE_THRESHOLD * 100) {
+                speakerNameMap.set(match.speakerLabel, match.speakerName);
+              }
+            });
+          }
+          
+          // Fallback to sisSpeakers if no matches
+          if (speakerNameMap.size === 0 && sisSpeakers && sisSpeakers.length > 0) {
+            sisSpeakers.forEach(speaker => {
+              if (speaker.similarity && speaker.similarity >= SIS_CONFIDENCE_THRESHOLD && speaker.bestMatchEmail) {
+                // Extract name from email (e.g., charlie@wby.se -> Charlie)
+                const namePart = speaker.bestMatchEmail.split('@')[0];
+                const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+                speakerNameMap.set(speaker.label, formattedName);
+              }
+            });
+          }
+          
+          // Format transcript with speaker names
+          const formattedSegments = transcriptSegments.map(segment => {
+            let speakerName = speakerNameMap.get(segment.speakerId) || speakerNameMap.get('meeting');
+            
+            if (!speakerName) {
+              // Fallback to generic speaker number
+              const speakerNum = parseInt(segment.speakerId.replace('speaker_', '')) + 1;
+              speakerName = `Talare ${speakerNum}`;
+            }
+            
+            return `[${speakerName}]: ${segment.text}`;
+          });
+          
+          formattedTranscript = formattedSegments.join('\n\n');
+          
+          // Collect speaker info for logging
+          const speakerCounts = new Map<string, number>();
+          transcriptSegments.forEach(segment => {
+            const name = speakerNameMap.get(segment.speakerId) || speakerNameMap.get('meeting') || 'Okänd';
+            speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
+          });
+          speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
+          
+          console.log('🎤 Speaker-attributed transcript created:', {
+            speakersIdentified: speakerNameMap.size,
+            speakerInfo,
+            formattedTranscriptPreview: formattedTranscript.substring(0, 300)
+          });
+        }
+        
         const requestBody = {
-          transcript,
+          transcript: formattedTranscript,
           meetingName: fileName.replace('.docx', ''),
           agenda: agendaId ? await fetchAgendaContent(agendaId) : undefined,
+          hasSpeakerAttribution: speakerInfo.length > 0,
+          speakers: speakerInfo,
         };
         
         console.log('🚀 Sending to analyze-meeting:', {
-          transcriptPreview: transcript.substring(0, 200),
+          transcriptPreview: formattedTranscript.substring(0, 200),
           wordCount,
-          hasAgenda: !!requestBody.agenda
+          hasAgenda: !!requestBody.agenda,
+          hasSpeakerAttribution: requestBody.hasSpeakerAttribution,
+          speakers: requestBody.speakers
         });
 
         const response = await fetch(

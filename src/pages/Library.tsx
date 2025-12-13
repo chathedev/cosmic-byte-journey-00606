@@ -691,11 +691,42 @@ const Library = () => {
       return;
     }
 
+    // Fetch SIS data for speaker attribution in protocol
+    let sisSpeakers: SISSpeaker[] | undefined;
+    let sisMatches: SISMatch[] | undefined;
+    let transcriptSegments: TranscriptSegment[] | undefined;
+    
+    try {
+      const asrStatus = await pollASRStatus(meeting.id);
+      if (asrStatus?.sisSpeakers) sisSpeakers = asrStatus.sisSpeakers;
+      if (asrStatus?.sisMatches) sisMatches = asrStatus.sisMatches;
+      if (asrStatus?.transcriptSegments) {
+        transcriptSegments = asrStatus.transcriptSegments.map(seg => ({
+          speaker: seg.speakerId,
+          text: seg.text,
+          start: seg.start,
+          end: seg.end,
+          confidence: 1,
+          speakerId: seg.speakerId,
+        })) as any;
+      }
+      console.log('🎤 Fetched SIS data for protocol:', { 
+        hasSisSpeakers: !!sisSpeakers?.length,
+        hasSisMatches: !!sisMatches?.length,
+        hasSegments: !!transcriptSegments?.length
+      });
+    } catch (e) {
+      console.warn('⚠️ Could not fetch SIS data for protocol:', e);
+    }
+
     setPendingMeetingData({
       id: effectiveMeeting.id,
       transcript: effectiveMeeting.transcript,
       title: effectiveMeeting.title,
       createdAt: effectiveMeeting.createdAt,
+      transcriptSegments,
+      sisSpeakers,
+      sisMatches,
     });
     setShowAgendaDialog(true);
   };
@@ -1369,14 +1400,41 @@ const Library = () => {
             setProtocolStatus(updatedStatus);
             sessionStorage.removeItem(`protocol_generated_${meetingToReplaceProtocol.id}`);
             
-            // Proceed to generation flow
+            // Proceed to generation flow with SIS data
             const latest = await meetingStorage.getMeeting(meetingToReplaceProtocol.id);
             const effectiveMeeting = latest || meetingToReplaceProtocol;
+            
+            // Fetch SIS data for speaker attribution
+            let sisSpeakers: SISSpeaker[] | undefined;
+            let sisMatches: SISMatch[] | undefined;
+            let transcriptSegments: TranscriptSegment[] | undefined;
+            
+            try {
+              const asrStatus = await pollASRStatus(meetingToReplaceProtocol.id);
+              if (asrStatus?.sisSpeakers) sisSpeakers = asrStatus.sisSpeakers;
+              if (asrStatus?.sisMatches) sisMatches = asrStatus.sisMatches;
+              if (asrStatus?.transcriptSegments) {
+                transcriptSegments = asrStatus.transcriptSegments.map(seg => ({
+                  speaker: seg.speakerId,
+                  text: seg.text,
+                  start: seg.start,
+                  end: seg.end,
+                  confidence: 1,
+                  speakerId: seg.speakerId,
+                })) as any;
+              }
+            } catch (e) {
+              console.warn('⚠️ Could not fetch SIS data for replace protocol:', e);
+            }
+            
             setPendingMeetingData({
               id: effectiveMeeting.id,
               transcript: effectiveMeeting.transcript,
               title: effectiveMeeting.title,
               createdAt: effectiveMeeting.createdAt,
+              transcriptSegments,
+              sisSpeakers,
+              sisMatches,
             });
             setShowAgendaDialog(true);
             

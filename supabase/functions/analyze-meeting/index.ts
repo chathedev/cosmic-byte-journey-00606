@@ -11,14 +11,16 @@ serve(async (req) => {
   }
 
   try {
-    const { transcript, meetingName, agenda } = await req.json();
+    const { transcript, meetingName, agenda, hasSpeakerAttribution, speakers } = await req.json();
     
     console.log('📥 analyze-meeting request:', {
       hasTranscript: !!transcript,
       transcriptLength: transcript?.length || 0,
       transcriptWords: transcript?.trim().split(/\s+/).length || 0,
       meetingName,
-      hasAgenda: !!agenda
+      hasAgenda: !!agenda,
+      hasSpeakerAttribution: !!hasSpeakerAttribution,
+      speakersCount: speakers?.length || 0
     });
     
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -104,6 +106,29 @@ serve(async (req) => {
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
     const agendaNote = agenda ? 'OBS: Använd mötesagendan ovan för att strukturera protokollet och säkerställ att alla agendapunkter täcks.' : '';
     const shortNote = wordCount < 50 ? 'OBS: Utskriften är mycket kort. Inkludera ett meddelande i sammanfattningen om att mötet innehöll begränsad information.' : '';
+    
+    // Speaker attribution instructions
+    let speakerNote = '';
+    if (hasSpeakerAttribution && speakers && speakers.length > 0) {
+      const speakerList = speakers.map((s: { name: string; segments: number }) => s.name).join(', ');
+      speakerNote = `
+🎤 VIKTIGT - TALARINFORMATION:
+Utskriften innehåller talaridentifiering med format [Namn]: text
+Identifierade talare: ${speakerList}
+
+Du MÅSTE:
+- Notera VEM som sa vad i protokollet när det är relevant
+- I sammanfattningen, nämn nyckeltalare och deras bidrag
+- I huvudpunkter, inkludera talarens namn när specifika åsikter eller förslag nämndes
+- I åtgärdspunkter, använd talarens namn som "ansvarig" om de tog på sig uppgiften
+- I beslut, nämn om en specifik person föreslog eller tog beslutet
+
+Exempel på hur du ska referera till talare:
+- "Charlie föreslog att..." 
+- "Enligt diskussionen mellan Anna och Erik..."
+- "Beslutet togs efter att Maria lyfte frågan om..."
+`;
+    }
 
     const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett DETALJERAT protokoll som täcker det viktigaste från mötet.
 
@@ -175,6 +200,7 @@ Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struk
   }
 }
 
+${speakerNote}
 ${agendaNote}
 ${shortNote}
 
