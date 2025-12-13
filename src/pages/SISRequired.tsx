@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause, ArrowRight, ArrowLeft, Volume2, Shield, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause, ArrowRight, ArrowLeft, Volume2, Shield, Sparkles, User, Lightbulb, VolumeX, Timer, MessageSquare } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -14,13 +14,55 @@ const MAX_RECORDING_TIME = 30;
 
 type Step = 'intro' | 'name' | 'tips' | 'record' | 'review' | 'uploading' | 'success';
 
+const STORAGE_KEY = 'sis_onboarding_state';
+
+interface StoredState {
+  step: Step;
+  speakerName: string;
+}
+
+function loadStoredState(): StoredState | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load SIS state:', e);
+  }
+  return null;
+}
+
+function saveState(state: StoredState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save SIS state:', e);
+  }
+}
+
+function clearStoredState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    console.error('Failed to clear SIS state:', e);
+  }
+}
+
 export default function SISRequired() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { enterpriseMembership, refreshEnterpriseMembership, isAdmin, isLoading } = useSubscription();
   
-  const [step, setStep] = useState<Step>('intro');
-  const [speakerName, setSpeakerName] = useState('');
+  // Load initial state from storage
+  const storedState = loadStoredState();
+  const initialStep = storedState?.step && !['uploading', 'success', 'review'].includes(storedState.step) 
+    ? storedState.step 
+    : 'intro';
+  const initialName = storedState?.speakerName || '';
+  
+  const [step, setStep] = useState<Step>(initialStep);
+  const [speakerName, setSpeakerName] = useState(initialName);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -38,6 +80,13 @@ export default function SISRequired() {
 
   const sampleText = `Hej, jag heter ${speakerName || '[ditt namn]'} och arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen. Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt.`;
 
+  // Save state whenever step or name changes
+  useEffect(() => {
+    if (step !== 'uploading' && step !== 'success') {
+      saveState({ step, speakerName });
+    }
+  }, [step, speakerName]);
+
   useEffect(() => {
     if (isLoading) return;
     
@@ -46,6 +95,7 @@ export default function SISRequired() {
     const isEnterprise = enterpriseMembership?.isMember;
     
     if (!isEnterprise || !sisEnabled || hasSample || isAdmin) {
+      clearStoredState();
       navigate('/', { replace: true });
     }
   }, [enterpriseMembership, isAdmin, navigate, isLoading]);
@@ -158,6 +208,7 @@ export default function SISRequired() {
       const result = await apiClient.uploadSISSample(audioBlob, speakerName.trim());
       
       if (result.ok) {
+        clearStoredState();
         setStep('success');
         await refreshEnterpriseMembership?.();
         setTimeout(() => window.location.reload(), 2000);
@@ -293,7 +344,7 @@ export default function SISRequired() {
                   animate={{ scale: 1 }}
                   className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto"
                 >
-                  <span className="text-2xl">👋</span>
+                  <User className="h-8 w-8 text-primary" />
                 </motion.div>
                 <h1 className="text-2xl font-semibold tracking-tight">Vad heter du?</h1>
                 <p className="text-muted-foreground text-sm">
@@ -350,17 +401,17 @@ export default function SISRequired() {
                   animate={{ scale: 1 }}
                   className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto"
                 >
-                  <span className="text-2xl">💡</span>
+                  <Lightbulb className="h-8 w-8 text-primary" />
                 </motion.div>
                 <h1 className="text-2xl font-semibold tracking-tight">Tips för bästa resultat</h1>
               </div>
 
               <div className="space-y-4">
                 {[
-                  { emoji: '🔇', title: 'Tyst miljö', desc: 'Välj en plats utan bakgrundsljud' },
-                  { emoji: '🎙️', title: 'Lagom avstånd', desc: 'Håll enheten nära men inte för nära' },
-                  { emoji: '🗣️', title: 'Naturligt tal', desc: 'Prata som du gör i vanliga möten' },
-                  { emoji: '⏱️', title: `${MIN_RECORDING_TIME}-${MAX_RECORDING_TIME} sekunder`, desc: 'Läs texten i lugn takt' },
+                  { icon: VolumeX, title: 'Tyst miljö', desc: 'Välj en plats utan bakgrundsljud' },
+                  { icon: Mic, title: 'Lagom avstånd', desc: 'Håll enheten nära men inte för nära' },
+                  { icon: MessageSquare, title: 'Naturligt tal', desc: 'Prata som du gör i vanliga möten' },
+                  { icon: Timer, title: `${MIN_RECORDING_TIME}-${MAX_RECORDING_TIME} sekunder`, desc: 'Läs texten i lugn takt' },
                 ].map((tip, i) => (
                   <motion.div
                     key={tip.title}
@@ -369,7 +420,9 @@ export default function SISRequired() {
                     transition={{ delay: i * 0.1 }}
                     className="flex items-center gap-4 p-3 rounded-xl bg-muted/50"
                   >
-                    <span className="text-xl">{tip.emoji}</span>
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <tip.icon className="h-5 w-5 text-primary" />
+                    </div>
                     <div>
                       <p className="text-sm font-medium">{tip.title}</p>
                       <p className="text-xs text-muted-foreground">{tip.desc}</p>
@@ -384,7 +437,7 @@ export default function SISRequired() {
                   Tillbaka
                 </Button>
                 <Button onClick={() => setStep('record')} className="flex-1 gap-2">
-                  Jag är redo!
+                  Jag är redo
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -407,7 +460,7 @@ export default function SISRequired() {
                   {isRecording ? 'Spelar in...' : 'Läs texten nedan'}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Hej, <span className="font-medium text-foreground">{speakerName}</span>!
+                  Hej, <span className="font-medium text-foreground">{speakerName}</span>
                 </p>
               </div>
 
@@ -471,7 +524,7 @@ export default function SISRequired() {
                         />
                         <span className="text-4xl font-light tabular-nums">{recordingTime}</span>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {isReady ? '✓ Redo att stoppa' : `${MIN_RECORDING_TIME - recordingTime}s kvar`}
+                          {isReady ? 'Redo att stoppa' : `${MIN_RECORDING_TIME - recordingTime}s kvar`}
                         </p>
                       </motion.div>
                     ) : (
@@ -544,7 +597,7 @@ export default function SISRequired() {
                 >
                   <Check className="h-10 w-10 text-green-500" />
                 </motion.div>
-                <h1 className="text-2xl font-semibold tracking-tight">Inspelning klar!</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">Inspelning klar</h1>
                 <p className="text-muted-foreground text-sm">
                   <span className="font-medium text-foreground">{recordingTime} sekunder</span> inspelat. Lyssna och godkänn.
                 </p>
@@ -639,7 +692,7 @@ export default function SISRequired() {
                 <Check className="h-12 w-12 text-white" />
               </motion.div>
               <div className="space-y-3">
-                <h1 className="text-2xl font-semibold tracking-tight">Allt klart, {speakerName}!</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">Allt klart, {speakerName}</h1>
                 <p className="text-muted-foreground">
                   Ditt röstprov har sparats. Du kan nu använda Tivly.
                 </p>
