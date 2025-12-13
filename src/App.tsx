@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, useContext } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
 import { toast } from "@/hooks/use-toast";
@@ -14,8 +14,8 @@ import { Bug } from "lucide-react";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
+import { AuthProvider, useAuth, AuthContext } from "@/contexts/AuthContext";
+import { SubscriptionProvider, useSubscription, SubscriptionContext } from "@/contexts/SubscriptionContext";
 import { AdminRoute } from "@/components/AdminRoute";
 import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -62,7 +62,9 @@ const queryClient = new QueryClient({
 const AuthRedirectHandler = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  // Use context directly to avoid throwing when outside provider
+  const authContext = useContext(AuthContext);
+  const refreshUser = authContext?.refreshUser;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -74,7 +76,7 @@ const AuthRedirectHandler = () => {
       // Clean URL
       window.history.replaceState({}, document.title, location.pathname);
       // Refresh user and stay on current page
-      refreshUser().then(() => {
+      refreshUser?.().then(() => {
         // Already on the right page
       });
     } else if (testUser === 'true') {
@@ -84,7 +86,7 @@ const AuthRedirectHandler = () => {
       try { sessionStorage.setItem('pendingTestLogin', '1'); } catch {}
       localStorage.setItem('userEmail', 'review@tivly.se');
       window.history.replaceState({}, document.title, '/');
-      refreshUser().then(() => navigate('/'));
+      refreshUser?.().then(() => navigate('/'));
     }
   }, [location, navigate, refreshUser]);
 

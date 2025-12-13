@@ -1,10 +1,13 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useContext } from 'react';
 import { Construction } from 'lucide-react';
 import { apiClient, MaintenanceStatus } from '@/lib/api';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { SubscriptionContext } from '@/contexts/SubscriptionContext';
 
 export const MaintenanceOverlay = () => {
-  const { isAdmin } = useSubscription();
+  // Use context directly to avoid throwing when outside provider
+  const subscriptionContext = useContext(SubscriptionContext);
+  const isAdmin = subscriptionContext?.isAdmin ?? false;
+  
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadDone = useRef(false);
