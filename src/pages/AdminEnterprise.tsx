@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt, Volume2, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt, Volume2, CheckCircle2, XCircle, RotateCcw, RefreshCw, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -83,6 +83,31 @@ interface CompanySummary {
   status: string;
 }
 
+interface SISCompanyOverview {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  planTier: string;
+  domains: string[];
+  memberCount: number;
+  sisReadyCount: number;
+  members: Array<{
+    email: string;
+    role: string;
+    status: string;
+    sisSample: {
+      status: 'ready' | 'processing' | 'error' | 'missing';
+      speakerName: string | null;
+      uploadedAt: string | null;
+      lastTranscribedAt: string | null;
+      lastCheckedAt: string | null;
+      lastMatchScore: number | null;
+      matchCount: number;
+    };
+  }>;
+}
+
 export default function AdminEnterprise() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -124,11 +149,31 @@ export default function AdminEnterprise() {
   // SIS reset
   const [resettingSISEmail, setResettingSISEmail] = useState<string | null>(null);
   
+  // SIS Companies Overview
+  const [sisOverview, setSisOverview] = useState<SISCompanyOverview[]>([]);
+  const [sisTimestamp, setSisTimestamp] = useState<string | null>(null);
+  const [loadingSIS, setLoadingSIS] = useState(false);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadCompanies();
+    loadSISOverview();
   }, []);
+
+  const loadSISOverview = async () => {
+    try {
+      setLoadingSIS(true);
+      const data = await apiClient.getSISCompanies();
+      setSisOverview(data.companies || []);
+      setSisTimestamp(data.timestamp);
+    } catch (error) {
+      console.error('Failed to load SIS overview:', error);
+      // Silently fail - SIS overview is supplementary
+    } finally {
+      setLoadingSIS(false);
+    }
+  };
 
   const loadCompanies = async () => {
     try {
@@ -146,6 +191,11 @@ export default function AdminEnterprise() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper to get SIS data for a company
+  const getSISDataForCompany = (companyId: string) => {
+    return sisOverview.find(c => c.id === companyId);
   };
 
   const handleCreateCompany = async (formData: FormData) => {
@@ -615,8 +665,32 @@ export default function AdminEnterprise() {
         {!selectedCompany ? (
           <Card>
             <CardHeader>
-              <CardTitle>Companies</CardTitle>
-              <CardDescription>All enterprise companies in the system</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Companies</CardTitle>
+                  <CardDescription>All enterprise companies in the system</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {sisTimestamp && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Uppdaterad: {new Date(sisTimestamp).toLocaleTimeString('sv-SE')}
+                    </span>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadSISOverview}
+                    disabled={loadingSIS}
+                  >
+                    {loadingSIS ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -626,32 +700,63 @@ export default function AdminEnterprise() {
                     <TableHead>Status</TableHead>
                     <TableHead>Members</TableHead>
                     <TableHead>Active Members</TableHead>
+                    <TableHead>SIS Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {summaries.map((summary) => (
-                    <TableRow key={summary.id}>
-                      <TableCell className="font-medium">{summary.name}</TableCell>
-                      <TableCell>
-                        <Badge variant={summary.status === 'active' ? 'default' : 'secondary'}>
-                          {summary.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{summary.memberCount}</TableCell>
-                      <TableCell>{summary.activeMemberCount}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => viewCompanyDetails(summary.id)}
-                        >
-                          View Details
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {summaries.map((summary) => {
+                    const sisData = getSISDataForCompany(summary.id);
+                    return (
+                      <TableRow key={summary.id}>
+                        <TableCell className="font-medium">{summary.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={summary.status === 'active' ? 'default' : 'secondary'}>
+                            {summary.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{summary.memberCount}</TableCell>
+                        <TableCell>{summary.activeMemberCount}</TableCell>
+                        <TableCell>
+                          {sisData ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                <span className="text-sm text-muted-foreground">
+                                  {sisData.sisReadyCount}/{sisData.memberCount}
+                                </span>
+                              </div>
+                              {sisData.sisReadyCount === sisData.memberCount && sisData.memberCount > 0 ? (
+                                <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
+                                  Komplett
+                                </Badge>
+                              ) : sisData.sisReadyCount > 0 ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  Delvis
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground text-xs">
+                                  Ingen
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => viewCompanyDetails(summary.id)}
+                          >
+                            View Details
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -1012,9 +1117,10 @@ export default function AdminEnterprise() {
                                         title: 'SIS-prov återställt',
                                         description: `Be ${member.preferredName || member.email} ladda upp ett nytt röstprov.`,
                                       });
-                                      // Refresh company data
+                                      // Refresh company data and SIS overview
                                       const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
                                       setSelectedCompany(updated.company);
+                                      loadSISOverview();
                                     } catch (error: any) {
                                       toast({
                                         title: 'Kunde inte återställa SIS',

@@ -1177,6 +1177,40 @@ class ApiClient {
     return response.json();
   }
 
+  async getSISCompanies(): Promise<{
+    timestamp: string;
+    companies: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      status: string;
+      planTier: string;
+      domains: string[];
+      memberCount: number;
+      sisReadyCount: number;
+      members: Array<{
+        email: string;
+        role: string;
+        status: string;
+        sisSample: {
+          status: 'ready' | 'processing' | 'error' | 'missing';
+          speakerName: string | null;
+          uploadedAt: string | null;
+          lastTranscribedAt: string | null;
+          lastCheckedAt: string | null;
+          lastMatchScore: number | null;
+          matchCount: number;
+        };
+      }>;
+    }>;
+  }> {
+    const response = await this.fetchWithAuth('/admin/sis/companies');
+    if (!response.ok) {
+      throw new Error('Failed to fetch SIS companies overview');
+    }
+    return response.json();
+  }
+
   // Admin operations
   async getAdminUsers(): Promise<any> {
     const response = await this.fetchWithAuth('/admin/users');
