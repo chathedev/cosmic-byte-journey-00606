@@ -39,7 +39,7 @@ interface TranscriptViewerDialogProps {
 }
 
 // Generate consistent colors for speakers
-const getSpeakerColor = (speaker: string): string => {
+const getSpeakerColor = (speaker: string | undefined | null): string => {
   const colors = [
     "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
     "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
@@ -51,12 +51,17 @@ const getSpeakerColor = (speaker: string): string => {
     "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30",
   ];
   
+  // Handle undefined/null/empty speaker
+  if (!speaker || speaker.length === 0) {
+    return colors[0];
+  }
+  
   // Convert speaker letter to index (A=0, B=1, etc.)
   const index = speaker.charCodeAt(0) - 65;
-  return colors[index % colors.length];
+  return colors[Math.abs(index) % colors.length];
 };
 
-const getSpeakerBgColor = (speaker: string): string => {
+const getSpeakerBgColor = (speaker: string | undefined | null): string => {
   const colors = [
     "bg-blue-500",
     "bg-emerald-500",
@@ -68,8 +73,13 @@ const getSpeakerBgColor = (speaker: string): string => {
     "bg-indigo-500",
   ];
   
+  // Handle undefined/null/empty speaker
+  if (!speaker || speaker.length === 0) {
+    return colors[0];
+  }
+  
   const index = speaker.charCodeAt(0) - 65;
-  return colors[index % colors.length];
+  return colors[Math.abs(index) % colors.length];
 };
 
 const formatTime = (ms: number): string => {
