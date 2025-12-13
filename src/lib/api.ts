@@ -1963,7 +1963,7 @@ class ApiClient {
     return response.json();
   }
 
-  async uploadSISSample(audioBlob: Blob): Promise<{
+  async uploadSISSample(audioBlob: Blob, speakerName: string): Promise<{
     ok: boolean;
     sisSample?: {
       status: 'ready' | 'processing' | 'error';
@@ -1980,6 +1980,7 @@ class ApiClient {
 
     const formData = new FormData();
     formData.append('audio', audioBlob, 'voice-sample.webm');
+    formData.append('speakerName', speakerName);
 
     const response = await fetch(`${API_BASE_URL}/sis/sample`, {
       method: 'POST',

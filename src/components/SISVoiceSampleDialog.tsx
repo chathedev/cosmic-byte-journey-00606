@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mic, MicOff, Check, AlertCircle, Loader2, Play, RotateCcw, Upload, Volume2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Mic, MicOff, Check, AlertCircle, Loader2, Play, RotateCcw, Upload, Volume2, User } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,6 +38,7 @@ export function SISVoiceSampleDialog({
   onSampleUploaded 
 }: SISVoiceSampleDialogProps) {
   const { toast } = useToast();
+  const [speakerName, setSpeakerName] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -43,6 +46,8 @@ export function SISVoiceSampleDialog({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [currentSentence, setCurrentSentence] = useState(0);
+
+  const canRecord = speakerName.trim().length >= 2;
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -183,7 +188,7 @@ export function SISVoiceSampleDialog({
     
     setIsUploading(true);
     try {
-      const result = await apiClient.uploadSISSample(audioBlob);
+      const result = await apiClient.uploadSISSample(audioBlob, speakerName.trim());
       
       if (result.ok) {
         toast({
@@ -193,6 +198,7 @@ export function SISVoiceSampleDialog({
         onSampleUploaded?.();
         onOpenChange(false);
         resetRecording();
+        setSpeakerName('');
       } else {
         throw new Error(result.error || 'Upload failed');
       }
@@ -231,6 +237,24 @@ export function SISVoiceSampleDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Speaker Name Input */}
+          <div className="space-y-2">
+            <Label htmlFor="speakerName" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Ditt namn
+            </Label>
+            <Input
+              id="speakerName"
+              placeholder="Ange ditt namn..."
+              value={speakerName}
+              onChange={(e) => setSpeakerName(e.target.value)}
+              disabled={isRecording || !!audioBlob}
+            />
+            <p className="text-xs text-muted-foreground">
+              Namnet kommer att visas i mötestranskriptioner för att identifiera dig.
+            </p>
+          </div>
+
           {/* Current sample status */}
           {currentSample && (
             <Card className={hasValidSample ? 'border-green-500/50 bg-green-500/5' : isProcessing ? 'border-yellow-500/50 bg-yellow-500/5' : ''}>
@@ -338,6 +362,7 @@ export function SISVoiceSampleDialog({
                   size="lg"
                   variant={isRecording ? 'destructive' : 'default'}
                   onClick={isRecording ? stopRecording : startRecording}
+                  disabled={!canRecord && !isRecording}
                   className="gap-2"
                 >
                   {isRecording ? (
@@ -348,7 +373,7 @@ export function SISVoiceSampleDialog({
                   ) : (
                     <>
                       <Mic className="h-5 w-5" />
-                      Starta inspelning
+                      {canRecord ? 'Starta inspelning' : 'Ange namn först'}
                     </>
                   )}
                 </Button>

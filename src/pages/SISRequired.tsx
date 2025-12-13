@@ -2,7 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause, User } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -16,6 +18,7 @@ export default function SISRequired() {
   const navigate = useNavigate();
   const { enterpriseMembership, refreshEnterpriseMembership, isAdmin, isLoading } = useSubscription();
   
+  const [speakerName, setSpeakerName] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -23,6 +26,8 @@ export default function SISRequired() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
+
+  const canRecord = speakerName.trim().length >= 2;
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -148,7 +153,7 @@ export default function SISRequired() {
     
     setIsUploading(true);
     try {
-      const result = await apiClient.uploadSISSample(audioBlob);
+      const result = await apiClient.uploadSISSample(audioBlob, speakerName.trim());
       
       if (result.ok) {
         toast({ title: 'Röstprov uppladdat!', description: 'Du är redo att använda Tivly.' });
@@ -230,6 +235,27 @@ export default function SISRequired() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             Spela in ett kort röstprov så vi kan identifiera dig i möten.
           </p>
+        </motion.div>
+
+        {/* Speaker Name Input */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.22 }}
+          className="space-y-2"
+        >
+          <Label htmlFor="speakerName" className="flex items-center gap-2 text-sm">
+            <User className="h-3.5 w-3.5" />
+            Ditt namn
+          </Label>
+          <Input
+            id="speakerName"
+            placeholder="Ange ditt namn..."
+            value={speakerName}
+            onChange={(e) => setSpeakerName(e.target.value)}
+            disabled={isRecording || !!audioBlob}
+            className="h-10"
+          />
         </motion.div>
 
         {/* Sample Text Card */}
@@ -354,6 +380,7 @@ export default function SISRequired() {
                   size="lg"
                   variant={isRecording ? 'destructive' : 'default'}
                   onClick={isRecording ? stopRecording : startRecording}
+                  disabled={!canRecord && !isRecording}
                   className="gap-2 h-12 px-8 rounded-full"
                 >
                   {isRecording ? (
@@ -364,7 +391,7 @@ export default function SISRequired() {
                   ) : (
                     <>
                       <Mic className="h-4 w-4" />
-                      Starta inspelning
+                      {canRecord ? 'Starta inspelning' : 'Ange namn först'}
                     </>
                   )}
                 </Button>
