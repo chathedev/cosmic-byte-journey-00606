@@ -138,7 +138,8 @@ export const AutoProtocolGenerator = ({
         let speakerInfo: { name: string; segments: number }[] = [];
         
         if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers)) {
-          const SIS_CONFIDENCE_THRESHOLD = 0.70;
+          // 80-100% = Very strong match, 70-79% = Strong match, <70% = Not reliable
+          const SIS_STRONG_THRESHOLD = 0.70;
           
           // Build speaker name map from SIS data
           const speakerNameMap = new Map<string, string>();
@@ -146,7 +147,7 @@ export const AutoProtocolGenerator = ({
           // Use sisMatches for speaker names
           if (sisMatches && sisMatches.length > 0) {
             sisMatches.forEach(match => {
-              if (match.confidencePercent >= SIS_CONFIDENCE_THRESHOLD * 100) {
+              if (match.confidencePercent >= SIS_STRONG_THRESHOLD * 100) {
                 speakerNameMap.set(match.speakerLabel, match.speakerName);
               }
             });
@@ -155,7 +156,7 @@ export const AutoProtocolGenerator = ({
           // Fallback to sisSpeakers if no matches
           if (speakerNameMap.size === 0 && sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
-              if (speaker.similarity && speaker.similarity >= SIS_CONFIDENCE_THRESHOLD && speaker.bestMatchEmail) {
+              if (speaker.similarity && speaker.similarity >= SIS_STRONG_THRESHOLD && speaker.bestMatchEmail) {
                 // Extract name from email (e.g., charlie@wby.se -> Charlie)
                 const namePart = speaker.bestMatchEmail.split('@')[0];
                 const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
