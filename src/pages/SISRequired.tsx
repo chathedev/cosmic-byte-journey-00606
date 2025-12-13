@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause, ArrowRight, ArrowLeft, Volume2, Shield, Sparkles, User, Lightbulb, VolumeX, Timer, MessageSquare } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Mic, MicOff, Check, Loader2, Play, RotateCcw, Upload, Building2, Pause, ArrowRight, ArrowLeft, Volume2, Shield, Sparkles, User, Lightbulb, VolumeX, Timer, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -193,6 +194,8 @@ export default function SISRequired() {
     setStep('record');
   }, [audioUrl]);
 
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
   const uploadSample = useCallback(async () => {
     if (!audioBlob || recordingTime < MIN_RECORDING_TIME) {
       toast({
@@ -209,9 +212,11 @@ export default function SISRequired() {
       
       if (result.ok) {
         clearStoredState();
-        setStep('success');
         await refreshEnterpriseMembership?.();
-        setTimeout(() => window.location.reload(), 2000);
+        // Navigate to home and show success dialog
+        navigate('/', { replace: true });
+        // Use a small delay to ensure navigation completes
+        setTimeout(() => setShowSuccessDialog(true), 100);
       } else {
         throw new Error(result.error || 'Upload failed');
       }
@@ -223,7 +228,34 @@ export default function SISRequired() {
       });
       setStep('review');
     }
-  }, [audioBlob, recordingTime, speakerName, toast, refreshEnterpriseMembership]);
+  }, [audioBlob, recordingTime, speakerName, toast, refreshEnterpriseMembership, navigate]);
+
+  // Success dialog component
+  const SuccessDialog = () => (
+    <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+      <DialogContent className="sm:max-w-md text-center p-8">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", duration: 0.5 }}
+          className="space-y-6"
+        >
+          <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold">Tack, {speakerName}!</h2>
+            <p className="text-muted-foreground">
+              Nu fungerar röstidentifieringen. Ditt namn kommer automatiskt att visas i framtida mötestranskriptioner.
+            </p>
+          </div>
+          <Button onClick={() => setShowSuccessDialog(false)} className="w-full">
+            Stäng
+          </Button>
+        </motion.div>
+      </DialogContent>
+    </Dialog>
+  );
 
   const progress = (recordingTime / MAX_RECORDING_TIME) * 100;
   const isReady = recordingTime >= MIN_RECORDING_TIME;
@@ -672,36 +704,11 @@ export default function SISRequired() {
             </motion.div>
           )}
 
-          {/* Step 7: Success */}
-          {step === 'success' && (
-            <motion.div
-              key="success"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.3 }}
-              className="space-y-8 text-center"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-                className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center mx-auto"
-              >
-                <Check className="h-12 w-12 text-white" />
-              </motion.div>
-              <div className="space-y-3">
-                <h1 className="text-2xl font-semibold tracking-tight">Allt klart, {speakerName}</h1>
-                <p className="text-muted-foreground">
-                  Ditt röstprov har sparats. Du kan nu använda Tivly.
-                </p>
-              </div>
-              <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-            </motion.div>
-          )}
         </AnimatePresence>
       </div>
+
+      {/* Success Dialog */}
+      <SuccessDialog />
     </div>
   );
 }
