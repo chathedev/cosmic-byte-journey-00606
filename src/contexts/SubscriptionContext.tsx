@@ -71,7 +71,7 @@ interface SubscriptionContextType {
   incrementProtocolCount: (meetingId: string) => Promise<void>;
 }
 
-const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
+export const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
