@@ -198,6 +198,14 @@ export default function AdminEnterprise() {
     return sisOverview.find(c => c.id === companyId);
   };
 
+  // Helper to get SIS data for a member from the SIS overview (more accurate than company data)
+  const getMemberSISStatus = (companyId: string, memberEmail: string) => {
+    const sisCompany = getSISDataForCompany(companyId);
+    if (!sisCompany) return null;
+    const sisMember = sisCompany.members.find(m => m.email.toLowerCase() === memberEmail.toLowerCase());
+    return sisMember?.sisSample || null;
+  };
+
   const handleCreateCompany = async (formData: FormData) => {
     const name = formData.get('name') as string;
     const contactEmail = formData.get('contactEmail') as string;
@@ -909,18 +917,29 @@ export default function AdminEnterprise() {
                         Medlemmar kan spela in röstprov för att identifieras automatiskt i möten.
                       </p>
                       <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1.5">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          <span className="text-muted-foreground">
-                            {selectedCompany.members.filter(m => m.sisSample?.status === 'ready').length} verifierade
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <XCircle className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {selectedCompany.members.filter(m => !m.sisSample || m.sisSample?.status !== 'ready').length} ej verifierade
-                          </span>
-                        </div>
+                        {(() => {
+                          const sisCompanyData = getSISDataForCompany(selectedCompany.id);
+                          const verifiedCount = sisCompanyData?.sisReadyCount ?? 
+                            selectedCompany.members.filter(m => m.sisSample?.status === 'ready').length;
+                          const totalCount = sisCompanyData?.memberCount ?? selectedCompany.members.length;
+                          const unverifiedCount = totalCount - verifiedCount;
+                          return (
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                <span className="text-muted-foreground">
+                                  {verifiedCount} verifierade
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <XCircle className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground">
+                                  {unverifiedCount} ej verifierade
+                                </span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -1063,7 +1082,10 @@ export default function AdminEnterprise() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedCompany.members.map((member) => (
+                    {selectedCompany.members.map((member) => {
+                      // Use SIS overview data for accurate status (falls back to company data)
+                      const sisSampleData = getMemberSISStatus(selectedCompany.id, member.email) || member.sisSample;
+                      return (
                       <TableRow key={member.email}>
                         <TableCell>
                           <div className="flex flex-col">
@@ -1087,12 +1109,12 @@ export default function AdminEnterprise() {
                         {selectedCompany.preferences?.speakerIdentificationEnabled && (
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              {member.sisSample?.status === 'ready' ? (
+                              {sisSampleData?.status === 'ready' ? (
                                 <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
                                   <CheckCircle2 className="h-3 w-3 mr-1" />
                                   Verifierad
                                 </Badge>
-                              ) : member.sisSample?.status === 'processing' ? (
+                              ) : sisSampleData?.status === 'processing' ? (
                                 <Badge variant="secondary">
                                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                                   Bearbetas
@@ -1103,7 +1125,7 @@ export default function AdminEnterprise() {
                                   Ej verifierad
                                 </Badge>
                               )}
-                              {member.sisSample?.status === 'ready' && (
+                              {sisSampleData?.status === 'ready' && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1164,7 +1186,8 @@ export default function AdminEnterprise() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
