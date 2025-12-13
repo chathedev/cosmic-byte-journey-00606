@@ -1053,7 +1053,7 @@ const Library = () => {
                       >
                         <div className="relative">
                           <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground transition-colors">
-                            {meeting.transcript}
+                            {meeting.transcript || ''}
                           </p>
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/80 pointer-events-none" />
                           <span className="text-xs text-primary font-medium mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
