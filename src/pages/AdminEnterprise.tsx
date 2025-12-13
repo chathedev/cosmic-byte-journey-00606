@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt, Volume2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt, Volume2, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -120,6 +120,9 @@ export default function AdminEnterprise() {
   // Trial management
   const [showTrialDialog, setShowTrialDialog] = useState(false);
   const [trialDays, setTrialDays] = useState<number>(7);
+  
+  // SIS reset
+  const [resettingSISEmail, setResettingSISEmail] = useState<string | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -978,22 +981,60 @@ export default function AdminEnterprise() {
                         </TableCell>
                         {selectedCompany.preferences?.speakerIdentificationEnabled && (
                           <TableCell>
-                            {member.sisSample?.status === 'ready' ? (
-                              <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Verifierad
-                              </Badge>
-                            ) : member.sisSample?.status === 'processing' ? (
-                              <Badge variant="secondary">
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Bearbetas
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-muted-foreground">
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Ej verifierad
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {member.sisSample?.status === 'ready' ? (
+                                <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Verifierad
+                                </Badge>
+                              ) : member.sisSample?.status === 'processing' ? (
+                                <Badge variant="secondary">
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Bearbetas
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground">
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Ej verifierad
+                                </Badge>
+                              )}
+                              {member.sisSample?.status === 'ready' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  disabled={resettingSISEmail === member.email}
+                                  onClick={async () => {
+                                    setResettingSISEmail(member.email);
+                                    try {
+                                      await apiClient.resetUserSIS(member.email);
+                                      toast({
+                                        title: 'SIS-prov återställt',
+                                        description: `Be ${member.preferredName || member.email} ladda upp ett nytt röstprov.`,
+                                      });
+                                      // Refresh company data
+                                      const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
+                                      setSelectedCompany(updated.company);
+                                    } catch (error: any) {
+                                      toast({
+                                        title: 'Kunde inte återställa SIS',
+                                        description: error?.message || 'Ett oväntat fel uppstod',
+                                        variant: 'destructive',
+                                      });
+                                    } finally {
+                                      setResettingSISEmail(null);
+                                    }
+                                  }}
+                                  title="Återställ SIS-prov"
+                                >
+                                  {resettingSISEmail === member.email ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <RotateCcw className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         )}
                         <TableCell>{new Date(member.addedAt).toLocaleDateString()}</TableCell>

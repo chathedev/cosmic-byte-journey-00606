@@ -1152,6 +1152,31 @@ class ApiClient {
     return response.json();
   }
 
+  async resetUserSIS(email: string): Promise<{
+    ok: boolean;
+    message: string;
+    sisSample: {
+      status: 'missing';
+      speakerName: null;
+      uploadedAt: null;
+      lastTranscribedAt: null;
+      lastCheckedAt: null;
+      lastMatchScore: null;
+      matches: [];
+      error: null;
+    };
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/users/${encodeURIComponent(email)}/reset-sis`,
+      { method: 'POST' }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to reset SIS sample' }));
+      throw new Error(error.error || 'Failed to reset SIS sample');
+    }
+    return response.json();
+  }
+
   // Admin operations
   async getAdminUsers(): Promise<any> {
     const response = await this.fetchWithAuth('/admin/users');
