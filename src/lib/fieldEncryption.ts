@@ -46,12 +46,17 @@ const CRYPTO_KEY_CACHE = 'tivly_crypto_key_cache';
 const decodeBase64 = (value: string): Uint8Array => {
   try {
     // Validate base64 string before decoding
-    if (!value || typeof value !== 'string') {
+    if (!value || typeof value !== 'string' || value.trim().length === 0) {
       throw new Error('Invalid base64 input: empty or not a string');
     }
     
     // Remove any whitespace
-    let cleaned = value.replace(/\s/g, '');
+    let cleaned = value.trim().replace(/\s/g, '');
+    
+    // Check minimum length for a valid key (at least 32 bytes = 43 base64 chars)
+    if (cleaned.length < 10) {
+      throw new Error('Base64 string too short to be valid key');
+    }
     
     // Handle URL-safe base64 (replace - with + and _ with /)
     cleaned = cleaned.replace(/-/g, '+').replace(/_/g, '/');
@@ -66,7 +71,13 @@ const decodeBase64 = (value: string): Uint8Array => {
       throw new Error('Invalid base64 format');
     }
     
-    return Uint8Array.from(atob(cleaned), (char) => char.charCodeAt(0));
+    // Use safer decoding approach
+    const binaryString = atob(cleaned);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   } catch (error) {
     console.error('Base64 decode error:', error);
     throw new Error(`Failed to decode base64: ${error instanceof Error ? error.message : 'Unknown error'}`);
