@@ -30,8 +30,13 @@ const getSpeakerFromSegment = (segment: TranscriptSegment): string => {
   return segment.speakerId || segment.speaker || 'unknown';
 };
 
-// Confidence threshold for SIS match (70%)
-const SIS_CONFIDENCE_THRESHOLD = 0.70;
+// Confidence thresholds for SIS match:
+// 80-100% = Very strong match (same person)
+// 70-79% = Strong match (likely same person)  
+// 60-69% = Weak/possible match; not reliable
+// 0-59% = Noise; treat as not the same person
+const SIS_STRONG_THRESHOLD = 0.70; // Minimum for attribution
+const SIS_VERY_STRONG_THRESHOLD = 0.80; // High confidence
 
 interface TranscriptViewerDialogProps {
   open: boolean;
@@ -107,7 +112,7 @@ export function TranscriptViewerDialog({
         const speakerSegments = segments.filter(s => getSpeakerFromSegment(s) === speakerId);
         
         for (const sisSpeaker of sisSpeakers) {
-          if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_CONFIDENCE_THRESHOLD && sisSpeaker.bestMatchEmail) {
+          if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_STRONG_THRESHOLD && sisSpeaker.bestMatchEmail) {
             const hasOverlap = speakerSegments.some(seg => 
               sisSpeaker.segments?.some(sisSeg => hasTimeOverlap(seg, sisSeg))
             );
@@ -130,7 +135,7 @@ export function TranscriptViewerDialog({
       // If only one speaker in both and no overlap found, map them directly
       if (Object.keys(map).length === 0 && transcriptSpeakerIds.length === 1 && sisSpeakers.length === 1) {
         const sisSpeaker = sisSpeakers[0];
-        if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_CONFIDENCE_THRESHOLD && sisSpeaker.bestMatchEmail) {
+        if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_STRONG_THRESHOLD && sisSpeaker.bestMatchEmail) {
           const matchWithName = sisMatches?.find(m => m.sampleOwnerEmail === sisSpeaker.bestMatchEmail);
           const speakerName = (matchWithName as any)?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
           
@@ -146,7 +151,7 @@ export function TranscriptViewerDialog({
     // Also check sisMatches directly for speakerLabel mapping
     if (sisMatches && sisMatches.length > 0) {
       sisMatches.forEach(match => {
-        if (match.speakerLabel && match.score >= SIS_CONFIDENCE_THRESHOLD) {
+        if (match.speakerLabel && match.score >= SIS_STRONG_THRESHOLD) {
           const speakerName = (match as any).speakerName || match.sampleOwnerEmail.split('@')[0];
           
           if (transcriptSpeakerIds.includes(match.speakerLabel)) {
