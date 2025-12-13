@@ -18,13 +18,19 @@ export interface TranscriptWord {
 }
 
 export interface TranscriptSegment {
-  speaker: string;
+  speaker?: string;      // Legacy field
+  speakerId?: string;    // ElevenLabs uses speakerId
   text: string;
   start: number;
   end: number;
-  confidence: number;
+  confidence?: number;
   words?: TranscriptWord[];
 }
+
+// Helper to get speaker identifier from segment (handles both speakerId and speaker)
+const getSpeakerFromSegment = (segment: TranscriptSegment): string => {
+  return segment.speakerId || segment.speaker || 'unknown';
+};
 
 interface TranscriptViewerDialogProps {
   open: boolean;
@@ -123,7 +129,8 @@ export function TranscriptViewerDialog({
       if (segments && segments.length > 0) {
         textToCopy = segments
           .map(s => {
-            const name = speakerNames[s.speaker] || `Talare ${s.speaker}`;
+            const speakerKey = getSpeakerFromSegment(s);
+            const name = speakerNames[speakerKey] || `Talare ${speakerKey}`;
             return `[${name}] ${s.text}`;
           })
           .join('\n\n');
@@ -206,12 +213,18 @@ export function TranscriptViewerDialog({
   };
 
   const getSpeakerDisplayName = (speaker: string): string => {
-    return speakerNames[speaker] || `Talare ${speaker}`;
+    if (speakerNames[speaker]) return speakerNames[speaker];
+    // Format "speaker_0" to "Talare 1", "speaker_1" to "Talare 2", etc.
+    const match = speaker.match(/speaker_(\d+)/i);
+    if (match) {
+      return `Talare ${parseInt(match[1], 10) + 1}`;
+    }
+    return `Talare ${speaker}`;
   };
 
   // Get unique speakers
   const uniqueSpeakers = segments 
-    ? [...new Set(segments.map(s => s.speaker))].sort()
+    ? [...new Set(segments.map(s => getSpeakerFromSegment(s)))].filter(s => s !== 'unknown').sort()
     : [];
 
   // Calculate total duration
@@ -351,16 +364,16 @@ export function TranscriptViewerDialog({
                   transition={{ delay: index * 0.02, duration: 0.2 }}
                   className="group"
                 >
-                  <div className={`rounded-xl border p-4 ${getSpeakerColor(segment.speaker)} transition-all hover:shadow-md`}>
+                  <div className={`rounded-xl border p-4 ${getSpeakerColor(getSpeakerFromSegment(segment))} transition-all hover:shadow-md`}>
                     <div className="flex items-center gap-2 mb-3">
-                      <div className={`w-8 h-8 rounded-full ${getSpeakerBgColor(segment.speaker)} flex items-center justify-center shadow-sm`}>
+                      <div className={`w-8 h-8 rounded-full ${getSpeakerBgColor(getSpeakerFromSegment(segment))} flex items-center justify-center shadow-sm`}>
                         <span className="text-xs font-bold text-white">
-                          {speakerNames[segment.speaker]?.charAt(0)?.toUpperCase() || segment.speaker}
+                          {speakerNames[getSpeakerFromSegment(segment)]?.charAt(0)?.toUpperCase() || getSpeakerFromSegment(segment).replace('speaker_', '').charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold">
-                          {getSpeakerDisplayName(segment.speaker)}
+                          {getSpeakerDisplayName(getSpeakerFromSegment(segment))}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
                           {formatTime(segment.start)} - {formatTime(segment.end)}
