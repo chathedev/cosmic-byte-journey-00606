@@ -8,15 +8,48 @@ const BACKEND_API_URL = 'https://api.tivly.se';
 const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
 const MAX_POLL_ATTEMPTS = 600; // Max 30 minutes of polling
 
+// SpeechBrain SIS Speaker Match
 export interface SISMatch {
   meetingId: string;
   meetingOwnerEmail: string;
   sampleOwnerEmail: string;
   score: number;
   confidencePercent: number;
+  speakerLabel?: string;
+  segments?: Array<{ start: number; end: number }>;
+  durationSeconds?: number;
+  text?: string;
   matchedWords: number;
   totalSampleWords: number;
   updatedAt: string;
+}
+
+// SpeechBrain Speaker Identification
+export interface SISSpeaker {
+  label: string;
+  segments: Array<{ start: number; end: number }>;
+  durationSeconds: number;
+  bestMatchEmail?: string;
+  similarity?: number;
+}
+
+// SIS Status types
+export type SISStatusType = 
+  | 'queued' 
+  | 'processing' 
+  | 'done' 
+  | 'no_samples' 
+  | 'error' 
+  | 'disabled' 
+  | 'missing_owner';
+
+export interface SISStatus {
+  status: SISStatusType;
+  sisSpeakers?: SISSpeaker[];
+  sisMatches?: SISMatch[];
+  sisMatch?: SISMatch;
+  sisError?: string;
+  transcript?: string;
 }
 
 export interface ASRResult {
@@ -27,8 +60,10 @@ export interface ASRResult {
   processing_time?: number;
   error?: string;
   meetingId?: string;
+  sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];
   sisMatch?: SISMatch;
+  sisSpeakers?: SISSpeaker[];
 }
 
 export interface TranscriptWord {
@@ -55,8 +90,10 @@ export interface ASRStatus {
   transcriptSegments?: TranscriptSegment[];
   error?: string;
   duration?: number;
+  sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];
   sisMatch?: SISMatch;
+  sisSpeakers?: SISSpeaker[];
 }
 
 export interface UploadProgress {
@@ -238,11 +275,20 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     const data = await response.json();
     debugLog('📊 ASR status:', data.status, data.progress ? `${data.progress}%` : '');
     
-    // Log SIS matches if available
+    // Log SIS status and matches if available
+    if (data.sisStatus) {
+      debugLog('🔍 SIS status:', data.sisStatus);
+    }
+    if (data.sisSpeakers && data.sisSpeakers.length > 0) {
+      debugLog('🗣️ SIS speakers found:', data.sisSpeakers.length);
+      data.sisSpeakers.forEach((speaker: SISSpeaker) => {
+        debugLog(`   - ${speaker.label}: ${speaker.durationSeconds?.toFixed(1)}s${speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${(speaker.similarity || 0) * 100}%)` : ''}`);
+      });
+    }
     if (data.sisMatches && data.sisMatches.length > 0) {
       debugLog('🎯 SIS matches found:', data.sisMatches.length, 'match(es)');
       data.sisMatches.forEach((match: SISMatch) => {
-        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}% (${match.matchedWords} words)`);
+        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}% (${match.matchedWords} words)${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}`);
       });
     }
     
@@ -253,8 +299,10 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       transcriptSegments: data.transcriptSegments,
       error: data.error,
       duration: data.duration,
+      sisStatus: data.sisStatus,
       sisMatches: data.sisMatches || [],
       sisMatch: data.sisMatch,
+      sisSpeakers: data.sisSpeakers || [],
     };
   } catch (error: any) {
     // Network error - keep polling as queued
@@ -302,8 +350,11 @@ export async function waitForASRCompletion(
       case 'completed':
       case 'done':
         debugLog('✅ ASR completed!');
+        if (status.sisStatus) {
+          debugLog(`🔍 SIS status: ${status.sisStatus}`);
+        }
         if (status.sisMatch) {
-          debugLog(`🎯 Best SIS match: ${status.sisMatch.sampleOwnerEmail} (${status.sisMatch.confidencePercent}%)`);
+          debugLog(`🎯 Best SIS match: ${status.sisMatch.sampleOwnerEmail} (${status.sisMatch.confidencePercent}%)${status.sisMatch.speakerLabel ? ` [${status.sisMatch.speakerLabel}]` : ''}`);
         }
         return {
           success: true,
@@ -311,8 +362,10 @@ export async function waitForASRCompletion(
           transcriptSegments: status.transcriptSegments,
           duration: status.duration,
           meetingId,
+          sisStatus: status.sisStatus,
           sisMatches: status.sisMatches,
           sisMatch: status.sisMatch,
+          sisSpeakers: status.sisSpeakers,
         };
         
       case 'error':
@@ -412,6 +465,74 @@ export async function transcribeAndSave(
     duration: pollResult.duration,
     meetingId
   };
+}
+
+/**
+ * Poll SIS status independently by meetingId
+ * Use this for monitoring SpeechBrain speaker identification separately from transcript
+ */
+export async function pollSISStatus(meetingId: string): Promise<SISStatus> {
+  const token = localStorage.getItem('authToken');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const response = await fetch(`${BACKEND_API_URL}/asr/sis-status?meetingId=${encodeURIComponent(meetingId)}`, {
+      method: 'GET',
+      headers,
+    });
+
+    // 404 = job not registered yet
+    if (response.status === 404) {
+      debugLog('🔍 SIS status: 404 - job not found');
+      return { status: 'queued' };
+    }
+
+    if (!response.ok) {
+      debugLog('🔍 SIS status check failed:', response.status);
+      return { status: 'queued' };
+    }
+
+    const data = await response.json();
+    debugLog('🔍 SIS status:', data.status);
+    
+    // Log speakers if available
+    if (data.sisSpeakers && data.sisSpeakers.length > 0) {
+      debugLog('🗣️ SIS speakers:', data.sisSpeakers.length);
+      data.sisSpeakers.forEach((speaker: SISSpeaker) => {
+        debugLog(`   - ${speaker.label}: ${speaker.durationSeconds?.toFixed(1)}s${speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail}` : ''}`);
+      });
+    }
+    
+    // Log matches if available
+    if (data.sisMatches && data.sisMatches.length > 0) {
+      debugLog('🎯 SIS matches:', data.sisMatches.length);
+      data.sisMatches.forEach((match: SISMatch) => {
+        const details = [
+          `${match.confidencePercent}%`,
+          match.speakerLabel ? `[${match.speakerLabel}]` : '',
+          match.durationSeconds ? `${match.durationSeconds.toFixed(1)}s` : ''
+        ].filter(Boolean).join(' ');
+        debugLog(`   - ${match.sampleOwnerEmail}: ${details}`);
+      });
+    }
+    
+    return {
+      status: data.status || 'queued',
+      sisSpeakers: data.sisSpeakers || [],
+      sisMatches: data.sisMatches || [],
+      sisMatch: data.sisMatch,
+      sisError: data.sisError,
+      transcript: data.transcript,
+    };
+  } catch (error: any) {
+    debugLog('🔍 SIS status network error');
+    return { status: 'queued' };
+  }
 }
 
 // Legacy exports for backwards compatibility

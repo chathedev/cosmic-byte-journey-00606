@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, SISMatch, TranscriptSegment } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment } from '@/lib/asrService';
 
 const POLL_INTERVAL_MS = 3000;
 
 interface UseASRPollingOptions {
-  onComplete?: (transcript: string, sisMatches?: SISMatch[], sisMatch?: SISMatch) => void;
+  onComplete?: (transcript: string, sisMatches?: SISMatch[], sisMatch?: SISMatch, sisSpeakers?: SISSpeaker[]) => void;
   onError?: (error: string) => void;
 }
 
@@ -18,8 +18,10 @@ export function useASRPolling(
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [sisStatus, setSisStatus] = useState<SISStatusType | null>(null);
   const [sisMatches, setSisMatches] = useState<SISMatch[]>([]);
   const [sisMatch, setSisMatch] = useState<SISMatch | null>(null);
+  const [sisSpeakers, setSisSpeakers] = useState<SISSpeaker[]>([]);
   
   const pollingRef = useRef(false);
   const meetingIdRef = useRef(meetingId);
@@ -50,10 +52,27 @@ export function useASRPolling(
         if (result.status === 'completed' || result.status === 'done') {
           setTranscript(result.transcript || null);
           setTranscriptSegments(result.transcriptSegments || null);
+          setSisStatus(result.sisStatus || null);
           setSisMatches(result.sisMatches || []);
           setSisMatch(result.sisMatch || null);
+          setSisSpeakers(result.sisSpeakers || []);
           stopPolling();
-          options.onComplete?.(result.transcript || '', result.sisMatches, result.sisMatch);
+          
+          // Log SIS results
+          if (result.sisStatus) {
+            console.log(`🔍 SIS status: ${result.sisStatus}`);
+          }
+          if (result.sisSpeakers && result.sisSpeakers.length > 0) {
+            console.log(`🗣️ SIS speakers: ${result.sisSpeakers.length}`);
+            result.sisSpeakers.forEach(speaker => {
+              console.log(`   - ${speaker.label}: ${speaker.durationSeconds?.toFixed(1)}s${speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail}` : ''}`);
+            });
+          }
+          if (result.sisMatch) {
+            console.log(`🎯 Best SIS match: ${result.sisMatch.sampleOwnerEmail} (${result.sisMatch.confidencePercent}%)${result.sisMatch.speakerLabel ? ` [${result.sisMatch.speakerLabel}]` : ''}`);
+          }
+          
+          options.onComplete?.(result.transcript || '', result.sisMatches, result.sisMatch, result.sisSpeakers);
           return;
         }
         
@@ -93,8 +112,10 @@ export function useASRPolling(
     transcriptSegments,
     error,
     isPolling,
+    sisStatus,
     sisMatches,
     sisMatch,
+    sisSpeakers,
     stopPolling,
     startPolling,
   };
