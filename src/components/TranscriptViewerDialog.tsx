@@ -3,11 +3,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, User, Clock, Edit3, Save, X, Check } from "lucide-react";
+import { Copy, User, Clock, Edit3, Save, X, Check, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { backendApi } from "@/lib/backendApi";
+import { SISSpeaker, SISMatch } from "@/lib/asrService";
 
 export interface TranscriptWord {
   text: string;
@@ -32,6 +33,9 @@ const getSpeakerFromSegment = (segment: TranscriptSegment): string => {
   return segment.speakerId || segment.speaker || 'unknown';
 };
 
+// Confidence threshold for SIS match (70%)
+const SIS_CONFIDENCE_THRESHOLD = 0.70;
+
 interface TranscriptViewerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,7 +45,9 @@ interface TranscriptViewerDialogProps {
   meetingId?: string;
   initialSpeakerNames?: Record<string, string>;
   onSpeakerNamesChange?: (names: Record<string, string>) => void;
-  speakerIdentificationEnabled?: boolean; // Controls whether to show individual speaker segments
+  speakerIdentificationEnabled?: boolean;
+  sisSpeakers?: SISSpeaker[];
+  sisMatches?: SISMatch[];
 }
 
 // Generate consistent colors for speakers
@@ -88,11 +94,21 @@ const getSpeakerBgColor = (speaker: string | undefined | null): string => {
   return colors[Math.abs(index) % colors.length];
 };
 
-const formatTime = (ms: number): string => {
-  const totalSeconds = Math.floor(ms / 1000);
+// Format time - handles both milliseconds and seconds
+const formatTime = (time: number): string => {
+  // If time is less than 1000, it's likely in seconds, otherwise milliseconds
+  const totalSeconds = time > 1000 ? Math.floor(time / 1000) : Math.floor(time);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+// Get underline color for identified speakers
+const getSpeakerUnderlineColor = (isIdentified: boolean, confidence: number): string => {
+  if (!isIdentified) return '';
+  if (confidence >= 0.85) return 'border-b-2 border-emerald-500/60';
+  if (confidence >= 0.70) return 'border-b-2 border-amber-500/50';
+  return '';
 };
 
 export function TranscriptViewerDialog({
@@ -105,6 +121,8 @@ export function TranscriptViewerDialog({
   initialSpeakerNames,
   onSpeakerNamesChange,
   speakerIdentificationEnabled = false,
+  sisSpeakers,
+  sisMatches,
 }: TranscriptViewerDialogProps) {
   const { toast } = useToast();
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>(initialSpeakerNames || {});
@@ -112,6 +130,44 @@ export function TranscriptViewerDialog({
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Build speaker identification map from SIS data
+  const sisIdentifiedSpeakers = useMemo(() => {
+    const map: Record<string, { name: string; email: string; confidence: number }> = {};
+    
+    // First, try sisSpeakers (new format)
+    if (sisSpeakers && sisSpeakers.length > 0) {
+      sisSpeakers.forEach(speaker => {
+        if (speaker.bestMatchEmail && speaker.similarity && speaker.similarity >= SIS_CONFIDENCE_THRESHOLD) {
+          // Find the matching sisMatch for speaker name
+          const matchWithName = sisMatches?.find(m => m.sampleOwnerEmail === speaker.bestMatchEmail);
+          const speakerName = (matchWithName as any)?.speakerName || speaker.bestMatchEmail.split('@')[0];
+          
+          map[speaker.label] = {
+            name: speakerName,
+            email: speaker.bestMatchEmail,
+            confidence: speaker.similarity,
+          };
+        }
+      });
+    }
+    
+    // Also check sisMatches for legacy format
+    if (sisMatches && sisMatches.length > 0) {
+      sisMatches.forEach(match => {
+        if (match.speakerLabel && match.score >= SIS_CONFIDENCE_THRESHOLD) {
+          const speakerName = (match as any).speakerName || match.sampleOwnerEmail.split('@')[0];
+          map[match.speakerLabel] = {
+            name: speakerName,
+            email: match.sampleOwnerEmail,
+            confidence: match.score,
+          };
+        }
+      });
+    }
+    
+    return map;
+  }, [sisSpeakers, sisMatches]);
 
   // Sync with initial speaker names when dialog opens
   useEffect(() => {
@@ -213,7 +269,13 @@ export function TranscriptViewerDialog({
   };
 
   const getSpeakerDisplayName = (speaker: string): string => {
+    // First check custom names
     if (speakerNames[speaker]) return speakerNames[speaker];
+    
+    // Then check SIS identified speakers
+    const sisMatch = sisIdentifiedSpeakers[speaker];
+    if (sisMatch) return sisMatch.name;
+    
     // Format "speaker_0" to "Talare 1", "speaker_1" to "Talare 2", etc.
     const match = speaker.match(/speaker_(\d+)/i);
     if (match) {
@@ -222,10 +284,23 @@ export function TranscriptViewerDialog({
     return `Talare ${speaker}`;
   };
 
+  // Check if speaker is SIS-identified
+  const isSISIdentified = (speaker: string): boolean => {
+    return !!sisIdentifiedSpeakers[speaker];
+  };
+
+  // Get SIS confidence for speaker
+  const getSISConfidence = (speaker: string): number => {
+    return sisIdentifiedSpeakers[speaker]?.confidence || 0;
+  };
+
   // Get unique speakers
   const uniqueSpeakers = segments 
     ? [...new Set(segments.map(s => getSpeakerFromSegment(s)))].filter(s => s !== 'unknown').sort()
     : [];
+
+  // Count identified speakers
+  const identifiedCount = uniqueSpeakers.filter(s => isSISIdentified(s)).length;
 
   // Calculate total duration
   const totalDuration = segments && segments.length > 0
@@ -247,6 +322,12 @@ export function TranscriptViewerDialog({
                   <div className="flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5" />
                     <span>{uniqueSpeakers.length} talare</span>
+                    {identifiedCount > 0 && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+                        <UserCheck className="w-3 h-3" />
+                        {identifiedCount} identifierad{identifiedCount !== 1 ? 'e' : ''}
+                      </Badge>
+                    )}
                   </div>
                 )}
                 {totalDuration > 0 && (
@@ -286,66 +367,78 @@ export function TranscriptViewerDialog({
           {speakerIdentificationEnabled && uniqueSpeakers.length > 0 && (
             <div className="mt-4 space-y-2">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Klicka för att redigera talarnamn
+                {identifiedCount > 0 ? 'Identifierade talare' : 'Klicka för att redigera talarnamn'}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
-                {uniqueSpeakers.map(speaker => (
-                  <AnimatePresence key={speaker} mode="wait">
-                    {editingSpeaker === speaker ? (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="flex items-center gap-1"
-                      >
-                        <div className={`w-3 h-3 rounded-full ${getSpeakerBgColor(speaker)} shrink-0`} />
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveEdit(speaker);
-                            if (e.key === 'Escape') handleCancelEdit();
-                          }}
-                          placeholder={`Talare ${speaker}`}
-                          className="h-7 w-32 text-sm"
-                          autoFocus
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleSaveEdit(speaker)}
+                {uniqueSpeakers.map(speaker => {
+                  const isIdentified = isSISIdentified(speaker);
+                  const confidence = getSISConfidence(speaker);
+                  
+                  return (
+                    <AnimatePresence key={speaker} mode="wait">
+                      {editingSpeaker === speaker ? (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="flex items-center gap-1"
                         >
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={handleCancelEdit}
+                          <div className={`w-3 h-3 rounded-full ${getSpeakerBgColor(speaker)} shrink-0`} />
+                          <Input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(speaker);
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            placeholder={`Talare ${speaker}`}
+                            className="h-7 w-32 text-sm"
+                            autoFocus
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleSaveEdit(speaker)}
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleCancelEdit}
+                          >
+                            <X className="w-3.5 h-3.5 text-muted-foreground" />
+                          </Button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
                         >
-                          <X className="w-3.5 h-3.5 text-muted-foreground" />
-                        </Button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                      >
-                        <Badge
-                          variant="outline"
-                          className={`${getSpeakerColor(speaker)} gap-1.5 py-1.5 px-3 cursor-pointer hover:opacity-80 transition-opacity group`}
-                          onClick={() => handleStartEdit(speaker)}
-                        >
-                          <div className={`w-2.5 h-2.5 rounded-full ${getSpeakerBgColor(speaker)}`} />
-                          <span className="font-medium">{getSpeakerDisplayName(speaker)}</span>
-                          <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-70 transition-opacity ml-1" />
-                        </Badge>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                ))}
+                          <Badge
+                            variant="outline"
+                            className={`${getSpeakerColor(speaker)} gap-1.5 py-1.5 px-3 cursor-pointer hover:opacity-80 transition-opacity group ${isIdentified ? getSpeakerUnderlineColor(true, confidence) : ''}`}
+                            onClick={() => handleStartEdit(speaker)}
+                          >
+                            <div className={`w-2.5 h-2.5 rounded-full ${getSpeakerBgColor(speaker)}`} />
+                            <span className="font-medium">{getSpeakerDisplayName(speaker)}</span>
+                            {isIdentified && (
+                              <span className="text-[10px] opacity-70 ml-0.5">
+                                {Math.round(confidence * 100)}%
+                              </span>
+                            )}
+                            {!isIdentified && (
+                              <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-70 transition-opacity ml-1" />
+                            )}
+                          </Badge>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -356,41 +449,53 @@ export function TranscriptViewerDialog({
           <div className="p-6 space-y-4">
             {speakerIdentificationEnabled && segments && segments.length > 0 ? (
               // Show diarized transcript with speaker segments
-              segments.map((segment, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.02, duration: 0.2 }}
-                  className="group"
-                >
-                  <div className={`rounded-xl border p-4 ${getSpeakerColor(getSpeakerFromSegment(segment))} transition-all hover:shadow-md`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className={`w-8 h-8 rounded-full ${getSpeakerBgColor(getSpeakerFromSegment(segment))} flex items-center justify-center shadow-sm`}>
-                        <span className="text-xs font-bold text-white">
-                          {speakerNames[getSpeakerFromSegment(segment)]?.charAt(0)?.toUpperCase() || getSpeakerFromSegment(segment).replace('speaker_', '').charAt(0).toUpperCase()}
-                        </span>
+              segments.map((segment, index) => {
+                const speakerKey = getSpeakerFromSegment(segment);
+                const isIdentified = isSISIdentified(speakerKey);
+                const confidence = getSISConfidence(speakerKey);
+                const displayName = getSpeakerDisplayName(speakerKey);
+                
+                return (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.02, duration: 0.2 }}
+                    className="group"
+                  >
+                    <div className={`rounded-xl border p-4 ${getSpeakerColor(speakerKey)} transition-all hover:shadow-md ${isIdentified ? getSpeakerUnderlineColor(true, confidence) : ''}`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`w-8 h-8 rounded-full ${getSpeakerBgColor(speakerKey)} flex items-center justify-center shadow-sm`}>
+                          <span className="text-xs font-bold text-white">
+                            {displayName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold">
+                              {displayName}
+                            </span>
+                            {isIdentified && (
+                              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                                {Math.round(confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTime(segment.start)} – {formatTime(segment.end)}
+                          </span>
+                        </div>
+                        {isIdentified && (
+                          <UserCheck className="w-4 h-4 text-emerald-500 ml-auto opacity-60" />
+                        )}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold">
-                          {getSpeakerDisplayName(getSpeakerFromSegment(segment))}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {formatTime(segment.start)} - {formatTime(segment.end)}
-                        </span>
-                      </div>
-                      {segment.confidence && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-auto">
-                          {Math.round(segment.confidence * 100)}% säkerhet
-                        </Badge>
-                      )}
+                      <p className="text-sm leading-relaxed pl-10">
+                        {segment.text}
+                      </p>
                     </div>
-                    <p className="text-sm leading-relaxed pl-10">
-                      {segment.text}
-                    </p>
-                  </div>
-                </motion.div>
-              ))
+                  </motion.div>
+                );
+              })
             ) : (
               // Show plain transcript
               <div className="prose prose-sm dark:prose-invert max-w-none">

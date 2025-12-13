@@ -25,7 +25,7 @@ import { apiClient } from "@/lib/api";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
 import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus, getDemoProtocol } from "@/utils/demoData";
 import { TranscriptionStatusWidget } from "@/components/TranscriptionStatusWidget";
-import { pollASRStatus } from "@/lib/asrService";
+import { pollASRStatus, SISSpeaker, SISMatch } from "@/lib/asrService";
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { TranscriptViewerDialog } from "@/components/TranscriptViewerDialog";
 
@@ -99,7 +99,7 @@ const Library = () => {
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
-  const [viewingTranscript, setViewingTranscript] = useState<{ meeting: MeetingSession; segments?: TranscriptSegment[] } | null>(null);
+  const [viewingTranscript, setViewingTranscript] = useState<{ meeting: MeetingSession; segments?: TranscriptSegment[]; sisSpeakers?: SISSpeaker[]; sisMatches?: SISMatch[] } | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -1039,7 +1039,9 @@ const Library = () => {
                             const segments = asrStatus.transcriptSegments || meeting.transcriptSegments;
                             setViewingTranscript({ 
                               meeting, 
-                              segments: segments as TranscriptSegment[] | undefined 
+                              segments: segments as TranscriptSegment[] | undefined,
+                              sisSpeakers: asrStatus.sisSpeakers,
+                              sisMatches: asrStatus.sisMatches,
                             });
                           } catch (err) {
                             // Fallback to plain transcript
@@ -1399,6 +1401,8 @@ const Library = () => {
         meetingId={viewingTranscript?.meeting.id}
         initialSpeakerNames={viewingTranscript?.meeting.speakerNames}
         speakerIdentificationEnabled={enterpriseMembership?.company?.speakerIdentificationEnabled ?? false}
+        sisSpeakers={viewingTranscript?.sisSpeakers}
+        sisMatches={viewingTranscript?.sisMatches}
         onSpeakerNamesChange={(names) => {
           if (viewingTranscript?.meeting) {
             // Update local state with new speaker names
