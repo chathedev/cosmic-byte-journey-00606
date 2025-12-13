@@ -65,11 +65,15 @@ export function useASRPolling(
           if (result.sisSpeakers && result.sisSpeakers.length > 0) {
             console.log(`🗣️ SIS speakers: ${result.sisSpeakers.length}`);
             result.sisSpeakers.forEach(speaker => {
-              console.log(`   - ${speaker.label}: ${speaker.durationSeconds?.toFixed(1)}s${speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail}` : ''}`);
+              const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
+              const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
+              const matchCount = speaker.matches?.length ? ` [${speaker.matches.length} sample(s)]` : '';
+              console.log(`   - ${speaker.label}: ${duration}${matchInfo}${matchCount}`);
             });
           }
           if (result.sisMatch) {
-            console.log(`🎯 Best SIS match: ${result.sisMatch.sampleOwnerEmail} (${result.sisMatch.confidencePercent}%)${result.sisMatch.speakerLabel ? ` [${result.sisMatch.speakerLabel}]` : ''}`);
+            const wordsInfo = result.sisMatch.matchedWords != null ? `(${result.sisMatch.matchedWords} words)` : '';
+            console.log(`🎯 Best SIS match: ${result.sisMatch.sampleOwnerEmail} (${result.sisMatch.confidencePercent}%) ${wordsInfo}${result.sisMatch.speakerLabel ? ` [${result.sisMatch.speakerLabel}]` : ''}`);
           }
           
           options.onComplete?.(result.transcript || '', result.sisMatches, result.sisMatch, result.sisSpeakers);
