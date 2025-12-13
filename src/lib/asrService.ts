@@ -8,13 +8,27 @@ const BACKEND_API_URL = 'https://api.tivly.se';
 const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
 const MAX_POLL_ATTEMPTS = 600; // Max 30 minutes of polling
 
+export interface SISMatch {
+  meetingId: string;
+  meetingOwnerEmail: string;
+  sampleOwnerEmail: string;
+  score: number;
+  confidencePercent: number;
+  matchedWords: number;
+  totalSampleWords: number;
+  updatedAt: string;
+}
+
 export interface ASRResult {
   success: boolean;
   transcript?: string;
+  transcriptSegments?: TranscriptSegment[];
   duration?: number;
   processing_time?: number;
   error?: string;
   meetingId?: string;
+  sisMatches?: SISMatch[];
+  sisMatch?: SISMatch;
 }
 
 export interface TranscriptWord {
@@ -38,9 +52,11 @@ export interface ASRStatus {
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
   progress?: number;
   transcript?: string;
-  transcriptSegments?: TranscriptSegment[]; // Speaker diarization data
+  transcriptSegments?: TranscriptSegment[];
   error?: string;
   duration?: number;
+  sisMatches?: SISMatch[];
+  sisMatch?: SISMatch;
 }
 
 export interface UploadProgress {
@@ -222,13 +238,23 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     const data = await response.json();
     debugLog('📊 ASR status:', data.status, data.progress ? `${data.progress}%` : '');
     
+    // Log SIS matches if available
+    if (data.sisMatches && data.sisMatches.length > 0) {
+      debugLog('🎯 SIS matches found:', data.sisMatches.length, 'match(es)');
+      data.sisMatches.forEach((match: SISMatch) => {
+        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}% (${match.matchedWords} words)`);
+      });
+    }
+    
     return {
       status: data.status || 'queued',
       progress: data.progress,
       transcript: data.transcript,
-      transcriptSegments: data.transcriptSegments, // Include speaker diarization
+      transcriptSegments: data.transcriptSegments,
       error: data.error,
       duration: data.duration,
+      sisMatches: data.sisMatches || [],
+      sisMatch: data.sisMatch,
     };
   } catch (error: any) {
     // Network error - keep polling as queued
@@ -276,11 +302,17 @@ export async function waitForASRCompletion(
       case 'completed':
       case 'done':
         debugLog('✅ ASR completed!');
+        if (status.sisMatch) {
+          debugLog(`🎯 Best SIS match: ${status.sisMatch.sampleOwnerEmail} (${status.sisMatch.confidencePercent}%)`);
+        }
         return {
           success: true,
           transcript: status.transcript,
+          transcriptSegments: status.transcriptSegments,
           duration: status.duration,
-          meetingId
+          meetingId,
+          sisMatches: status.sisMatches,
+          sisMatch: status.sisMatch,
         };
         
       case 'error':

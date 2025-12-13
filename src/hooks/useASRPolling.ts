@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, SISMatch, TranscriptSegment } from '@/lib/asrService';
 
 const POLL_INTERVAL_MS = 3000;
 
 interface UseASRPollingOptions {
-  onComplete?: (transcript: string) => void;
+  onComplete?: (transcript: string, sisMatches?: SISMatch[], sisMatch?: SISMatch) => void;
   onError?: (error: string) => void;
 }
 
@@ -15,8 +15,11 @@ export function useASRPolling(
   const [status, setStatus] = useState<ASRStatus['status'] | null>(null);
   const [progress, setProgress] = useState<number | undefined>(undefined);
   const [transcript, setTranscript] = useState<string | null>(null);
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [sisMatches, setSisMatches] = useState<SISMatch[]>([]);
+  const [sisMatch, setSisMatch] = useState<SISMatch | null>(null);
   
   const pollingRef = useRef(false);
   const meetingIdRef = useRef(meetingId);
@@ -44,10 +47,13 @@ export function useASRPolling(
         setStatus(result.status);
         setProgress(result.progress);
         
-        if (result.status === 'completed') {
+        if (result.status === 'completed' || result.status === 'done') {
           setTranscript(result.transcript || null);
+          setTranscriptSegments(result.transcriptSegments || null);
+          setSisMatches(result.sisMatches || []);
+          setSisMatch(result.sisMatch || null);
           stopPolling();
-          options.onComplete?.(result.transcript || '');
+          options.onComplete?.(result.transcript || '', result.sisMatches, result.sisMatch);
           return;
         }
         
@@ -84,8 +90,11 @@ export function useASRPolling(
     status,
     progress,
     transcript,
+    transcriptSegments,
     error,
     isPolling,
+    sisMatches,
+    sisMatch,
     stopPolling,
     startPolling,
   };

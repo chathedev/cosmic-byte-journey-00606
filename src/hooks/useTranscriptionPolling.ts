@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, SISMatch, TranscriptSegment } from '@/lib/asrService';
 import { meetingStorage } from '@/utils/meetingStorage';
 
 const POLL_INTERVAL_MS = 4000; // Poll every 4 seconds
@@ -9,11 +9,14 @@ export interface TranscriptionState {
   status: 'idle' | 'uploading' | 'processing' | 'done' | 'failed';
   progress: number;
   transcript: string | null;
+  transcriptSegments: TranscriptSegment[] | null;
   error: string | null;
+  sisMatches: SISMatch[];
+  sisMatch: SISMatch | null;
 }
 
 interface UseTranscriptionPollingOptions {
-  onComplete?: (meetingId: string, transcript: string) => void;
+  onComplete?: (meetingId: string, transcript: string, sisMatches?: SISMatch[], sisMatch?: SISMatch) => void;
   onError?: (meetingId: string, error: string) => void;
 }
 
@@ -48,7 +51,10 @@ export function useTranscriptionPolling(
         status: 'processing',
         progress: 10,
         transcript: null,
+        transcriptSegments: null,
         error: null,
+        sisMatches: [],
+        sisMatch: null,
       }
     }));
 
@@ -62,6 +68,9 @@ export function useTranscriptionPolling(
         if (asrStatus.status === 'completed' && asrStatus.transcript) {
           // ASR completed!
           console.log('✅ Transcription complete via ASR status:', meetingId);
+          if (asrStatus.sisMatch) {
+            console.log(`🎯 SIS match: ${asrStatus.sisMatch.sampleOwnerEmail} (${asrStatus.sisMatch.confidencePercent}%)`);
+          }
           pollingRef.current[meetingId] = false;
           
           setStates(prev => ({
@@ -70,11 +79,14 @@ export function useTranscriptionPolling(
               status: 'done',
               progress: 100,
               transcript: asrStatus.transcript!,
+              transcriptSegments: asrStatus.transcriptSegments || null,
               error: null,
+              sisMatches: asrStatus.sisMatches || [],
+              sisMatch: asrStatus.sisMatch || null,
             }
           }));
           
-          options.onComplete?.(meetingId, asrStatus.transcript);
+          options.onComplete?.(meetingId, asrStatus.transcript, asrStatus.sisMatches, asrStatus.sisMatch);
           return;
         }
 
@@ -88,7 +100,10 @@ export function useTranscriptionPolling(
               status: 'failed',
               progress: 0,
               transcript: null,
+              transcriptSegments: null,
               error: asrStatus.error || 'Transkribering misslyckades',
+              sisMatches: [],
+              sisMatch: null,
             }
           }));
           
@@ -124,11 +139,14 @@ export function useTranscriptionPolling(
               status: 'done',
               progress: 100,
               transcript: meeting.transcript,
+              transcriptSegments: null,
               error: null,
+              sisMatches: asrStatus.sisMatches || [],
+              sisMatch: asrStatus.sisMatch || null,
             }
           }));
           
-          options.onComplete?.(meetingId, meeting.transcript);
+          options.onComplete?.(meetingId, meeting.transcript, asrStatus.sisMatches, asrStatus.sisMatch);
           return;
         }
 
@@ -150,7 +168,10 @@ export function useTranscriptionPolling(
           status: 'failed',
           progress: 0,
           transcript: null,
+          transcriptSegments: null,
           error: 'Tidsgränsen överskreds',
+          sisMatches: [],
+          sisMatch: null,
         }
       }));
       options.onError?.(meetingId, 'Tidsgränsen överskreds');
