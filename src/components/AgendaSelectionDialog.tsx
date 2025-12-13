@@ -9,6 +9,28 @@ import { AgendaSelectorNew } from "./AgendaSelectorNew";
 import { meetingStorage } from "@/utils/meetingStorage";
 import { Square } from "lucide-react";
 
+interface SISSpeaker {
+  label: string;
+  segments: { start: number; end: number }[];
+  durationSeconds: number;
+  bestMatchEmail?: string;
+  similarity?: number;
+}
+
+interface SISMatch {
+  speakerName: string;
+  speakerLabel: string;
+  confidencePercent: number;
+  sampleOwnerEmail?: string;
+}
+
+interface TranscriptSegment {
+  speakerId: string;
+  text: string;
+  start: number;
+  end: number;
+}
+
 interface AgendaSelectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -17,6 +39,9 @@ interface AgendaSelectionDialogProps {
     transcript: string;
     title: string;
     createdAt: string;
+    transcriptSegments?: TranscriptSegment[];
+    sisSpeakers?: SISSpeaker[];
+    sisMatches?: SISMatch[];
   };
 }
 
@@ -92,7 +117,10 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           meetingId: finalId,
           meetingCreatedAt: meetingData.createdAt,
           agendaId: selectedAgendaId,
-          token
+          token,
+          transcriptSegments: meetingData.transcriptSegments,
+          sisSpeakers: meetingData.sisSpeakers,
+          sisMatches: meetingData.sisMatches,
         }
       });
       

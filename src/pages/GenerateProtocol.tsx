@@ -6,6 +6,32 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
 
+interface SISSpeaker {
+  label: string;
+  segments: { start: number; end: number }[];
+  durationSeconds: number;
+  bestMatchEmail?: string;
+  similarity?: number;
+  matches?: {
+    sampleOwnerEmail: string;
+    similarity: number;
+  }[];
+}
+
+interface SISMatch {
+  speakerName: string;
+  speakerLabel: string;
+  confidencePercent: number;
+  segments: { start: number; end: number }[];
+}
+
+interface TranscriptSegment {
+  speakerId: string;
+  text: string;
+  start: number;
+  end: number;
+}
+
 interface LocationState {
   transcript: string;
   meetingName: string;
@@ -13,6 +39,9 @@ interface LocationState {
   meetingCreatedAt?: string;
   agendaId?: string;
   token: string;
+  transcriptSegments?: TranscriptSegment[];
+  sisSpeakers?: SISSpeaker[];
+  sisMatches?: SISMatch[];
 }
 
 export default function GenerateProtocol() {
@@ -197,6 +226,9 @@ export default function GenerateProtocol() {
           meetingId={pageState.meetingId}
           userId={user?.email || undefined}
           isFreeTrialMode={isFreeUser}
+          transcriptSegments={pageState.transcriptSegments}
+          sisSpeakers={pageState.sisSpeakers}
+          sisMatches={pageState.sisMatches}
         />
       )}
     </div>
