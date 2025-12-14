@@ -41,13 +41,19 @@ export interface SISSpeakerMatch {
 }
 
 // SpeechBrain Speaker Identification
+// Per docs: sisSpeakers[n] carries bestMatchEmail plus the similarity percent
+// that shows up as the "secure 70%" badge. The backend resolves labels
+// using both sisMatches and sisSpeakers.bestMatchEmail when speakerLabel is missing.
 export interface SISSpeaker {
   label: string;
   segments: Array<{ start: number; end: number }>;
   durationSeconds?: number | null;
+  // Per docs: bestMatchEmail links this speaker to an enterprise member
   bestMatchEmail?: string;
+  // Per docs: similarity percent for the "secure X%" confidence badge
   similarity?: number;
-  speakerName?: string; // Alias from voice learning
+  // Per docs: speakerName is decorated by backend from stored aliases
+  speakerName?: string;
   matches?: SISSpeakerMatch[];
 }
 

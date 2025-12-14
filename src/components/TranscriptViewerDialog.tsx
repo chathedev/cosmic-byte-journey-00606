@@ -32,13 +32,15 @@ const getSpeakerFromSegment = (segment: TranscriptSegment): string => {
   return segment.speakerId || segment.speaker || 'unknown';
 };
 
-// Confidence thresholds for SIS match:
-// 80-100% = Very strong match (same person)
-// 70-79% = Strong match (likely same person)  
-// 60-69% = Weak/possible match; not reliable
-// 0-59% = Noise; treat as not the same person
+// Confidence thresholds for SIS match (per docs):
+// - ~0.72+ triggers voice learning (embedding rollback)
+// - 80-100% = Very strong match (high confidence, same person)
+// - 70-79% = Strong match (likely same person, shows "secure X%" badge)
+// - 60-69% = Weak/possible match; not reliable for attribution
+// - 0-59% = Noise; treat as not the same person
 const SIS_STRONG_THRESHOLD = 0.70; // Minimum for attribution
 const SIS_VERY_STRONG_THRESHOLD = 0.80; // High confidence
+const SIS_LEARNING_THRESHOLD = 0.72; // Per docs: threshold for voice learning
 
 interface TranscriptViewerDialogProps {
   open: boolean;
@@ -152,9 +154,18 @@ export function TranscriptViewerDialog({
   }, [open, meetingId, loadedFromBackend]);
 
   // Build speaker identification map from SIS data
-  // Priority: sisSpeaker.speakerName (alias) → sisMatch.speakerName → email prefix
+  // Per docs: sisSpeakers[n] carries bestMatchEmail plus the similarity percent
+  // that shows up as the "secure 70%" badge. Backend resolves labels using both
+  // sisMatches and sisSpeakers.bestMatchEmail when speakerLabel is missing.
   const sisIdentifiedSpeakers = useMemo(() => {
-    const map: Record<string, { name: string; email: string; confidence: number; speakerLabel?: string; hasAlias: boolean }> = {};
+    const map: Record<string, { 
+      name: string; 
+      email: string; 
+      confidence: number; 
+      speakerLabel?: string; 
+      hasAlias: boolean;
+      canLearn: boolean; // Per docs: similarity > 0.72 triggers learning
+    }> = {};
     
     const transcriptSpeakerIds = segments 
       ? [...new Set(segments.map(s => getSpeakerFromSegment(s)))]
@@ -164,7 +175,8 @@ export function TranscriptViewerDialog({
       return s1.start < s2.end && s2.start < s1.end;
     };
     
-    // Match transcript speakers to SIS speakers by time overlap
+    // Per docs: sisSpeakers[n].bestMatchEmail + similarity for "secure X%" badge
+    // Use this to resolve labels even when speakerLabel is missing
     if (sisSpeakers && sisSpeakers.length > 0 && segments && segments.length > 0) {
       transcriptSpeakerIds.forEach(speakerId => {
         const speakerSegments = segments.filter(s => getSpeakerFromSegment(s) === speakerId);
@@ -176,7 +188,7 @@ export function TranscriptViewerDialog({
             );
             
             if (hasOverlap) {
-              // Priority: sisSpeaker.speakerName → sisMatch.speakerName → email prefix
+              // Per docs priority: sisSpeaker.speakerName → sisMatch.speakerName → email prefix
               const matchWithName = sisMatches?.find(m => m.sampleOwnerEmail === sisSpeaker.bestMatchEmail);
               const speakerName = sisSpeaker.speakerName || matchWithName?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
               const hasAlias = !!(sisSpeaker.speakerName || matchWithName?.speakerName);
@@ -187,6 +199,7 @@ export function TranscriptViewerDialog({
                 confidence: sisSpeaker.similarity,
                 speakerLabel: sisSpeaker.label,
                 hasAlias,
+                canLearn: sisSpeaker.similarity >= SIS_LEARNING_THRESHOLD,
               };
               break;
             }
@@ -194,7 +207,8 @@ export function TranscriptViewerDialog({
         }
       });
       
-      // If only one speaker in both and no overlap found, map them directly
+      // Per docs: If only one speaker in transcript and one in sisSpeakers, map directly
+      // This handles cases where time overlap doesn't match due to segment timing differences
       if (Object.keys(map).length === 0 && transcriptSpeakerIds.length === 1 && sisSpeakers.length === 1) {
         const sisSpeaker = sisSpeakers[0];
         if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_STRONG_THRESHOLD && sisSpeaker.bestMatchEmail) {
@@ -208,28 +222,51 @@ export function TranscriptViewerDialog({
             confidence: sisSpeaker.similarity,
             speakerLabel: sisSpeaker.label,
             hasAlias,
+            canLearn: sisSpeaker.similarity >= SIS_LEARNING_THRESHOLD,
           };
         }
       }
     }
     
-    // Also check sisMatches directly for speakerLabel mapping
+    // Per docs: Also check sisMatches for speakerLabel mapping (fallback resolution)
+    // Backend may set speakerLabel from sisSpeakers.bestMatchEmail when sanitizing
     if (sisMatches && sisMatches.length > 0) {
       sisMatches.forEach(match => {
-        if (match.speakerLabel && match.score >= SIS_STRONG_THRESHOLD) {
+        const label = match.speakerLabel;
+        if (label && match.score >= SIS_STRONG_THRESHOLD && !map[label]) {
           // Get corresponding sisSpeaker for speakerName priority
-          const sisSpeaker = sisSpeakers?.find(s => s.label === match.speakerLabel);
+          const sisSpeaker = sisSpeakers?.find(s => s.label === label || s.bestMatchEmail === match.sampleOwnerEmail);
           const speakerName = sisSpeaker?.speakerName || match.speakerName || match.sampleOwnerEmail.split('@')[0];
           const hasAlias = !!(sisSpeaker?.speakerName || match.speakerName);
           
-          // Only set if not already set with better info
-          if (!map[match.speakerLabel]) {
-            map[match.speakerLabel] = {
+          map[label] = {
+            name: speakerName,
+            email: match.sampleOwnerEmail,
+            confidence: match.score,
+            speakerLabel: label,
+            hasAlias,
+            canLearn: match.score >= SIS_LEARNING_THRESHOLD,
+          };
+        }
+      });
+      
+      // Per docs: Fallback - if sisMatches has no speakerLabel, use sisSpeakers.bestMatchEmail to resolve
+      // This handles cases where sanitized /asr/status hides speakerLabel
+      sisMatches.forEach(match => {
+        if (!match.speakerLabel && match.score >= SIS_STRONG_THRESHOLD) {
+          // Find sisSpeaker with matching bestMatchEmail
+          const sisSpeaker = sisSpeakers?.find(s => s.bestMatchEmail === match.sampleOwnerEmail);
+          if (sisSpeaker?.label && !map[sisSpeaker.label]) {
+            const speakerName = sisSpeaker.speakerName || match.speakerName || match.sampleOwnerEmail.split('@')[0];
+            const hasAlias = !!(sisSpeaker.speakerName || match.speakerName);
+            
+            map[sisSpeaker.label] = {
               name: speakerName,
               email: match.sampleOwnerEmail,
               confidence: match.score,
-              speakerLabel: match.speakerLabel,
+              speakerLabel: sisSpeaker.label,
               hasAlias,
+              canLearn: match.score >= SIS_LEARNING_THRESHOLD,
             };
           }
         }
@@ -272,38 +309,49 @@ export function TranscriptViewerDialog({
   // Display name priority per docs section 3:
   // 1. response.speakerNames[label] (from manual rename or auto-applied backend cache)
   // 2. sisSpeakers[n].speakerName (alias decorated by backend from stored aliases)
-  // 3. label (original diarization label if readable)
-  // 4. speaker_{n} fallback → "Talare N" for Swedish UI
+  // 3. sisMatch.speakerName (from SIS match data)
+  // 4. label (original diarization label if readable)
+  // 5. speaker_{n} fallback → "Talare N" for Swedish UI
   const getSpeakerDisplayName = useCallback((speaker: string): string => {
     // 1. First check speakerNames map (backend cache or manual rename)
     if (speakerNames[speaker]) {
       return speakerNames[speaker];
     }
     
-    // 2. Then check sisSpeakers[n].speakerName (backend-decorated alias)
+    // 2. Check sisSpeakers[n].speakerName (backend-decorated alias)
     const sisSpeaker = sisSpeakers?.find(s => s.label === speaker);
     if (sisSpeaker?.speakerName) {
       return sisSpeaker.speakerName;
     }
     
-    // 2b. Also check sisMatches[n].speakerName (fallback)
+    // 2b. Per docs: also check sisSpeakers by bestMatchEmail when speakerLabel is sanitized
+    const sisSpeakerByEmail = sisSpeakers?.find(s => {
+      // Find if this speaker was matched via bestMatchEmail
+      const matchForSpeaker = sisMatches?.find(m => m.speakerLabel === speaker);
+      return matchForSpeaker && s.bestMatchEmail === matchForSpeaker.sampleOwnerEmail && s.speakerName;
+    });
+    if (sisSpeakerByEmail?.speakerName) {
+      return sisSpeakerByEmail.speakerName;
+    }
+    
+    // 3. Check sisMatches[n].speakerName (fallback)
     const matchWithLabel = sisMatches?.find(m => m.speakerLabel === speaker);
     if (matchWithLabel?.speakerName) {
       return matchWithLabel.speakerName;
     }
     
-    // 2c. Check our computed sisIdentifiedSpeakers map
+    // 3b. Check our computed sisIdentifiedSpeakers map for resolved aliases
     const sisInfo = sisIdentifiedSpeakers[speaker];
     if (sisInfo?.hasAlias && sisInfo.name) {
       return sisInfo.name;
     }
     
-    // 3. Use the label as-is if it's human-readable (not speaker_N pattern)
+    // 4. Use the label as-is if it's human-readable (not speaker_N pattern)
     if (speaker && !speaker.match(/^speaker_\d+$/i)) {
       return speaker;
     }
     
-    // 4. Fall back to "Talare X" format for Swedish UI
+    // 5. Fall back to "Talare X" format for Swedish UI
     const match = speaker.match(/speaker_(\d+)/i);
     if (match) {
       return `Talare ${parseInt(match[1], 10) + 1}`;
@@ -587,8 +635,9 @@ export function TranscriptViewerDialog({
                       )}
                     </div>
                     <span className="text-[11px] font-medium">{displayName}</span>
+                {/* Per docs: "secure X%" confidence badge from sisSpeakers.similarity */}
                     {isIdentified && (
-                      <div className="flex items-center gap-0.5">
+                      <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}% - röstmatchning`}>
                         <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`} />
                         <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
                           {Math.round(confidence * 100)}%
@@ -657,8 +706,9 @@ export function TranscriptViewerDialog({
                             }`}>
                               {displayName}
                             </span>
+                           {/* Per docs: confidence badge from sisSpeakers.similarity */}
                             {isIdentified && (
-                              <div className="flex items-center gap-0.5">
+                              <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}%`}>
                                 <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-500' : 'text-amber-500'}`} />
                                 <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
                                   {Math.round(confidence * 100)}%
