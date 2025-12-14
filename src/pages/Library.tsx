@@ -99,7 +99,7 @@ const Library = () => {
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
-  const [viewingTranscript, setViewingTranscript] = useState<{ meeting: MeetingSession; segments?: TranscriptSegment[]; sisSpeakers?: SISSpeaker[]; sisMatches?: SISMatch[] } | null>(null);
+  const [viewingTranscript, setViewingTranscript] = useState<{ meeting: MeetingSession; segments?: TranscriptSegment[]; sisSpeakers?: SISSpeaker[]; sisMatches?: SISMatch[]; speakerNames?: Record<string, string>; sisLearning?: { email: string; similarity: number; matchedSegments?: number; updated?: boolean }[] } | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -1073,6 +1073,8 @@ const Library = () => {
                               segments: segments as TranscriptSegment[] | undefined,
                               sisSpeakers: asrStatus.sisSpeakers,
                               sisMatches: asrStatus.sisMatches,
+                              speakerNames: asrStatus.speakerNames,
+                              sisLearning: asrStatus.sisLearning,
                             });
                           } catch (err) {
                             // Fallback to plain transcript
@@ -1461,6 +1463,8 @@ const Library = () => {
         speakerIdentificationEnabled={enterpriseMembership?.company?.speakerIdentificationEnabled ?? false}
         sisSpeakers={viewingTranscript?.sisSpeakers}
         sisMatches={viewingTranscript?.sisMatches}
+        backendSpeakerNames={viewingTranscript?.speakerNames}
+        backendSisLearning={viewingTranscript?.sisLearning}
         onSpeakerNamesChange={(names) => {
           if (viewingTranscript?.meeting) {
             // Update local state with new speaker names
@@ -1469,6 +1473,8 @@ const Library = () => {
                 ? { ...m, speakerNames: names }
                 : m
             ));
+            // Also update the viewingTranscript to keep in sync
+            setViewingTranscript(prev => prev ? { ...prev, speakerNames: names } : prev);
           }
         }}
       />

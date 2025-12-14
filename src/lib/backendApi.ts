@@ -1,12 +1,9 @@
+import { SISLearningEntry } from './asrService';
+
 const BACKEND_URL = 'https://api.tivly.se';
 
-// SIS Voice Learning types
-export interface SISLearningEntry {
-  email: string;
-  similarity: number;
-  matchedSegments?: number;
-  updated?: boolean;
-}
+// Re-export for convenience
+export type { SISLearningEntry };
 
 export interface SpeakerNamesResponse {
   speakerNames: Record<string, string>;
