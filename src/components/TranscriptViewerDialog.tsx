@@ -101,22 +101,27 @@ export function TranscriptViewerDialog({
   backendSisLearning,
 }: TranscriptViewerDialogProps) {
   const { toast } = useToast();
-  // Merge: backend-provided names → initial props → local state
-  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({
-    ...backendSpeakerNames,
+  
+  // Per docs section 3: pick display name from response.speakerNames[label] first
+  // State: merge backend names → initial props (priority order)
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>(() => ({
     ...initialSpeakerNames,
-  });
+    ...backendSpeakerNames, // Backend names take priority (auto-applied aliases)
+  }));
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [sisLearning, setSisLearning] = useState<SISLearningEntry[]>(backendSisLearning || []);
-  const [loadedFromBackend, setLoadedFromBackend] = useState(!!backendSpeakerNames);
+  const [loadedFromBackend, setLoadedFromBackend] = useState(!!backendSpeakerNames && Object.keys(backendSpeakerNames).length > 0);
 
-  // Update state when props change (e.g., after meeting refresh)
+  // Sync state when props change (e.g., after meeting refresh per docs section 3)
   useEffect(() => {
-    if (backendSpeakerNames && Object.keys(backendSpeakerNames).length > 0) {
-      setSpeakerNames(prev => ({ ...backendSpeakerNames, ...prev }));
-      setLoadedFromBackend(true);
+    if (backendSpeakerNames) {
+      // Backend speakerNames take priority - these are the "cached" aliases
+      setSpeakerNames(prev => ({ ...prev, ...backendSpeakerNames }));
+      if (Object.keys(backendSpeakerNames).length > 0) {
+        setLoadedFromBackend(true);
+      }
     }
   }, [backendSpeakerNames]);
 
@@ -126,16 +131,17 @@ export function TranscriptViewerDialog({
     }
   }, [backendSisLearning]);
 
-  // Load speaker names from backend on mount (fallback if not provided via props)
+  // Per docs: "fetch current aliases via GET /meetings/:meetingId/speaker-names"
+  // Load speaker names from backend to hydrate UI without waiting for /asr/status
   useEffect(() => {
     if (open && meetingId && !loadedFromBackend) {
       backendApi.getSpeakerNames(meetingId).then(data => {
-        if (Object.keys(data.speakerNames).length > 0) {
-          setSpeakerNames(prev => ({ ...data.speakerNames, ...prev }));
-          console.log('[SIS] Loaded speaker names from backend:', data.speakerNames);
-        }
-        if (data.sisLearning) {
-          setSisLearning(data.sisLearning);
+        // Merge: existing local state, then backend aliases (backend takes priority)
+        setSpeakerNames(prev => ({ ...prev, ...data.speakerNames }));
+        if (data.sisLearning && data.sisLearning.length > 0) {
+          setSisLearning(prev => [...prev, ...data.sisLearning.filter(
+            l => !prev.some(p => p.email === l.email)
+          )]);
         }
         setLoadedFromBackend(true);
       }).catch(err => {
@@ -263,31 +269,47 @@ export function TranscriptViewerDialog({
     }
   };
 
-  // Display name priority per docs:
-  // 1. speakerNames[label] (from manual rename or backend cache)
-  // 2. sisSpeakers[n].speakerName (alias from voice learning)
-  // 3. label (original diarization label)
-  // 4. speaker_{n} fallback
+  // Display name priority per docs section 3:
+  // 1. response.speakerNames[label] (from manual rename or auto-applied backend cache)
+  // 2. sisSpeakers[n].speakerName (alias decorated by backend from stored aliases)
+  // 3. label (original diarization label if readable)
+  // 4. speaker_{n} fallback → "Talare N" for Swedish UI
   const getSpeakerDisplayName = useCallback((speaker: string): string => {
-    // 1. First check manually set names / cached speakerNames
-    if (speakerNames[speaker]) return speakerNames[speaker];
+    // 1. First check speakerNames map (backend cache or manual rename)
+    if (speakerNames[speaker]) {
+      return speakerNames[speaker];
+    }
     
-    // 2. Then check SIS identified names (sisSpeaker.speakerName or sisMatch.speakerName)
-    const sisMatch = sisIdentifiedSpeakers[speaker];
-    if (sisMatch) return sisMatch.name;
+    // 2. Then check sisSpeakers[n].speakerName (backend-decorated alias)
+    const sisSpeaker = sisSpeakers?.find(s => s.label === speaker);
+    if (sisSpeaker?.speakerName) {
+      return sisSpeaker.speakerName;
+    }
     
-    // 3. Use the label as-is if it's readable
+    // 2b. Also check sisMatches[n].speakerName (fallback)
+    const matchWithLabel = sisMatches?.find(m => m.speakerLabel === speaker);
+    if (matchWithLabel?.speakerName) {
+      return matchWithLabel.speakerName;
+    }
+    
+    // 2c. Check our computed sisIdentifiedSpeakers map
+    const sisInfo = sisIdentifiedSpeakers[speaker];
+    if (sisInfo?.hasAlias && sisInfo.name) {
+      return sisInfo.name;
+    }
+    
+    // 3. Use the label as-is if it's human-readable (not speaker_N pattern)
     if (speaker && !speaker.match(/^speaker_\d+$/i)) {
       return speaker;
     }
     
-    // 4. Fall back to "Talare X" format
+    // 4. Fall back to "Talare X" format for Swedish UI
     const match = speaker.match(/speaker_(\d+)/i);
     if (match) {
       return `Talare ${parseInt(match[1], 10) + 1}`;
     }
     return `Talare ${speaker}`;
-  }, [speakerNames, sisIdentifiedSpeakers]);
+  }, [speakerNames, sisSpeakers, sisMatches, sisIdentifiedSpeakers]);
 
   const isSISIdentified = (speaker: string): boolean => {
     return !!sisIdentifiedSpeakers[speaker];
@@ -320,7 +342,9 @@ export function TranscriptViewerDialog({
     setEditValue("");
   };
 
-  // Save speaker name - sends to backend with SIS association for voice learning
+  // Save speaker name - per docs section 2:
+  // PUT /meetings/:meetingId/speaker-names with full speakerNames map
+  // Backend validates, updates meeting record, associates with SIS voice, persists alias
   const saveSpeakerName = async (speakerId: string) => {
     if (!editValue.trim()) {
       cancelEditing();
@@ -328,17 +352,17 @@ export function TranscriptViewerDialog({
     }
 
     const trimmedName = editValue.trim();
+    
+    // Per docs: "keep sending the saved speakerNames map in PUT"
     const newNames = {
       ...speakerNames,
       [speakerId]: trimmedName,
     };
 
+    // Optimistic update
     setSpeakerNames(newNames);
     setEditingSpeaker(null);
     setEditValue("");
-
-    // Notify parent component
-    onSpeakerNamesChange?.(newNames);
 
     // Save to backend if we have a meeting ID
     if (meetingId) {
@@ -347,24 +371,34 @@ export function TranscriptViewerDialog({
         const sisInfo = sisIdentifiedSpeakers[speakerId];
         
         if (sisInfo) {
-          console.log(`[SIS] Saving speaker name "${trimmedName}" for voice: ${sisInfo.email} (${Math.round(sisInfo.confidence * 100)}%)`);
+          console.log(`[SIS] Saving "${trimmedName}" for ${sisInfo.email} (${Math.round(sisInfo.confidence * 100)}%)`);
         }
         
+        // Per docs: send full speakerNames map so backend can rewrite both meeting record and /asr/status
         const result = await backendApi.saveSpeakerNames(meetingId, newNames);
         
-        // Update learning status from response
+        // Per docs section 3: "refresh the meeting payload after a rename"
+        // Update local state with the returned speakerNames (may include auto-applied aliases)
+        if (result.speakerNames) {
+          setSpeakerNames(prev => ({ ...prev, ...result.speakerNames }));
+        }
+        
+        // Notify parent to refresh meeting data
+        onSpeakerNamesChange?.(result.speakerNames || newNames);
+        
+        // Update sisLearning from response
         if (result.sisLearning && result.sisLearning.length > 0) {
           setSisLearning(result.sisLearning);
           
-          // Check if this save triggered a voice learning update
+          // Per docs section 4: surface "learning confidence" badge when updated: true
           const learnedVoice = result.sisLearning.find(l => l.updated);
           if (learnedVoice) {
             toast({
-              title: "Röst kopplad!",
+              title: "Röst inlärd!",
               description: (
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-emerald-500" />
-                  <span>"{trimmedName}" kommer nu kännas igen automatiskt i framtida möten</span>
+                  <span>"{trimmedName}" känns igen automatiskt i framtida möten ({Math.round(learnedVoice.similarity * 100)}%)</span>
                 </div>
               ),
               duration: 4000,
@@ -373,20 +407,29 @@ export function TranscriptViewerDialog({
             toast({
               title: "Namn sparat",
               description: sisInfo 
-                ? `"${trimmedName}" kopplat till röst (${Math.round(sisInfo.confidence * 100)}% säkerhet)`
-                : `Talaren sparad som "${trimmedName}"`,
-              duration: 3000,
+                ? `"${trimmedName}" kopplat till röst (${Math.round(sisInfo.confidence * 100)}%)`
+                : `Sparade "${trimmedName}"`,
+              duration: 2500,
             });
           }
         } else {
           toast({
             title: "Namn sparat",
-            description: `Talaren sparad som "${trimmedName}"`,
+            description: `Sparade "${trimmedName}"`,
             duration: 2000,
           });
         }
       } catch (error) {
         console.error('[SIS] Failed to save speaker names:', error);
+        // Rollback on error
+        setSpeakerNames(prev => {
+          const reverted = { ...prev };
+          delete reverted[speakerId];
+          if (initialSpeakerNames?.[speakerId]) {
+            reverted[speakerId] = initialSpeakerNames[speakerId];
+          }
+          return reverted;
+        });
         toast({
           title: "Kunde inte spara",
           description: "Försök igen senare.",
@@ -396,6 +439,9 @@ export function TranscriptViewerDialog({
       } finally {
         setIsSaving(false);
       }
+    } else {
+      // No meetingId - just update locally
+      onSpeakerNamesChange?.(newNames);
     }
   };
 
