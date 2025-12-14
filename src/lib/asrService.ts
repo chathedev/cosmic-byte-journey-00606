@@ -25,6 +25,7 @@ export interface SISMatch {
   score: number;
   confidencePercent: number;
   speakerLabel?: string;
+  speakerName?: string; // Alias name from voice learning
   segments?: Array<{ start: number; end: number }>;
   durationSeconds?: number | null;
   text?: string | null;
@@ -46,6 +47,7 @@ export interface SISSpeaker {
   durationSeconds?: number | null;
   bestMatchEmail?: string;
   similarity?: number;
+  speakerName?: string; // Alias from voice learning
   matches?: SISSpeakerMatch[];
 }
 
@@ -100,6 +102,14 @@ export interface TranscriptSegment {
   words?: TranscriptWord[];
 }
 
+// SIS Learning entry for voice training feedback
+export interface SISLearningEntry {
+  email: string;
+  similarity: number;
+  matchedSegments?: number;
+  updated?: boolean;
+}
+
 export interface ASRStatus {
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
   progress?: number;
@@ -111,6 +121,8 @@ export interface ASRStatus {
   sisMatches?: SISMatch[];
   sisMatch?: SISMatch;
   sisSpeakers?: SISSpeaker[];
+  speakerNames?: Record<string, string>; // Pre-loaded speaker aliases from backend
+  sisLearning?: SISLearningEntry[]; // Voice learning results
 }
 
 export interface UploadProgress {
@@ -324,6 +336,8 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       sisMatches: data.sisMatches || [],
       sisMatch: data.sisMatch,
       sisSpeakers: data.sisSpeakers || [],
+      speakerNames: data.speakerNames || {},
+      sisLearning: data.sisLearning || [],
     };
   } catch (error: any) {
     // Network error - keep polling as queued

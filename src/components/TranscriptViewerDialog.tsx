@@ -6,8 +6,8 @@ import { Copy, Clock, UserCheck, Pencil, Save, X, Loader2, Sparkles, Volume2 } f
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { SISSpeaker, SISMatch } from "@/lib/asrService";
-import { backendApi, SISLearningEntry } from "@/lib/backendApi";
+import { SISSpeaker, SISMatch, SISLearningEntry } from "@/lib/asrService";
+import { backendApi } from "@/lib/backendApi";
 
 export interface TranscriptWord {
   text: string;
@@ -52,6 +52,9 @@ interface TranscriptViewerDialogProps {
   speakerIdentificationEnabled?: boolean;
   sisSpeakers?: SISSpeaker[];
   sisMatches?: SISMatch[];
+  // Pre-loaded from /asr/status response
+  backendSpeakerNames?: Record<string, string>;
+  backendSisLearning?: SISLearningEntry[];
 }
 
 const getSpeakerBgColor = (speaker: string | undefined | null): string => {
@@ -94,16 +97,36 @@ export function TranscriptViewerDialog({
   speakerIdentificationEnabled = false,
   sisSpeakers,
   sisMatches,
+  backendSpeakerNames,
+  backendSisLearning,
 }: TranscriptViewerDialogProps) {
   const { toast } = useToast();
-  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>(initialSpeakerNames || {});
+  // Merge: backend-provided names → initial props → local state
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({
+    ...backendSpeakerNames,
+    ...initialSpeakerNames,
+  });
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [sisLearning, setSisLearning] = useState<SISLearningEntry[]>([]);
-  const [loadedFromBackend, setLoadedFromBackend] = useState(false);
+  const [sisLearning, setSisLearning] = useState<SISLearningEntry[]>(backendSisLearning || []);
+  const [loadedFromBackend, setLoadedFromBackend] = useState(!!backendSpeakerNames);
 
-  // Load speaker names from backend on mount
+  // Update state when props change (e.g., after meeting refresh)
+  useEffect(() => {
+    if (backendSpeakerNames && Object.keys(backendSpeakerNames).length > 0) {
+      setSpeakerNames(prev => ({ ...backendSpeakerNames, ...prev }));
+      setLoadedFromBackend(true);
+    }
+  }, [backendSpeakerNames]);
+
+  useEffect(() => {
+    if (backendSisLearning && backendSisLearning.length > 0) {
+      setSisLearning(backendSisLearning);
+    }
+  }, [backendSisLearning]);
+
+  // Load speaker names from backend on mount (fallback if not provided via props)
   useEffect(() => {
     if (open && meetingId && !loadedFromBackend) {
       backendApi.getSpeakerNames(meetingId).then(data => {
@@ -123,8 +146,9 @@ export function TranscriptViewerDialog({
   }, [open, meetingId, loadedFromBackend]);
 
   // Build speaker identification map from SIS data
+  // Priority: sisSpeaker.speakerName (alias) → sisMatch.speakerName → email prefix
   const sisIdentifiedSpeakers = useMemo(() => {
-    const map: Record<string, { name: string; email: string; confidence: number; speakerLabel?: string }> = {};
+    const map: Record<string, { name: string; email: string; confidence: number; speakerLabel?: string; hasAlias: boolean }> = {};
     
     const transcriptSpeakerIds = segments 
       ? [...new Set(segments.map(s => getSpeakerFromSegment(s)))]
@@ -146,14 +170,17 @@ export function TranscriptViewerDialog({
             );
             
             if (hasOverlap) {
+              // Priority: sisSpeaker.speakerName → sisMatch.speakerName → email prefix
               const matchWithName = sisMatches?.find(m => m.sampleOwnerEmail === sisSpeaker.bestMatchEmail);
-              const speakerName = (matchWithName as any)?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
+              const speakerName = sisSpeaker.speakerName || matchWithName?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
+              const hasAlias = !!(sisSpeaker.speakerName || matchWithName?.speakerName);
               
               map[speakerId] = {
                 name: speakerName,
                 email: sisSpeaker.bestMatchEmail,
                 confidence: sisSpeaker.similarity,
                 speakerLabel: sisSpeaker.label,
+                hasAlias,
               };
               break;
             }
@@ -166,13 +193,15 @@ export function TranscriptViewerDialog({
         const sisSpeaker = sisSpeakers[0];
         if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_STRONG_THRESHOLD && sisSpeaker.bestMatchEmail) {
           const matchWithName = sisMatches?.find(m => m.sampleOwnerEmail === sisSpeaker.bestMatchEmail);
-          const speakerName = (matchWithName as any)?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
+          const speakerName = sisSpeaker.speakerName || matchWithName?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
+          const hasAlias = !!(sisSpeaker.speakerName || matchWithName?.speakerName);
           
           map[transcriptSpeakerIds[0]] = {
             name: speakerName,
             email: sisSpeaker.bestMatchEmail,
             confidence: sisSpeaker.similarity,
             speakerLabel: sisSpeaker.label,
+            hasAlias,
           };
         }
       }
@@ -182,22 +211,21 @@ export function TranscriptViewerDialog({
     if (sisMatches && sisMatches.length > 0) {
       sisMatches.forEach(match => {
         if (match.speakerLabel && match.score >= SIS_STRONG_THRESHOLD) {
-          const speakerName = (match as any).speakerName || match.sampleOwnerEmail.split('@')[0];
+          // Get corresponding sisSpeaker for speakerName priority
+          const sisSpeaker = sisSpeakers?.find(s => s.label === match.speakerLabel);
+          const speakerName = sisSpeaker?.speakerName || match.speakerName || match.sampleOwnerEmail.split('@')[0];
+          const hasAlias = !!(sisSpeaker?.speakerName || match.speakerName);
           
-          if (transcriptSpeakerIds.includes(match.speakerLabel)) {
+          // Only set if not already set with better info
+          if (!map[match.speakerLabel]) {
             map[match.speakerLabel] = {
               name: speakerName,
               email: match.sampleOwnerEmail,
               confidence: match.score,
               speakerLabel: match.speakerLabel,
+              hasAlias,
             };
           }
-          map[match.speakerLabel] = {
-            name: speakerName,
-            email: match.sampleOwnerEmail,
-            confidence: match.score,
-            speakerLabel: match.speakerLabel,
-          };
         }
       });
     }
@@ -235,15 +263,25 @@ export function TranscriptViewerDialog({
     }
   };
 
+  // Display name priority per docs:
+  // 1. speakerNames[label] (from manual rename or backend cache)
+  // 2. sisSpeakers[n].speakerName (alias from voice learning)
+  // 3. label (original diarization label)
+  // 4. speaker_{n} fallback
   const getSpeakerDisplayName = useCallback((speaker: string): string => {
-    // First check manually set names
+    // 1. First check manually set names / cached speakerNames
     if (speakerNames[speaker]) return speakerNames[speaker];
     
-    // Then check SIS identified names
+    // 2. Then check SIS identified names (sisSpeaker.speakerName or sisMatch.speakerName)
     const sisMatch = sisIdentifiedSpeakers[speaker];
     if (sisMatch) return sisMatch.name;
     
-    // Fall back to generic name
+    // 3. Use the label as-is if it's readable
+    if (speaker && !speaker.match(/^speaker_\d+$/i)) {
+      return speaker;
+    }
+    
+    // 4. Fall back to "Talare X" format
     const match = speaker.match(/speaker_(\d+)/i);
     if (match) {
       return `Talare ${parseInt(match[1], 10) + 1}`;
