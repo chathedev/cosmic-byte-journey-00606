@@ -18,17 +18,24 @@ const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
 const MAX_POLL_ATTEMPTS = 600; // Max 30 minutes of polling
 
 // SpeechBrain SIS Speaker Match
+// Per docs: sisMatches now carry speakerName, speakerLabel, confidencePercent, and matched transcript snippet
+// Use speakerNames[label] or sisMatches[i]?.speakerName when rendering the UI instead of exposing raw emails
 export interface SISMatch {
   meetingId: string;
   meetingOwnerEmail: string;
   sampleOwnerEmail: string;
   score: number;
+  // Per docs: confidencePercent is the similarity score as percentage (0-100)
+  // >= 60 means alias is auto-persisted
   confidencePercent: number;
+  // Per docs: speakerLabel is the diarization label (e.g., "speaker_0", "meeting")
   speakerLabel?: string;
-  speakerName?: string; // Alias name from voice learning
+  // Per docs: speakerName is the friendly alias from voice learning
+  speakerName?: string;
+  // Per docs: matched transcript snippet
+  text?: string | null;
   segments?: Array<{ start: number; end: number }>;
   durationSeconds?: number | null;
-  text?: string | null;
   matchedWords?: number | null;
   totalSampleWords?: number | null;
   updatedAt: string;
@@ -44,13 +51,16 @@ export interface SISSpeakerMatch {
 // Per docs: sisSpeakers[n] carries bestMatchEmail plus the similarity percent
 // that shows up as the "secure 70%" badge. The backend resolves labels
 // using both sisMatches and sisSpeakers.bestMatchEmail when speakerLabel is missing.
+// The speakerLabel is the key to use with speakerNames map.
 export interface SISSpeaker {
+  // Per docs: label is the diarization label returned by SpeechBrain (e.g., "speaker_0", "meeting")
+  // Use this as key with speakerNames map
   label: string;
   segments: Array<{ start: number; end: number }>;
   durationSeconds?: number | null;
   // Per docs: bestMatchEmail links this speaker to an enterprise member
   bestMatchEmail?: string;
-  // Per docs: similarity percent for the "secure X%" confidence badge
+  // Per docs: similarity percent for the "secure X%" confidence badge (0.0-1.0)
   similarity?: number;
   // Per docs: speakerName is decorated by backend from stored aliases
   speakerName?: string;
@@ -356,6 +366,82 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
 }
 
 /**
+ * Poll SIS status for real-time speaker identification progress
+ * Per docs: GET /asr/sis-status?meetingId=<meetingId>
+ * - Offers a second channel always in sync with the SIS worker
+ * - Returns sisMatches, sisSpeakers, and the same normalized speakerNames map
+ * - Poll this endpoint for real-time speaker-identification progress
+ */
+export async function pollSISStatus(meetingId: string): Promise<SISStatus & { speakerNames?: Record<string, string>; transcript?: string }> {
+  const token = localStorage.getItem('authToken');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const response = await fetch(`${BACKEND_API_URL}/asr/sis-status?meetingId=${encodeURIComponent(meetingId)}`, {
+      method: 'GET',
+      headers,
+    });
+
+    // 404 = job not registered yet or no SIS data
+    if (response.status === 404) {
+      debugLog('🔍 SIS status: 404 - no SIS data yet');
+      return {
+        status: 'queued',
+      };
+    }
+
+    if (!response.ok) {
+      debugLog('🔍 SIS status check error:', response.status);
+      return {
+        status: 'queued',
+      };
+    }
+
+    const data = await response.json();
+    debugLog('🔍 SIS status:', data.sisStatus || data.status);
+    
+    // Per docs: log sisSpeakers[i].bestMatchEmail to see which sample generated the alias
+    if (data.sisSpeakers && data.sisSpeakers.length > 0) {
+      debugLog('🗣️ SIS speakers:', data.sisSpeakers.length);
+      data.sisSpeakers.forEach((speaker: SISSpeaker) => {
+        const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
+        const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
+        debugLog(`   - ${speaker.label}: ${duration}${matchInfo}`);
+      });
+    }
+    
+    // Per docs: check sisMatch.confidencePercent (>= 60 → alias is auto-persisted)
+    if (data.sisMatches && data.sisMatches.length > 0) {
+      debugLog('🎯 SIS matches:', data.sisMatches.length);
+      data.sisMatches.forEach((match: SISMatch) => {
+        const autoPersisted = match.confidencePercent >= 60 ? ' [auto-persisted]' : '';
+        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}%${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}${autoPersisted}`);
+      });
+    }
+    
+    return {
+      status: data.sisStatus || data.status || 'queued',
+      sisSpeakers: data.sisSpeakers || [],
+      sisMatches: data.sisMatches || [],
+      sisMatch: data.sisMatch,
+      sisError: data.sisError,
+      transcript: data.transcript,
+      speakerNames: data.speakerNames || {},
+    };
+  } catch (error: any) {
+    debugLog('🔍 SIS status network error');
+    return {
+      status: 'queued',
+    };
+  }
+}
+
+/**
  * Wait for ASR completion with polling
  */
 export async function waitForASRCompletion(
@@ -508,73 +594,7 @@ export async function transcribeAndSave(
   };
 }
 
-/**
- * Poll SIS status independently by meetingId
- * Use this for monitoring SpeechBrain speaker identification separately from transcript
- */
-export async function pollSISStatus(meetingId: string): Promise<SISStatus> {
-  const token = localStorage.getItem('authToken');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json'
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  try {
-    const response = await fetch(`${BACKEND_API_URL}/asr/sis-status?meetingId=${encodeURIComponent(meetingId)}`, {
-      method: 'GET',
-      headers,
-    });
-
-    // 404 = job not registered yet
-    if (response.status === 404) {
-      debugLog('🔍 SIS status: 404 - job not found');
-      return { status: 'queued' };
-    }
-
-    if (!response.ok) {
-      debugLog('🔍 SIS status check failed:', response.status);
-      return { status: 'queued' };
-    }
-
-    const data = await response.json();
-    debugLog('🔍 SIS status:', data.status);
-    
-    // Log speakers if available
-    if (data.sisSpeakers && data.sisSpeakers.length > 0) {
-      debugLog('🗣️ SIS speakers:', data.sisSpeakers.length);
-      data.sisSpeakers.forEach((speaker: SISSpeaker) => {
-        debugLog(`   - ${speaker.label}: ${speaker.durationSeconds?.toFixed(1)}s${speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail}` : ''}`);
-      });
-    }
-    
-    // Log matches if available
-    if (data.sisMatches && data.sisMatches.length > 0) {
-      debugLog('🎯 SIS matches:', data.sisMatches.length);
-      data.sisMatches.forEach((match: SISMatch) => {
-        const details = [
-          `${match.confidencePercent}%`,
-          match.speakerLabel ? `[${match.speakerLabel}]` : '',
-          match.durationSeconds ? `${match.durationSeconds.toFixed(1)}s` : ''
-        ].filter(Boolean).join(' ');
-        debugLog(`   - ${match.sampleOwnerEmail}: ${details}`);
-      });
-    }
-    
-    return {
-      status: data.status || 'queued',
-      sisSpeakers: data.sisSpeakers || [],
-      sisMatches: data.sisMatches || [],
-      sisMatch: data.sisMatch,
-      sisError: data.sisError,
-      transcript: data.transcript,
-    };
-  } catch (error: any) {
-    debugLog('🔍 SIS status network error');
-    return { status: 'queued' };
-  }
-}
+// pollSISStatus is now defined above with enhanced docs support
 
 // Legacy exports for backwards compatibility
 export const submitASRJob = uploadAudioForTranscription;
