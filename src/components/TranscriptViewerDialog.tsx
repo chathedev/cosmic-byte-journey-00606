@@ -2,12 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Clock, UserCheck, Pencil, Save, X, Loader2 } from "lucide-react";
+import { Copy, Clock, UserCheck, Pencil, Save, X, Loader2, Sparkles, Volume2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { SISSpeaker, SISMatch } from "@/lib/asrService";
-import { backendApi } from "@/lib/backendApi";
+import { backendApi, SISLearningEntry } from "@/lib/backendApi";
 
 export interface TranscriptWord {
   text: string;
@@ -100,6 +100,27 @@ export function TranscriptViewerDialog({
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [sisLearning, setSisLearning] = useState<SISLearningEntry[]>([]);
+  const [loadedFromBackend, setLoadedFromBackend] = useState(false);
+
+  // Load speaker names from backend on mount
+  useEffect(() => {
+    if (open && meetingId && !loadedFromBackend) {
+      backendApi.getSpeakerNames(meetingId).then(data => {
+        if (Object.keys(data.speakerNames).length > 0) {
+          setSpeakerNames(prev => ({ ...data.speakerNames, ...prev }));
+          console.log('[SIS] Loaded speaker names from backend:', data.speakerNames);
+        }
+        if (data.sisLearning) {
+          setSisLearning(data.sisLearning);
+        }
+        setLoadedFromBackend(true);
+      }).catch(err => {
+        console.warn('[SIS] Could not load speaker names:', err);
+        setLoadedFromBackend(true);
+      });
+    }
+  }, [open, meetingId, loadedFromBackend]);
 
   // Build speaker identification map from SIS data
   const sisIdentifiedSpeakers = useMemo(() => {
@@ -261,16 +282,17 @@ export function TranscriptViewerDialog({
     setEditValue("");
   };
 
-  // Save speaker name - sends to backend with SIS association
+  // Save speaker name - sends to backend with SIS association for voice learning
   const saveSpeakerName = async (speakerId: string) => {
     if (!editValue.trim()) {
       cancelEditing();
       return;
     }
 
+    const trimmedName = editValue.trim();
     const newNames = {
       ...speakerNames,
-      [speakerId]: editValue.trim(),
+      [speakerId]: trimmedName,
     };
 
     setSpeakerNames(newNames);
@@ -284,24 +306,47 @@ export function TranscriptViewerDialog({
     if (meetingId) {
       setIsSaving(true);
       try {
-        // Build speaker names map with SIS match info for voice learning
         const sisInfo = sisIdentifiedSpeakers[speakerId];
-        const speakerNamesWithSIS: Record<string, string> = { ...newNames };
         
-        // If this speaker has SIS data, include it so backend can learn the voice-name association
         if (sisInfo) {
-          console.log(`[SIS] Saving speaker name "${editValue.trim()}" for voice email: ${sisInfo.email}`);
+          console.log(`[SIS] Saving speaker name "${trimmedName}" for voice: ${sisInfo.email} (${Math.round(sisInfo.confidence * 100)}%)`);
         }
         
-        await backendApi.saveSpeakerNames(meetingId, speakerNamesWithSIS);
+        const result = await backendApi.saveSpeakerNames(meetingId, newNames);
         
-        toast({
-          title: "Namn sparat",
-          description: sisInfo 
-            ? `"${editValue.trim()}" kopplat till röst (${Math.round(sisInfo.confidence * 100)}% säkerhet)`
-            : `Talaren sparad som "${editValue.trim()}"`,
-          duration: 3000,
-        });
+        // Update learning status from response
+        if (result.sisLearning && result.sisLearning.length > 0) {
+          setSisLearning(result.sisLearning);
+          
+          // Check if this save triggered a voice learning update
+          const learnedVoice = result.sisLearning.find(l => l.updated);
+          if (learnedVoice) {
+            toast({
+              title: "Röst kopplad!",
+              description: (
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-500" />
+                  <span>"{trimmedName}" kommer nu kännas igen automatiskt i framtida möten</span>
+                </div>
+              ),
+              duration: 4000,
+            });
+          } else {
+            toast({
+              title: "Namn sparat",
+              description: sisInfo 
+                ? `"${trimmedName}" kopplat till röst (${Math.round(sisInfo.confidence * 100)}% säkerhet)`
+                : `Talaren sparad som "${trimmedName}"`,
+              duration: 3000,
+            });
+          }
+        } else {
+          toast({
+            title: "Namn sparat",
+            description: `Talaren sparad som "${trimmedName}"`,
+            duration: 2000,
+          });
+        }
       } catch (error) {
         console.error('[SIS] Failed to save speaker names:', error);
         toast({
@@ -364,10 +409,18 @@ export function TranscriptViewerDialog({
           </div>
         </DialogHeader>
 
-        {/* Speaker Legend - for renaming */}
+        {/* Speaker Legend - for renaming and voice learning */}
         {speakerIdentificationEnabled && uniqueSpeakers.length > 0 && (
           <div className="px-5 py-2.5 border-b border-border/30 bg-muted/30">
-            <p className="text-[10px] text-muted-foreground mb-2">Klicka för att namnge talare:</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-muted-foreground">Klicka för att namnge talare:</p>
+              {sisLearning.length > 0 && (
+                <div className="flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Sparkles className="w-3 h-3" />
+                  <span>{sisLearning.filter(l => l.updated).length} röst{sisLearning.filter(l => l.updated).length !== 1 ? 'er' : ''} inlärda</span>
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {uniqueSpeakers.map(speakerId => {
                 const isEditing = editingSpeaker === speakerId;
@@ -375,10 +428,12 @@ export function TranscriptViewerDialog({
                 const confidence = getSISConfidence(speakerId);
                 const displayName = getSpeakerDisplayName(speakerId);
                 const hasCustomName = !!speakerNames[speakerId];
+                const sisInfo = sisIdentifiedSpeakers[speakerId];
+                const voiceLearned = sisInfo && sisLearning.some(l => l.email === sisInfo.email && l.updated);
                 
                 if (isEditing) {
                   return (
-                    <div key={speakerId} className="flex items-center gap-1 bg-background rounded-md border border-border px-1.5 py-0.5">
+                    <div key={speakerId} className="flex items-center gap-1 bg-background rounded-md border border-primary/50 shadow-sm px-1.5 py-0.5">
                       <div className={`w-4 h-4 rounded-full ${getSpeakerBgColor(speakerId)} flex items-center justify-center`}>
                         <span className="text-[7px] font-semibold text-white">
                           {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -392,22 +447,27 @@ export function TranscriptViewerDialog({
                           if (e.key === 'Escape') cancelEditing();
                         }}
                         placeholder="Ange namn..."
-                        className="h-5 w-28 text-[11px] px-1.5 py-0"
+                        className="h-5 w-32 text-[11px] px-1.5 py-0 border-0 focus-visible:ring-0"
                         autoFocus
                       />
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => saveSpeakerName(speakerId)}
-                        className="h-5 w-5 p-0"
+                        disabled={isSaving}
+                        className="h-5 w-5 p-0 hover:bg-emerald-500/20"
                       >
-                        <Save className="w-3 h-3 text-emerald-600" />
+                        {isSaving ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Save className="w-3 h-3 text-emerald-600" />
+                        )}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={cancelEditing}
-                        className="h-5 w-5 p-0"
+                        className="h-5 w-5 p-0 hover:bg-destructive/20"
                       >
                         <X className="w-3 h-3 text-muted-foreground" />
                       </Button>
@@ -419,37 +479,52 @@ export function TranscriptViewerDialog({
                   <button
                     key={speakerId}
                     onClick={() => canRename(speakerId) && startEditing(speakerId)}
-                    disabled={!canRename(speakerId)}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
-                      canRename(speakerId) 
-                        ? 'hover:bg-muted/80 cursor-pointer' 
+                    disabled={!canRename(speakerId) || isSaving}
+                    className={`group flex items-center gap-1.5 px-2 py-1 rounded-md transition-all ${
+                      canRename(speakerId) && !isSaving
+                        ? 'hover:bg-muted/80 hover:shadow-sm cursor-pointer' 
                         : 'opacity-50 cursor-not-allowed'
                     } ${
-                      isIdentified 
-                        ? 'bg-emerald-500/10 border border-emerald-500/20' 
-                        : hasCustomName
-                          ? 'bg-blue-500/10 border border-blue-500/20'
-                          : 'bg-muted/50 border border-border/50'
+                      voiceLearned
+                        ? 'bg-gradient-to-r from-emerald-500/15 to-emerald-500/5 border border-emerald-500/30'
+                        : isIdentified 
+                          ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                          : hasCustomName
+                            ? 'bg-blue-500/10 border border-blue-500/20'
+                            : 'bg-muted/50 border border-border/50'
                     }`}
                   >
-                    <div className={`w-4 h-4 rounded-full ${getSpeakerBgColor(speakerId)} flex items-center justify-center`}>
+                    <div className={`w-4 h-4 rounded-full ${getSpeakerBgColor(speakerId)} flex items-center justify-center relative`}>
                       <span className="text-[7px] font-semibold text-white">
                         {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </span>
+                      {voiceLearned && (
+                        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background" />
+                      )}
                     </div>
                     <span className="text-[11px] font-medium">{displayName}</span>
                     {isIdentified && (
-                      <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {Math.round(confidence * 100)}%
-                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`} />
+                        <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {Math.round(confidence * 100)}%
+                        </span>
+                      </div>
                     )}
                     {canRename(speakerId) && (
-                      <Pencil className="w-2.5 h-2.5 text-muted-foreground" />
+                      <Pencil className="w-2.5 h-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     )}
                   </button>
                 );
               })}
             </div>
+            {/* Hint about voice learning */}
+            {uniqueSpeakers.some(s => isSISIdentified(s)) && !sisLearning.some(l => l.updated) && (
+              <p className="text-[9px] text-muted-foreground/70 mt-2 flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5" />
+                Namnge talare för att lära systemet deras röster
+              </p>
+            )}
           </div>
         )}
 
@@ -464,37 +539,47 @@ export function TranscriptViewerDialog({
                   const confidence = getSISConfidence(speakerKey);
                   const displayName = getSpeakerDisplayName(speakerKey);
                   const hasCustomName = !!speakerNames[speakerKey];
+                  const sisInfo = sisIdentifiedSpeakers[speakerKey];
+                  const voiceLearned = sisInfo && sisLearning.some(l => l.email === sisInfo.email && l.updated);
                   
                   return (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.02, duration: 0.15 }}
+                      transition={{ delay: Math.min(index * 0.02, 0.5), duration: 0.15 }}
                       className="py-3 border-b border-border/30 last:border-0"
                     >
                       <div className="flex items-start gap-2.5">
-                        <div className={`w-5 h-5 rounded-full ${getSpeakerBgColor(speakerKey)} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                        <div className={`relative w-5 h-5 rounded-full ${getSpeakerBgColor(speakerKey)} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                           <span className="text-[8px] font-semibold text-white">
                             {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                           </span>
+                          {voiceLearned && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background" />
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-1.5 mb-0.5">
+                          <div className="flex items-center gap-1.5 mb-0.5">
                             <span className={`text-xs font-medium ${
-                              isIdentified 
-                                ? 'text-emerald-700 dark:text-emerald-400' 
-                                : hasCustomName 
-                                  ? 'text-blue-700 dark:text-blue-400'
-                                  : 'text-muted-foreground'
+                              voiceLearned
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : isIdentified 
+                                  ? 'text-emerald-700 dark:text-emerald-400' 
+                                  : hasCustomName 
+                                    ? 'text-blue-700 dark:text-blue-400'
+                                    : 'text-muted-foreground'
                             }`}>
                               {displayName}
                             </span>
                             {isIdentified && (
-                              <span className={`text-[10px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {Math.round(confidence * 100)}%
-                              </span>
+                              <div className="flex items-center gap-0.5">
+                                <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-500' : 'text-amber-500'}`} />
+                                <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {Math.round(confidence * 100)}%
+                                </span>
+                              </div>
                             )}
                             <span className="text-[10px] text-muted-foreground/50 ml-auto">
                               {formatTime(segment.start)}

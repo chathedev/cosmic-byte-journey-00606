@@ -1,5 +1,18 @@
 const BACKEND_URL = 'https://api.tivly.se';
 
+// SIS Voice Learning types
+export interface SISLearningEntry {
+  email: string;
+  similarity: number;
+  matchedSegments?: number;
+  updated?: boolean;
+}
+
+export interface SpeakerNamesResponse {
+  speakerNames: Record<string, string>;
+  sisLearning?: SISLearningEntry[];
+}
+
 export interface DashboardData {
   status: string;
   uptime: {
@@ -312,13 +325,25 @@ export const backendApi = {
     return response.json();
   },
 
-  // Speaker Names Management
-  async saveSpeakerNames(meetingId: string, speakerNames: Record<string, string>): Promise<any> {
+  // Speaker Names Management - Voice Learning Integration
+  // When speaker names are saved, backend associates them with SIS voice matches
+  // and persists aliases for future meetings with the same voices
+  async saveSpeakerNames(meetingId: string, speakerNames: Record<string, string>): Promise<SpeakerNamesResponse> {
+    // Filter out empty names
+    const cleanedNames: Record<string, string> = {};
+    for (const [key, value] of Object.entries(speakerNames)) {
+      if (typeof value === 'string' && value.trim()) {
+        cleanedNames[key] = value.trim();
+      }
+    }
+
+    console.log(`[SIS] Saving speaker names for meeting ${meetingId}:`, cleanedNames);
+
     const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
       method: 'PUT',
       credentials: 'include',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ speakerNames }),
+      body: JSON.stringify({ speakerNames: cleanedNames }),
     });
 
     if (!response.ok) {
@@ -326,7 +351,48 @@ export const backendApi = {
       throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    
+    // Log voice learning results
+    if (data.sisLearning && data.sisLearning.length > 0) {
+      console.log('[SIS] Voice learning results:');
+      data.sisLearning.forEach((entry: SISLearningEntry) => {
+        const status = entry.updated ? '✓ Updated' : '○ Matched';
+        console.log(`  ${status} ${entry.email}: ${Math.round(entry.similarity * 100)}%`);
+      });
+    }
+
+    return {
+      speakerNames: data.speakerNames || cleanedNames,
+      sisLearning: data.sisLearning,
+    };
+  },
+
+  async getSpeakerNames(meetingId: string): Promise<SpeakerNamesResponse> {
+    try {
+      const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return { speakerNames: {} };
+        }
+        console.warn('[SIS] Could not fetch speaker names:', response.status);
+        return { speakerNames: {} };
+      }
+
+      const data = await response.json();
+      return {
+        speakerNames: data.speakerNames || {},
+        sisLearning: data.sisLearning,
+      };
+    } catch (error) {
+      console.warn('[SIS] Get speaker names error:', error);
+      return { speakerNames: {} };
+    }
   },
 
   // Admin Auth Management
