@@ -1,11 +1,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Copy, Clock, UserCheck } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Copy, Clock, UserCheck, Pencil, Save, X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { SISSpeaker, SISMatch } from "@/lib/asrService";
+import { backendApi } from "@/lib/backendApi";
 
 export interface TranscriptWord {
   text: string;
@@ -86,17 +88,22 @@ export function TranscriptViewerDialog({
   transcript,
   segments,
   meetingTitle,
+  meetingId,
   initialSpeakerNames,
+  onSpeakerNamesChange,
   speakerIdentificationEnabled = false,
   sisSpeakers,
   sisMatches,
 }: TranscriptViewerDialogProps) {
   const { toast } = useToast();
-  const [speakerNames] = useState<Record<string, string>>(initialSpeakerNames || {});
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>(initialSpeakerNames || {});
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Build speaker identification map from SIS data
   const sisIdentifiedSpeakers = useMemo(() => {
-    const map: Record<string, { name: string; email: string; confidence: number }> = {};
+    const map: Record<string, { name: string; email: string; confidence: number; speakerLabel?: string }> = {};
     
     const transcriptSpeakerIds = segments 
       ? [...new Set(segments.map(s => getSpeakerFromSegment(s)))]
@@ -125,6 +132,7 @@ export function TranscriptViewerDialog({
                 name: speakerName,
                 email: sisSpeaker.bestMatchEmail,
                 confidence: sisSpeaker.similarity,
+                speakerLabel: sisSpeaker.label,
               };
               break;
             }
@@ -143,6 +151,7 @@ export function TranscriptViewerDialog({
             name: speakerName,
             email: sisSpeaker.bestMatchEmail,
             confidence: sisSpeaker.similarity,
+            speakerLabel: sisSpeaker.label,
           };
         }
       }
@@ -159,12 +168,14 @@ export function TranscriptViewerDialog({
               name: speakerName,
               email: match.sampleOwnerEmail,
               confidence: match.score,
+              speakerLabel: match.speakerLabel,
             };
           }
           map[match.speakerLabel] = {
             name: speakerName,
             email: match.sampleOwnerEmail,
             confidence: match.score,
+            speakerLabel: match.speakerLabel,
           };
         }
       });
@@ -181,9 +192,8 @@ export function TranscriptViewerDialog({
         textToCopy = segments
           .map(s => {
             const speakerKey = getSpeakerFromSegment(s);
-            const sisMatch = sisIdentifiedSpeakers[speakerKey];
-            const name = sisMatch?.name || speakerNames[speakerKey] || `Talare ${speakerKey}`;
-            return `[${name}] ${s.text}`;
+            const displayName = getSpeakerDisplayName(speakerKey);
+            return `[${displayName}] ${s.text}`;
           })
           .join('\n\n');
       }
@@ -204,18 +214,21 @@ export function TranscriptViewerDialog({
     }
   };
 
-  const getSpeakerDisplayName = (speaker: string): string => {
+  const getSpeakerDisplayName = useCallback((speaker: string): string => {
+    // First check manually set names
     if (speakerNames[speaker]) return speakerNames[speaker];
     
+    // Then check SIS identified names
     const sisMatch = sisIdentifiedSpeakers[speaker];
     if (sisMatch) return sisMatch.name;
     
+    // Fall back to generic name
     const match = speaker.match(/speaker_(\d+)/i);
     if (match) {
       return `Talare ${parseInt(match[1], 10) + 1}`;
     }
     return `Talare ${speaker}`;
-  };
+  }, [speakerNames, sisIdentifiedSpeakers]);
 
   const isSISIdentified = (speaker: string): boolean => {
     return !!sisIdentifiedSpeakers[speaker];
@@ -234,6 +247,79 @@ export function TranscriptViewerDialog({
   const totalDuration = segments && segments.length > 0
     ? Math.max(...segments.map(s => s.end))
     : 0;
+
+  // Start editing a speaker name
+  const startEditing = (speakerId: string) => {
+    const currentName = speakerNames[speakerId] || sisIdentifiedSpeakers[speakerId]?.name || '';
+    setEditingSpeaker(speakerId);
+    setEditValue(currentName);
+  };
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setEditingSpeaker(null);
+    setEditValue("");
+  };
+
+  // Save speaker name - sends to backend with SIS association
+  const saveSpeakerName = async (speakerId: string) => {
+    if (!editValue.trim()) {
+      cancelEditing();
+      return;
+    }
+
+    const newNames = {
+      ...speakerNames,
+      [speakerId]: editValue.trim(),
+    };
+
+    setSpeakerNames(newNames);
+    setEditingSpeaker(null);
+    setEditValue("");
+
+    // Notify parent component
+    onSpeakerNamesChange?.(newNames);
+
+    // Save to backend if we have a meeting ID
+    if (meetingId) {
+      setIsSaving(true);
+      try {
+        // Build speaker names map with SIS match info for voice learning
+        const sisInfo = sisIdentifiedSpeakers[speakerId];
+        const speakerNamesWithSIS: Record<string, string> = { ...newNames };
+        
+        // If this speaker has SIS data, include it so backend can learn the voice-name association
+        if (sisInfo) {
+          console.log(`[SIS] Saving speaker name "${editValue.trim()}" for voice email: ${sisInfo.email}`);
+        }
+        
+        await backendApi.saveSpeakerNames(meetingId, speakerNamesWithSIS);
+        
+        toast({
+          title: "Namn sparat",
+          description: sisInfo 
+            ? `"${editValue.trim()}" kopplat till röst (${Math.round(sisInfo.confidence * 100)}% säkerhet)`
+            : `Talaren sparad som "${editValue.trim()}"`,
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error('[SIS] Failed to save speaker names:', error);
+        toast({
+          title: "Kunde inte spara",
+          description: "Försök igen senare.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  // Check if a speaker can be renamed (always allow, but show different UI for SIS-identified)
+  const canRename = (speakerId: string): boolean => {
+    return !!meetingId; // Can only rename if we have a meeting ID to save to
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -258,6 +344,12 @@ export function TranscriptViewerDialog({
                     <span>{identifiedCount} identifierad{identifiedCount !== 1 ? 'e' : ''}</span>
                   </div>
                 )}
+                {isSaving && (
+                  <div className="flex items-center gap-1 text-amber-600">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Sparar...</span>
+                  </div>
+                )}
               </div>
             </div>
             <Button
@@ -272,6 +364,95 @@ export function TranscriptViewerDialog({
           </div>
         </DialogHeader>
 
+        {/* Speaker Legend - for renaming */}
+        {speakerIdentificationEnabled && uniqueSpeakers.length > 0 && (
+          <div className="px-5 py-2.5 border-b border-border/30 bg-muted/30">
+            <p className="text-[10px] text-muted-foreground mb-2">Klicka för att namnge talare:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {uniqueSpeakers.map(speakerId => {
+                const isEditing = editingSpeaker === speakerId;
+                const isIdentified = isSISIdentified(speakerId);
+                const confidence = getSISConfidence(speakerId);
+                const displayName = getSpeakerDisplayName(speakerId);
+                const hasCustomName = !!speakerNames[speakerId];
+                
+                if (isEditing) {
+                  return (
+                    <div key={speakerId} className="flex items-center gap-1 bg-background rounded-md border border-border px-1.5 py-0.5">
+                      <div className={`w-4 h-4 rounded-full ${getSpeakerBgColor(speakerId)} flex items-center justify-center`}>
+                        <span className="text-[7px] font-semibold text-white">
+                          {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <Input
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveSpeakerName(speakerId);
+                          if (e.key === 'Escape') cancelEditing();
+                        }}
+                        placeholder="Ange namn..."
+                        className="h-5 w-28 text-[11px] px-1.5 py-0"
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => saveSpeakerName(speakerId)}
+                        className="h-5 w-5 p-0"
+                      >
+                        <Save className="w-3 h-3 text-emerald-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelEditing}
+                        className="h-5 w-5 p-0"
+                      >
+                        <X className="w-3 h-3 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <button
+                    key={speakerId}
+                    onClick={() => canRename(speakerId) && startEditing(speakerId)}
+                    disabled={!canRename(speakerId)}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
+                      canRename(speakerId) 
+                        ? 'hover:bg-muted/80 cursor-pointer' 
+                        : 'opacity-50 cursor-not-allowed'
+                    } ${
+                      isIdentified 
+                        ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                        : hasCustomName
+                          ? 'bg-blue-500/10 border border-blue-500/20'
+                          : 'bg-muted/50 border border-border/50'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full ${getSpeakerBgColor(speakerId)} flex items-center justify-center`}>
+                      <span className="text-[7px] font-semibold text-white">
+                        {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-medium">{displayName}</span>
+                    {isIdentified && (
+                      <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {Math.round(confidence * 100)}%
+                      </span>
+                    )}
+                    {canRename(speakerId) && (
+                      <Pencil className="w-2.5 h-2.5 text-muted-foreground" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <ScrollArea className="flex-1 max-h-[55vh]">
           <div className="px-5 py-4">
@@ -282,6 +463,7 @@ export function TranscriptViewerDialog({
                   const isIdentified = isSISIdentified(speakerKey);
                   const confidence = getSISConfidence(speakerKey);
                   const displayName = getSpeakerDisplayName(speakerKey);
+                  const hasCustomName = !!speakerNames[speakerKey];
                   
                   return (
                     <motion.div
@@ -300,11 +482,17 @@ export function TranscriptViewerDialog({
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-1.5 mb-0.5">
-                            <span className={`text-xs font-medium ${isIdentified ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            <span className={`text-xs font-medium ${
+                              isIdentified 
+                                ? 'text-emerald-700 dark:text-emerald-400' 
+                                : hasCustomName 
+                                  ? 'text-blue-700 dark:text-blue-400'
+                                  : 'text-muted-foreground'
+                            }`}>
                               {displayName}
                             </span>
                             {isIdentified && (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                              <span className={`text-[10px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
                                 {Math.round(confidence * 100)}%
                               </span>
                             )}
