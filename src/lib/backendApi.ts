@@ -323,10 +323,10 @@ export const backendApi = {
   },
 
   // Speaker Names Management - Voice Learning Integration
-  // When speaker names are saved, backend associates them with SIS voice matches
-  // and persists aliases for future meetings with the same voices
+  // Per docs: PUT /meetings/:meetingId/speaker-names with { speakerNames: { label: name } }
+  // Backend validates, updates meeting record, associates with SIS voices, persists aliases
   async saveSpeakerNames(meetingId: string, speakerNames: Record<string, string>): Promise<SpeakerNamesResponse> {
-    // Filter out empty names
+    // Validate: speakerNames must be object with non-empty string values (per docs)
     const cleanedNames: Record<string, string> = {};
     for (const [key, value] of Object.entries(speakerNames)) {
       if (typeof value === 'string' && value.trim()) {
@@ -334,7 +334,7 @@ export const backendApi = {
       }
     }
 
-    console.log(`[SIS] Saving speaker names for meeting ${meetingId}:`, cleanedNames);
+    console.log(`[SIS] PUT /meetings/${meetingId}/speaker-names:`, cleanedNames);
 
     const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
       method: 'PUT',
@@ -350,23 +350,28 @@ export const backendApi = {
 
     const data = await response.json();
     
-    // Log voice learning results
+    // Log voice learning results per docs section 4
     if (data.sisLearning && data.sisLearning.length > 0) {
-      console.log('[SIS] Voice learning results:');
+      console.log('[SIS] Voice learning results (sisLearning):');
       data.sisLearning.forEach((entry: SISLearningEntry) => {
-        const status = entry.updated ? '✓ Updated' : '○ Matched';
-        console.log(`  ${status} ${entry.email}: ${Math.round(entry.similarity * 100)}%`);
+        const status = entry.updated ? '✓ LEARNED' : '○ Matched';
+        console.log(`  ${status} ${entry.email}: ${Math.round(entry.similarity * 100)}% (${entry.matchedSegments || 0} segments)`);
       });
     }
 
+    // Return the updated speakerNames from backend (which may include auto-applied aliases)
     return {
       speakerNames: data.speakerNames || cleanedNames,
-      sisLearning: data.sisLearning,
+      sisLearning: data.sisLearning || [],
     };
   },
 
+  // Per docs: GET /meetings/:meetingId/speaker-names
+  // Backend resolves missing state and returns sanitized speakerNames map
   async getSpeakerNames(meetingId: string): Promise<SpeakerNamesResponse> {
     try {
+      console.log(`[SIS] GET /meetings/${meetingId}/speaker-names`);
+      
       const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
         method: 'GET',
         credentials: 'include',
@@ -375,20 +380,26 @@ export const backendApi = {
 
       if (!response.ok) {
         if (response.status === 404) {
-          return { speakerNames: {} };
+          console.log('[SIS] Speaker names not found (404) - returning empty');
+          return { speakerNames: {}, sisLearning: [] };
         }
         console.warn('[SIS] Could not fetch speaker names:', response.status);
-        return { speakerNames: {} };
+        return { speakerNames: {}, sisLearning: [] };
       }
 
       const data = await response.json();
+      
+      if (data.speakerNames && Object.keys(data.speakerNames).length > 0) {
+        console.log('[SIS] Loaded speaker names:', data.speakerNames);
+      }
+      
       return {
         speakerNames: data.speakerNames || {},
-        sisLearning: data.sisLearning,
+        sisLearning: data.sisLearning || [],
       };
     } catch (error) {
       console.warn('[SIS] Get speaker names error:', error);
-      return { speakerNames: {} };
+      return { speakerNames: {}, sisLearning: [] };
     }
   },
 
