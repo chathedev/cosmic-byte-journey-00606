@@ -214,16 +214,17 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Global Dev Button Component - only for charlie.wretling@icloud.com
+// Global Dev Button Component - always visible on iOS app, or for specific user on web
 const GlobalDevButton = () => {
   const { user } = useAuth();
   const { userPlan } = useSubscription();
   const [logs, setLogs] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const isIos = isIosApp();
 
-  // Only show for specific email
+  // Show on iOS app always, or for specific email on web
   const allowedEmail = 'charlie.wretling@icloud.com';
-  const isAllowed = user?.email?.toLowerCase() === allowedEmail.toLowerCase();
+  const isAllowed = isIos || user?.email?.toLowerCase() === allowedEmail.toLowerCase();
 
   // Capture console logs and errors
   useEffect(() => {
@@ -272,8 +273,6 @@ const GlobalDevButton = () => {
   }, []);
   
   const handleDevClick = async () => {
-    const isIos = isIosApp();
-    
     // Gather comprehensive debug info
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -285,6 +284,7 @@ const GlobalDevButton = () => {
         capacitor: typeof (window as any).Capacitor !== 'undefined',
       },
       user: {
+        email: user?.email || 'unknown',
         plan: userPlan?.plan || 'unknown',
         meetingsUsed: userPlan?.meetingsUsed || 0,
         meetingsLimit: userPlan?.meetingsLimit || 0,
@@ -304,6 +304,7 @@ Path: ${debugInfo.session.pathname}
 Capacitor: ${debugInfo.session.capacitor}
 
 --- USER INFO ---
+Email: ${debugInfo.user.email}
 Plan: ${debugInfo.user.plan}
 Meetings: ${debugInfo.user.meetingsUsed}/${debugInfo.user.meetingsLimit}
 
@@ -320,21 +321,19 @@ ${JSON.stringify(debugInfo, null, 2)}
     // Copy to clipboard
     try {
       await navigator.clipboard.writeText(formattedOutput);
-      sonnerToast.success('Debug info copied to clipboard! 📋', {
-        duration: 3000,
-        description: `${errors.length} errors, ${logs.length} logs captured`,
+      sonnerToast.success('Loggar kopierade! 📋', {
+        duration: 2000,
+        description: `${errors.length} fel, ${logs.length} loggar`,
       });
-      console.log('🔧 DEBUG INFO COPIED:', debugInfo);
     } catch (err) {
-      sonnerToast.error('Failed to copy to clipboard', {
-        description: 'Check console for debug info',
+      sonnerToast.error('Kunde inte kopiera', {
+        description: 'Se konsolen för info',
       });
-      console.log('🔧 DEBUG INFO:', debugInfo);
-      console.log('📋 FORMATTED OUTPUT:', formattedOutput);
+      console.log('🔧 DEBUG INFO:', formattedOutput);
     }
   };
 
-  // Don't render if not allowed user
+  // Don't render if not allowed
   if (!isAllowed) {
     return null;
   }
@@ -343,11 +342,11 @@ ${JSON.stringify(debugInfo, null, 2)}
     <Button
       onClick={handleDevClick}
       size="icon"
-      variant="outline"
-      className="fixed bottom-4 right-4 z-[9999] h-12 w-12 rounded-full shadow-lg bg-background/80 backdrop-blur-sm border-2 hover:scale-110 transition-transform"
-      title="Copy debug info"
+      variant="default"
+      className="fixed bottom-20 right-4 z-[9999] h-14 w-14 rounded-full shadow-2xl bg-primary hover:bg-primary/90 border-2 border-primary-foreground/20 hover:scale-110 active:scale-95 transition-transform"
+      title="Kopiera loggar"
     >
-      <Bug className="h-5 w-5" />
+      <Bug className="h-6 w-6" />
     </Button>
   );
 };
