@@ -244,8 +244,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         setSessionId(continuedMeeting.id);
         setSelectedFolder(continuedMeeting.folder);
         hasIncrementedCountRef.current = true;
-        // Start recording for continued meeting too
-        startRecording();
+        // Start recording for continued meeting - pass meetingId directly
+        startRecording(continuedMeeting.id);
         return;
       }
 
@@ -259,8 +259,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       createdAtRef.current = new Date().toISOString();
       setSessionId(tempId);
       
-      // Start recording
-      startRecording();
+      // Start recording - pass meetingId directly so ASR can connect immediately
+      startRecording(tempId);
     };
 
     initSession();
@@ -294,7 +294,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     };
   }, [isRecording, isPaused]);
 
-  const startRecording = async () => {
+  const startRecording = async (meetingId?: string) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -339,10 +339,13 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       setIsRecording(true);
       await requestWakeLock();
       
+      // Use the passed meetingId directly (not from state which might not be set yet)
+      const currentMeetingId = meetingId || sessionId;
+      
       // For ASR mode (Enterprise): connect realtime ASR websocket
-      if (useAsrMode && sessionId) {
-        console.log('🎤 Connecting realtime ASR for session:', sessionId);
-        realtimeASR.connect(sessionId, stream);
+      if (useAsrMode && currentMeetingId) {
+        console.log('🎤 Connecting realtime ASR for session:', currentMeetingId);
+        realtimeASR.connect(currentMeetingId, stream);
       } else if (!useAsrMode) {
         // Start browser speech recognition for Free/Pro plans
         startSpeechRecognition();

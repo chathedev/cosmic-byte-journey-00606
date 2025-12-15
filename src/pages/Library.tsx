@@ -129,14 +129,19 @@ const Library = () => {
       if (pendingMeetingJson) {
         try {
           const pendingMeeting = JSON.parse(pendingMeetingJson) as MeetingSession;
-          // Check if we have background upload in progress
-          const uploadStatus = getUploadStatus(pendingMeeting.id);
-          if (uploadStatus) {
-            pendingMeeting.transcriptionStatus = uploadStatus.status === 'complete' ? 'processing' : 'uploading';
-          } else {
-            pendingMeeting.transcriptionStatus = 'uploading';
+          
+          // Only set to uploading/processing if not already done (Enterprise realtime ASR is already done)
+          if (pendingMeeting.transcriptionStatus !== 'done' || !pendingMeeting.transcript) {
+            // Check if we have background upload in progress
+            const uploadStatus = getUploadStatus(pendingMeeting.id);
+            if (uploadStatus) {
+              pendingMeeting.transcriptionStatus = uploadStatus.status === 'complete' ? 'processing' : 'uploading';
+            } else {
+              pendingMeeting.transcriptionStatus = 'uploading';
+            }
+            pendingMeetingIdRef.current = pendingMeeting.id;
           }
-          pendingMeetingIdRef.current = pendingMeeting.id;
+          
           setMeetings([pendingMeeting]);
           setIsLoading(false);
         } catch (e) {
