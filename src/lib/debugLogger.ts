@@ -1,31 +1,20 @@
-// Debug logger - only logs for admins and allowed users
+// Debug logger - only logs for admins
+// Suppresses ALL console output for non-admin users
 
-const ALLOWED_EMAILS = ['charlie.wretling@icloud.com'];
+// Store original console methods
+const originalConsole = {
+  log: console.log.bind(console),
+  error: console.error.bind(console),
+  warn: console.warn.bind(console),
+  info: console.info.bind(console),
+  debug: console.debug.bind(console),
+};
 
-let cachedIsAllowed: boolean | null = null;
-let cachedEmail: string | null = null;
-
-function checkIsAllowed(): boolean {
-  // Check localStorage for user email (cached auth)
-  const authData = localStorage.getItem('authUser');
-  if (!authData) return false;
-  
-  try {
-    const user = JSON.parse(authData);
-    const email = user?.email?.toLowerCase();
-    
-    if (!email) return false;
-    
-    // Cache the result
-    if (email !== cachedEmail) {
-      cachedEmail = email;
-      // Check if admin or allowed email
-      cachedIsAllowed = ALLOWED_EMAILS.some(e => e.toLowerCase() === email);
-    }
-    
-    return cachedIsAllowed || false;
-  } catch {
-    return false;
+// Extend window type
+declare global {
+  interface Window {
+    __TIVLY_IS_ADMIN__?: boolean;
+    __TIVLY_CONSOLE_INITIALIZED__?: boolean;
   }
 }
 
@@ -34,32 +23,60 @@ function isAdmin(): boolean {
   return window.__TIVLY_IS_ADMIN__ === true;
 }
 
-// Extend window type
-declare global {
-  interface Window {
-    __TIVLY_IS_ADMIN__?: boolean;
-  }
-}
+// Initialize console suppression for non-admins
+export const initializeConsoleSuppression = () => {
+  if (window.__TIVLY_CONSOLE_INITIALIZED__) return;
+  window.__TIVLY_CONSOLE_INITIALIZED__ = true;
 
+  // Override all console methods
+  console.log = (...args: any[]) => {
+    if (isAdmin()) originalConsole.log(...args);
+  };
+  
+  console.error = (...args: any[]) => {
+    if (isAdmin()) originalConsole.error(...args);
+  };
+  
+  console.warn = (...args: any[]) => {
+    if (isAdmin()) originalConsole.warn(...args);
+  };
+  
+  console.info = (...args: any[]) => {
+    if (isAdmin()) originalConsole.info(...args);
+  };
+  
+  console.debug = (...args: any[]) => {
+    if (isAdmin()) originalConsole.debug(...args);
+  };
+};
+
+// Debug log functions (always check admin status)
 export const debugLog = (...args: any[]) => {
-  if (isAdmin() || checkIsAllowed()) {
-    console.log(...args);
-  }
+  if (isAdmin()) originalConsole.log(...args);
 };
 
 export const debugError = (...args: any[]) => {
-  if (isAdmin() || checkIsAllowed()) {
-    console.error(...args);
-  }
+  if (isAdmin()) originalConsole.error(...args);
 };
 
 export const debugWarn = (...args: any[]) => {
-  if (isAdmin() || checkIsAllowed()) {
-    console.warn(...args);
-  }
+  if (isAdmin()) originalConsole.warn(...args);
+};
+
+export const debugInfo = (...args: any[]) => {
+  if (isAdmin()) originalConsole.info(...args);
 };
 
 // Set admin status (call from SubscriptionContext)
 export const setDebugAdminStatus = (isAdminUser: boolean) => {
   window.__TIVLY_IS_ADMIN__ = isAdminUser;
+};
+
+// Restore original console (for cleanup/testing)
+export const restoreConsole = () => {
+  console.log = originalConsole.log;
+  console.error = originalConsole.error;
+  console.warn = originalConsole.warn;
+  console.info = originalConsole.info;
+  console.debug = originalConsole.debug;
 };
