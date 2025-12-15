@@ -116,7 +116,7 @@ export const VoiceMemosWaveform = ({ stream, isActive, isPaused = false }: Voice
 
           phaseRef.current += 0.02;
 
-          // Compute a calm, low-reactive amplitude signal
+          // Compute amplitude - MORE REACTIVE
           let rms = 0;
           if (analyserRef.current && stream && !isPaused) {
             const analyser = analyserRef.current;
@@ -131,12 +131,12 @@ export const VoiceMemosWaveform = ({ stream, isActive, isPaused = false }: Voice
             rms = Math.sqrt(sum / data.length);
           }
 
-          // Always keep motion; voice gently nudges it (less reactive, more chill)
-          const flowing = 0.055 + (Math.sin(phaseRef.current) * 0.01 + Math.sin(phaseRef.current * 0.7) * 0.008);
-          const voiceNudge = Math.min(0.16, Math.pow(rms, 0.7) * 0.28);
+          // More reactive: higher multiplier, lower threshold
+          const flowing = 0.08 + (Math.sin(phaseRef.current) * 0.015 + Math.sin(phaseRef.current * 0.7) * 0.01);
+          const voiceNudge = Math.min(0.5, Math.pow(rms, 0.5) * 1.8); // Much more reactive
           const target = flowing + voiceNudge;
 
-          const smoothing = isPaused ? 0.03 : 0.06;
+          const smoothing = isPaused ? 0.05 : 0.25; // Faster response
           smoothedRef.current = smoothedRef.current + (target - smoothedRef.current) * smoothing;
 
           historyRef.current.push(smoothedRef.current);
