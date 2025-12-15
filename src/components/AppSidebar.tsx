@@ -18,8 +18,9 @@ import {
   FiDatabase,
   FiMenu,
   FiX,
+  FiHeadphones,
 } from "react-icons/fi";
-import { Lock } from "lucide-react";
+import { Lock, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -27,6 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import { isUserAdmin, hasPlusAccess, hasUnlimitedAccess, isLibraryLocked } from "@/lib/accessCheck";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
+import { SupportCodeDialog } from "@/components/SupportCodeDialog";
+import { AdminSupportPanel } from "@/components/AdminSupportPanel";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +43,8 @@ export function AppSidebar() {
   const [selected, setSelected] = useState("Hem");
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
+  const [showSupportCode, setShowSupportCode] = useState(false);
+  const [showAdminSupport, setShowAdminSupport] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
   const isNative = isNativeApp();
@@ -159,6 +164,7 @@ export function AppSidebar() {
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
     { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
+    { Icon: Eye, title: "Support Panel", action: () => setShowAdminSupport(true) },
   ];
 
   return (
@@ -341,7 +347,14 @@ export function AppSidebar() {
                     {adminItems.map((item) => (
                       <button
                         key={item.title}
-                        onClick={() => handleNavigation(item.path, item.title)}
+                        onClick={() => {
+                          if ('action' in item && item.action) {
+                            item.action();
+                            if (isMobile) setOpen(false);
+                          } else if ('path' in item && item.path) {
+                            handleNavigation(item.path, item.title);
+                          }
+                        }}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
                           selected === item.title
                             ? 'bg-primary/10 text-primary font-medium'
@@ -370,9 +383,22 @@ export function AppSidebar() {
               </div>
             )}
 
+            {/* Support Button for All Users */}
+            {!collapsed && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <button
+                  onClick={() => setShowSupportCode(true)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                >
+                  <FiHeadphones className="text-lg shrink-0" />
+                  <span className="text-sm">Support</span>
+                </button>
+              </div>
+            )}
+
             {/* Enterprise Contact */}
             {userPlan?.plan === 'enterprise' && !collapsed && (
-              <div className="mt-4 pt-4 border-t border-border">
+              <div className="pt-2">
                 <button
                   onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
@@ -477,6 +503,8 @@ export function AppSidebar() {
       {/* Dialogs */}
       <SettingsDialog open={showSettings} onOpenChange={setShowSettings} />
       <SubscribeDialog open={showSubscribe} onOpenChange={setShowSubscribe} />
+      <SupportCodeDialog open={showSupportCode} onOpenChange={setShowSupportCode} />
+      <AdminSupportPanel open={showAdminSupport} onOpenChange={setShowAdminSupport} />
     </>
   );
 }

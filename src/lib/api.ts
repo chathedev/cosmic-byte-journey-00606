@@ -2120,6 +2120,111 @@ class ApiClient {
     
     return response.json();
   }
+
+  // ==================== SUPPORT ACCESS API ====================
+
+  // Generate a support code for user (user endpoint)
+  async generateSupportCode(): Promise<{ code: string; expiresAt: string }> {
+    const response = await this.fetchWithAuth('/support/generate', {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to generate support code' }));
+      throw new Error((error as any).error || 'Failed to generate support code');
+    }
+
+    return response.json();
+  }
+
+  // Revoke active support code (user endpoint)
+  async revokeSupportCode(): Promise<{ success: boolean }> {
+    const response = await this.fetchWithAuth('/support/revoke', {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to revoke support code' }));
+      throw new Error((error as any).error || 'Failed to revoke support code');
+    }
+
+    return response.json();
+  }
+
+  // Admin: Claim a support code (admin endpoint)
+  async claimSupportCode(code: string): Promise<{ supportToken: string; expiresAt: string; userEmail: string }> {
+    const response = await this.fetchWithAuth('/admin/support/claim', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Invalid or expired support code' }));
+      if ((error as any).error === 'support_expired') {
+        throw new Error('Supportkoden har upphört');
+      }
+      if ((error as any).error === 'support_revoked') {
+        throw new Error('Supportkoden har återkallats');
+      }
+      throw new Error((error as any).error || 'Ogiltig supportkod');
+    }
+
+    return response.json();
+  }
+
+  // Admin: Get user data via support token (support endpoint)
+  async getSupportUserData(supportToken: string): Promise<{
+    user: { email: string; displayName?: string; plan?: { plan?: string } };
+    meetings: any[];
+    meetingCount: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/support/user`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supportToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to get user data' }));
+      if ((error as any).error === 'support_expired') {
+        throw new Error('support_expired');
+      }
+      if ((error as any).error === 'support_revoked') {
+        throw new Error('support_revoked');
+      }
+      throw new Error((error as any).error || 'Failed to get user data');
+    }
+
+    return response.json();
+  }
+
+  // Admin: Get specific meeting via support token (support endpoint)
+  async getSupportMeeting(supportToken: string, meetingId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/support/meetings/${meetingId}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supportToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to get meeting' }));
+      if ((error as any).error === 'support_expired') {
+        throw new Error('support_expired');
+      }
+      if ((error as any).error === 'support_revoked') {
+        throw new Error('support_revoked');
+      }
+      throw new Error((error as any).error || 'Failed to get meeting');
+    }
+
+    return response.json();
+  }
 }
 
 export const apiClient = new ApiClient();
