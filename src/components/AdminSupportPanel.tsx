@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useSupport } from "@/contexts/SupportContext";
-import { Shield, Eye, RefreshCw, LogOut, Clock, User, FileText, Calendar, AlertTriangle } from "lucide-react";
+import { Shield, Eye, RefreshCw, LogOut, Clock, User, FileText, Calendar, AlertTriangle, Building2, Mic, CreditCard, Activity, CheckCircle2, XCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 interface AdminSupportPanelProps {
@@ -20,10 +20,63 @@ interface SupportUserData {
   user: {
     email: string;
     displayName?: string;
-    plan?: { plan?: string };
+    preferredName?: string;
+    plan?: string | { plan?: string };
+    meetingCount?: number;
+    meetingUsageBaseline?: number;
+    paymentStatus?: string;
+    planCancelledAt?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    lastLoginAt?: string;
+    isVerified?: boolean;
+    verifiedAt?: string | null;
+    primaryIp?: string;
+    lastIp?: string;
+    ipAddresses?: string[];
+    folders?: Array<{
+      id: string;
+      name: string;
+      metadata?: { systemFolder?: boolean };
+    }>;
+    meetings?: Array<{
+      id: string;
+      folderId?: string | null;
+      title: string;
+      transcript?: string;
+      status?: string;
+      createdAt: string;
+      updatedAt?: string;
+      protocol?: string | null;
+      speakerNames?: Record<string, string>;
+    }>;
+    enterprise?: {
+      companyId: string;
+      companyName: string;
+      role: string;
+      dataAccessMode: string;
+      joinedAt: string;
+    };
+    sisSample?: {
+      status: string;
+      speakerName?: string;
+      uploadedAt?: string;
+      lastMatchScore?: number;
+    };
+    meetingLimit?: number;
+    meetingSlotsRemaining?: number;
+    meetingUsage?: {
+      meetingCount: number;
+      meetingLimit: number;
+      meetingSlotsRemaining: number;
+      totalMeetingCount: number;
+      lastResetAt?: string;
+    };
+    lastAuthMethod?: string;
+    lastAuthPlatform?: string;
   };
-  meetings: any[];
-  meetingCount: number;
+  meetings?: any[];
+  meetingCount?: number;
 }
 
 export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps) => {
@@ -51,6 +104,17 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  // Get trash folder ID
+  const getTrashFolderId = () => {
+    return userData?.user?.folders?.find(f => f.name === '__Trash')?.id || null;
+  };
+
+  // Filter out trashed meetings
+  const getActiveMeetings = () => {
+    const trashFolderId = getTrashFolderId();
+    return userData?.user?.meetings?.filter(m => m.folderId !== trashFolderId) || [];
   };
 
   const handleClaimCode = async () => {
@@ -143,13 +207,28 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
       setSelectedMeeting(fullMeeting);
       setActiveTab("meeting");
     } catch (error: any) {
-      toast({
-        title: "Kunde inte ladda möte",
-        description: error?.message || "Ett oväntat fel uppstod",
-        variant: "destructive",
-      });
+      // Fallback to local meeting data
+      setSelectedMeeting(meeting);
+      setActiveTab("meeting");
     }
   };
+
+  const getPlanString = (plan: string | { plan?: string } | undefined): string => {
+    if (!plan) return 'free';
+    if (typeof plan === 'string') return plan;
+    return plan.plan || 'free';
+  };
+
+  const getPlanBadgeVariant = (plan: string) => {
+    switch (plan?.toLowerCase()) {
+      case 'enterprise': return 'default';
+      case 'pro': return 'secondary';
+      case 'premium': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
+  const activeMeetings = getActiveMeetings();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -245,7 +324,9 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="w-full">
                 <TabsTrigger value="overview" className="flex-1">Översikt</TabsTrigger>
-                <TabsTrigger value="meetings" className="flex-1">Möten</TabsTrigger>
+                <TabsTrigger value="meetings" className="flex-1">
+                  Möten ({activeMeetings.length})
+                </TabsTrigger>
                 {selectedMeeting && <TabsTrigger value="meeting" className="flex-1">Mötesdetaljer</TabsTrigger>}
               </TabsList>
 
@@ -254,8 +335,9 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                   <div className="flex items-center justify-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : userData ? (
+                ) : userData?.user ? (
                   <>
+                    {/* User Info Card */}
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
@@ -263,7 +345,7 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                           Användarinfo
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2">
+                      <CardContent className="space-y-3">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <p className="text-xs text-muted-foreground">E-post</p>
@@ -271,18 +353,159 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Plan</p>
-                            <Badge variant="outline">{userData.user.plan?.plan || 'free'}</Badge>
+                            <Badge variant={getPlanBadgeVariant(getPlanString(userData.user.plan))}>
+                              {getPlanString(userData.user.plan)}
+                            </Badge>
                           </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Antal möten</p>
-                            <p className="text-sm font-medium">{userData.meetingCount}</p>
-                          </div>
-                          {userData.user.displayName && (
+                          {userData.user.preferredName && (
                             <div>
                               <p className="text-xs text-muted-foreground">Namn</p>
-                              <p className="text-sm font-medium">{userData.user.displayName}</p>
+                              <p className="text-sm font-medium">{userData.user.preferredName}</p>
                             </div>
                           )}
+                          <div>
+                            <p className="text-xs text-muted-foreground">Verifierad</p>
+                            <div className="flex items-center gap-1">
+                              {userData.user.isVerified ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-destructive" />
+                              )}
+                              <span className="text-sm">{userData.user.isVerified ? 'Ja' : 'Nej'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Skapad</p>
+                            <p className="text-sm">{formatDate(userData.user.createdAt)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Senaste inloggning</p>
+                            <p className="text-sm">{userData.user.lastLoginAt ? formatDate(userData.user.lastLoginAt) : '-'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Meeting Usage Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          Mötesanvändning
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <p className="text-2xl font-bold">{activeMeetings.length}</p>
+                            <p className="text-xs text-muted-foreground">Aktiva möten</p>
+                          </div>
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <p className="text-2xl font-bold">{userData.user.meetingUsage?.meetingLimit ?? userData.user.meetingLimit ?? '-'}</p>
+                            <p className="text-xs text-muted-foreground">Mötesgräns</p>
+                          </div>
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <p className="text-2xl font-bold">{userData.user.meetingUsage?.totalMeetingCount ?? userData.user.meetingCount ?? '-'}</p>
+                            <p className="text-xs text-muted-foreground">Totalt antal</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Enterprise Card */}
+                    {userData.user.enterprise && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Building2 className="h-4 w-4" />
+                            Enterprise
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Företag</p>
+                              <p className="text-sm font-medium">{userData.user.enterprise.companyName}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Roll</p>
+                              <Badge variant="outline">{userData.user.enterprise.role}</Badge>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Dataåtkomst</p>
+                              <p className="text-sm">{userData.user.enterprise.dataAccessMode}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Ansluten</p>
+                              <p className="text-sm">{formatDate(userData.user.enterprise.joinedAt)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* SIS Sample Card */}
+                    {userData.user.sisSample && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Mic className="h-4 w-4" />
+                            Röstprov (SIS)
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Status</p>
+                              <Badge variant={userData.user.sisSample.status === 'ready' ? 'default' : 'secondary'}>
+                                {userData.user.sisSample.status}
+                              </Badge>
+                            </div>
+                            {userData.user.sisSample.speakerName && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Talarnamn</p>
+                                <p className="text-sm font-medium">{userData.user.sisSample.speakerName}</p>
+                              </div>
+                            )}
+                            {userData.user.sisSample.uploadedAt && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Uppladdad</p>
+                                <p className="text-sm">{formatDate(userData.user.sisSample.uploadedAt)}</p>
+                              </div>
+                            )}
+                            {userData.user.sisSample.lastMatchScore !== undefined && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Senaste matchpoäng</p>
+                                <p className="text-sm">{Math.round(userData.user.sisSample.lastMatchScore * 100)}%</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Payment Info Card */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          Betalning
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Betalstatus</p>
+                            <Badge variant={userData.user.paymentStatus === 'paid' ? 'default' : 'outline'}>
+                              {userData.user.paymentStatus || 'Okänd'}
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Senaste autentisering</p>
+                            <p className="text-sm">
+                              {userData.user.lastAuthMethod || '-'} ({userData.user.lastAuthPlatform || '-'})
+                            </p>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -312,9 +535,9 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                   <div className="flex items-center justify-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : userData?.meetings?.length ? (
+                ) : activeMeetings.length > 0 ? (
                   <div className="space-y-2">
-                    {userData.meetings.map((meeting) => (
+                    {activeMeetings.map((meeting) => (
                       <Card 
                         key={meeting.id} 
                         className="cursor-pointer hover:bg-accent/50 transition-colors"
@@ -329,13 +552,21 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                                   <Calendar className="h-3 w-3" />
                                   {formatDate(meeting.createdAt)}
                                 </span>
-                                {meeting.isCompleted && (
+                                <Badge variant="outline" className="text-xs">
+                                  {meeting.status}
+                                </Badge>
+                                {meeting.protocol && (
                                   <Badge variant="secondary" className="text-xs">
                                     <FileText className="h-3 w-3 mr-1" />
                                     Protokoll
                                   </Badge>
                                 )}
                               </div>
+                              {meeting.transcript && (
+                                <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                                  {meeting.transcript.slice(0, 150)}...
+                                </p>
+                              )}
                             </div>
                             <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
                           </div>
@@ -346,7 +577,7 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Inga möten hittades</p>
+                    <p>Inga aktiva möten hittades</p>
                   </div>
                 )}
               </TabsContent>
@@ -358,9 +589,24 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                       <CardTitle className="text-base">{selectedMeeting.title || 'Utan titel'}</CardTitle>
                       <CardDescription>
                         Skapat: {formatDate(selectedMeeting.createdAt)}
+                        {selectedMeeting.status && ` • Status: ${selectedMeeting.status}`}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Speaker Names */}
+                      {selectedMeeting.speakerNames && Object.keys(selectedMeeting.speakerNames).length > 0 && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Talare</Label>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {Object.entries(selectedMeeting.speakerNames).map(([key, name]) => (
+                              <Badge key={key} variant="outline">
+                                {name as string}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {selectedMeeting.transcript && (
                         <div>
                           <Label className="text-xs text-muted-foreground">Transkription</Label>
