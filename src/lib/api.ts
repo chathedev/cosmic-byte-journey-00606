@@ -2009,13 +2009,19 @@ class ApiClient {
     ok: boolean;
     disabled?: boolean;
     sisSample: {
-      status: 'ready' | 'processing' | 'error' | 'disabled' | null;
+      status: 'ready' | 'processing' | 'error' | 'disabled' | 'missing' | null;
+      speakerName?: string;
       uploadedAt?: string;
       lastTranscribedAt?: string;
+      lastCheckedAt?: string;
       lastMatchScore?: number;
+      matchCount?: number;
       matches?: Array<{
         meetingId: string;
+        meetingOwnerEmail?: string;
+        sampleOwnerEmail?: string;
         score: number;
+        confidencePercent?: number;
         matchedWords: number;
         totalSampleWords: number;
         updatedAt: string;
@@ -2046,8 +2052,22 @@ class ApiClient {
     ok: boolean;
     sisSample?: {
       status: 'ready' | 'processing' | 'error';
+      speakerName?: string;
       uploadedAt?: string;
+      lastTranscribedAt?: string;
+      lastCheckedAt?: string;
       lastMatchScore?: number;
+      matchCount?: number;
+      matches?: Array<{
+        meetingId: string;
+        meetingOwnerEmail?: string;
+        sampleOwnerEmail?: string;
+        score: number;
+        confidencePercent?: number;
+        matchedWords: number;
+        totalSampleWords: number;
+        updatedAt: string;
+      }>;
       error?: string | null;
     };
     error?: string;
