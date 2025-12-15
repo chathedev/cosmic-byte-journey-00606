@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { MinimalAudioRing } from "./MinimalAudioRing";
+import { AudioWaveVisualizer } from "./AudioWaveVisualizer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -775,8 +775,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                   {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
                 </div>
 
-                <MinimalAudioRing
-                  stream={streamRef.current}
+                <AudioWaveVisualizer
                   isActive={isRecording && !isPaused}
                   size={120}
                 />

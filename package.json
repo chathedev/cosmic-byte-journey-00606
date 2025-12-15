@@ -76,6 +76,7 @@
     "react-icons": "^5.5.0",
     "react-resizable-panels": "^2.1.9",
     "react-router-dom": "^6.30.1",
+    "react-voice-visualizer": "^2.0.8",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.6.0",
