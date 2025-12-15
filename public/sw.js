@@ -1,6 +1,6 @@
 // Lightweight, fast SW optimized for Firebase + React
 // Cache version - increment this to force cache refresh
-const CACHE_VERSION = 'tivly-v2';
+const CACHE_VERSION = 'tivly-v3';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-512.png',
