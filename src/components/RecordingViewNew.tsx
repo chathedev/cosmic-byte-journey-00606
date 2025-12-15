@@ -294,8 +294,22 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     };
   }, [isRecording, isPaused]);
 
-  const startRecording = async (meetingId?: string) => {
+  const startRecording = async (meetingId?: string, retryCount = 0) => {
+    const MAX_RETRIES = 3;
+    
     try {
+      // Clean up any existing streams/recorders first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch { /* ignore */ }
+        mediaRecorderRef.current = null;
+      }
+      
+      console.log('🎤 Requesting microphone access...');
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -305,6 +319,27 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           channelCount: 1,
         },
       });
+      
+      // Verify stream is active
+      if (!stream.active || stream.getAudioTracks().length === 0) {
+        throw new Error('No active audio tracks in stream');
+      }
+      
+      const audioTrack = stream.getAudioTracks()[0];
+      console.log('🎤 Audio track obtained:', audioTrack.label, '| enabled:', audioTrack.enabled, '| muted:', audioTrack.muted);
+      
+      // Handle track ending unexpectedly
+      audioTrack.onended = () => {
+        console.warn('⚠️ Audio track ended unexpectedly');
+        if (isRecording && !isSavingRef.current) {
+          toast({
+            title: 'Mikrofon bortkopplad',
+            description: 'Inspelningen fortsätter men ljud kan saknas.',
+            variant: 'destructive',
+          });
+        }
+      };
+      
       streamRef.current = stream;
 
       // Determine best supported mimeType with codecs for reliable recording
@@ -332,6 +367,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
           console.log(`📦 Audio chunk received: ${event.data.size} bytes (total chunks: ${audioChunksRef.current.length})`);
         }
       };
+      
+      // Handle recorder errors
+      mediaRecorder.onerror = (event: any) => {
+        console.error('❌ MediaRecorder error:', event.error);
+        if (!isSavingRef.current && retryCount < MAX_RETRIES) {
+          console.log(`🔄 Retrying recording (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+          setTimeout(() => startRecording(meetingId, retryCount + 1), 500);
+        }
+      };
 
       mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
@@ -352,11 +396,25 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       }
       
       console.log('✅ Recording started', useAsrMode ? '(Realtime ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting recording:', error);
+      
+      // Retry on certain errors
+      if (retryCount < MAX_RETRIES && (
+        error.name === 'NotReadableError' || 
+        error.name === 'AbortError' ||
+        error.message?.includes('Could not start')
+      )) {
+        console.log(`🔄 Retrying recording (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        setTimeout(() => startRecording(meetingId, retryCount + 1), 1000);
+        return;
+      }
+      
       toast({
         title: 'Behörighet nekad',
-        description: 'Tivly behöver tillstånd till mikrofon.',
+        description: error.name === 'NotAllowedError' 
+          ? 'Tivly behöver tillstånd till mikrofon.' 
+          : 'Kunde inte starta mikrofon. Försök igen.',
         variant: 'destructive',
       });
       onBack();
