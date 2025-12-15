@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, Play, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -315,16 +315,6 @@ const MeetingDetail = () => {
     }
   };
 
-  // Handle continue meeting
-  const handleContinueMeeting = () => {
-    if (!meeting) return;
-    navigate('/recording', { 
-      state: { 
-        continuedMeeting: meeting,
-        selectedLanguage: 'sv-SE'
-      } 
-    });
-  };
 
   // Handle create protocol
   const handleCreateProtocol = async () => {
@@ -568,14 +558,6 @@ const MeetingDetail = () => {
                   transition={{ delay: 0.2 }}
                   className="flex flex-wrap gap-3 pt-4 border-t border-border"
                 >
-                  <Button
-                    onClick={handleContinueMeeting}
-                    disabled={userPlan?.plan === 'free' || isProcessing}
-                    className="gap-2"
-                  >
-                    <Play className="w-4 h-4" />
-                    Fortsätt möte
-                  </Button>
                   <Button
                     onClick={handleCreateProtocol}
                     variant="outline"
