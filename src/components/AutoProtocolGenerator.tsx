@@ -165,42 +165,47 @@ export const AutoProtocolGenerator = ({
             });
           }
           
-          // Format transcript with speaker names
-          const formattedSegments = transcriptSegments
-            .filter(segment => segment && segment.text) // Filter out invalid segments
-            .map(segment => {
-              const speakerId = segment.speakerId || 'unknown';
-              let speakerName = speakerNameMap.get(speakerId) || speakerNameMap.get('meeting');
-              
-              if (!speakerName) {
-                // Fallback to generic speaker number
-                const speakerMatch = speakerId.match(/speaker_(\d+)/);
-                const speakerNum = speakerMatch ? parseInt(speakerMatch[1]) + 1 : 1;
-                speakerName = `Talare ${speakerNum}`;
-              }
-              
-              return `[${speakerName}]: ${segment.text || ''}`;
+          // Only format with speaker names if we have REAL identified speakers
+          // Don't use generic "Talare 1/2/3" - it adds no value
+          if (speakerNameMap.size > 0) {
+            // Format transcript with real speaker names
+            const formattedSegments = transcriptSegments
+              .filter(segment => segment && segment.text)
+              .map(segment => {
+                const speakerId = segment.speakerId || 'unknown';
+                const speakerName = speakerNameMap.get(speakerId) || speakerNameMap.get('meeting');
+                
+                // Only add speaker label if we have a real name for this speaker
+                if (speakerName) {
+                  return `[${speakerName}]: ${segment.text || ''}`;
+                }
+                // No real name identified - just return the text without speaker label
+                return segment.text || '';
+              });
+            
+            formattedTranscript = formattedSegments.length > 0 
+              ? formattedSegments.join('\n\n') 
+              : transcript;
+            
+            // Collect speaker info for logging (only real names)
+            const speakerCounts = new Map<string, number>();
+            transcriptSegments
+              .filter(segment => segment && segment.speakerId && speakerNameMap.has(segment.speakerId))
+              .forEach(segment => {
+                const name = speakerNameMap.get(segment.speakerId!)!;
+                speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
+              });
+            speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
+            
+            console.log('🎤 Speaker-attributed transcript created with REAL names:', {
+              speakersIdentified: speakerNameMap.size,
+              speakerInfo,
+              formattedTranscriptPreview: formattedTranscript.substring(0, 300)
             });
-          
-          formattedTranscript = formattedSegments.length > 0 
-            ? formattedSegments.join('\n\n') 
-            : transcript;
-          
-          // Collect speaker info for logging
-          const speakerCounts = new Map<string, number>();
-          transcriptSegments
-            .filter(segment => segment && segment.speakerId)
-            .forEach(segment => {
-              const name = speakerNameMap.get(segment.speakerId!) || speakerNameMap.get('meeting') || 'Okänd';
-              speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
-            });
-          speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
-          
-          console.log('🎤 Speaker-attributed transcript created:', {
-            speakersIdentified: speakerNameMap.size,
-            speakerInfo,
-            formattedTranscriptPreview: formattedTranscript.substring(0, 300)
-          });
+          } else {
+            // No real speaker names identified - use plain transcript without generic labels
+            console.log('ℹ️ No real speaker names identified, using plain transcript');
+          }
         }
         
         const requestBody = {
