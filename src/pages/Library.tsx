@@ -979,7 +979,12 @@ const Library = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">{meeting.title}</CardTitle>
+                          <button
+                            onClick={() => navigate(`/meetings/${meeting.id}`)}
+                            className="text-left hover:text-primary transition-colors"
+                          >
+                            <CardTitle className="text-lg hover:underline underline-offset-2">{meeting.title}</CardTitle>
+                          </button>
                           <Button
                             onClick={() => handleStartEdit(meeting)}
                             variant="ghost"

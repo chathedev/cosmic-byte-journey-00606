@@ -455,7 +455,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         description: 'Transkribering pågår i bakgrunden.',
       });
       
-      navigate('/library', { state: { fromRecording: true, pendingMeetingId: testMeetingId } });
+      navigate(`/meetings/${testMeetingId}`);
       
       // Use background uploader for ASR (same as file upload)
       const audioFile = new File([audioBlob], `test-meeting-${testMeetingId}.webm`, { type: audioBlob.type });
@@ -632,8 +632,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           description: useAsrMode ? 'Transkribering pågår i bakgrunden.' : 'Transkribering klar!',
         });
         
-        // Redirect to library (not specific meeting URL)
-        navigate('/library', { state: { fromRecording: true, pendingMeetingId: meetingId } });
+        // Redirect to meeting detail page
+        navigate(`/meetings/${meetingId}`);
 
         // For Enterprise: use background uploader (same as file upload flow)
         if (useAsrMode) {
