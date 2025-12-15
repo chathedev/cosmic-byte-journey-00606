@@ -93,9 +93,11 @@ export default function SISRequired() {
     
     const sisEnabled = enterpriseMembership?.company?.speakerIdentificationEnabled;
     const hasSample = enterpriseMembership?.sisSample?.status === 'ready';
+    const sisDisabled = enterpriseMembership?.sisSample?.status === 'disabled';
     const isEnterprise = enterpriseMembership?.isMember;
     
-    if (!isEnterprise || !sisEnabled || hasSample || isAdmin) {
+    // Redirect if: not enterprise, SIS disabled, sample already ready, or admin
+    if (!isEnterprise || !sisEnabled || sisDisabled || hasSample || isAdmin) {
       clearStoredState();
       navigate('/', { replace: true });
     }

@@ -38,7 +38,7 @@ export interface EnterpriseMembership {
     joinedAt?: string;
   };
   sisSample?: {
-    status: 'ready' | 'processing' | 'error' | null;
+    status: 'ready' | 'processing' | 'error' | 'disabled' | null;
     uploadedAt?: string;
     lastMatchScore?: number;
   };
@@ -315,19 +315,31 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       console.log('[SubscriptionContext] 🏢 Enterprise API response:', membership);
       
       if (membership?.isMember) {
-        // Also fetch SIS sample status if the company has SIS enabled
-        let sisSample = undefined;
-        const sisEnabled = (membership as any)?.company?.speakerIdentificationEnabled || 
-                          (membership as any)?.company?.preferences?.speakerIdentificationEnabled;
+        // Extract SIS enabled flag from backend response
+        const sisEnabled = membership.company?.speakerIdentificationEnabled ?? 
+                          (membership as any)?.company?.preferences?.speakerIdentificationEnabled ??
+                          true; // Default to true per docs
+        
+        // Fetch SIS sample status only if SIS is enabled
+        let sisSample: EnterpriseMembership['sisSample'] = undefined;
         
         if (sisEnabled) {
           try {
             const sisStatus = await apiClient.getSISSampleStatus();
             console.log('[SubscriptionContext] 🎤 SIS sample status:', sisStatus);
-            sisSample = sisStatus?.sisSample || undefined;
+            
+            // Handle disabled state from backend
+            if (sisStatus?.disabled || sisStatus?.sisSample?.status === 'disabled') {
+              sisSample = { status: 'disabled' };
+            } else {
+              sisSample = sisStatus?.sisSample || undefined;
+            }
           } catch (sisError) {
             console.log('[SubscriptionContext] 🎤 SIS sample check failed:', sisError);
           }
+        } else {
+          // SIS is disabled at company level
+          sisSample = { status: 'disabled' };
         }
         
         setEnterpriseMembership({

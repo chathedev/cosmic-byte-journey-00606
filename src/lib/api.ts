@@ -924,6 +924,7 @@ class ApiClient {
       planTier: string;
       billingStatus?: string;
       billingHistory?: any[];
+      speakerIdentificationEnabled?: boolean;
     };
     membership?: {
       role: string;
@@ -952,9 +953,18 @@ class ApiClient {
         return { isMember: false };
       }
       
+      // Extract speakerIdentificationEnabled from company or enterprise payload
+      const sisEnabled = data.company?.speakerIdentificationEnabled ?? 
+                         data.company?.preferences?.speakerIdentificationEnabled ??
+                         data.enterprise?.speakerIdentificationEnabled ??
+                         true; // Default to true per docs
+      
       return {
         isMember: true,
-        company: data.company,
+        company: {
+          ...data.company,
+          speakerIdentificationEnabled: sisEnabled,
+        },
         membership: data.membership
       };
     } catch (error) {
@@ -1997,8 +2007,9 @@ class ApiClient {
   // SIS (Speaker Identification System) API methods
   async getSISSampleStatus(): Promise<{
     ok: boolean;
+    disabled?: boolean;
     sisSample: {
-      status: 'ready' | 'processing' | 'error' | null;
+      status: 'ready' | 'processing' | 'error' | 'disabled' | null;
       uploadedAt?: string;
       lastTranscribedAt?: string;
       lastMatchScore?: number;
@@ -2017,9 +2028,18 @@ class ApiClient {
       if (response.status === 404) {
         return { ok: true, sisSample: null };
       }
+      // Handle 403 when SIS is disabled for enterprise
+      if (response.status === 403) {
+        return { ok: true, disabled: true, sisSample: { status: 'disabled' } };
+      }
       throw new Error('Failed to get SIS sample status');
     }
-    return response.json();
+    const data = await response.json();
+    // Handle { status: 'disabled' } response from backend
+    if (data.status === 'disabled' || data.sisSample?.status === 'disabled') {
+      return { ok: true, disabled: true, sisSample: { status: 'disabled' } };
+    }
+    return data;
   }
 
   async uploadSISSample(audioBlob: Blob, speakerName: string): Promise<{
@@ -2052,6 +2072,10 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to upload voice sample' }));
+      // Handle 403 when SIS is disabled for the enterprise
+      if (response.status === 403) {
+        return { ok: false, error: error.error || error.message || 'Talaridentifiering är inaktiverad för ditt företag' };
+      }
       return { ok: false, error: error.error || 'Failed to upload voice sample' };
     }
 

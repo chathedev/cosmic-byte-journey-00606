@@ -874,11 +874,11 @@ export default function AdminEnterprise() {
                       <Label className="text-sm font-semibold">Talaridentifiering (SIS)</Label>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={selectedCompany.preferences?.speakerIdentificationEnabled ? 'default' : 'secondary'}>
-                        {selectedCompany.preferences?.speakerIdentificationEnabled ? 'Aktiverad' : 'Inaktiverad'}
+                      <Badge variant={(selectedCompany.preferences?.speakerIdentificationEnabled ?? true) ? 'default' : 'secondary'}>
+                        {(selectedCompany.preferences?.speakerIdentificationEnabled ?? true) ? 'Aktiverad' : 'Inaktiverad'}
                       </Badge>
                       <Switch
-                        checked={selectedCompany.preferences?.speakerIdentificationEnabled ?? false}
+                        checked={selectedCompany.preferences?.speakerIdentificationEnabled ?? true}
                         onCheckedChange={async (checked) => {
                           try {
                             setIsSubmitting(true);
@@ -890,11 +890,13 @@ export default function AdminEnterprise() {
                             });
                             const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
                             setSelectedCompany(updated.company);
+                            // Also refresh SIS overview data
+                            loadSISOverview();
                             toast({
                               title: checked ? 'SIS aktiverad' : 'SIS inaktiverad',
                               description: checked 
                                 ? 'Talaridentifiering är nu aktiverad för detta företag' 
-                                : 'Talaridentifiering är nu inaktiverad',
+                                : 'Talaridentifiering är nu inaktiverad. Befintliga sisMatches bevaras men nya prov accepteras inte.',
                             });
                           } catch (error) {
                             console.error('Failed to toggle SIS:', error);
@@ -911,7 +913,7 @@ export default function AdminEnterprise() {
                       />
                     </div>
                   </div>
-                  {selectedCompany.preferences?.speakerIdentificationEnabled && (
+                  {(selectedCompany.preferences?.speakerIdentificationEnabled ?? true) && (
                     <div className="bg-muted/30 rounded-lg p-3 space-y-2">
                       <p className="text-sm text-muted-foreground">
                         Medlemmar kan spela in röstprov för att identifieras automatiskt i möten.
