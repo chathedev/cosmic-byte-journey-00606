@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface MinimalAudioRingProps {
   stream?: MediaStream | null;
@@ -7,50 +7,78 @@ interface MinimalAudioRingProps {
 }
 
 export const MinimalAudioRing = ({ stream, isActive = true, size = 120 }: MinimalAudioRingProps) => {
-  const [scale, setScale] = useState(1);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number>(0);
-  const smoothedRef = useRef(0);
+
+  const ringRef = useRef<HTMLDivElement | null>(null);
+  const glowRef = useRef<HTMLDivElement | null>(null);
+
+  // Smoothed amplitude (0..1)
+  const levelRef = useRef(0);
 
   useEffect(() => {
+    // Reset visuals when inactive
     if (!stream || !isActive) {
-      setScale(1);
+      levelRef.current = 0;
+      if (ringRef.current) ringRef.current.style.transform = 'scale(1)';
+      if (glowRef.current) {
+        glowRef.current.style.transform = 'scale(1)';
+        glowRef.current.style.opacity = '0.12';
+      }
       return;
     }
 
+    let disposed = false;
+
     const setup = async () => {
       try {
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 128;
-        analyserRef.current.smoothingTimeConstant = 0.85;
-        
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        source.connect(analyserRef.current);
-        
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        
+        const ctx = new AudioContext();
+        audioContextRef.current = ctx;
+
+        const analyser = ctx.createAnalyser();
+        analyserRef.current = analyser;
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0; // we do our own smoothing
+
+        const source = ctx.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const timeData = new Uint8Array(analyser.fftSize);
+
         const animate = () => {
-          if (!analyserRef.current) return;
-          
-          analyserRef.current.getByteFrequencyData(dataArray);
-          
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
+          if (disposed || !analyserRef.current) return;
+
+          // RMS from time-domain samples (more sensitive than frequency average)
+          analyserRef.current.getByteTimeDomainData(timeData);
+          let sumSq = 0;
+          for (let i = 0; i < timeData.length; i++) {
+            const v = (timeData[i] - 128) / 128;
+            sumSq += v * v;
           }
-          const amplitude = sum / dataArray.length / 255;
-          
-          // Smooth interpolation
-          smoothedRef.current += (amplitude - smoothedRef.current) * 0.15;
-          
-          // Scale from 1 to 1.15
-          setScale(1 + smoothedRef.current * 0.15);
-          
+          const rms = Math.sqrt(sumSq / timeData.length); // ~0..0.4 typical speech
+
+          // Boost and curve so quiet speech still moves
+          const boosted = Math.min(1, rms * 4.2);
+          const target = Math.pow(boosted, 0.6);
+
+          // Fast attack, slower release (reactive but still smooth)
+          const current = levelRef.current;
+          const k = target > current ? 0.35 : 0.12;
+          levelRef.current = current + (target - current) * k;
+
+          const level = levelRef.current;
+          const scale = 1 + level * 0.22;
+
+          if (ringRef.current) ringRef.current.style.transform = `scale(${scale})`;
+          if (glowRef.current) {
+            glowRef.current.style.transform = `scale(${scale * 1.12})`;
+            glowRef.current.style.opacity = String(0.10 + level * 0.35);
+          }
+
           animationRef.current = requestAnimationFrame(animate);
         };
-        
+
         animate();
       } catch (e) {
         console.error('Audio setup failed:', e);
@@ -60,44 +88,49 @@ export const MinimalAudioRing = ({ stream, isActive = true, size = 120 }: Minima
     setup();
 
     return () => {
+      disposed = true;
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (audioContextRef.current?.state !== 'closed') {
-        audioContextRef.current?.close();
+      analyserRef.current = null;
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
       }
+      audioContextRef.current = null;
     };
   }, [stream, isActive]);
 
   return (
-    <div 
-      className="relative flex items-center justify-center"
-      style={{ width: size, height: size }}
-    >
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       {/* Outer glow */}
       <div
-        className="absolute rounded-full bg-primary/10 transition-transform duration-150 ease-out"
+        ref={glowRef}
+        className="absolute rounded-full bg-primary/10 blur-xl"
         style={{
-          width: size * 0.9,
-          height: size * 0.9,
-          transform: `scale(${scale * 1.1})`,
+          width: size * 0.95,
+          height: size * 0.95,
+          opacity: 0.12,
+          transform: 'scale(1)',
+          willChange: 'transform, opacity',
         }}
       />
-      
+
       {/* Main ring */}
       <div
-        className="absolute rounded-full border-2 border-primary/60 transition-transform duration-150 ease-out"
+        ref={ringRef}
+        className="absolute rounded-full border-2 border-primary/60"
         style={{
-          width: size * 0.7,
-          height: size * 0.7,
-          transform: `scale(${scale})`,
+          width: size * 0.72,
+          height: size * 0.72,
+          transform: 'scale(1)',
+          willChange: 'transform',
         }}
       />
-      
+
       {/* Inner dot */}
       <div
         className="rounded-full bg-primary/80"
         style={{
-          width: size * 0.15,
-          height: size * 0.15,
+          width: size * 0.14,
+          height: size * 0.14,
         }}
       />
     </div>
