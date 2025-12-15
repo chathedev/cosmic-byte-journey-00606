@@ -14,12 +14,13 @@ interface SISVoiceSampleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentSample?: {
-    status: 'ready' | 'processing' | 'error' | null;
+    status: 'ready' | 'processing' | 'error' | 'disabled' | null;
     uploadedAt?: string;
     lastMatchScore?: number;
     error?: string | null;
   };
   onSampleUploaded?: () => void;
+  sisEnabled?: boolean;
 }
 
 const SAMPLE_SENTENCES = [
@@ -35,7 +36,8 @@ export function SISVoiceSampleDialog({
   open, 
   onOpenChange, 
   currentSample,
-  onSampleUploaded 
+  onSampleUploaded,
+  sisEnabled = true
 }: SISVoiceSampleDialogProps) {
   const { toast } = useToast();
   const [speakerName, setSpeakerName] = useState('');
@@ -222,7 +224,36 @@ export function SISVoiceSampleDialog({
 
   const hasValidSample = currentSample?.status === 'ready';
   const isProcessing = currentSample?.status === 'processing';
+  const isDisabled = !sisEnabled || currentSample?.status === 'disabled';
 
+  // If SIS is disabled, show a disabled state message
+  if (isDisabled) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Volume2 className="h-5 w-5 text-muted-foreground" />
+              Röstidentifiering inaktiverad
+            </DialogTitle>
+            <DialogDescription>
+              Talaridentifiering är för närvarande inaktiverad för ditt företag.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6">
+            <Card className="border-muted bg-muted/30">
+              <CardContent className="pt-6 text-center space-y-3">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">
+                  Kontakta din företagsadministratör om du vill aktivera röstidentifiering.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
