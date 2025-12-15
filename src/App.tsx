@@ -425,16 +425,25 @@ const EnterpriseSISGate = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Preferred Name Gate - requires users to set their name on first login
+// Only shows on actual dashboard routes, not auth/login screens
 const PreferredNameGate = ({ children }: { children: React.ReactNode }) => {
-  const { user, refreshUser } = useAuth();
+  const { user, isLoading, refreshUser } = useAuth();
   const location = useLocation();
   const [needsName, setNeedsName] = useState(false);
   
-  // Skip on auth routes
-  const isAuthRoute = location.pathname === '/auth' || location.pathname === '/magic-login' || location.pathname === '/sis-required';
+  // Routes where we should NOT show the name dialog
+  const excludedRoutes = ['/auth', '/magic-login', '/sis-required', '/free-trial', '/generate-protocol'];
+  const isExcludedRoute = excludedRoutes.some(route => location.pathname === route);
+  
+  // Dashboard routes where we SHOULD show the dialog (user is actually in the app)
+  const dashboardRoutes = ['/', '/library', '/chat', '/agendas', '/recording', '/protocol', '/feedback', '/subscribe-success'];
+  const isDashboardRoute = dashboardRoutes.some(route => location.pathname === route) || 
+                           location.pathname.startsWith('/meetings/') ||
+                           location.pathname.startsWith('/admin');
   
   useEffect(() => {
-    if (!user || isAuthRoute) {
+    // Only show if: user is logged in, not loading, on a dashboard route, and has no preferred name
+    if (isLoading || !user || isExcludedRoute || !isDashboardRoute) {
       setNeedsName(false);
       return;
     }
@@ -442,7 +451,7 @@ const PreferredNameGate = ({ children }: { children: React.ReactNode }) => {
     // Check if user has a preferred name
     const preferredName = (user as any)?.preferredName;
     setNeedsName(!preferredName);
-  }, [user, isAuthRoute]);
+  }, [user, isLoading, isExcludedRoute, isDashboardRoute]);
   
   const handleNameSet = async (name: string) => {
     setNeedsName(false);
