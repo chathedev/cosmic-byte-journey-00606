@@ -10,10 +10,11 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield, User, Loader2 } from "lucide-react";
+import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield, User, Loader2, Headphones } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "./SubscribeDialog";
+import { SupportCodeDialog } from "./SupportCodeDialog";
 
 // Helper function to format dates cleanly without timezone info
 const formatSwedishDate = (dateString: string | undefined) => {
@@ -52,6 +53,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [showDowngradeConfirm, setShowDowngradeConfirm] = useState(false);
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [showSupportCode, setShowSupportCode] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
   const [isDowngrading, setIsDowngrading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -420,6 +422,17 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                       </Button>
                     </div>
                   </div>
+                  
+                  {/* Hidden support section */}
+                  <div className="pt-4 mt-4 border-t border-border/30">
+                    <button
+                      onClick={() => setShowSupportCode(true)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    >
+                      <Headphones className="w-3 h-3" />
+                      <span>Behöver du hjälp? Generera supportkod</span>
+                    </button>
+                  </div>
                 </div>
               </TabsContent>
 
@@ -707,6 +720,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       </AlertDialog>
 
       <SubscribeDialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog} />
+      <SupportCodeDialog open={showSupportCode} onOpenChange={setShowSupportCode} />
     </>
   );
 };
