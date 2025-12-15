@@ -16,6 +16,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth, AuthContext } from "@/contexts/AuthContext";
 import { SubscriptionProvider, useSubscription, SubscriptionContext } from "@/contexts/SubscriptionContext";
+import { SupportProvider } from "@/contexts/SupportContext";
 import { AdminRoute } from "@/components/AdminRoute";
 import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -23,6 +24,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
 import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
+import { SupportBanner } from "@/components/SupportBanner";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -430,6 +432,7 @@ const AppContent = () => {
       <AuthRedirectHandler />
       <GlobalDevButton />
       <MaintenanceOverlay />
+      <SupportBanner />
       <EnterpriseTrialCheck />
       <WelcomeGate>
         <EnterpriseSISGate>
@@ -555,10 +558,12 @@ const App = () => {
             <BrowserRouter>
               <AuthProvider>
                 <SubscriptionProvider>
-                  <AdminBypassGate>
-                    {/* If admin bypassed, render full app */}
-                    <AppContent />
-                  </AdminBypassGate>
+                  <SupportProvider>
+                    <AdminBypassGate>
+                      {/* If admin bypassed, render full app */}
+                      <AppContent />
+                    </AdminBypassGate>
+                  </SupportProvider>
                 </SubscriptionProvider>
               </AuthProvider>
             </BrowserRouter>
@@ -613,7 +618,9 @@ const App = () => {
           <BrowserRouter>
             <AuthProvider>
               <SubscriptionProvider>
-                <AppContent />
+                <SupportProvider>
+                  <AppContent />
+                </SupportProvider>
               </SubscriptionProvider>
             </AuthProvider>
           </BrowserRouter>
