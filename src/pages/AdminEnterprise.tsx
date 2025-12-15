@@ -874,12 +874,29 @@ export default function AdminEnterprise() {
                       <Label className="text-sm font-semibold">Talaridentifiering (SIS)</Label>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={(selectedCompany.preferences?.speakerIdentificationEnabled ?? true) ? 'default' : 'secondary'}>
+                      {isSubmitting && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      <Badge 
+                        variant={(selectedCompany.preferences?.speakerIdentificationEnabled ?? true) ? 'default' : 'secondary'}
+                        className={isSubmitting ? 'opacity-50' : ''}
+                      >
                         {(selectedCompany.preferences?.speakerIdentificationEnabled ?? true) ? 'Aktiverad' : 'Inaktiverad'}
                       </Badge>
                       <Switch
                         checked={selectedCompany.preferences?.speakerIdentificationEnabled ?? true}
                         onCheckedChange={async (checked) => {
+                          const previousValue = selectedCompany.preferences?.speakerIdentificationEnabled ?? true;
+                          
+                          // Optimistic update
+                          setSelectedCompany(prev => prev ? {
+                            ...prev,
+                            preferences: {
+                              ...prev.preferences,
+                              speakerIdentificationEnabled: checked,
+                            },
+                          } : null);
+                          
                           try {
                             setIsSubmitting(true);
                             await apiClient.updateEnterpriseCompany(selectedCompany.id, {
@@ -888,21 +905,44 @@ export default function AdminEnterprise() {
                                 speakerIdentificationEnabled: checked,
                               },
                             });
+                            
+                            // Verify by re-fetching
                             const updated = await apiClient.getEnterpriseCompany(selectedCompany.id);
+                            const actualValue = updated.company.preferences?.speakerIdentificationEnabled ?? true;
+                            
+                            if (actualValue !== checked) {
+                              // Server didn't accept the change - revert
+                              setSelectedCompany(updated.company);
+                              toast({
+                                title: 'Ändring misslyckades',
+                                description: 'Servern accepterade inte ändringen. Värdet har återställts.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            
                             setSelectedCompany(updated.company);
                             // Also refresh SIS overview data
                             loadSISOverview();
                             toast({
-                              title: checked ? 'SIS aktiverad' : 'SIS inaktiverad',
+                              title: checked ? '✓ SIS aktiverad' : '✓ SIS inaktiverad',
                               description: checked 
                                 ? 'Talaridentifiering är nu aktiverad för detta företag' 
                                 : 'Talaridentifiering är nu inaktiverad. Befintliga sisMatches bevaras men nya prov accepteras inte.',
                             });
                           } catch (error) {
                             console.error('Failed to toggle SIS:', error);
+                            // Rollback on error
+                            setSelectedCompany(prev => prev ? {
+                              ...prev,
+                              preferences: {
+                                ...prev.preferences,
+                                speakerIdentificationEnabled: previousValue,
+                              },
+                            } : null);
                             toast({
                               title: 'Fel',
-                              description: 'Kunde inte ändra SIS-inställning',
+                              description: 'Kunde inte ändra SIS-inställning. Värdet har återställts.',
                               variant: 'destructive',
                             });
                           } finally {
