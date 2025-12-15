@@ -107,7 +107,7 @@ export function AppSidebar() {
     checkAdmin();
   }, [user]);
 
-  // Auto-open settings if user has no preferred name set
+  // Auto-open settings if user has no preferred name set (only check once)
   useEffect(() => {
     if (hasCheckedName) return;
     if (!user) return;
@@ -121,19 +121,20 @@ export function AppSidebar() {
         setRequireNameInSettings(true);
         setShowSettings(true);
         setHasCheckedName(true);
-      }, 500);
+      }, 800);
       return () => clearTimeout(timer);
     } else {
       setHasCheckedName(true);
     }
   }, [user, planLoading, hasCheckedName]);
 
-  // When settings closes and name is now set, clear the require flag
-  useEffect(() => {
-    if (!showSettings && (user as any)?.preferredName) {
+  // When name is saved and settings closes, clear the require flag
+  const handleSettingsClose = (isOpen: boolean) => {
+    setShowSettings(isOpen);
+    if (!isOpen && (user as any)?.preferredName) {
       setRequireNameInSettings(false);
     }
-  }, [showSettings, user]);
+  };
 
   useEffect(() => {
     const path = location.pathname;
@@ -516,7 +517,7 @@ export function AppSidebar() {
       )}
 
       {/* Dialogs */}
-      <SettingsDialog open={showSettings} onOpenChange={setShowSettings} requireName={requireNameInSettings} />
+      <SettingsDialog open={showSettings} onOpenChange={handleSettingsClose} requireName={requireNameInSettings} />
       <SubscribeDialog open={showSubscribe} onOpenChange={setShowSubscribe} />
       <AdminSupportPanel open={showAdminSupport} onOpenChange={setShowAdminSupport} />
     </>
