@@ -55,15 +55,22 @@ function getAuthBaseUrl(): string {
   return 'https://api.tivly.se';
 }
 
-// Check if user has app access - ENTERPRISE ONLY for iOS app
+// Check if user has app access - ENTERPRISE or ADMIN for iOS app
 function hasAppAccess(userData: any): boolean {
   if (!userData) return false;
   
-  // Check for admin role
-  const isAdmin = userData.role === 'admin' || userData.role === 'owner';
-  if (isAdmin) return true;
+  // Check for admin flag
+  if (userData.isAdmin === true) return true;
   
-  // Check plan type - ONLY enterprise allowed on iOS app
+  // Check for admin/owner role (single role field)
+  if (userData.role === 'admin' || userData.role === 'owner') return true;
+  
+  // Check roles array for admin/owner
+  if (Array.isArray(userData.roles)) {
+    if (userData.roles.includes('admin') || userData.roles.includes('owner')) return true;
+  }
+  
+  // Check plan type - enterprise allowed on iOS app
   const planType = typeof userData.plan === 'string' ? userData.plan : userData.plan?.plan;
   if (planType?.toLowerCase() === 'enterprise') return true;
   
