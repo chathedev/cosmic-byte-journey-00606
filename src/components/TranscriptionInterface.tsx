@@ -234,13 +234,33 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     );
   }
 
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 5) return "God natt";
+    if (hour < 10) return "God morgon";
+    if (hour < 12) return "God förmiddag";
+    if (hour < 18) return "God eftermiddag";
+    if (hour < 22) return "God kväll";
+    return "God natt";
+  };
+
+  const preferredName = (user as any)?.preferredName;
+  const displayName = preferredName || user?.displayName?.split(' ')[0] || '';
+
   return (
     <div className="min-h-screen bg-background flex flex-col mobile-compact">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 pt-8 md:p-8">
         <div className="max-w-4xl w-full space-y-8">
-          {/* Hero section */}
+          {/* Hero section with greeting */}
           <div className="text-center space-y-3">
+            {displayName && (
+              <p className="text-lg md:text-xl text-muted-foreground font-medium animate-fade-in">
+                {getGreeting()}, <span className="text-primary">{displayName}</span> 👋
+              </p>
+            )}
+            
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-3">
               <Mic className="w-8 h-8 text-primary" />
             </div>

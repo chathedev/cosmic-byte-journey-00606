@@ -451,12 +451,12 @@ export function AppSidebar() {
               <div className="flex items-center gap-3 mb-2">
                 <Avatar className="h-9 w-9 shrink-0">
                   <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                    {user?.email?.[0]?.toUpperCase() || "U"}
+                    {((user as any)?.preferredName?.[0] || user?.email?.[0] || "U").toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">
-                    {user?.email?.split('@')[0] || 'Användare'}
+                    {(user as any)?.preferredName || user?.email?.split('@')[0] || 'Användare'}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {user?.email || ''}
