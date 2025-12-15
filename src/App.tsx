@@ -26,6 +26,7 @@ import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
 import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 import { SupportBanner } from "@/components/SupportBanner";
 import { PreferredNameDialog } from "@/components/PreferredNameDialog";
+import { IOSAppPromoDialog } from "@/components/IOSAppPromoDialog";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -425,14 +426,18 @@ const EnterpriseSISGate = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Preferred Name Gate - requires users to set their name on first login
-// Only shows on actual dashboard routes, not auth/login screens
+// Only shows on actual dashboard routes after successful authentication
 const PreferredNameGate = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, refreshUser } = useAuth();
   const location = useLocation();
   const [needsName, setNeedsName] = useState(false);
+  const [hasCheckedAccess, setHasCheckedAccess] = useState(false);
   
-  // Routes where we should NOT show the name dialog
-  const excludedRoutes = ['/auth', '/magic-login', '/sis-required', '/free-trial', '/generate-protocol'];
+  // Routes where we should NEVER show the name dialog
+  const excludedRoutes = [
+    '/auth', '/magic-login', '/sis-required', '/free-trial', '/generate-protocol',
+    '/app-only-access', '/web-only-access', '/email-verification'
+  ];
   const isExcludedRoute = excludedRoutes.some(route => location.pathname === route);
   
   // Dashboard routes where we SHOULD show the dialog (user is actually in the app)
@@ -442,15 +447,38 @@ const PreferredNameGate = ({ children }: { children: React.ReactNode }) => {
                            location.pathname.startsWith('/admin');
   
   useEffect(() => {
-    // Only show if: user is logged in, not loading, on a dashboard route, and has no preferred name
-    if (isLoading || !user || isExcludedRoute || !isDashboardRoute) {
+    // Wait for auth to fully load
+    if (isLoading) {
       setNeedsName(false);
       return;
     }
     
-    // Check if user has a preferred name
-    const preferredName = (user as any)?.preferredName;
-    setNeedsName(!preferredName);
+    // Must be authenticated
+    if (!user) {
+      setNeedsName(false);
+      return;
+    }
+    
+    // Skip excluded routes
+    if (isExcludedRoute) {
+      setNeedsName(false);
+      return;
+    }
+    
+    // Must be on a dashboard route
+    if (!isDashboardRoute) {
+      setNeedsName(false);
+      return;
+    }
+    
+    // Small delay to ensure we're fully rendered on dashboard
+    const timer = setTimeout(() => {
+      const preferredName = (user as any)?.preferredName;
+      setNeedsName(!preferredName);
+      setHasCheckedAccess(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, [user, isLoading, isExcludedRoute, isDashboardRoute]);
   
   const handleNameSet = async (name: string) => {
@@ -478,6 +506,7 @@ const AppContent = () => {
       <MaintenanceOverlay />
       <SupportBanner />
       <EnterpriseTrialCheck />
+      <IOSAppPromoDialog />
       <PreferredNameGate>
         <WelcomeGate>
           <EnterpriseSISGate>
