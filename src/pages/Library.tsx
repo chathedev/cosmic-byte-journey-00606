@@ -1030,10 +1030,10 @@ const Library = () => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent onClick={e => e.stopPropagation()}>
+                <CardContent>
                   {/* Content based on status */}
                   {isFailed ? (
-                    <div className="mb-4">
+                    <div className="mb-4" onClick={e => e.stopPropagation()}>
                       <TranscriptionStatusWidget
                         meetingId={meeting.id}
                         status="failed"
@@ -1048,7 +1048,7 @@ const Library = () => {
                       />
                     </div>
                   ) : isProcessing && !hasTranscript ? (
-                    <div className="mb-4">
+                    <div className="mb-4" onClick={e => e.stopPropagation()}>
                       <TranscriptionStatusWidget
                         meetingId={meeting.id}
                         status={meeting.transcriptionStatus === 'uploading' ? 'uploading' : 'processing'}
@@ -1063,7 +1063,8 @@ const Library = () => {
                     <div className="mb-4">
                       <TranscriptionCompleteMessage meetingId={meeting.id} status={meeting.transcriptionStatus} />
                       <button
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           setLoadingTranscript(meeting.id);
                           try {
                             // Try to fetch segments from ASR status
@@ -1112,7 +1113,7 @@ const Library = () => {
                   
                   {/* Protocol Status Badge */}
                   {protocolStatus[meeting.id] && (
-                    <div className="mb-3 pb-3 border-b border-border">
+                    <div className="mb-3 pb-3 border-b border-border" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className="flex items-center gap-1">
@@ -1235,7 +1236,7 @@ const Library = () => {
                     </div>
                   )}
                   
-                  <div className="flex gap-2 flex-wrap items-center">
+                  <div className="flex gap-2 flex-wrap items-center" onClick={e => e.stopPropagation()}>
                     <Button
                       onClick={() => handleContinueMeeting(meeting)}
                       size="sm"
