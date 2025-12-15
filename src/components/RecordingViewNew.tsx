@@ -12,10 +12,10 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { AudioWaveVisualizer } from "./AudioWaveVisualizer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRealtimeASR } from "@/hooks/useRealtimeASR";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -63,12 +63,32 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [isTestMode, setIsTestMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Real-time transcript for Free/Pro plans (browser speech recognition)
+  // Real-time transcript for all plans
   const [liveTranscript, setLiveTranscript] = useState<string>(continuedMeeting?.transcript || "");
   const [interimText, setInterimText] = useState<string>("");
   
   // Determine transcription mode based on plan
   const useAsrMode = hasAsrAccess(userPlan?.plan, isAdmin);
+  
+  // Realtime ASR for Enterprise users
+  const realtimeASR = useRealtimeASR({
+    onPartial: (text) => setInterimText(text),
+    onFinal: (text) => {
+      setLiveTranscript(prev => prev + (prev ? ' ' : '') + text);
+      setInterimText('');
+    },
+    onDone: (transcript) => {
+      console.log('✅ Realtime ASR done:', transcript.substring(0, 100) + '...');
+    },
+    onError: (message) => {
+      console.error('❌ Realtime ASR error:', message);
+      toast({
+        title: 'Transkribering misslyckades',
+        description: message,
+        variant: 'destructive',
+      });
+    },
+  });
   
   // Test access for admins and specific user - NEVER on iOS domain
   const allowedTestEmail = 'charlie.wretling@icloud.com';
@@ -319,12 +339,16 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       setIsRecording(true);
       await requestWakeLock();
       
-      // Start browser speech recognition for Free/Pro plans
-      if (!useAsrMode) {
+      // For ASR mode (Enterprise): connect realtime ASR websocket
+      if (useAsrMode && sessionId) {
+        console.log('🎤 Connecting realtime ASR for session:', sessionId);
+        realtimeASR.connect(sessionId, stream);
+      } else if (!useAsrMode) {
+        // Start browser speech recognition for Free/Pro plans
         startSpeechRecognition();
       }
       
-      console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
+      console.log('✅ Recording started', useAsrMode ? '(Realtime ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -353,16 +377,20 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       mediaRecorderRef.current.resume();
       setIsPaused(false);
       requestWakeLock();
-      // Resume speech recognition for Free/Pro
-      if (!useAsrMode && recognitionRef.current) {
+      // Resume transcription
+      if (useAsrMode && streamRef.current) {
+        realtimeASR.resume(streamRef.current);
+      } else if (recognitionRef.current) {
         try { recognitionRef.current.start(); } catch { /* ignore */ }
       }
     } else {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
       releaseWakeLock();
-      // Pause speech recognition for Free/Pro
-      if (!useAsrMode && recognitionRef.current) {
+      // Pause transcription
+      if (useAsrMode) {
+        realtimeASR.pause();
+      } else if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch { /* ignore */ }
       }
     }
@@ -489,7 +517,10 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
     }
 
     // For browser mode (Free/Pro), check if we have any transcript
-    if (!useAsrMode && !liveTranscript.trim() && !interimText.trim()) {
+    const browserTranscript = liveTranscript.trim() || interimText.trim();
+    const asrTranscript = realtimeASR.fullTranscript.trim();
+    
+    if (!useAsrMode && !browserTranscript) {
       toast({
         title: 'Ingen text transkriberad',
         description: 'Försäkra dig om att mikrofonen fungerar och tala tydligt.',
@@ -500,7 +531,14 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
 
     setIsSaving(true);
     setIsRecording(false);
-    stopSpeechRecognition();
+    
+    // Stop transcription
+    if (useAsrMode) {
+      await realtimeASR.stop();
+    } else {
+      stopSpeechRecognition();
+    }
+    
     await releaseWakeLock();
 
     // Stop media recorder and get final audio data
@@ -527,8 +565,12 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
     try {
       console.log('📤 Saving meeting and redirecting instantly...');
       
-      // Combine live transcript with any interim text
-      const finalTranscript = (liveTranscript + ' ' + interimText).trim();
+      // Get transcript from appropriate source
+      // For Enterprise with realtime ASR: use the realtime transcript
+      // For Free/Pro: use browser transcript
+      const browserTranscript = (liveTranscript + ' ' + interimText).trim();
+      const asrRealtimeTranscript = realtimeASR.fullTranscript.trim();
+      const finalTranscript = useAsrMode ? asrRealtimeTranscript : browserTranscript;
       
       // Get mimeType from MediaRecorder if available, fallback to detection
       const recorderMimeType = mediaRecorderRef.current?.mimeType;
@@ -544,7 +586,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         }
       }
       
-      // For ASR mode, we need the audio blob
+      // For ASR mode, we need the audio blob for backup upload
       const blob = new Blob(audioChunksRef.current, { type: blobMimeType });
       
       // Detailed logging for debugging
@@ -552,7 +594,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
       console.log('  - Total chunks:', audioChunksRef.current.length);
       console.log('  - Blob size:', blob.size, 'bytes');
       console.log('  - Blob type:', blob.type);
-      console.log('  - Expected min size for real recording: 50000+ bytes');
+      console.log('  - Final transcript length:', finalTranscript.length);
       
       if (blob.size < 100) {
         console.error('❌ CRITICAL: Blob is essentially empty! Recording failed.');
@@ -560,38 +602,25 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         console.warn('⚠️ WARNING: Blob is very small, may not contain real audio.');
       }
 
-      // Only check blob size for ASR mode - require at least 50KB for real meeting
-      if (useAsrMode && blob.size < 50000) {
-        console.error('❌ Audio blob too small for ASR:', blob.size, 'bytes');
-        toast({
-          title: 'Ljudfilen är för liten',
-          description: 'Inspelningen verkar vara tom. Kontrollera mikrofonen och försök igen.',
-          variant: 'destructive',
-        });
-        isSavingRef.current = false;
-        setIsSaving(false);
-        setViewState('recording');
-        startRecording();
-        return;
-      }
-
       const isContinuedMeeting = continuedMeeting && sessionId && !sessionId.startsWith('temp-');
       
       const now = new Date().toISOString();
+      
+      // For Enterprise with realtime ASR: transcript is already on backend, we save it locally too
+      // For Free/Pro: save browser transcript directly
       const meetingData = {
         ...(isContinuedMeeting ? { id: sessionId } : {}),
         title: meetingName,
         folder: selectedFolder,
-        // For browser mode: save transcript directly. For ASR mode: empty (filled by backend)
-        transcript: useAsrMode ? '' : finalTranscript,
+        transcript: finalTranscript, // Save transcript from realtime ASR or browser
         protocol: continuedMeeting?.protocol || '',
         createdAt: createdAtRef.current,
         updatedAt: now,
         userId: user.uid,
         isCompleted: true,
         source: 'live' as const,
-        // For browser mode: done immediately. For ASR mode: processing
-        transcriptionStatus: useAsrMode ? 'processing' as const : 'done' as const,
+        // Realtime ASR already persisted, so mark as done if we have transcript
+        transcriptionStatus: (useAsrMode && finalTranscript) ? 'done' as const : (!useAsrMode ? 'done' as const : 'processing' as const),
         forceCreate: !isContinuedMeeting,
       };
 
@@ -629,23 +658,16 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         
         toast({
           title: 'Möte sparat',
-          description: useAsrMode ? 'Transkribering pågår i bakgrunden.' : 'Transkribering klar!',
+          description: finalTranscript ? 'Transkribering klar!' : 'Transkribering pågår i bakgrunden.',
         });
         
         // Redirect to library (not specific meeting URL)
         navigate('/library', { state: { fromRecording: true, pendingMeetingId: meetingId } });
 
-        // For Enterprise: use background uploader (same as file upload flow)
-        if (useAsrMode) {
-          console.log('🎤 Enterprise: Starting background upload for ASR...');
-          const audioFile = new File([blob], `meeting-${meetingId}.webm`, { type: blob.type });
-          startBackgroundUpload(audioFile, meetingId, 'sv');
-        } else {
-          // For browser mode (Pro), dispatch completion event immediately
-          window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
-            detail: { meetingId, transcript: finalTranscript } 
-          }));
-        }
+        // Dispatch completion event
+        window.dispatchEvent(new CustomEvent('transcriptionComplete', { 
+          detail: { meetingId, transcript: finalTranscript } 
+        }));
       } else {
         // Free plan - show protocol page directly, secretly save in background
         console.log('📋 Free user: Redirecting to protocol page');
@@ -770,16 +792,15 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                 </button>
               )}
 
-              <div className="flex flex-col items-center text-center gap-6">
+              <div className="flex flex-col items-center text-center gap-4">
                 <div className="font-mono text-4xl md:text-5xl tracking-tight">
                   {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
                 </div>
 
-                <AudioWaveVisualizer
-                  stream={streamRef.current}
-                  isActive={isRecording && !isPaused}
-                  size={120}
-                />
+                {/* Recording indicator */}
+                <div className={`w-4 h-4 rounded-full transition-all ${
+                  !isPaused ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50' : 'bg-muted-foreground/40'
+                }`} />
 
                 <div className="space-y-1">
                   <h2 className="text-base md:text-lg font-medium">
@@ -788,23 +809,45 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                   <p className="text-sm text-muted-foreground max-w-xs">
                     {isPaused
                       ? 'Tryck "Återuppta" för att fortsätta'
-                      : useAsrMode
-                        ? 'Ljudet spelas in för transkribering i bakgrunden.'
-                        : 'Tala tydligt – texten visas i realtid.'}
+                      : 'Tala tydligt – texten visas i realtid.'}
                   </p>
                 </div>
               </div>
             </section>
 
-            {/* Live Transcript Display (Free/Pro only) */}
-            {!useAsrMode && (
-              <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                <div className="px-4 py-2 border-b bg-muted/30">
-                  <span className="text-xs font-medium text-muted-foreground">Transkribering</span>
-                </div>
-                <ScrollArea className="h-[200px] md:h-[240px]">
-                  <div ref={transcriptScrollRef} className="p-4 text-sm leading-relaxed">
-                    {liveTranscript || interimText ? (
+            {/* Live Transcript Display - Always shown */}
+            <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+              <div className="px-4 py-2 border-b bg-muted/30 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Transkribering</span>
+                {useAsrMode && realtimeASR.isConnecting && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Ansluter...</span>
+                )}
+                {useAsrMode && realtimeASR.isConnected && (
+                  <span className="text-xs text-green-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    Live
+                  </span>
+                )}
+              </div>
+              <ScrollArea className="h-[200px] md:h-[240px]">
+                <div ref={transcriptScrollRef} className="p-4 text-sm leading-relaxed">
+                  {useAsrMode ? (
+                    // Enterprise: realtime ASR transcript
+                    realtimeASR.fullTranscript || liveTranscript || interimText ? (
+                      <>
+                        <span className="text-foreground">{realtimeASR.finalText || liveTranscript}</span>
+                        {(realtimeASR.partialText || interimText) && (
+                          <span className="text-muted-foreground/60 italic"> {realtimeASR.partialText || interimText}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground italic">
+                        Börja tala för att se transkriberingen...
+                      </span>
+                    )
+                  ) : (
+                    // Free/Pro: browser speech recognition
+                    liveTranscript || interimText ? (
                       <>
                         <span className="text-foreground">{liveTranscript}</span>
                         {interimText && (
@@ -815,11 +858,11 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                       <span className="text-muted-foreground italic">
                         Börja tala för att se transkriberingen...
                       </span>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
+                    )
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
 
             {/* Folder Selection */}
             <div className="flex items-center justify-center gap-3">
