@@ -34,6 +34,7 @@ interface SISSpeaker {
   durationSeconds: number;
   bestMatchEmail?: string;
   similarity?: number;
+  speakerName?: string; // Direct speaker name from backend
   matches?: {
     sampleOwnerEmail: string;
     similarity: number;
@@ -138,29 +139,39 @@ export const AutoProtocolGenerator = ({
         let speakerInfo: { name: string; segments: number }[] = [];
         
         if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers)) {
-          // 80-100% = Very strong match, 70-79% = Strong match, <70% = Not reliable
-          const SIS_STRONG_THRESHOLD = 0.70;
-          
           // Build speaker name map from SIS data
           const speakerNameMap = new Map<string, string>();
           
-          // Use sisMatches for speaker names
-          if (sisMatches && sisMatches.length > 0) {
-            sisMatches.forEach(match => {
-              if (match.confidencePercent >= SIS_STRONG_THRESHOLD * 100) {
-                speakerNameMap.set(match.speakerLabel, match.speakerName);
+          // Priority 1: Use sisSpeakers with direct speakerName (most reliable)
+          if (sisSpeakers && sisSpeakers.length > 0) {
+            sisSpeakers.forEach(speaker => {
+              if (speaker.speakerName && speaker.speakerName.trim()) {
+                // Use the direct speaker name from backend if available
+                speakerNameMap.set(speaker.label, speaker.speakerName);
+                console.log(`🎤 Using direct speakerName: ${speaker.label} -> ${speaker.speakerName}`);
               }
             });
           }
           
-          // Fallback to sisSpeakers if no matches
-          if (speakerNameMap.size === 0 && sisSpeakers && sisSpeakers.length > 0) {
+          // Priority 2: Use sisMatches with speakerName (if not already found)
+          if (sisMatches && sisMatches.length > 0) {
+            sisMatches.forEach(match => {
+              if (!speakerNameMap.has(match.speakerLabel) && match.speakerName && match.speakerName.trim()) {
+                speakerNameMap.set(match.speakerLabel, match.speakerName);
+                console.log(`🎤 Using sisMatch speakerName: ${match.speakerLabel} -> ${match.speakerName}`);
+              }
+            });
+          }
+          
+          // Priority 3: Fallback to email-based name extraction (if still no match)
+          if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
-              if (speaker.similarity && speaker.similarity >= SIS_STRONG_THRESHOLD && speaker.bestMatchEmail) {
+              if (!speakerNameMap.has(speaker.label) && speaker.bestMatchEmail) {
                 // Extract name from email (e.g., charlie@wby.se -> Charlie)
                 const namePart = speaker.bestMatchEmail.split('@')[0];
                 const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
                 speakerNameMap.set(speaker.label, formattedName);
+                console.log(`🎤 Using email-derived name: ${speaker.label} -> ${formattedName}`);
               }
             });
           }

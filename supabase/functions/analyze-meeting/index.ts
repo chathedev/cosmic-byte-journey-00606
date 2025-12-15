@@ -112,21 +112,20 @@ serve(async (req) => {
     if (hasSpeakerAttribution && speakers && speakers.length > 0) {
       const speakerList = speakers.map((s: { name: string; segments: number }) => s.name).join(', ');
       speakerNote = `
-🎤 VIKTIGT - TALARINFORMATION:
-Utskriften innehåller talaridentifiering med format [Namn]: text
-Identifierade talare: ${speakerList}
+🎤 TALARINFORMATION (använd naturligt, inte överdrivet):
+Identifierade talare i mötet: ${speakerList}
 
-Du MÅSTE:
-- Notera VEM som sa vad i protokollet när det är relevant
-- I sammanfattningen, nämn nyckeltalare och deras bidrag
-- I huvudpunkter, inkludera talarens namn när specifika åsikter eller förslag nämndes
-- I åtgärdspunkter, använd talarens namn som "ansvarig" om de tog på sig uppgiften
-- I beslut, nämn om en specifik person föreslog eller tog beslutet
+Du SKA subtilt och naturligt referera till talare i protokollet:
+- I sammanfattningen, nämn huvudtalare kort om relevant (t.ex. "Mötet leddes av Charlie som...")
+- I huvudpunkter, inkludera talarens namn när de hade en specifik åsikt eller förslag
+- I åtgärdspunkter, sätt talarens namn som "ansvarig" om de tog på sig uppgiften
+- I beslut, nämn om en specifik person föreslog det
 
-Exempel på hur du ska referera till talare:
-- "Charlie föreslog att..." 
-- "Enligt diskussionen mellan Anna och Erik..."
-- "Beslutet togs efter att Maria lyfte frågan om..."
+VIKTIGT - Balans:
+- Använd INTE talarnamn på varje punkt - bara när det tillför värde
+- Skriv naturligt, t.ex. "Charlie föreslog..." eller "Enligt Erik bör..."
+- Om samma person säger allt, nämn dem bara 1-2 gånger, inte på varje punkt
+- Fokusera på INNEHÅLLET först, talarattribuering är sekundär
 `;
     }
 
