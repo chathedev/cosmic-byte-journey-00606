@@ -1238,16 +1238,6 @@ const Library = () => {
                   
                   <div className="flex gap-2 flex-wrap items-center" onClick={e => e.stopPropagation()}>
                     <Button
-                      onClick={() => handleContinueMeeting(meeting)}
-                      size="sm"
-                      variant="default"
-                      disabled={userPlan?.plan === 'free' || (isProcessing && !hasTranscript)}
-                      title={userPlan?.plan === 'free' ? 'Endast för betalande användare' : (isProcessing && !hasTranscript) ? 'Väntar på transkribering...' : undefined}
-                    >
-                      <Play className="w-4 h-4 mr-1" />
-                      Fortsätt möte
-                    </Button>
-                    <Button
                       onClick={() => handleCreateProtocol(meeting)}
                       size="sm"
                       variant="outline"
