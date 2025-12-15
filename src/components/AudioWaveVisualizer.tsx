@@ -43,7 +43,7 @@ export const AudioWaveVisualizer = ({ stream, isActive, size = 120 }: AudioWaveV
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 128;
-      analyser.smoothingTimeConstant = 0.4;
+      analyser.smoothingTimeConstant = 0.7; // More smoothing for less reactivity
       
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
@@ -91,20 +91,20 @@ export const AudioWaveVisualizer = ({ stream, isActive, size = 120 }: AudioWaveV
       const step = Math.floor(dataArray.length / barCount);
       for (let i = 0; i < barCount; i++) {
         const idx = i * step;
-        // Boost and curve the amplitude
+        // Require more audio - less boost, higher threshold
         const raw = dataArray[idx] / 255;
-        const boosted = Math.pow(raw, 0.6) * 1.5;
+        const boosted = Math.pow(raw, 0.8) * 0.9; // Less boost, steeper curve
         amplitudes.push(Math.min(boosted, 1));
       }
     } else {
       amplitudes = new Array(barCount).fill(0);
     }
     
-    // Smooth the bars with fast attack, slower release
+    // Smooth the bars with slower response
     for (let i = 0; i < barCount; i++) {
       const target = amplitudes[i];
       const current = barsRef.current[i];
-      const k = target > current ? 0.4 : 0.15; // Fast attack, slow release
+      const k = target > current ? 0.25 : 0.08; // Slower attack and release
       barsRef.current[i] = current + (target - current) * k;
     }
     
