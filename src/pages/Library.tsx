@@ -957,13 +957,14 @@ const Library = () => {
                 layout
               >
               <Card 
-                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                onClick={() => navigate(`/meetings/${meeting.id}`)}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       {editingMeetingId === meeting.id ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                           <Input
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
@@ -979,14 +980,9 @@ const Library = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => navigate(`/meetings/${meeting.id}`)}
-                            className="text-left hover:text-primary transition-colors"
-                          >
-                            <CardTitle className="text-lg hover:underline underline-offset-2">{meeting.title}</CardTitle>
-                          </button>
+                          <CardTitle className="text-lg">{meeting.title}</CardTitle>
                           <Button
-                            onClick={() => handleStartEdit(meeting)}
+                            onClick={(e) => { e.stopPropagation(); handleStartEdit(meeting); }}
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
@@ -1034,7 +1030,7 @@ const Library = () => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent onClick={e => e.stopPropagation()}>
                   {/* Content based on status */}
                   {isFailed ? (
                     <div className="mb-4">
