@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { AppleWaveform } from "./AppleWaveform";
+import { BreathingOrb } from "./BreathingOrb";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -771,14 +771,12 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                   </button>
                 )}
                 
-                {/* Apple-style Audio Waveform */}
-                <div className="py-6">
-                  <AppleWaveform 
-                    stream={streamRef.current} 
-                    isActive={isRecording} 
-                    isPaused={isPaused}
-                  />
-                </div>
+                {/* Breathing Orb Visualization */}
+                <BreathingOrb 
+                  stream={streamRef.current} 
+                  isActive={isRecording} 
+                  isPaused={isPaused}
+                />
 
                 {/* Status Text */}
                 <div className="space-y-2">
