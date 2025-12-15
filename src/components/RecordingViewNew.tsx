@@ -776,6 +776,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                 </div>
 
                 <AudioWaveVisualizer
+                  stream={streamRef.current}
                   isActive={isRecording && !isPaused}
                   size={120}
                 />
