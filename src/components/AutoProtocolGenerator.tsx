@@ -139,39 +139,48 @@ export const AutoProtocolGenerator = ({
         let speakerInfo: { name: string; segments: number }[] = [];
         
         if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers)) {
+          // 70%+ confidence required for reliable speaker identification
+          const SIS_CONFIDENCE_THRESHOLD = 70; // Percent
+          
           // Build speaker name map from SIS data
           const speakerNameMap = new Map<string, string>();
           
-          // Priority 1: Use sisSpeakers with direct speakerName (most reliable)
+          // Priority 1: Use sisSpeakers with speakerName if confidence >= 70%
           if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
-              if (speaker.speakerName && speaker.speakerName.trim()) {
-                // Use the direct speaker name from backend if available
+              const confidencePercent = (speaker.similarity || 0) * 100;
+              if (speaker.speakerName && speaker.speakerName.trim() && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                 speakerNameMap.set(speaker.label, speaker.speakerName);
-                console.log(`🎤 Using direct speakerName: ${speaker.label} -> ${speaker.speakerName}`);
+                console.log(`🎤 Using speakerName (${confidencePercent.toFixed(0)}% confidence): ${speaker.label} -> ${speaker.speakerName}`);
+              } else if (speaker.speakerName) {
+                console.log(`⚠️ Skipping low-confidence speaker (${confidencePercent.toFixed(0)}%): ${speaker.label} -> ${speaker.speakerName}`);
               }
             });
           }
           
-          // Priority 2: Use sisMatches with speakerName (if not already found)
+          // Priority 2: Use sisMatches with speakerName if confidence >= 70%
           if (sisMatches && sisMatches.length > 0) {
             sisMatches.forEach(match => {
               if (!speakerNameMap.has(match.speakerLabel) && match.speakerName && match.speakerName.trim()) {
-                speakerNameMap.set(match.speakerLabel, match.speakerName);
-                console.log(`🎤 Using sisMatch speakerName: ${match.speakerLabel} -> ${match.speakerName}`);
+                if (match.confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
+                  speakerNameMap.set(match.speakerLabel, match.speakerName);
+                  console.log(`🎤 Using sisMatch (${match.confidencePercent}% confidence): ${match.speakerLabel} -> ${match.speakerName}`);
+                } else {
+                  console.log(`⚠️ Skipping low-confidence sisMatch (${match.confidencePercent}%): ${match.speakerLabel} -> ${match.speakerName}`);
+                }
               }
             });
           }
           
-          // Priority 3: Fallback to email-based name extraction (if still no match)
+          // Priority 3: Fallback to email-based name if similarity >= 70%
           if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
-              if (!speakerNameMap.has(speaker.label) && speaker.bestMatchEmail) {
-                // Extract name from email (e.g., charlie@wby.se -> Charlie)
+              const confidencePercent = (speaker.similarity || 0) * 100;
+              if (!speakerNameMap.has(speaker.label) && speaker.bestMatchEmail && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                 const namePart = speaker.bestMatchEmail.split('@')[0];
                 const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
                 speakerNameMap.set(speaker.label, formattedName);
-                console.log(`🎤 Using email-derived name: ${speaker.label} -> ${formattedName}`);
+                console.log(`🎤 Using email-derived name (${confidencePercent.toFixed(0)}% confidence): ${speaker.label} -> ${formattedName}`);
               }
             });
           }
