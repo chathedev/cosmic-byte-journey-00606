@@ -25,7 +25,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
 import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 import { SupportBanner } from "@/components/SupportBanner";
-import { PreferredNameDialog } from "@/components/PreferredNameDialog";
 import { IOSAppPromoDialog } from "@/components/IOSAppPromoDialog";
 
 import Index from "./pages/Index";
@@ -425,75 +424,7 @@ const EnterpriseSISGate = ({ children }: { children: React.ReactNode }) => {
   return <Navigate to="/sis-required" replace />;
 };
 
-// Preferred Name Gate - requires users to set their name on first login
-// Only shows on actual dashboard routes after successful authentication
-const PreferredNameGate = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, refreshUser } = useAuth();
-  const location = useLocation();
-  const [needsName, setNeedsName] = useState(false);
-  const [hasCheckedAccess, setHasCheckedAccess] = useState(false);
-  
-  // Routes where we should NEVER show the name dialog
-  const excludedRoutes = [
-    '/auth', '/magic-login', '/sis-required', '/free-trial', '/generate-protocol',
-    '/app-only-access', '/web-only-access', '/email-verification'
-  ];
-  const isExcludedRoute = excludedRoutes.some(route => location.pathname === route);
-  
-  // Dashboard routes where we SHOULD show the dialog (user is actually in the app)
-  const dashboardRoutes = ['/', '/library', '/chat', '/agendas', '/recording', '/protocol', '/feedback', '/subscribe-success'];
-  const isDashboardRoute = dashboardRoutes.some(route => location.pathname === route) || 
-                           location.pathname.startsWith('/meetings/') ||
-                           location.pathname.startsWith('/admin');
-  
-  useEffect(() => {
-    // Wait for auth to fully load
-    if (isLoading) {
-      setNeedsName(false);
-      return;
-    }
-    
-    // Must be authenticated
-    if (!user) {
-      setNeedsName(false);
-      return;
-    }
-    
-    // Skip excluded routes
-    if (isExcludedRoute) {
-      setNeedsName(false);
-      return;
-    }
-    
-    // Must be on a dashboard route
-    if (!isDashboardRoute) {
-      setNeedsName(false);
-      return;
-    }
-    
-    // Small delay to ensure we're fully rendered on dashboard
-    const timer = setTimeout(() => {
-      const preferredName = (user as any)?.preferredName;
-      setNeedsName(!preferredName);
-      setHasCheckedAccess(true);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [user, isLoading, isExcludedRoute, isDashboardRoute]);
-  
-  const handleNameSet = async (name: string) => {
-    setNeedsName(false);
-    // Refresh user to get updated preferredName
-    await refreshUser();
-  };
-  
-  return (
-    <>
-      <PreferredNameDialog open={needsName} onNameSet={handleNameSet} />
-      {children}
-    </>
-  );
-};
+// Preferred Name Gate removed - now handled via auto-opening Settings in AppSidebar
 
 // Shared app content for all routes
 const AppContent = () => {
@@ -507,46 +438,44 @@ const AppContent = () => {
       <SupportBanner />
       <EnterpriseTrialCheck />
       <IOSAppPromoDialog />
-      <PreferredNameGate>
-        <WelcomeGate>
-          <EnterpriseSISGate>
-            <AppLayout>
-              <Suspense
-                fallback={
-                  <div className="min-h-screen bg-background flex items-center justify-center">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
-                  </div>
-                }
-              >
-                <Routes>
-                  <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
-                  <Route path="/magic-login" element={<MagicLogin />} />
-                  <Route path="/sis-required" element={<ProtectedRoute><SISRequired /></ProtectedRoute>} />
-                  <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                  <Route path="/free-trial" element={<FreeTrial />} />
-                  <Route path="/generate-protocol" element={<GenerateProtocol />} />
-                  <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
-                  <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
-                  <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                  <Route path="/meetings/:id" element={<ProtectedRoute><MeetingDetail /></ProtectedRoute>} />
-                  <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-                  <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
-                  <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
-                  <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-                  <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
-                  <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
-                  <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
-                  <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
-                  <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
-                  <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
-                  <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </AppLayout>
-          </EnterpriseSISGate>
-        </WelcomeGate>
-      </PreferredNameGate>
+      <WelcomeGate>
+        <EnterpriseSISGate>
+          <AppLayout>
+            <Suspense
+              fallback={
+                <div className="min-h-screen bg-background flex items-center justify-center">
+                  <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                <Route path="/magic-login" element={<MagicLogin />} />
+                <Route path="/sis-required" element={<ProtectedRoute><SISRequired /></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/free-trial" element={<FreeTrial />} />
+                <Route path="/generate-protocol" element={<GenerateProtocol />} />
+                <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
+                <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
+                <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+                <Route path="/meetings/:id" element={<ProtectedRoute><MeetingDetail /></ProtectedRoute>} />
+                <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
+                <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
+                <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
+                <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
+                <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
+                <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
+                <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AppLayout>
+        </EnterpriseSISGate>
+      </WelcomeGate>
     </PlanGate>
   );
 };
