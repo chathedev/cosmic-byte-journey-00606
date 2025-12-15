@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { BreathingOrb } from "./BreathingOrb";
+import { VoiceMemosWaveform } from "./VoiceMemosWaveform";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -758,41 +758,43 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-full max-w-lg space-y-6">
             {/* Recording Status */}
-            <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-8 md:p-12 border border-border/50 shadow-xl relative">
-              <div className="flex flex-col items-center text-center space-y-6">
-                {/* Test button for allowed user */}
-                {hasTestAccess && !isTestMode && (
-                  <button
-                    onClick={startTestMode}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 z-10"
-                    title="Simulera Tivly-möte"
-                  >
-                    Test
-                  </button>
-                )}
-                
-                {/* Breathing Orb Visualization */}
-                <BreathingOrb 
-                  stream={streamRef.current} 
-                  isActive={isRecording} 
+            <section className="relative rounded-3xl border border-border/50 bg-card/40 backdrop-blur-sm shadow-xl p-8 md:p-12">
+              {/* Test button for allowed user */}
+              {hasTestAccess && !isTestMode && (
+                <button
+                  onClick={startTestMode}
+                  className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 z-10"
+                  title="Simulera Tivly-möte"
+                >
+                  Test
+                </button>
+              )}
+
+              <div className="flex flex-col items-center text-center gap-6">
+                <div className="font-mono text-4xl md:text-5xl tracking-tight">
+                  {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
+                </div>
+
+                <VoiceMemosWaveform
+                  stream={streamRef.current}
+                  isActive={isRecording}
                   isPaused={isPaused}
                 />
 
-                {/* Status Text */}
-                <div className="space-y-2">
-                  <h2 className="text-lg md:text-xl font-semibold">
-                    {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Lyssnar...'}
+                <div className="space-y-1">
+                  <h2 className="text-base md:text-lg font-medium">
+                    {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
                   </h2>
                   <p className="text-sm text-muted-foreground max-w-xs">
-                    {isPaused 
+                    {isPaused
                       ? 'Tryck "Återuppta" för att fortsätta'
-                      : useAsrMode 
+                      : useAsrMode
                         ? 'Ljudet spelas in för transkribering i bakgrunden.'
                         : 'Tala tydligt – texten visas i realtid.'}
                   </p>
                 </div>
               </div>
-            </div>
+            </section>
 
             {/* Live Transcript Display (Free/Pro only) */}
             {!useAsrMode && (
