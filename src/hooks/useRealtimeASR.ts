@@ -56,90 +56,28 @@ export function useRealtimeASR(options: UseRealtimeASROptions = {}) {
     return result;
   }, []);
 
-  const connect = useCallback(async (meetingId: string, stream: MediaStream) => {
-    if (wsRef.current) {
-      console.log('⚠️ Realtime ASR already connected');
-      return;
+  // Cleanup audio resources - defined FIRST since other functions depend on it
+  const cleanupAudio = useCallback(() => {
+    if (sourceRef.current) {
+      try { sourceRef.current.disconnect(); } catch { /* ignore */ }
+      sourceRef.current = null;
     }
-
-    setIsConnecting(true);
-    setError(null);
-    meetingIdRef.current = meetingId;
-
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('No auth token available');
-      }
-
-      // Create WebSocket connection
-      const wsUrl = `wss://${API_HOST}/asr/realtime?meetingId=${encodeURIComponent(meetingId)}`;
-      console.log('🔌 Connecting to realtime ASR:', wsUrl);
-      
-      const ws = new WebSocket(wsUrl, ['authorization', token]);
-      
-      ws.onopen = () => {
-        console.log('✅ Realtime ASR WebSocket connected');
-        setIsConnected(true);
-        setIsConnecting(false);
-        
-        // Start audio processing
-        setupAudioProcessing(stream, ws);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg: RealtimeASRMessage = JSON.parse(event.data);
-          console.log('📨 ASR message:', msg.type, msg.text?.substring(0, 50) || msg.transcript?.substring(0, 50) || '');
-          
-          switch (msg.type) {
-            case 'partial':
-              setPartialText(msg.text || '');
-              options.onPartial?.(msg.text || '');
-              break;
-            case 'final':
-              setFinalText(prev => prev + (prev ? ' ' : '') + (msg.text || ''));
-              setPartialText('');
-              options.onFinal?.(msg.text || '');
-              break;
-            case 'done':
-              setPartialText('');
-              options.onDone?.(msg.transcript || finalText);
-              break;
-            case 'error':
-              setError(msg.message || 'Unknown error');
-              options.onError?.(msg.message || 'Unknown error');
-              break;
-          }
-        } catch (e) {
-          console.error('Failed to parse ASR message:', e);
-        }
-      };
-
-      ws.onerror = (event) => {
-        console.error('❌ Realtime ASR WebSocket error:', event);
-        setError('WebSocket connection error');
-        setIsConnecting(false);
-      };
-
-      ws.onclose = (event) => {
-        console.log('🔌 Realtime ASR WebSocket closed:', event.code, event.reason);
-        setIsConnected(false);
-        setIsConnecting(false);
-        wsRef.current = null;
-        cleanupAudio();
-      };
-
-      wsRef.current = ws;
-    } catch (e: any) {
-      console.error('❌ Failed to connect realtime ASR:', e);
-      setError(e.message || 'Connection failed');
-      setIsConnecting(false);
+    if (processorRef.current) {
+      try { processorRef.current.disconnect(); } catch { /* ignore */ }
+      processorRef.current = null;
     }
-  }, [options, finalText]);
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch { /* ignore */ }
+      audioContextRef.current = null;
+    }
+  }, []);
 
+  // Setup audio processing pipeline
   const setupAudioProcessing = useCallback((stream: MediaStream, ws: WebSocket) => {
     try {
+      // Clean up any existing audio context first
+      cleanupAudio();
+      
       // Create audio context at 16kHz for direct processing, or use default and downsample
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 16000,
@@ -181,22 +119,148 @@ export function useRealtimeASR(options: UseRealtimeASROptions = {}) {
     } catch (e) {
       console.error('❌ Failed to setup audio processing:', e);
     }
-  }, [float32ToPCM16, downsample]);
+  }, [float32ToPCM16, downsample, cleanupAudio]);
 
-  const cleanupAudio = useCallback(() => {
-    if (sourceRef.current) {
-      sourceRef.current.disconnect();
-      sourceRef.current = null;
+  // Connect to realtime ASR websocket with retry logic
+  const connect = useCallback(async (meetingId: string, stream: MediaStream, retryCount = 0) => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000;
+    
+    // Close existing connection if any
+    if (wsRef.current) {
+      console.log('⚠️ Closing existing ASR connection before reconnecting');
+      try {
+        wsRef.current.close();
+      } catch { /* ignore */ }
+      wsRef.current = null;
+      cleanupAudio();
     }
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
+
+    setIsConnecting(true);
+    setError(null);
+    meetingIdRef.current = meetingId;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No auth token available');
+      }
+
+      // Create WebSocket connection
+      const wsUrl = `wss://${API_HOST}/asr/realtime?meetingId=${encodeURIComponent(meetingId)}`;
+      console.log('🔌 Connecting to realtime ASR:', wsUrl, retryCount > 0 ? `(retry ${retryCount}/${MAX_RETRIES})` : '');
+      
+      const ws = new WebSocket(wsUrl, ['authorization', token]);
+      
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          console.warn('⚠️ WebSocket connection timeout');
+          ws.close();
+          if (retryCount < MAX_RETRIES) {
+            setTimeout(() => connect(meetingId, stream, retryCount + 1), RETRY_DELAY);
+          } else {
+            setError('Connection timeout after retries');
+            setIsConnecting(false);
+            options.onError?.('Connection timeout - please try again');
+          }
+        }
+      }, 10000);
+      
+      ws.onopen = () => {
+        clearTimeout(connectionTimeout);
+        console.log('✅ Realtime ASR WebSocket connected');
+        setIsConnected(true);
+        setIsConnecting(false);
+        
+        // Verify stream is still active before starting audio processing
+        if (!stream.active) {
+          console.error('❌ Stream became inactive before audio processing could start');
+          return;
+        }
+        
+        // Start audio processing
+        setupAudioProcessing(stream, ws);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg: RealtimeASRMessage = JSON.parse(event.data);
+          console.log('📨 ASR message:', msg.type, msg.text?.substring(0, 50) || msg.transcript?.substring(0, 50) || '');
+          
+          switch (msg.type) {
+            case 'partial':
+              setPartialText(msg.text || '');
+              options.onPartial?.(msg.text || '');
+              break;
+            case 'final':
+              setFinalText(prev => prev + (prev ? ' ' : '') + (msg.text || ''));
+              setPartialText('');
+              options.onFinal?.(msg.text || '');
+              break;
+            case 'done':
+              setPartialText('');
+              options.onDone?.(msg.transcript || finalText);
+              break;
+            case 'error':
+              setError(msg.message || 'Unknown error');
+              options.onError?.(msg.message || 'Unknown error');
+              break;
+          }
+        } catch (e) {
+          console.error('Failed to parse ASR message:', e);
+        }
+      };
+
+      ws.onerror = (event) => {
+        clearTimeout(connectionTimeout);
+        console.error('❌ Realtime ASR WebSocket error:', event);
+        
+        // Retry on error
+        if (retryCount < MAX_RETRIES) {
+          console.log(`🔄 Retrying ASR connection (${retryCount + 1}/${MAX_RETRIES})...`);
+          wsRef.current = null;
+          setTimeout(() => connect(meetingId, stream, retryCount + 1), RETRY_DELAY);
+        } else {
+          setError('WebSocket connection error after retries');
+          setIsConnecting(false);
+          options.onError?.('Could not connect to transcription service');
+        }
+      };
+
+      ws.onclose = (event) => {
+        clearTimeout(connectionTimeout);
+        console.log('🔌 Realtime ASR WebSocket closed:', event.code, event.reason);
+        setIsConnected(false);
+        setIsConnecting(false);
+        wsRef.current = null;
+        cleanupAudio();
+        
+        // Auto-reconnect on unexpected close (not normal close)
+        if (event.code !== 1000 && event.code !== 1005 && retryCount < MAX_RETRIES && meetingIdRef.current) {
+          console.log(`🔄 Auto-reconnecting after unexpected close...`);
+          setTimeout(() => {
+            if (stream.active && meetingIdRef.current) {
+              connect(meetingIdRef.current, stream, retryCount + 1);
+            }
+          }, RETRY_DELAY);
+        }
+      };
+
+      wsRef.current = ws;
+    } catch (e: any) {
+      console.error('❌ Failed to connect realtime ASR:', e);
+      
+      if (retryCount < MAX_RETRIES) {
+        console.log(`🔄 Retrying ASR connection (${retryCount + 1}/${MAX_RETRIES})...`);
+        setTimeout(() => connect(meetingId, stream, retryCount + 1), RETRY_DELAY);
+      } else {
+        setError(e.message || 'Connection failed');
+        setIsConnecting(false);
+        options.onError?.(e.message || 'Connection failed');
+      }
     }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  }, []);
+  }, [options, finalText, cleanupAudio, setupAudioProcessing]);
 
   const stop = useCallback(async () => {
     if (!wsRef.current) return;
