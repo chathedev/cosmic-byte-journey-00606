@@ -15,9 +15,9 @@ export const IOSAppPromoDialog = () => {
   const { enterpriseMembership, isLoading } = useSubscription();
   
   useEffect(() => {
-    // Only show for enterprise users on web
+    // Only show for enterprise users on web (not iOS app)
     if (isLoading) return;
-    if (!enterpriseMembership) return;
+    if (!enterpriseMembership?.isMember) return;
     if (!isWebBrowser()) return;
     
     // Check if dismissed recently
@@ -44,7 +44,7 @@ export const IOSAppPromoDialog = () => {
     handleDismiss();
   };
   
-  if (!enterpriseMembership) return null;
+  if (!enterpriseMembership?.isMember) return null;
   
   const companyName = enterpriseMembership?.company?.name || 'ditt företag';
   
