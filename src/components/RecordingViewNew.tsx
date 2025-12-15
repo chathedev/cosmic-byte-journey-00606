@@ -51,6 +51,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [viewState, setViewState] = useState<ViewState>('recording');
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true); // New: loading state
+  const [initStatus, setInitStatus] = useState<string>('Förbereder...'); // New: status message
   const [sessionId, setSessionId] = useState<string>(continuedMeeting?.id || "");
   const [meetingName, setMeetingName] = useState(continuedMeeting?.title || "Namnlöst möte");
   const [selectedFolder, setSelectedFolder] = useState(continuedMeeting?.folder || "Allmänt");
@@ -240,18 +242,23 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     const initSession = async () => {
       if (!user) return;
       
+      setIsInitializing(true);
+      setInitStatus('Kontrollerar behörigheter...');
+      
       if (continuedMeeting) {
         setSessionId(continuedMeeting.id);
         setSelectedFolder(continuedMeeting.folder);
         hasIncrementedCountRef.current = true;
         // Start recording for continued meeting - pass meetingId directly
-        startRecording(continuedMeeting.id);
+        await startRecording(continuedMeeting.id);
         return;
       }
 
+      setInitStatus('Förbereder session...');
       const { allowed, reason } = await canCreateMeeting();
       if (!allowed) {
         setShowUpgradeDialog(true);
+        setIsInitializing(false);
         return;
       }
 
@@ -260,7 +267,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       setSessionId(tempId);
       
       // Start recording - pass meetingId directly so ASR can connect immediately
-      startRecording(tempId);
+      await startRecording(tempId);
     };
 
     initSession();
@@ -308,6 +315,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         mediaRecorderRef.current = null;
       }
       
+      setInitStatus('Ansluter mikrofon...');
       console.log('🎤 Requesting microphone access...');
       
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -342,6 +350,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       streamRef.current = stream;
 
+      setInitStatus('Startar inspelning...');
+      
       // Determine best supported mimeType with codecs for reliable recording
       let mimeType = 'audio/webm; codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -373,6 +383,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         console.error('❌ MediaRecorder error:', event.error);
         if (!isSavingRef.current && retryCount < MAX_RETRIES) {
           console.log(`🔄 Retrying recording (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+          setInitStatus(`Försöker igen (${retryCount + 1}/${MAX_RETRIES})...`);
           setTimeout(() => startRecording(meetingId, retryCount + 1), 500);
         }
       };
@@ -380,20 +391,26 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
       
-      setIsRecording(true);
-      await requestWakeLock();
-      
       // Use the passed meetingId directly (not from state which might not be set yet)
       const currentMeetingId = meetingId || sessionId;
       
       // For ASR mode (Enterprise): connect realtime ASR websocket
       if (useAsrMode && currentMeetingId) {
+        setInitStatus('Ansluter transkribering...');
         console.log('🎤 Connecting realtime ASR for session:', currentMeetingId);
         realtimeASR.connect(currentMeetingId, stream);
+        
+        // Wait a moment for ASR to connect before showing recording UI
+        await new Promise(resolve => setTimeout(resolve, 500));
       } else if (!useAsrMode) {
         // Start browser speech recognition for Free/Pro plans
         startSpeechRecognition();
       }
+      
+      // All ready - show recording UI
+      setIsRecording(true);
+      setIsInitializing(false);
+      await requestWakeLock();
       
       console.log('✅ Recording started', useAsrMode ? '(Realtime ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
     } catch (error: any) {
@@ -406,10 +423,12 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         error.message?.includes('Could not start')
       )) {
         console.log(`🔄 Retrying recording (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        setInitStatus(`Försöker igen (${retryCount + 1}/${MAX_RETRIES})...`);
         setTimeout(() => startRecording(meetingId, retryCount + 1), 1000);
         return;
       }
       
+      setIsInitializing(false);
       toast({
         title: 'Behörighet nekad',
         description: error.name === 'NotAllowedError' 
@@ -780,6 +799,48 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
     stopSpeechRecognition();
     onBack();
   };
+
+  // Loading overlay while initializing
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center">
+        <div className="text-center space-y-6">
+          {/* Animated microphone icon */}
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
+                <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+            </div>
+            {/* Spinning ring */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-24 h-24 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-lg font-medium">{initStatus}</h2>
+            <p className="text-sm text-muted-foreground">
+              {useAsrMode ? 'Ansluter till transkribering...' : 'Förbereder inspelning...'}
+            </p>
+          </div>
+          
+          {/* Back button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Avbryt
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Loading overlay while saving
   if (isSaving) {
