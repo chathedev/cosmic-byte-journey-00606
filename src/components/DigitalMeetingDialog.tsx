@@ -175,13 +175,8 @@ export const DigitalMeetingDialog = ({
         description: 'Filen laddas upp i bakgrunden.',
       });
 
-      // Redirect to library with pending meeting info
-      navigate('/library', { 
-        state: { 
-          fromRecording: true, 
-          pendingMeetingId: meetingId,
-        } 
-      });
+      // Redirect to meeting detail page
+      navigate(`/meetings/${meetingId}`);
 
     } catch (error: any) {
       console.error('Upload init error:', error);
