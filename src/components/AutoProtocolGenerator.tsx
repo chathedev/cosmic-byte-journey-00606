@@ -166,26 +166,34 @@ export const AutoProtocolGenerator = ({
           }
           
           // Format transcript with speaker names
-          const formattedSegments = transcriptSegments.map(segment => {
-            let speakerName = speakerNameMap.get(segment.speakerId) || speakerNameMap.get('meeting');
-            
-            if (!speakerName) {
-              // Fallback to generic speaker number
-              const speakerNum = parseInt(segment.speakerId.replace('speaker_', '')) + 1;
-              speakerName = `Talare ${speakerNum}`;
-            }
-            
-            return `[${speakerName}]: ${segment.text}`;
-          });
+          const formattedSegments = transcriptSegments
+            .filter(segment => segment && segment.text) // Filter out invalid segments
+            .map(segment => {
+              const speakerId = segment.speakerId || 'unknown';
+              let speakerName = speakerNameMap.get(speakerId) || speakerNameMap.get('meeting');
+              
+              if (!speakerName) {
+                // Fallback to generic speaker number
+                const speakerMatch = speakerId.match(/speaker_(\d+)/);
+                const speakerNum = speakerMatch ? parseInt(speakerMatch[1]) + 1 : 1;
+                speakerName = `Talare ${speakerNum}`;
+              }
+              
+              return `[${speakerName}]: ${segment.text || ''}`;
+            });
           
-          formattedTranscript = formattedSegments.join('\n\n');
+          formattedTranscript = formattedSegments.length > 0 
+            ? formattedSegments.join('\n\n') 
+            : transcript;
           
           // Collect speaker info for logging
           const speakerCounts = new Map<string, number>();
-          transcriptSegments.forEach(segment => {
-            const name = speakerNameMap.get(segment.speakerId) || speakerNameMap.get('meeting') || 'Okänd';
-            speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
-          });
+          transcriptSegments
+            .filter(segment => segment && segment.speakerId)
+            .forEach(segment => {
+              const name = speakerNameMap.get(segment.speakerId!) || speakerNameMap.get('meeting') || 'Okänd';
+              speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
+            });
           speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
           
           console.log('🎤 Speaker-attributed transcript created:', {
