@@ -106,113 +106,50 @@ const MeetingDetail = () => {
   const [pendingMeetingData, setPendingMeetingData] = useState<MeetingDataForDialog | null>(null);
   const [selectedProtocol, setSelectedProtocol] = useState<{ transcript: string; aiProtocol: any } | null>(null);
   const [chatMeeting, setChatMeeting] = useState<MeetingSession | null>(null);
-  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
 
-  // Friendly waiting messages based on stage and elapsed time
-  // PRIORITY: stage from backend is more accurate than status
-  const getWaitingMessage = () => {
-    // Check stage FIRST (more accurate from backend)
+  // Simple stage-based message (no time-based logic)
+  const getStageInfo = () => {
     if (stage === 'transcribing') {
-      if (elapsedSeconds < 30) {
-        return {
-          title: 'Transkriberar ljud...',
-          subtitle: 'AI analyserar ditt möte'
-        };
-      } else if (elapsedSeconds < 60) {
-        return {
-          title: 'Bearbetar ljudet...',
-          subtitle: 'Längre möten tar lite extra tid'
-        };
-      } else if (elapsedSeconds < 120) {
-        return {
-          title: 'Nästan klart...',
-          subtitle: 'Ta en kopp kaffe medan du väntar ☕'
-        };
-      } else if (elapsedSeconds < 180) {
-        return {
-          title: 'Fortfarande igång...',
-          subtitle: 'Långa möten kräver mer processorkraft'
-        };
-      } else {
-        return {
-          title: 'Bearbetar stort möte...',
-          subtitle: 'Detta kan ta upp till 5 minuter för längre inspelningar'
-        };
-      }
+      return {
+        title: 'Transkriberar',
+        subtitle: 'AI analyserar ditt möte',
+        icon: '🎙️'
+      };
     }
     
     if (stage === 'sis_processing') {
       return {
-        title: 'Identifierar talare...',
-        subtitle: 'Analyserar röster i mötet'
+        title: 'Identifierar talare',
+        subtitle: 'Analyserar röster i mötet',
+        icon: '👥'
       };
     }
     
-    // Only show uploading message if stage explicitly says uploading
     if (stage === 'uploading') {
       return {
-        title: 'Skickar till servern...',
-        subtitle: 'Vänta medan filen laddas upp'
+        title: 'Laddar upp',
+        subtitle: 'Skickar filen till servern',
+        icon: '📤'
       };
     }
     
-    // Fallback for uploading status without stage
     if (status === 'uploading') {
       return {
-        title: 'Laddar upp...',
-        subtitle: 'Skickar filen till servern'
+        title: 'Laddar upp',
+        subtitle: 'Skickar filen till servern',
+        icon: '📤'
       };
     }
     
-    // Fallback for processing without stage
-    if (elapsedSeconds < 30) {
-      return {
-        title: 'Bearbetar...',
-        subtitle: 'AI analyserar ditt möte'
-      };
-    } else if (elapsedSeconds < 60) {
-      return {
-        title: 'Analyserar mötet...',
-        subtitle: 'Längre möten tar lite extra tid'
-      };
-    } else if (elapsedSeconds < 120) {
-      return {
-        title: 'Nästan klart...',
-        subtitle: 'Ta en kopp kaffe medan du väntar ☕'
-      };
-    } else {
-      return {
-        title: 'Hög belastning...',
-        subtitle: 'Tack för ditt tålamod! Snart klart.'
-      };
-    }
+    return {
+      title: 'Bearbetar',
+      subtitle: 'Vänta medan mötet analyseras',
+      icon: '⚙️'
+    };
   };
-
-  // Track elapsed time during processing
-  useEffect(() => {
-    if (status === 'processing' && !processingStartTime) {
-      setProcessingStartTime(Date.now());
-    }
-    
-    if (status === 'done' || status === 'failed' || status === null) {
-      setProcessingStartTime(null);
-      setElapsedSeconds(0);
-    }
-  }, [status, processingStartTime]);
-
-  useEffect(() => {
-    if (!processingStartTime || status !== 'processing') return;
-    
-    const interval = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - processingStartTime) / 1000));
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, [processingStartTime, status]);
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -591,27 +528,29 @@ const MeetingDetail = () => {
                           <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
                         </div>
                         <div className="text-center space-y-2">
+                          <div className="text-2xl mb-2">{getStageInfo().icon}</div>
                           <motion.p 
-                            key={getWaitingMessage().title}
+                            key={getStageInfo().title}
                             initial={{ opacity: 0, y: -5 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="font-medium"
                           >
-                            {getWaitingMessage().title}
+                            {getStageInfo().title}
                           </motion.p>
                           <motion.p 
-                            key={getWaitingMessage().subtitle}
+                            key={getStageInfo().subtitle}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             className="text-sm text-muted-foreground"
                           >
-                            {getWaitingMessage().subtitle}
+                            {getStageInfo().subtitle}
                           </motion.p>
-                          {status === 'processing' && elapsedSeconds > 0 && (
-                            <p className="text-xs text-muted-foreground/70">
-                              {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')} förfluten tid
-                            </p>
-                          )}
+                        </div>
+                        {/* Info box */}
+                        <div className="mt-4 bg-background/80 rounded-lg px-4 py-3 text-center max-w-sm">
+                          <p className="text-xs text-muted-foreground">
+                            Längre möten kan ta upp till 5 minuter. Du kan lämna sidan – vi skickar ett mejl när det är klart.
+                          </p>
                         </div>
                         <div className="flex gap-1">
                           {[0, 1, 2].map(i => (
