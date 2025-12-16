@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers } from "lucide-react";
+import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers, Terminal, Search, Filter, X, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
-import { backendApi, DashboardData, HealthCheck } from '@/lib/backendApi';
+import { backendApi, DashboardData, HealthCheck, ASRLogsResponse } from '@/lib/backendApi';
 import { apiClient, MaintenanceStatus } from '@/lib/api';
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +29,15 @@ const AdminBackend = () => {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [maintenancePending, setMaintenancePending] = useState(false);
+  
+  // ASR Logs state
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsData, setLogsData] = useState<ASRLogsResponse | null>(null);
+  const [logsLevel, setLogsLevel] = useState<string>('all');
+  const [logsKeyword, setLogsKeyword] = useState<string>('');
+  const [logsPaused, setLogsPaused] = useState(false);
+  const logsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     action: 'cleanup' | 'restart' | null;
@@ -64,6 +76,34 @@ const AdminBackend = () => {
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // ASR Logs polling
+  const fetchLogs = async () => {
+    try {
+      const data = await backendApi.getASRLogs({
+        lines: 80,
+        level: logsLevel === 'all' ? undefined : logsLevel,
+        keyword: logsKeyword || undefined,
+      });
+      setLogsData(data);
+    } catch (error) {
+      console.error('Failed to fetch ASR logs:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (logsOpen && !logsPaused) {
+      fetchLogs(); // Fetch immediately
+      logsIntervalRef.current = setInterval(fetchLogs, 1000);
+    }
+    
+    return () => {
+      if (logsIntervalRef.current) {
+        clearInterval(logsIntervalRef.current);
+        logsIntervalRef.current = null;
+      }
+    };
+  }, [logsOpen, logsPaused, logsLevel, logsKeyword]);
 
   const handleCleanup = async () => {
     setIsActionLoading('cleanup');
@@ -383,6 +423,124 @@ const AdminBackend = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* ASR Logs Viewer */}
+          <Card className="border-0 bg-muted/30">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">ASR Loggar</span>
+                  {logsOpen && logsData && (
+                    <Badge variant="secondary" className="font-normal text-xs">
+                      {logsData.showing}/{logsData.total}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {logsOpen && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLogsPaused(!logsPaused)}
+                        className="h-7 w-7 p-0"
+                      >
+                        {logsPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLogsOpen(false)}
+                        className="h-7 w-7 p-0"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </>
+                  )}
+                  {!logsOpen && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsOpen(true)}
+                      className="h-7 text-xs"
+                    >
+                      Öppna
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              {logsOpen && (
+                <>
+                  {/* Filters */}
+                  <div className="flex gap-2 mb-3">
+                    <Select value={logsLevel} onValueChange={setLogsLevel}>
+                      <SelectTrigger className="w-28 h-8 text-xs">
+                        <Filter className="w-3 h-3 mr-1" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alla</SelectItem>
+                        <SelectItem value="error">Error</SelectItem>
+                        <SelectItem value="warn">Warning</SelectItem>
+                        <SelectItem value="info">Info</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                      <Input
+                        placeholder="Sök (meeting ID, [asr], etc.)"
+                        value={logsKeyword}
+                        onChange={(e) => setLogsKeyword(e.target.value)}
+                        className="h-8 pl-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Log lines */}
+                  <ScrollArea className="h-64 rounded border border-border/50 bg-background/50">
+                    <div className="p-2 font-mono text-xs space-y-0.5">
+                      {logsData?.lines && logsData.lines.length > 0 ? (
+                        logsData.lines.map((line, i) => {
+                          const isError = /error|fail|fatal/i.test(line);
+                          const isWarn = /warn/i.test(line);
+                          return (
+                            <div 
+                              key={i} 
+                              className={`px-1 py-0.5 rounded ${
+                                isError ? 'bg-red-500/10 text-red-400' : 
+                                isWarn ? 'bg-yellow-500/10 text-yellow-400' : 
+                                'text-muted-foreground'
+                              }`}
+                            >
+                              {line}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          {logsData?.message || 'Inga loggar hittades'}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                  
+                  {/* Status bar */}
+                  <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                    <span>
+                      {logsPaused ? (
+                        <span className="text-yellow-500">⏸ Pausad</span>
+                      ) : (
+                        <span className="text-green-500">● Live</span>
+                      )}
+                    </span>
+                    <span>Uppdateras varje sekund</span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">

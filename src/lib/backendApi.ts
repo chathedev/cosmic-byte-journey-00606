@@ -138,6 +138,17 @@ export interface CleanupResponse {
   freedSpace: { bytes: number; formatted: string };
 }
 
+export interface ASRLogsResponse {
+  ok: boolean;
+  lines: string[];
+  total: number;
+  showing: number;
+  requested: number;
+  level?: string;
+  keyword?: string;
+  message?: string;
+}
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('authToken');
   return {
@@ -201,6 +212,24 @@ export const backendApi = {
 
   async getLogs(lines: number = 100): Promise<{ ok: boolean; lines: string[]; total: number; showing: number }> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/logs?lines=${lines}`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getASRLogs(options: { lines?: number; level?: string; keyword?: string } = {}): Promise<ASRLogsResponse> {
+    const params = new URLSearchParams();
+    if (options.lines) params.set('lines', String(options.lines));
+    if (options.level) params.set('level', options.level);
+    if (options.keyword) params.set('keyword', options.keyword);
+    
+    const response = await fetch(`${BACKEND_URL}/admin/logs?${params.toString()}`, {
       credentials: 'include',
       headers: getAuthHeaders(),
     });
