@@ -19,44 +19,7 @@ import { MeetingChat } from "@/components/MeetingChat";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
-// Typing effect component
-const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
-  const indexRef = useRef(0);
-
-  useEffect(() => {
-    if (!text) return;
-    
-    // Reset on new text
-    setDisplayedText("");
-    indexRef.current = 0;
-    setIsComplete(false);
-
-    const chars = text.split("");
-    const typeSpeed = Math.max(5, Math.min(30, 3000 / chars.length)); // Adaptive speed
-
-    const timer = setInterval(() => {
-      if (indexRef.current < chars.length) {
-        setDisplayedText(prev => prev + chars[indexRef.current]);
-        indexRef.current++;
-      } else {
-        clearInterval(timer);
-        setIsComplete(true);
-        onComplete?.();
-      }
-    }, typeSpeed);
-
-    return () => clearInterval(timer);
-  }, [text, onComplete]);
-
-  return (
-    <span className="whitespace-pre-wrap">
-      {displayedText}
-      {!isComplete && <span className="animate-pulse">|</span>}
-    </span>
-  );
-};
+// Removed typing effect - using simple fade animation instead
 
 interface AgendaSISSpeaker {
   label: string;
@@ -98,8 +61,6 @@ const MeetingDetail = () => {
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
   const [sisSpeakers, setSisSpeakers] = useState<SISSpeaker[]>([]);
   const [sisMatches, setSisMatches] = useState<SISMatch[]>([]);
-  const [showTypingEffect, setShowTypingEffect] = useState(false);
-  const [typingComplete, setTypingComplete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
@@ -169,7 +130,6 @@ const MeetingDetail = () => {
           if (fetchedMeeting.transcript && fetchedMeeting.transcript.trim().length > 0) {
             setTranscript(fetchedMeeting.transcript);
             setStatus('done');
-            setTypingComplete(true); // Skip typing for existing transcripts
           } else {
             setStatus('processing');
           }
@@ -245,7 +205,6 @@ const MeetingDetail = () => {
           setSisSpeakers(asrStatus.sisSpeakers || []);
           setSisMatches(asrStatus.sisMatches || []);
           setStatus('done');
-          setShowTypingEffect(true);
 
           // Save transcript
           try {
@@ -531,16 +490,14 @@ const MeetingDetail = () => {
                         <span className="font-medium">Transkription</span>
                       </div>
                       <div className="bg-muted/30 rounded-xl p-6 max-h-[400px] overflow-y-auto prose prose-sm dark:prose-invert">
-                        {showTypingEffect && !typingComplete ? (
-                          <TypewriterText 
-                            text={transcript || ''} 
-                            onComplete={() => setTypingComplete(true)}
-                          />
-                        ) : (
-                          <p className="whitespace-pre-wrap leading-relaxed text-foreground/90">
-                            {transcript}
-                          </p>
-                        )}
+                        <motion.p 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.5 }}
+                          className="whitespace-pre-wrap leading-relaxed text-foreground/90"
+                        >
+                          {transcript}
+                        </motion.p>
                       </div>
                     </motion.div>
                   ) : null}
