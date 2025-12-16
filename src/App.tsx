@@ -11,6 +11,7 @@ import { toast as sonnerToast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Bug } from "lucide-react";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -303,6 +304,13 @@ const GlobalDevButton = () => {
   }, [isAllowed]);
 
   const handleDevClick = async () => {
+    // Haptic feedback immediately
+    try {
+      await Haptics.impact({ style: ImpactStyle.Heavy });
+    } catch {
+      // Haptics not available (web)
+    }
+
     // Gather comprehensive debug info
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -319,8 +327,8 @@ const GlobalDevButton = () => {
         meetingsUsed: userPlan?.meetingsUsed || 0,
         meetingsLimit: userPlan?.meetingsLimit || 0,
       },
-      errors: errors.slice(-20), // Last 20 errors
-      logs: logs.slice(-50), // Last 50 logs
+      errors: errorBufferRef.current.slice(-20), // Last 20 errors
+      logs: logBufferRef.current.slice(-50), // Last 50 logs
     };
     
     const formattedOutput = `
@@ -351,11 +359,19 @@ ${JSON.stringify(debugInfo, null, 2)}
     // Copy to clipboard
     try {
       await navigator.clipboard.writeText(formattedOutput);
+      // Success haptic
+      try {
+        await Haptics.notification({ type: 'SUCCESS' as any });
+      } catch {}
       sonnerToast.success('Loggar kopierade! 📋', {
         duration: 2000,
-        description: `${errors.length} fel, ${logs.length} loggar`,
+        description: `${debugInfo.errors.length} fel, ${debugInfo.logs.length} loggar`,
       });
     } catch (err) {
+      // Error haptic
+      try {
+        await Haptics.notification({ type: 'ERROR' as any });
+      } catch {}
       sonnerToast.error('Kunde inte kopiera', {
         description: 'Se konsolen för info',
       });
