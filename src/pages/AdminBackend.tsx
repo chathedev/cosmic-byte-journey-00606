@@ -222,7 +222,7 @@ const AdminBackend = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background overflow-x-hidden">
         {/* Minimal Header */}
         <div className="border-b border-border/50">
           <div className="max-w-4xl mx-auto px-6 py-6">

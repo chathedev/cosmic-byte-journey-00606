@@ -605,17 +605,18 @@ export default function AdminEnterprise() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background p-4 md:p-8 overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Enterprise Management</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Enterprise Management</h1>
             <p className="text-muted-foreground mt-1">Hantera företag, medlemmar och möten</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button 
               variant="outline" 
+              size="sm"
               onClick={() => navigate('/admin/enterprise/billing')}
             >
               <Receipt className="h-4 w-4 mr-2" />
@@ -623,16 +624,17 @@ export default function AdminEnterprise() {
             </Button>
             <Button 
               variant="outline" 
+              size="sm"
               onClick={loadAllCompanyMeetings}
               disabled={loadingAllMeetings}
             >
               {loadingAllMeetings && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Calendar className="h-4 w-4 mr-2" />
-              Visa Alla Möten
+              Möten
             </Button>
-            <Button onClick={() => setShowCreateCompany(true)}>
+            <Button size="sm" onClick={() => setShowCreateCompany(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Skapa Företag
+              Företag
             </Button>
           </div>
         </div>

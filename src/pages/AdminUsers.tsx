@@ -378,29 +378,25 @@ export default function AdminUsers() {
 
   return (
     <>
-      <div className="sticky top-0 z-40 bg-gradient-to-r from-background via-background/95 to-background border-b border-border/50 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  User Management
-                </h1>
-                <p className="text-xs text-muted-foreground">Manage user plans and permissions</p>
-              </div>
+      <div className="sticky top-0 z-40 bg-gradient-to-r from-background via-background/95 to-background border-b border-border/50 px-4 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm flex-shrink-0">
+              <Users className="w-5 h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold truncate">User Management</h1>
+              <p className="text-xs text-muted-foreground">Manage user plans and permissions</p>
             </div>
           </div>
-          <Badge variant="outline" className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border-green-500/20">
+          <Badge variant="outline" className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border-green-500/20 flex-shrink-0 self-start sm:self-auto">
             <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs font-medium text-green-700 dark:text-green-400">Live Updates</span>
+            <span className="text-xs font-medium text-green-700 dark:text-green-400">Live</span>
           </Badge>
         </div>
       </div>
 
-      <div className="p-4 lg:p-6 space-y-6 animate-fade-in">
+      <div className="p-4 lg:p-6 space-y-6 animate-fade-in overflow-x-hidden">
             {error && (
               <Card className="border-destructive bg-destructive/5">
                 <CardContent className="pt-6">

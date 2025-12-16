@@ -363,8 +363,8 @@ export default function AdminEnterpriseBilling() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Button
