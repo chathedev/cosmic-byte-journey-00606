@@ -8,6 +8,9 @@ const WEB_APP_URL = 'https://app.tivly.se';
 // Key for tracking if first meeting email was sent
 const FIRST_MEETING_EMAIL_SENT_KEY = 'tivly_first_meeting_email_sent';
 
+// Track which meetings have already had emails sent (prevent duplicates)
+const sentTranscriptionEmails = new Set<string>();
+
 export interface TranscriptionEmailData {
   userEmail: string;
   userName?: string;
@@ -23,6 +26,15 @@ export interface FeedbackEmailData {
 }
 
 export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailData): Promise<boolean> {
+  // Prevent duplicate emails for the same meeting
+  if (sentTranscriptionEmails.has(data.meetingId)) {
+    console.log('📧 Email already sent for meeting:', data.meetingId, '- skipping');
+    return false;
+  }
+  
+  // Mark as sent immediately to prevent race conditions
+  sentTranscriptionEmails.add(data.meetingId);
+  
   try {
     console.log('📧 Sending transcription complete email to:', data.userEmail);
     
@@ -81,13 +93,15 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
     
     if (!response.ok || !result.ok) {
       console.error('❌ Failed to send transcription email:', response.status, result.message || result);
+      sentTranscriptionEmails.delete(data.meetingId); // Allow retry on failure
       return false;
     }
 
-    console.log('✅ Transcription complete email sent successfully');
+    console.log('✅ Transcription complete email sent successfully for:', data.meetingTitle);
     return true;
   } catch (error) {
     console.error('❌ Error sending transcription email:', error);
+    sentTranscriptionEmails.delete(data.meetingId); // Allow retry on failure
     return false;
   }
 }
