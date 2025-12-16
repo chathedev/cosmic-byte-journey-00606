@@ -10,8 +10,6 @@ import { toast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Bug } from "lucide-react";
-import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -215,186 +213,6 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Global Dev Button Component - always visible on iOS app, or for specific user on web
-const GlobalDevButton = () => {
-  const { user } = useAuth();
-  const { userPlan } = useSubscription();
-  const [logs, setLogs] = useState<string[]>([]);
-  const [errors, setErrors] = useState<string[]>([]);
-  const isIos = isIosApp();
-
-  // Show on iOS app always, or for specific email on web
-  const allowedEmail = 'charlie.wretling@icloud.com';
-  const isAllowed = isIos || user?.email?.toLowerCase() === allowedEmail.toLowerCase();
-
-  // Buffers must live outside console overrides (and updates must be deferred)
-  const logBufferRef = useRef<string[]>([]);
-  const errorBufferRef = useRef<string[]>([]);
-  const flushTimerRef = useRef<number | null>(null);
-
-  const scheduleFlush = () => {
-    if (flushTimerRef.current != null) return;
-    flushTimerRef.current = window.setTimeout(() => {
-      flushTimerRef.current = null;
-      // Update React state outside the console.* call stack (prevents render loops)
-      setLogs([...logBufferRef.current]);
-      setErrors([...errorBufferRef.current]);
-    }, 50);
-  };
-
-  // Capture console logs and errors (only when the button is actually allowed)
-  useEffect(() => {
-    if (!isAllowed) return;
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    console.log = (...args: any[]) => {
-      try {
-        const message = args
-          .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
-          .join(' ');
-        logBufferRef.current.push(`[LOG] ${new Date().toISOString()} - ${message}`);
-        if (logBufferRef.current.length > 100) logBufferRef.current.shift();
-        scheduleFlush();
-      } catch {
-        // Ignore stringify issues (e.g. circular structures)
-      }
-      originalLog.apply(console, args);
-    };
-
-    console.error = (...args: any[]) => {
-      try {
-        const message = args
-          .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
-          .join(' ');
-        errorBufferRef.current.push(`[ERROR] ${new Date().toISOString()} - ${message}`);
-        if (errorBufferRef.current.length > 50) errorBufferRef.current.shift();
-        scheduleFlush();
-      } catch {
-        // Ignore stringify issues
-      }
-      originalError.apply(console, args);
-    };
-
-    console.warn = (...args: any[]) => {
-      try {
-        const message = args
-          .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
-          .join(' ');
-        errorBufferRef.current.push(`[WARN] ${new Date().toISOString()} - ${message}`);
-        if (errorBufferRef.current.length > 50) errorBufferRef.current.shift();
-        scheduleFlush();
-      } catch {
-        // Ignore stringify issues
-      }
-      originalWarn.apply(console, args);
-    };
-
-    return () => {
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
-      if (flushTimerRef.current != null) {
-        window.clearTimeout(flushTimerRef.current);
-        flushTimerRef.current = null;
-      }
-    };
-  }, [isAllowed]);
-
-  const handleDevClick = async () => {
-    // Haptic feedback immediately
-    try {
-      await Haptics.impact({ style: ImpactStyle.Heavy });
-    } catch {
-      // Haptics not available (web)
-    }
-
-    // Gather comprehensive debug info
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      session: {
-        platform: isIos ? 'iOS App (io.tivly.se)' : 'Web (app.tivly.se)',
-        hostname: window.location.hostname,
-        pathname: window.location.pathname,
-        userAgent: navigator.userAgent,
-        capacitor: typeof (window as any).Capacitor !== 'undefined',
-      },
-      user: {
-        email: user?.email || 'unknown',
-        plan: userPlan?.plan || 'unknown',
-        meetingsUsed: userPlan?.meetingsUsed || 0,
-        meetingsLimit: userPlan?.meetingsLimit || 0,
-      },
-      errors: errorBufferRef.current.slice(-20), // Last 20 errors
-      logs: logBufferRef.current.slice(-50), // Last 50 logs
-    };
-    
-    const formattedOutput = `
-=== TIVLY DEBUG INFO ===
-Timestamp: ${debugInfo.timestamp}
-
---- SESSION INFO ---
-Platform: ${debugInfo.session.platform}
-Hostname: ${debugInfo.session.hostname}
-Path: ${debugInfo.session.pathname}
-Capacitor: ${debugInfo.session.capacitor}
-
---- USER INFO ---
-Email: ${debugInfo.user.email}
-Plan: ${debugInfo.user.plan}
-Meetings: ${debugInfo.user.meetingsUsed}/${debugInfo.user.meetingsLimit}
-
---- ERRORS (Last 20) ---
-${debugInfo.errors.length > 0 ? debugInfo.errors.join('\n') : 'No errors recorded'}
-
---- LOGS (Last 50) ---
-${debugInfo.logs.length > 0 ? debugInfo.logs.join('\n') : 'No logs recorded'}
-
---- RAW DATA ---
-${JSON.stringify(debugInfo, null, 2)}
-`.trim();
-    
-    // Copy to clipboard
-    try {
-      await navigator.clipboard.writeText(formattedOutput);
-      // Success haptic
-      try {
-        await Haptics.notification({ type: 'SUCCESS' as any });
-      } catch {}
-      sonnerToast.success('Loggar kopierade! 📋', {
-        duration: 2000,
-        description: `${debugInfo.errors.length} fel, ${debugInfo.logs.length} loggar`,
-      });
-    } catch (err) {
-      // Error haptic
-      try {
-        await Haptics.notification({ type: 'ERROR' as any });
-      } catch {}
-      sonnerToast.error('Kunde inte kopiera', {
-        description: 'Se konsolen för info',
-      });
-      console.log('🔧 DEBUG INFO:', formattedOutput);
-    }
-  };
-
-  // Don't render if not allowed
-  if (!isAllowed) {
-    return null;
-  }
-
-  return (
-    <button
-      onClick={handleDevClick}
-      type="button"
-      className="fixed bottom-24 right-4 z-[99999] h-16 w-16 rounded-full shadow-2xl bg-red-500 hover:bg-red-600 border-4 border-white flex items-center justify-center pointer-events-auto touch-manipulation cursor-pointer"
-      style={{ WebkitTapHighlightColor: 'transparent' }}
-    >
-      <Bug className="h-8 w-8 text-white" />
-    </button>
-  );
-};
 
 
 // Trial Overlay Component - checks enterprise trial status
@@ -477,7 +295,6 @@ const AppContent = () => {
       <ScrollToTop />
       <PreserveAppParam />
       <AuthRedirectHandler />
-      <GlobalDevButton />
       <MaintenanceOverlay />
       <SupportBanner />
       <EnterpriseTrialCheck />
