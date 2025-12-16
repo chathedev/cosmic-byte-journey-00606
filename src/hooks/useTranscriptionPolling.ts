@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment } from '@/lib/asrService';
 import { meetingStorage } from '@/utils/meetingStorage';
 
 const POLL_INTERVAL_MS = 4000; // Poll every 4 seconds
@@ -7,6 +7,7 @@ const MAX_POLL_ATTEMPTS = 450; // Max ~30 minutes
 
 export interface TranscriptionState {
   status: 'idle' | 'uploading' | 'processing' | 'done' | 'failed';
+  stage?: ASRStage; // More granular stage from backend
   progress: number;
   transcript: string | null;
   transcriptSegments: TranscriptSegment[] | null;
@@ -51,6 +52,7 @@ export function useTranscriptionPolling(
       ...prev,
       [meetingId]: {
         status: 'processing',
+        stage: 'uploading',
         progress: 10,
         transcript: null,
         transcriptSegments: null,
@@ -125,7 +127,7 @@ export function useTranscriptionPolling(
           return;
         }
 
-        // Update progress
+        // Update progress with stage info
         const progressEstimate = Math.min(
           90,
           20 + (attemptsRef.current[meetingId] * 2)
@@ -135,7 +137,8 @@ export function useTranscriptionPolling(
           ...prev,
           [meetingId]: {
             ...prev[meetingId],
-            status: asrStatus.status === 'queued' ? 'processing' : 'processing',
+            status: 'processing',
+            stage: asrStatus.stage || (asrStatus.status === 'queued' ? 'uploading' : 'transcribing'),
             progress: asrStatus.progress || progressEstimate,
           }
         }));

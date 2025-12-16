@@ -93,6 +93,7 @@ const MeetingDetail = () => {
   const [meeting, setMeeting] = useState<MeetingSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<'uploading' | 'processing' | 'done' | 'failed' | null>(null);
+  const [stage, setStage] = useState<'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
   const [sisSpeakers, setSisSpeakers] = useState<SISSpeaker[]>([]);
@@ -111,23 +112,60 @@ const MeetingDetail = () => {
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
 
-  // Friendly waiting messages based on elapsed time
+  // Friendly waiting messages based on stage and elapsed time
   const getWaitingMessage = () => {
-    if (status === 'uploading') {
+    if (status === 'uploading' || stage === 'uploading') {
       return {
         title: 'Skickar till servern...',
         subtitle: 'Vänta medan filen laddas upp'
       };
     }
     
+    if (stage === 'transcribing') {
+      if (elapsedSeconds < 30) {
+        return {
+          title: 'Transkriberar ljud...',
+          subtitle: 'AI analyserar ditt möte'
+        };
+      } else if (elapsedSeconds < 60) {
+        return {
+          title: 'Bearbetar ljudet...',
+          subtitle: 'Längre möten tar lite extra tid'
+        };
+      } else if (elapsedSeconds < 120) {
+        return {
+          title: 'Nästan klart...',
+          subtitle: 'Ta en kopp kaffe medan du väntar ☕'
+        };
+      } else if (elapsedSeconds < 180) {
+        return {
+          title: 'Fortfarande igång...',
+          subtitle: 'Långa möten kräver mer processorkraft'
+        };
+      } else {
+        return {
+          title: 'Bearbetar stort möte...',
+          subtitle: 'Detta kan ta upp till 5 minuter för längre inspelningar'
+        };
+      }
+    }
+    
+    if (stage === 'sis_processing') {
+      return {
+        title: 'Identifierar talare...',
+        subtitle: 'Analyserar röster i mötet'
+      };
+    }
+    
+    // Fallback for processing without stage
     if (elapsedSeconds < 30) {
       return {
-        title: 'Transkriberar ljud...',
+        title: 'Bearbetar...',
         subtitle: 'AI analyserar ditt möte'
       };
     } else if (elapsedSeconds < 60) {
       return {
-        title: 'Bearbetar mötet...',
+        title: 'Analyserar mötet...',
         subtitle: 'Längre möten tar lite extra tid'
       };
     } else if (elapsedSeconds < 120) {
@@ -135,20 +173,10 @@ const MeetingDetail = () => {
         title: 'Nästan klart...',
         subtitle: 'Ta en kopp kaffe medan du väntar ☕'
       };
-    } else if (elapsedSeconds < 180) {
-      return {
-        title: 'Fortfarande igång...',
-        subtitle: 'Långa möten kräver mer processorkraft'
-      };
-    } else if (elapsedSeconds < 240) {
-      return {
-        title: 'Hög belastning just nu...',
-        subtitle: 'Tack för ditt tålamod! Snart klart.'
-      };
     } else {
       return {
-        title: 'Bearbetar stort möte...',
-        subtitle: 'Detta kan ta upp till 5 minuter för längre inspelningar'
+        title: 'Hög belastning...',
+        subtitle: 'Tack för ditt tålamod! Snart klart.'
       };
     }
   };
@@ -346,6 +374,11 @@ const MeetingDetail = () => {
             variant: 'destructive',
           });
           return;
+        }
+
+        // Update stage while still processing
+        if (asrStatus.stage) {
+          setStage(asrStatus.stage);
         }
       } catch (e) {
         // Continue polling silently

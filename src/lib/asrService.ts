@@ -126,8 +126,12 @@ export interface SISLearningEntry {
   updated?: boolean;
 }
 
+// Backend stage values for detailed progress tracking
+export type ASRStage = 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error';
+
 export interface ASRStatus {
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
+  stage?: ASRStage; // More granular stage from backend
   progress?: number;
   transcript?: string;
   transcriptSegments?: TranscriptSegment[];
@@ -343,6 +347,7 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     
     return {
       status: data.status || 'queued',
+      stage: data.stage as ASRStage | undefined,
       progress: data.progress,
       transcript: data.transcript,
       transcriptSegments: data.transcriptSegments,

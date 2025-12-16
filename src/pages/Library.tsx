@@ -296,6 +296,15 @@ const Library = () => {
           return;
         }
 
+        // Update stage while still processing
+        if (asrStatus.stage) {
+          setMeetings(prev => prev.map(m => 
+            m.id === currentPendingId 
+              ? { ...m, transcriptionStage: asrStatus.stage } 
+              : m
+          ));
+        }
+
         // Also check meeting data directly as backup
         const meeting = await meetingStorage.getMeeting(currentPendingId);
         
@@ -1052,6 +1061,7 @@ const Library = () => {
                       <TranscriptionStatusWidget
                         meetingId={meeting.id}
                         status={meeting.transcriptionStatus === 'uploading' ? 'uploading' : 'processing'}
+                        stage={meeting.transcriptionStage}
                         meetingTitle={meeting.title}
                         onComplete={() => {
                           // Reload meeting data when complete

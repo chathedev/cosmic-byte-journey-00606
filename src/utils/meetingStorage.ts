@@ -34,6 +34,7 @@ export interface MeetingSession {
   agendaId?: string;
   source?: 'live' | 'upload'; // Indikerar om mötet är från live-inspelning eller uppladdad fil
   transcriptionStatus?: 'uploading' | 'processing' | 'done' | 'failed'; // Status för transkribering
+  transcriptionStage?: 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error'; // More granular stage from backend
 }
 
 export interface MeetingFolder {
