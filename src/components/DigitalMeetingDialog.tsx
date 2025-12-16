@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { useNavigate } from "react-router-dom";
 
 interface DigitalMeetingDialogProps {
@@ -98,7 +97,7 @@ export const DigitalMeetingDialog = ({
     const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
     const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
     
-    console.log('📤 Starting instant upload flow');
+    console.log('📤 Starting upload flow - POST to /transcribe first');
     console.log('  - File:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     
     if (file.size < 1000) {
@@ -123,50 +122,48 @@ export const DigitalMeetingDialog = ({
     }
 
     try {
-      // Step 1: Create meeting - let backend generate ID (NEVER send client ID to avoid upsert)
-      const createResponse = await fetch('https://api.tivly.se/meetings', {
+      // Step 1: POST audio to /transcribe - backend generates meetingId
+      const formData = new FormData();
+      formData.append('audio', file);
+      formData.append('language', languageCode);
+      formData.append('title', meetingTitle);
+      
+      console.log('📤 Uploading to /asr/transcribe...');
+      
+      const transcribeResponse = await fetch('https://api.tivly.se/asr/transcribe', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          // DO NOT send id - let backend generate to ensure new meeting is ALWAYS created
-          title: meetingTitle,
-          transcript: '',
-          transcriptionStatus: 'uploading',
-          folder: 'general',
-          source: 'upload',
-          forceCreate: true, // Signal to backend this must be a new meeting
-        }),
+        body: formData,
       });
 
-      if (!createResponse.ok) {
-        throw new Error('Failed to create meeting');
+      if (!transcribeResponse.ok) {
+        const errorText = await transcribeResponse.text();
+        console.error('Transcribe error:', errorText);
+        throw new Error('Failed to start transcription');
       }
 
-      // Get the backend-generated meeting ID
-      const createResult = await createResponse.json();
-      const meetingId = createResult.meeting?.id || createResult.id;
+      // Get the server-generated meetingId from response
+      const transcribeResult = await transcribeResponse.json();
+      const meetingId = transcribeResult.meetingId || transcribeResult.meeting_id || transcribeResult.id;
       
       if (!meetingId) {
-        throw new Error('No meeting ID returned from backend');
+        console.error('No meetingId in response:', transcribeResult);
+        throw new Error('No meeting ID returned from transcription service');
       }
       
-      console.log('✅ NEW meeting created with backend ID:', meetingId);
+      console.log('✅ Transcription started with server-generated meetingId:', meetingId);
 
-      // Increment meeting count
+      // Step 2: Increment meeting count
       await incrementMeetingCount(meetingId);
-
-      // Step 2: Start background upload (non-blocking!)
-      startBackgroundUpload(file, meetingId, languageCode);
 
       // Step 3: Save pending meeting to sessionStorage for instant display
       const pendingMeeting = {
         id: meetingId,
         title: meetingTitle,
         transcript: '',
-        transcriptionStatus: 'uploading',
+        transcriptionStatus: 'processing',
         folder: 'general',
         source: 'upload',
         createdAt: new Date().toISOString(),
@@ -174,21 +171,21 @@ export const DigitalMeetingDialog = ({
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Step 4: Close dialog and redirect IMMEDIATELY
+      // Step 4: Close dialog and redirect
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
       
       toast({
-        title: 'Uppladdning startad',
-        description: 'Filen laddas upp i bakgrunden.',
+        title: 'Transkribering startad',
+        description: 'Din fil bearbetas nu.',
       });
 
-      // Redirect to meeting detail page
+      // Redirect to meeting detail page with server-generated meetingId
       navigate(`/meetings/${meetingId}`);
 
     } catch (error: any) {
-      console.error('Upload init error:', error);
+      console.error('Upload error:', error);
       setIsSubmitting(false);
       toast({
         title: "Något gick fel",
