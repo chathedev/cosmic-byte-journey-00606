@@ -385,15 +385,14 @@ ${JSON.stringify(debugInfo, null, 2)}
   }
 
   return (
-    <Button
+    <button
       onClick={handleDevClick}
-      size="icon"
-      variant="default"
-      className="fixed bottom-20 right-4 z-[9999] h-14 w-14 rounded-full shadow-2xl bg-primary hover:bg-primary/90 border-2 border-primary-foreground/20 hover:scale-110 active:scale-95 transition-transform"
-      title="Kopiera loggar"
+      type="button"
+      className="fixed bottom-24 right-4 z-[99999] h-16 w-16 rounded-full shadow-2xl bg-red-500 hover:bg-red-600 border-4 border-white flex items-center justify-center pointer-events-auto touch-manipulation cursor-pointer"
+      style={{ WebkitTapHighlightColor: 'transparent' }}
     >
-      <Bug className="h-6 w-6" />
-    </Button>
+      <Bug className="h-8 w-8 text-white" />
+    </button>
   );
 };
 
