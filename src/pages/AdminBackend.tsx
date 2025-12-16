@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers, Terminal, Search, Filter, X, Pause, Play } from "lucide-react";
+import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers, Terminal, Search, Filter, X, Pause, Play, ArrowDownToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
@@ -36,7 +36,9 @@ const AdminBackend = () => {
   const [logsLevel, setLogsLevel] = useState<string>('all');
   const [logsKeyword, setLogsKeyword] = useState<string>('');
   const [logsPaused, setLogsPaused] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
   const logsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const logsEndRef = useRef<HTMLDivElement | null>(null);
   
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -104,6 +106,13 @@ const AdminBackend = () => {
       }
     };
   }, [logsOpen, logsPaused, logsLevel, logsKeyword]);
+
+  // Auto-scroll to bottom when logs update
+  useEffect(() => {
+    if (autoScroll && logsEndRef.current && logsData?.lines?.length) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logsData, autoScroll]);
 
   const handleCleanup = async () => {
     setIsActionLoading('cleanup');
@@ -445,8 +454,18 @@ const AdminBackend = () => {
                         size="sm"
                         onClick={() => setLogsPaused(!logsPaused)}
                         className="h-7 w-7 p-0"
+                        title={logsPaused ? "Fortsätt" : "Pausa"}
                       >
                         {logsPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                      </Button>
+                      <Button
+                        variant={autoScroll ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setAutoScroll(!autoScroll)}
+                        className="h-7 w-7 p-0"
+                        title={autoScroll ? "Auto-scroll på" : "Auto-scroll av"}
+                      >
+                        <ArrowDownToLine className="w-3 h-3" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -523,6 +542,7 @@ const AdminBackend = () => {
                           {logsData?.message || 'Inga loggar hittades'}
                         </div>
                       )}
+                      <div ref={logsEndRef} />
                     </div>
                   </ScrollArea>
                   
