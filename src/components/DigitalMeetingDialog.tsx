@@ -96,12 +96,10 @@ export const DigitalMeetingDialog = ({
     
     const file = selectedFile;
     const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
-    const meetingId = crypto.randomUUID();
     const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
     
     console.log('📤 Starting instant upload flow');
     console.log('  - File:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
-    console.log('  - Meeting ID:', meetingId);
     
     if (file.size < 1000) {
       toast({
@@ -125,7 +123,7 @@ export const DigitalMeetingDialog = ({
     }
 
     try {
-      // Step 1: Create meeting placeholder FAST
+      // Step 1: Create meeting - let backend generate ID (NEVER send client ID to avoid upsert)
       const createResponse = await fetch('https://api.tivly.se/meetings', {
         method: 'POST',
         headers: {
@@ -133,18 +131,29 @@ export const DigitalMeetingDialog = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: meetingId,
+          // DO NOT send id - let backend generate to ensure new meeting is ALWAYS created
           title: meetingTitle,
           transcript: '',
           transcriptionStatus: 'uploading',
           folder: 'general',
           source: 'upload',
+          forceCreate: true, // Signal to backend this must be a new meeting
         }),
       });
 
       if (!createResponse.ok) {
         throw new Error('Failed to create meeting');
       }
+
+      // Get the backend-generated meeting ID
+      const createResult = await createResponse.json();
+      const meetingId = createResult.meeting?.id || createResult.id;
+      
+      if (!meetingId) {
+        throw new Error('No meeting ID returned from backend');
+      }
+      
+      console.log('✅ NEW meeting created with backend ID:', meetingId);
 
       // Increment meeting count
       await incrementMeetingCount(meetingId);
