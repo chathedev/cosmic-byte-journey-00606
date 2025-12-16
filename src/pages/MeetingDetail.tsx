@@ -206,12 +206,9 @@ const MeetingDetail = () => {
           setSisMatches(asrStatus.sisMatches || []);
           setStatus('done');
 
-          // Save transcript
-          try {
-            await apiClient.updateMeeting(id, { transcript: newTranscript });
-          } catch (e) {
-            console.error('Failed to save transcript:', e);
-          }
+          // Note: Transcript is already saved by backend via /asr endpoint
+          // No need to PUT to /meetings - the backend handles persistence
+          console.log('✅ Transcript received from backend - already persisted');
 
           // Send email notification
           if (user?.email) {
