@@ -235,10 +235,10 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
+            <Shield className="h-5 w-5 text-muted-foreground" />
             Support Panel
             {isSupportMode && timeRemaining !== null && (
-              <Badge variant="outline" className="ml-2 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+              <Badge variant="outline" className="ml-2">
                 <Clock className="h-3 w-3 mr-1" />
                 {formatTime(timeRemaining)}
               </Badge>
@@ -246,27 +246,20 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
           </DialogTitle>
           <DialogDescription>
             {isSupportMode 
-              ? `Läs-åtkomst till ${supportSession?.userEmail} - inga ändringar kan göras`
-              : "Ange en supportkod för att få tillfällig läs-åtkomst till en användares data"
+              ? `Läs-åtkomst till ${supportSession?.userEmail}`
+              : "Ange en supportkod för tillfällig läs-åtkomst"
             }
           </DialogDescription>
         </DialogHeader>
 
         {/* Support Mode Banner */}
         {isSupportMode && (
-          <div className="shrink-0 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-between">
+          <div className="shrink-0 px-4 py-2 bg-muted/50 border border-border rounded-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                Supportvy – endast läsläge
-              </span>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Supportvy – endast läsläge</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleExitSupportMode}
-              className="text-amber-700 dark:text-amber-400 hover:bg-amber-500/20"
-            >
+            <Button variant="ghost" size="sm" onClick={handleExitSupportMode}>
               <LogOut className="h-4 w-4 mr-1" />
               Avsluta
             </Button>
