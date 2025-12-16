@@ -79,11 +79,7 @@ export const TranscriptionStatusWidget = ({
   }
 
   const getStatusText = () => {
-    // Use stage for more accurate status
-    if (status === 'uploading' || stage === 'uploading') {
-      return 'Skickar till servern...';
-    }
-    
+    // PRIORITY: Use stage from backend for accurate status (stage is more reliable than status)
     if (stage === 'transcribing') {
       if (elapsedSeconds < 30) {
         return 'Transkriberar...';
@@ -100,6 +96,16 @@ export const TranscriptionStatusWidget = ({
     
     if (stage === 'sis_processing') {
       return 'Identifierar talare...';
+    }
+    
+    // Only show uploading if stage explicitly says uploading (not just status)
+    if (stage === 'uploading') {
+      return 'Skickar till servern...';
+    }
+    
+    // Fallback for uploading status without stage
+    if (status === 'uploading') {
+      return 'Laddar upp...';
     }
     
     // Fallback for processing without stage
