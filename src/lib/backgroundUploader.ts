@@ -167,17 +167,9 @@ async function executeUpload(meetingId: string): Promise<void> {
     upload.error = error.message || 'Upload failed after retries';
     notifyListeners(meetingId, upload);
     
-    // Update meeting status in backend
-    try {
-      await fetch(`${BACKEND_API_URL}/meetings/${meetingId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ transcriptionStatus: 'failed' }),
-      });
-    } catch { /* ignore */ }
+    // Note: Don't try to PUT to /meetings/{id} - meeting may not exist yet
+    // The backend handles error states via /asr/status endpoint
+    console.error('Upload failed for meeting:', meetingId);
   }
 }
 

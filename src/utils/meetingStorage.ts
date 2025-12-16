@@ -324,6 +324,16 @@ export const meetingStorage = {
       const { meetings } = await apiClient.getMeetings();
       const current = (meetings || []).find((m: any) => String(m.id) === String(meetingId));
       
+      // If meeting doesn't exist in /meetings yet (new from /transcribe), 
+      // it's a new meeting that should be counted
+      if (!current) {
+        console.log('📊 Meeting not in /meetings yet (new from /transcribe):', meetingId);
+        // Mark as counted locally - the backend will handle counting via /transcribe
+        localStorage.setItem(cacheKey, 'true');
+        sessionStorage.removeItem(lockKey);
+        return true; // It's a new meeting, should be counted
+      }
+      
       if (current?.counted) {
         console.log('⏭️ Meeting already marked as counted (backend verified):', meetingId);
         localStorage.setItem(cacheKey, 'true'); // Cache the result
@@ -333,9 +343,14 @@ export const meetingStorage = {
       
       console.log('📊 Backend confirms meeting NOT counted yet:', meetingId);
       
-      // Atomically mark as counted in backend
-      await apiClient.updateMeeting(meetingId, { counted: true });
-      console.log('✅ Successfully marked meeting as counted in backend:', meetingId);
+      // Try to mark as counted - gracefully handle 404 (meeting might be managed by /transcribe)
+      try {
+        await apiClient.updateMeeting(meetingId, { counted: true });
+        console.log('✅ Successfully marked meeting as counted in backend:', meetingId);
+      } catch (updateError: any) {
+        // If 404, meeting might be managed by /transcribe - that's OK
+        console.warn('Could not update meeting counted status (may be /transcribe meeting):', updateError);
+      }
       
       // CACHE THE RESULT - this meeting is now counted forever
       localStorage.setItem(cacheKey, 'true');
