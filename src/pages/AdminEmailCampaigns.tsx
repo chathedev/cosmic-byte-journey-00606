@@ -120,8 +120,8 @@ export default function AdminEmailCampaigns() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
@@ -221,7 +221,7 @@ export default function AdminEmailCampaigns() {
                         )}
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1 flex-wrap">
                           <Button size="sm" variant="ghost" onClick={() => setPreviewDialog({ open: true, campaignId: campaign.id })}>
                             <Eye className="w-4 h-4" />
                           </Button>
