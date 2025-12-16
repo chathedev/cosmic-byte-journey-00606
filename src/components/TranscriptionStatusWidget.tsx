@@ -49,9 +49,20 @@ export const TranscriptionStatusWidget = ({
     );
   }
 
+  const getStatusText = () => {
+    switch (status) {
+      case 'uploading':
+        return 'Skickar till servern...';
+      case 'processing':
+        return 'Transkriberar ljud...';
+      default:
+        return 'Bearbetar...';
+    }
+  };
+
   return (
     <span className="text-xs text-muted-foreground">
-      {status === 'uploading' ? 'Laddar upp...' : 'Transkriberar...'}
+      {getStatusText()}
     </span>
   );
 };
