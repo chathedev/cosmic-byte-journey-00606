@@ -482,12 +482,12 @@ const MeetingDetail = () => {
                         </div>
                         <div className="text-center space-y-1">
                           <p className="font-medium">
-                            {status === 'uploading' ? 'Laddar upp...' : 'Transkriberar...'}
+                            {status === 'uploading' ? 'Skickar till servern...' : 'Transkriberar ljud...'}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {status === 'uploading' 
-                              ? 'Filen skickas till servern'
-                              : 'AI analyserar ditt möte'}
+                              ? 'Vänta medan filen laddas upp'
+                              : 'AI analyserar och transkriberar ditt möte'}
                           </p>
                         </div>
                         <div className="flex gap-1">
