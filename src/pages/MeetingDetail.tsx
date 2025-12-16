@@ -113,14 +113,9 @@ const MeetingDetail = () => {
   const transcriptionDoneRef = useRef(false);
 
   // Friendly waiting messages based on stage and elapsed time
+  // PRIORITY: stage from backend is more accurate than status
   const getWaitingMessage = () => {
-    if (status === 'uploading' || stage === 'uploading') {
-      return {
-        title: 'Skickar till servern...',
-        subtitle: 'Vänta medan filen laddas upp'
-      };
-    }
-    
+    // Check stage FIRST (more accurate from backend)
     if (stage === 'transcribing') {
       if (elapsedSeconds < 30) {
         return {
@@ -154,6 +149,22 @@ const MeetingDetail = () => {
       return {
         title: 'Identifierar talare...',
         subtitle: 'Analyserar röster i mötet'
+      };
+    }
+    
+    // Only show uploading message if stage explicitly says uploading
+    if (stage === 'uploading') {
+      return {
+        title: 'Skickar till servern...',
+        subtitle: 'Vänta medan filen laddas upp'
+      };
+    }
+    
+    // Fallback for uploading status without stage
+    if (status === 'uploading') {
+      return {
+        title: 'Laddar upp...',
+        subtitle: 'Skickar filen till servern'
       };
     }
     
