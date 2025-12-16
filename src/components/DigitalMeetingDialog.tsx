@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, FileAudio, X, AlertCircle, Lock } from "lucide-react";
+import { Upload, FileAudio, X, AlertCircle, Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -300,7 +300,11 @@ export const DigitalMeetingDialog = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <FileAudio className="w-5 h-5 text-primary" />
+                    {isSubmitting ? (
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    ) : (
+                      <FileAudio className="w-5 h-5 text-primary" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
@@ -321,6 +325,13 @@ export const DigitalMeetingDialog = ({
                   </Button>
                 )}
               </div>
+              {isSubmitting && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-sm text-muted-foreground text-center">
+                    Laddar upp till servern... Detta kan ta en stund för större filer.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -337,8 +348,17 @@ export const DigitalMeetingDialog = ({
               onClick={handleUpload}
               disabled={!selectedFile || isSubmitting}
             >
-              <Upload className="mr-2 h-4 w-4" />
-              {isSubmitting ? 'Laddar upp...' : 'Ladda upp'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Skickar...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Ladda upp
+                </>
+              )}
             </Button>
           </div>
         </div>
