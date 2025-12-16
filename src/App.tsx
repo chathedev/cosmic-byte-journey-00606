@@ -226,42 +226,68 @@ const GlobalDevButton = () => {
   const allowedEmail = 'charlie.wretling@icloud.com';
   const isAllowed = isIos || user?.email?.toLowerCase() === allowedEmail.toLowerCase();
 
-  // Capture console logs and errors
+  // Buffers must live outside console overrides (and updates must be deferred)
+  const logBufferRef = useRef<string[]>([]);
+  const errorBufferRef = useRef<string[]>([]);
+  const flushTimerRef = useRef<number | null>(null);
+
+  const scheduleFlush = () => {
+    if (flushTimerRef.current != null) return;
+    flushTimerRef.current = window.setTimeout(() => {
+      flushTimerRef.current = null;
+      // Update React state outside the console.* call stack (prevents render loops)
+      setLogs([...logBufferRef.current]);
+      setErrors([...errorBufferRef.current]);
+    }, 50);
+  };
+
+  // Capture console logs and errors (only when the button is actually allowed)
   useEffect(() => {
+    if (!isAllowed) return;
+
     const originalLog = console.log;
     const originalError = console.error;
     const originalWarn = console.warn;
 
-    const logBuffer: string[] = [];
-    const errorBuffer: string[] = [];
-
     console.log = (...args: any[]) => {
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
-      logBuffer.push(`[LOG] ${new Date().toISOString()} - ${message}`);
-      if (logBuffer.length > 100) logBuffer.shift();
-      setLogs([...logBuffer]);
+      try {
+        const message = args
+          .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
+          .join(' ');
+        logBufferRef.current.push(`[LOG] ${new Date().toISOString()} - ${message}`);
+        if (logBufferRef.current.length > 100) logBufferRef.current.shift();
+        scheduleFlush();
+      } catch {
+        // Ignore stringify issues (e.g. circular structures)
+      }
       originalLog.apply(console, args);
     };
 
     console.error = (...args: any[]) => {
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
-      errorBuffer.push(`[ERROR] ${new Date().toISOString()} - ${message}`);
-      if (errorBuffer.length > 50) errorBuffer.shift();
-      setErrors([...errorBuffer]);
+      try {
+        const message = args
+          .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
+          .join(' ');
+        errorBufferRef.current.push(`[ERROR] ${new Date().toISOString()} - ${message}`);
+        if (errorBufferRef.current.length > 50) errorBufferRef.current.shift();
+        scheduleFlush();
+      } catch {
+        // Ignore stringify issues
+      }
       originalError.apply(console, args);
     };
 
     console.warn = (...args: any[]) => {
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
-      errorBuffer.push(`[WARN] ${new Date().toISOString()} - ${message}`);
-      if (errorBuffer.length > 50) errorBuffer.shift();
-      setErrors([...errorBuffer]);
+      try {
+        const message = args
+          .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
+          .join(' ');
+        errorBufferRef.current.push(`[WARN] ${new Date().toISOString()} - ${message}`);
+        if (errorBufferRef.current.length > 50) errorBufferRef.current.shift();
+        scheduleFlush();
+      } catch {
+        // Ignore stringify issues
+      }
       originalWarn.apply(console, args);
     };
 
@@ -269,9 +295,13 @@ const GlobalDevButton = () => {
       console.log = originalLog;
       console.error = originalError;
       console.warn = originalWarn;
+      if (flushTimerRef.current != null) {
+        window.clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
     };
-  }, []);
-  
+  }, [isAllowed]);
+
   const handleDevClick = async () => {
     // Gather comprehensive debug info
     const debugInfo = {
