@@ -122,16 +122,19 @@ export const DigitalMeetingDialog = ({
     }
 
     try {
-      // Step 1: POST audio to /transcribe - backend generates meetingId
+      // Step 1: POST audio to /transcribe - backend creates the meeting + returns server-generated meetingId
+      // IMPORTANT: Do NOT call /asr/transcribe directly from the browser (that may not persist a meeting record).
       const formData = new FormData();
-      formData.append('audio', file);
+      formData.append('audioFile', file, file.name);
+      formData.append('file', file, file.name); // backward-compat field name
       formData.append('language', languageCode);
-      formData.append('title', meetingTitle);
-      
-      console.log('📤 Uploading to /asr/transcribe...');
-      
-      const transcribeResponse = await fetch('https://api.tivly.se/asr/transcribe', {
+      formData.append('meetingTitle', meetingTitle);
+
+      console.log('📤 Uploading to /transcribe (creates meeting in backend)...');
+
+      const transcribeResponse = await fetch('https://api.tivly.se/transcribe', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
