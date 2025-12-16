@@ -14,7 +14,7 @@ interface User {
   uid: string; // Alias for id to maintain compatibility
   email: string;
   displayName?: string;
-  preferredName?: string | null; // Enterprise-only display name
+  preferredName?: string | null; // Display name for all users
   photoURL?: string | null;
   emailVerified: boolean;
   providerData?: any[];
@@ -2101,7 +2101,7 @@ class ApiClient {
 
     return response.json();
   }
-  // Update preferred name (enterprise-only)
+  // Update preferred name (all plans)
   async updatePreferredName(preferredName: string | null): Promise<{ preferredName: string | null }> {
     const response = await this.fetchWithAuth('/me/preferred-name', {
       method: 'PUT',
@@ -2110,11 +2110,6 @@ class ApiClient {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      if (response.status === 403) {
-        throw new Error(errorData.code === 'enterprise_only' 
-          ? 'Denna funktion är endast tillgänglig för enterprise-användare' 
-          : errorData.message || 'Åtkomst nekad');
-      }
       throw new Error(errorData.message || errorData.error || 'Kunde inte uppdatera visningsnamn');
     }
     

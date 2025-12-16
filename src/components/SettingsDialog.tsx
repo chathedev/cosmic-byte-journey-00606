@@ -59,7 +59,7 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
   const [isDowngrading, setIsDowngrading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
-  // Preferred name editing (enterprise-only)
+  // Preferred name editing (all plans)
   const [preferredName, setPreferredName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   
