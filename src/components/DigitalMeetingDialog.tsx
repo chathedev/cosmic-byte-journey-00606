@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { apiClient } from "@/lib/api";
+
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -154,29 +154,12 @@ export const DigitalMeetingDialog = ({
         throw new Error('No meeting ID returned from transcription service');
       }
       
-      console.log('✅ Transcription started with server-generated meetingId:', meetingId);
+      console.log('✅ Transcription started - backend created meeting with ID:', meetingId);
 
-      // Step 2: CRITICAL - Create/save the meeting record in backend via PUT /meetings/{meetingId}
-      // Use PUT (not POST) so we use the SAME meetingId from /asr/transcribe
-      console.log('📤 Step 2: Saving meeting record with ID:', meetingId);
-      try {
-        await apiClient.updateMeeting(meetingId, {
-          title: meetingTitle,
-          transcript: '', // Will be updated when transcription completes
-          folder: 'Allmänt',
-          isCompleted: false,
-          source: 'upload',
-        });
-        console.log('✅ Meeting record saved in backend with ID:', meetingId);
-      } catch (saveErr: any) {
-        // If 404, backend doesn't support upsert - log but continue
-        console.warn('⚠️ Could not save meeting record:', saveErr.message);
-      }
-
-      // Step 3: Increment meeting count
+      // Step 2: Increment meeting count (backend already created the meeting record)
       await incrementMeetingCount(meetingId);
 
-      // Step 4: Save pending meeting to sessionStorage for instant display
+      // Step 3: Save pending meeting to sessionStorage for instant display
       const pendingMeeting = {
         id: meetingId,
         title: meetingTitle,
@@ -189,7 +172,7 @@ export const DigitalMeetingDialog = ({
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Step 5: Close dialog and redirect
+      // Step 4: Close dialog and redirect
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
