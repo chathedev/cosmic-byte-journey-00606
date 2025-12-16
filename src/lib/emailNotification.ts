@@ -8,8 +8,44 @@ const WEB_APP_URL = 'https://app.tivly.se';
 // Key for tracking if first meeting email was sent
 const FIRST_MEETING_EMAIL_SENT_KEY = 'tivly_first_meeting_email_sent';
 
-// Track which meetings have already had emails sent (prevent duplicates)
-const sentTranscriptionEmails = new Set<string>();
+// Key for tracking sent transcription emails (persisted in localStorage)
+const SENT_TRANSCRIPTION_EMAILS_KEY = 'tivly_sent_transcription_emails';
+
+// Get sent emails from localStorage
+function getSentTranscriptionEmails(): Set<string> {
+  try {
+    const stored = localStorage.getItem(SENT_TRANSCRIPTION_EMAILS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Clean up old entries (keep only last 100 to prevent localStorage bloat)
+      if (Array.isArray(parsed) && parsed.length > 100) {
+        const trimmed = parsed.slice(-100);
+        localStorage.setItem(SENT_TRANSCRIPTION_EMAILS_KEY, JSON.stringify(trimmed));
+        return new Set(trimmed);
+      }
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    }
+  } catch (e) {
+    console.error('Failed to parse sent emails from localStorage:', e);
+  }
+  return new Set();
+}
+
+// Mark email as sent in localStorage
+function markEmailSent(meetingId: string): void {
+  try {
+    const sent = getSentTranscriptionEmails();
+    sent.add(meetingId);
+    localStorage.setItem(SENT_TRANSCRIPTION_EMAILS_KEY, JSON.stringify([...sent]));
+  } catch (e) {
+    console.error('Failed to save sent email to localStorage:', e);
+  }
+}
+
+// Check if email was already sent
+function wasEmailSent(meetingId: string): boolean {
+  return getSentTranscriptionEmails().has(meetingId);
+}
 
 export interface TranscriptionEmailData {
   userEmail: string;
@@ -26,14 +62,14 @@ export interface FeedbackEmailData {
 }
 
 export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailData): Promise<boolean> {
-  // Prevent duplicate emails for the same meeting
-  if (sentTranscriptionEmails.has(data.meetingId)) {
-    console.log('📧 Email already sent for meeting:', data.meetingId, '- skipping');
+  // Prevent duplicate emails for the same meeting (check localStorage)
+  if (wasEmailSent(data.meetingId)) {
+    console.log('📧 Email already sent for meeting:', data.meetingId, '- skipping (localStorage)');
     return false;
   }
   
   // Mark as sent immediately to prevent race conditions
-  sentTranscriptionEmails.add(data.meetingId);
+  markEmailSent(data.meetingId);
   
   try {
     console.log('📧 Sending transcription complete email to:', data.userEmail);
@@ -93,7 +129,8 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
     
     if (!response.ok || !result.ok) {
       console.error('❌ Failed to send transcription email:', response.status, result.message || result);
-      sentTranscriptionEmails.delete(data.meetingId); // Allow retry on failure
+      // Note: We don't remove from localStorage on failure to prevent spam retries
+      // User can clear localStorage manually if needed
       return false;
     }
 
@@ -101,7 +138,7 @@ export async function sendTranscriptionCompleteEmail(data: TranscriptionEmailDat
     return true;
   } catch (error) {
     console.error('❌ Error sending transcription email:', error);
-    sentTranscriptionEmails.delete(data.meetingId); // Allow retry on failure
+    // Note: We don't remove from localStorage on failure to prevent spam retries
     return false;
   }
 }
