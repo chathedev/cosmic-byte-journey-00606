@@ -125,13 +125,15 @@ export const AutoProtocolGenerator = ({
         return;
       }
       
-      // Slower, smoother progress animation
+      // Smooth, steady progress animation
       const progressInterval = setInterval(() => {
         setProgress(prev => {
-          if (prev >= 85) return prev;
-          return prev + Math.random() * 2;
+          if (prev >= 92) return prev; // Cap at 92% until complete
+          // Smooth incremental increase with slight variance
+          const increment = 0.8 + Math.random() * 0.6;
+          return Math.min(prev + increment, 92);
         });
-      }, 300);
+      }, 200);
 
       try {
         // Build speaker-attributed transcript if SIS data available
@@ -311,11 +313,21 @@ export const AutoProtocolGenerator = ({
           throw new Error("AI kunde inte generera huvudpunkter. Försök igen.");
         }
         
-        // Complete progress
+        // Complete progress smoothly
         clearInterval(progressInterval);
+        // Animate from current to 100 smoothly
+        const animateToComplete = () => {
+          setProgress(prev => {
+            if (prev >= 100) return 100;
+            return Math.min(prev + 2, 100);
+          });
+        };
+        const completeInterval = setInterval(animateToComplete, 30);
+        await new Promise(resolve => setTimeout(resolve, 250));
+        clearInterval(completeInterval);
         setProgress(100);
         
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         console.log("📝 Setting generated protocol with summary:", data.summary.substring(0, 100));
         setGeneratedProtocol(data);
