@@ -40,7 +40,7 @@ export const DigitalMeetingDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
+  const { userPlan, isAdmin } = useSubscription();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -156,43 +156,7 @@ export const DigitalMeetingDialog = ({
       
       console.log('✅ Upload complete - meetingId:', meetingId);
 
-      // Step 2: Poll status until we confirm transcription has started (status = transcribing/processing)
-      console.log('🔍 Checking transcription status...');
-      let statusConfirmed = false;
-      for (let i = 0; i < 5; i++) {
-        try {
-          const statusResponse = await fetch(`https://api.tivly.se/asr/status/${meetingId}`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            console.log('📊 Status check:', statusData.status);
-            
-            // If status shows transcribing, processing, or done - upload is complete!
-            if (statusData.status === 'transcribing' || statusData.status === 'processing' || statusData.status === 'done') {
-              statusConfirmed = true;
-              console.log('✅ Transcription confirmed started, redirecting immediately');
-              break;
-            }
-          }
-        } catch (statusErr) {
-          console.log('Status check attempt failed, continuing...');
-        }
-        
-        // Brief wait before next check
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      // Step 3: Increment meeting count
-      await incrementMeetingCount(meetingId);
-
-      // Step 4: Save pending meeting to sessionStorage for instant display
+      // Save pending meeting to sessionStorage for instant display on meeting page
       const pendingMeeting = {
         id: meetingId,
         title: meetingTitle,
@@ -205,18 +169,18 @@ export const DigitalMeetingDialog = ({
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Step 5: Close dialog and redirect IMMEDIATELY
+      // Close dialog and redirect immediately (do not wait for any extra checks)
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
-      
+
       toast({
-        title: 'Transkribering startad',
-        description: 'Din fil bearbetas nu.',
+        title: 'Uppladdning klar',
+        description: 'Transkribering startad.',
       });
 
-      // Redirect to meeting detail page immediately
       navigate(`/meetings/${meetingId}`);
+
 
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -374,7 +338,7 @@ export const DigitalMeetingDialog = ({
               disabled={!selectedFile || isSubmitting}
             >
               <Upload className="mr-2 h-4 w-4" />
-              {isSubmitting ? 'Startar...' : 'Ladda upp'}
+              {isSubmitting ? 'Laddar upp...' : 'Ladda upp'}
             </Button>
           </div>
         </div>
