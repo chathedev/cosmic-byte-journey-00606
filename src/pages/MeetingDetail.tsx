@@ -51,7 +51,7 @@ const MeetingDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userPlan } = useSubscription();
+  const { userPlan, incrementMeetingCount } = useSubscription();
 
   const [meeting, setMeeting] = useState<MeetingSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,10 +107,10 @@ const MeetingDetail = () => {
             pendingMeeting = JSON.parse(pendingMeetingJson);
             if (pendingMeeting?.id === id) {
               const uploadStatus = getUploadStatus(id);
+              // Only override when we actually have background-upload status.
+              // If we already have a pendingMeeting (from normal upload flow), keep its status.
               if (uploadStatus) {
                 pendingMeeting.transcriptionStatus = uploadStatus.status === 'complete' ? 'processing' : 'uploading';
-              } else {
-                pendingMeeting.transcriptionStatus = 'uploading';
               }
               setMeeting(pendingMeeting);
               setStatus(pendingMeeting.transcriptionStatus);
@@ -217,6 +217,11 @@ const MeetingDetail = () => {
           } catch (updateErr) {
             console.warn('⚠️ Could not update meeting with transcript:', updateErr);
           }
+
+          // Count meeting usage in the background (don’t block UI)
+          void incrementMeetingCount(id).catch((e) => {
+            console.warn('⚠️ Could not increment meeting count:', e);
+          });
 
           // Send email notification
           if (user?.email) {
