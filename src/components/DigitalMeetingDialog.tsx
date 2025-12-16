@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Upload, FileAudio, X, AlertCircle, Lock, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Upload, FileAudio, X, AlertCircle, Lock, Loader2, Coffee, Sparkles, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface DigitalMeetingDialogProps {
   open: boolean;
@@ -30,6 +31,20 @@ const ACCEPTED_TYPES = [
 
 const ACCEPTED_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.aac'];
 
+// Friendly messages for large file uploads
+const LARGE_FILE_MESSAGES = [
+  { icon: Coffee, text: "Perfect time to grab a coffee ☕", subtext: "We're processing your recording with care" },
+  { icon: Sparkles, text: "Your meeting is in good hands", subtext: "We're working on it while you take a breather" },
+  { icon: Heart, text: "Thanks for your patience!", subtext: "Great things take a little time" },
+];
+
+const UPLOAD_TIPS = [
+  "Tip: Larger files contain more audio detail for better accuracy",
+  "Fun fact: We process thousands of meeting hours every day",
+  "Did you know? Clear audio leads to 98% transcription accuracy",
+  "Pro tip: Review your transcript right after it's ready",
+];
+
 export const DigitalMeetingDialog = ({ 
   open, 
   onOpenChange, 
@@ -38,11 +53,35 @@ export const DigitalMeetingDialog = ({
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userPlan, isAdmin } = useSubscription();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Check if file is large (>50MB)
+  const isLargeFile = selectedFile && selectedFile.size > 50 * 1024 * 1024;
+  const fileSizeMB = selectedFile ? selectedFile.size / 1024 / 1024 : 0;
+
+  // Rotate messages and tips during upload
+  useEffect(() => {
+    if (!isSubmitting || !isLargeFile) return;
+    
+    const messageInterval = setInterval(() => {
+      setCurrentMessageIndex(prev => (prev + 1) % LARGE_FILE_MESSAGES.length);
+    }, 5000);
+
+    const tipInterval = setInterval(() => {
+      setCurrentTipIndex(prev => (prev + 1) % UPLOAD_TIPS.length);
+    }, 7000);
+
+    return () => {
+      clearInterval(messageInterval);
+      clearInterval(tipInterval);
+    };
+  }, [isSubmitting, isLargeFile]);
 
   // Check if user has upload access (Pro, Enterprise, or Admin)
   const hasUploadAccess = userPlan && (
@@ -66,8 +105,8 @@ export const DigitalMeetingDialog = ({
     // Validate file type
     if (!isValidAudioFile(file)) {
       toast({
-        title: "Ogiltigt filformat",
-        description: "Endast MP3, WAV och M4A-filer stöds.",
+        title: "Invalid file format",
+        description: "Only MP3, WAV, and M4A files are supported.",
         variant: "destructive",
       });
       return;
@@ -78,8 +117,8 @@ export const DigitalMeetingDialog = ({
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       toast({
-        title: "Filen är för stor",
-        description: `Filen får max vara ${maxSizeMB}MB. Din fil är ${(file.size / 1024 / 1024).toFixed(1)}MB`,
+        title: "File too large",
+        description: `Maximum file size is ${maxSizeMB}MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB`,
         variant: "destructive",
       });
       return;
@@ -95,15 +134,15 @@ export const DigitalMeetingDialog = ({
     
     const file = selectedFile;
     const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
-    const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
+    const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uploaded meeting';
     
     console.log('📤 Starting upload flow - POST to /transcribe first');
     console.log('  - File:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     
     if (file.size < 1000) {
       toast({
-        title: "Filen är tom",
-        description: "Den valda filen verkar vara tom. Välj en annan fil.",
+        title: "File appears empty",
+        description: "The selected file seems to be empty. Please choose another file.",
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -113,8 +152,8 @@ export const DigitalMeetingDialog = ({
     const token = localStorage.getItem('authToken');
     if (!token) {
       toast({
-        title: "Autentisering krävs",
-        description: "Ladda om sidan och logga in igen.",
+        title: "Authentication required",
+        description: "Please reload the page and sign in again.",
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -162,7 +201,7 @@ export const DigitalMeetingDialog = ({
         title: meetingTitle,
         transcript: '',
         transcriptionStatus: 'processing',
-        folder: 'Allmänt',
+        folder: 'General',
         source: 'upload',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -175,8 +214,8 @@ export const DigitalMeetingDialog = ({
       setIsSubmitting(false);
 
       toast({
-        title: 'Uppladdning klar',
-        description: 'Transkribering startad.',
+        title: 'Upload complete! 🎉',
+        description: 'Transcription has started. We\'ll have it ready for you soon.',
       });
 
       navigate(`/meetings/${meetingId}`);
@@ -186,8 +225,8 @@ export const DigitalMeetingDialog = ({
       console.error('Upload error:', error);
       setIsSubmitting(false);
       toast({
-        title: "Något gick fel",
-        description: error.message || "Försök igen.",
+        title: "Something went wrong",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     }
@@ -208,10 +247,10 @@ export const DigitalMeetingDialog = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5 text-muted-foreground" />
-              Uppladdning av möten
+              Upload Meetings
             </DialogTitle>
             <DialogDescription>
-              Denna funktion kräver Pro eller Enterprise-plan
+              This feature requires a Pro or Enterprise plan
             </DialogDescription>
           </DialogHeader>
 
@@ -220,15 +259,15 @@ export const DigitalMeetingDialog = ({
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 <div className="space-y-2">
-                  <p className="font-medium">Uppgradera för att ladda upp möten</p>
+                  <p className="font-medium">Upgrade to upload meetings</p>
                   <p className="text-sm text-muted-foreground">
-                    Med Pro eller Enterprise kan du ladda upp inspelade ljudfiler 
-                    och få dem automatiskt transkriberade med hög kvalitet.
+                    With Pro or Enterprise, you can upload recorded audio files 
+                    and have them automatically transcribed with high accuracy.
                   </p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground mt-2">
-                    <li>Stöd för MP3, WAV och M4A</li>
-                    <li>Sparas i ditt bibliotek</li>
-                    <li>E-postnotifikation när klart</li>
+                    <li>Support for MP3, WAV, and M4A</li>
+                    <li>Saved to your library</li>
+                    <li>Email notification when ready</li>
                   </ul>
                 </div>
               </AlertDescription>
@@ -236,12 +275,12 @@ export const DigitalMeetingDialog = ({
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Stäng
+                Close
               </Button>
               <Button onClick={() => {
                 onOpenChange(false);
               }}>
-                Uppgradera till Pro
+                Upgrade to Pro
               </Button>
             </div>
           </div>
@@ -250,13 +289,16 @@ export const DigitalMeetingDialog = ({
     );
   }
 
+  const currentMessage = LARGE_FILE_MESSAGES[currentMessageIndex];
+  const CurrentIcon = currentMessage.icon;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Ladda upp digitalt möte</DialogTitle>
+          <DialogTitle>Upload Meeting Recording</DialogTitle>
           <DialogDescription>
-            Transkribera en inspelad ljudfil från ditt digitala möte
+            Transcribe an audio file from your digital meeting
           </DialogDescription>
         </DialogHeader>
 
@@ -266,9 +308,9 @@ export const DigitalMeetingDialog = ({
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <div className="space-y-3">
-                <p className="font-medium">Ladda upp din ljudfil</p>
+                <p className="font-medium">Upload your audio file</p>
                 <p className="text-sm text-muted-foreground">
-                  Stöder MP3, WAV och M4A. Max 500MB. Uppladdning sker i bakgrunden.
+                  Supports MP3, WAV, and M4A. Max 500MB. Upload happens in the background.
                 </p>
               </div>
             </AlertDescription>
@@ -282,10 +324,10 @@ export const DigitalMeetingDialog = ({
             >
               <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm font-medium text-foreground mb-1">
-                Klicka för att välja ljudfil
+                Click to select an audio file
               </p>
               <p className="text-xs text-muted-foreground">
-                MP3, WAV eller M4A (max 500MB)
+                MP3, WAV, or M4A (max 500MB)
               </p>
               <input
                 ref={fileInputRef}
@@ -311,7 +353,10 @@ export const DigitalMeetingDialog = ({
                       {selectedFile.name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      {fileSizeMB.toFixed(2)} MB
+                      {isLargeFile && !isSubmitting && (
+                        <span className="ml-2 text-primary">• Large file</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -325,13 +370,87 @@ export const DigitalMeetingDialog = ({
                   </Button>
                 )}
               </div>
-              {isSubmitting && (
-                <div className="mt-3 pt-3 border-t border-border">
-                  <p className="text-sm text-muted-foreground text-center">
-                    Laddar upp till servern... Detta kan ta en stund för större filer.
-                  </p>
-                </div>
-              )}
+              
+              {/* Enhanced upload state for large files */}
+              <AnimatePresence mode="wait">
+                {isSubmitting && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 pt-4 border-t border-border"
+                  >
+                    {isLargeFile ? (
+                      <div className="space-y-4">
+                        {/* Friendly large file message */}
+                        <motion.div 
+                          key={currentMessageIndex}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10"
+                        >
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <CurrentIcon className="w-6 h-6 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {currentMessage.text}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {currentMessage.subtext}
+                            </p>
+                          </div>
+                        </motion.div>
+
+                        {/* Animated progress bar */}
+                        <div className="space-y-2">
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <motion.div 
+                              className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+                              initial={{ width: "0%" }}
+                              animate={{ width: "100%" }}
+                              transition={{ 
+                                duration: 30,
+                                ease: "linear"
+                              }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Uploading {fileSizeMB.toFixed(0)}MB...</span>
+                            <span>This may take a few minutes</span>
+                          </div>
+                        </div>
+
+                        {/* Rotating tips */}
+                        <motion.p 
+                          key={currentTipIndex}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="text-xs text-center text-muted-foreground italic"
+                        >
+                          💡 {UPLOAD_TIPS[currentTipIndex]}
+                        </motion.p>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Uploading your recording...
+                        </p>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden max-w-xs mx-auto">
+                          <motion.div 
+                            className="h-full bg-primary rounded-full"
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 8, ease: "linear" }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -342,7 +461,7 @@ export const DigitalMeetingDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Avbryt
+              Cancel
             </Button>
             <Button
               onClick={handleUpload}
@@ -351,12 +470,12 @@ export const DigitalMeetingDialog = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Skickar...
+                  Uploading...
                 </>
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Ladda upp
+                  Upload
                 </>
               )}
             </Button>
