@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
+import type { ASRStage } from "@/lib/asrService";
 
 interface TranscriptionStatusWidgetProps {
   meetingId: string;
   status: 'uploading' | 'processing' | 'done' | 'failed';
+  stage?: ASRStage;
   meetingTitle?: string;
   onComplete?: () => void;
   onRetry?: () => void;
@@ -11,6 +13,7 @@ interface TranscriptionStatusWidgetProps {
 
 export const TranscriptionStatusWidget = ({
   status,
+  stage,
   onComplete,
   onRetry,
 }: TranscriptionStatusWidgetProps) => {
@@ -76,20 +79,43 @@ export const TranscriptionStatusWidget = ({
   }
 
   const getStatusText = () => {
-    if (status === 'uploading') {
+    // Use stage for more accurate status
+    if (status === 'uploading' || stage === 'uploading') {
       return 'Skickar till servern...';
     }
     
-    // Processing status with time-based messages
-    if (elapsedSeconds < 30) {
-      return 'Transkriberar...';
-    } else if (elapsedSeconds < 60) {
-      return 'Bearbetar mötet...';
-    } else if (elapsedSeconds < 120) {
-      return 'Tar lite extra tid...';
-    } else {
-      return `Bearbetar... (${Math.floor(elapsedSeconds / 60)}:${(elapsedSeconds % 60).toString().padStart(2, '0')})`;
+    if (stage === 'transcribing') {
+      if (elapsedSeconds < 30) {
+        return 'Transkriberar...';
+      } else if (elapsedSeconds < 60) {
+        return 'Bearbetar ljudet...';
+      } else if (elapsedSeconds < 120) {
+        return 'Tar lite extra tid...';
+      } else if (elapsedSeconds < 180) {
+        return 'Längre möte, ta en kaffe ☕';
+      } else {
+        return `Arbetar... (${Math.floor(elapsedSeconds / 60)}:${(elapsedSeconds % 60).toString().padStart(2, '0')})`;
+      }
     }
+    
+    if (stage === 'sis_processing') {
+      return 'Identifierar talare...';
+    }
+    
+    // Fallback for processing without stage
+    if (status === 'processing') {
+      if (elapsedSeconds < 30) {
+        return 'Bearbetar...';
+      } else if (elapsedSeconds < 60) {
+        return 'Analyserar mötet...';
+      } else if (elapsedSeconds < 120) {
+        return 'Tar lite extra tid...';
+      } else {
+        return `Arbetar... (${Math.floor(elapsedSeconds / 60)}:${(elapsedSeconds % 60).toString().padStart(2, '0')})`;
+      }
+    }
+    
+    return 'Bearbetar...';
   };
 
   return (
