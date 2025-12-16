@@ -154,12 +154,45 @@ export const DigitalMeetingDialog = ({
         throw new Error('No meeting ID returned from transcription service');
       }
       
-      console.log('✅ Transcription started - backend created meeting with ID:', meetingId);
+      console.log('✅ Upload complete - meetingId:', meetingId);
 
-      // Step 2: Increment meeting count (backend already created the meeting record)
+      // Step 2: Poll status until we confirm transcription has started (status = transcribing/processing)
+      console.log('🔍 Checking transcription status...');
+      let statusConfirmed = false;
+      for (let i = 0; i < 5; i++) {
+        try {
+          const statusResponse = await fetch(`https://api.tivly.se/asr/status/${meetingId}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            console.log('📊 Status check:', statusData.status);
+            
+            // If status shows transcribing, processing, or done - upload is complete!
+            if (statusData.status === 'transcribing' || statusData.status === 'processing' || statusData.status === 'done') {
+              statusConfirmed = true;
+              console.log('✅ Transcription confirmed started, redirecting immediately');
+              break;
+            }
+          }
+        } catch (statusErr) {
+          console.log('Status check attempt failed, continuing...');
+        }
+        
+        // Brief wait before next check
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Step 3: Increment meeting count
       await incrementMeetingCount(meetingId);
 
-      // Step 3: Save pending meeting to sessionStorage for instant display
+      // Step 4: Save pending meeting to sessionStorage for instant display
       const pendingMeeting = {
         id: meetingId,
         title: meetingTitle,
@@ -172,7 +205,7 @@ export const DigitalMeetingDialog = ({
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Step 4: Close dialog and redirect
+      // Step 5: Close dialog and redirect IMMEDIATELY
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
@@ -182,7 +215,7 @@ export const DigitalMeetingDialog = ({
         description: 'Din fil bearbetas nu.',
       });
 
-      // Redirect to meeting detail page with server-generated meetingId
+      // Redirect to meeting detail page immediately
       navigate(`/meetings/${meetingId}`);
 
     } catch (error: any) {
