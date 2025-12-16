@@ -110,45 +110,12 @@ const MeetingDetail = () => {
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
 
-  // Simple stage-based message (no time-based logic)
+  // Simple stage-based status text
   const getStageInfo = () => {
-    if (stage === 'transcribing') {
-      return {
-        title: 'Transkriberar',
-        subtitle: 'AI analyserar ditt möte',
-        icon: '🎙️'
-      };
-    }
-    
-    if (stage === 'sis_processing') {
-      return {
-        title: 'Identifierar talare',
-        subtitle: 'Analyserar röster i mötet',
-        icon: '👥'
-      };
-    }
-    
-    if (stage === 'uploading') {
-      return {
-        title: 'Laddar upp',
-        subtitle: 'Skickar filen till servern',
-        icon: '📤'
-      };
-    }
-    
-    if (status === 'uploading') {
-      return {
-        title: 'Laddar upp',
-        subtitle: 'Skickar filen till servern',
-        icon: '📤'
-      };
-    }
-    
-    return {
-      title: 'Bearbetar',
-      subtitle: 'Vänta medan mötet analyseras',
-      icon: '⚙️'
-    };
+    if (stage === 'transcribing') return { title: 'Transkriberar...' };
+    if (stage === 'sis_processing') return { title: 'Identifierar talare...' };
+    if (stage === 'uploading' || status === 'uploading') return { title: 'Laddar upp...' };
+    return { title: 'Bearbetar...' };
   };
 
   // Format date helper
@@ -518,49 +485,15 @@ const MeetingDetail = () => {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="bg-muted/50 rounded-xl p-8"
+                      className="bg-muted/30 border border-border/50 rounded-lg p-4"
                     >
-                      <div className="flex flex-col items-center justify-center space-y-4">
-                        <div className="relative">
-                          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                          </div>
-                          <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
-                        </div>
-                        <div className="text-center space-y-2">
-                          <div className="text-2xl mb-2">{getStageInfo().icon}</div>
-                          <motion.p 
-                            key={getStageInfo().title}
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="font-medium"
-                          >
-                            {getStageInfo().title}
-                          </motion.p>
-                          <motion.p 
-                            key={getStageInfo().subtitle}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="text-sm text-muted-foreground"
-                          >
-                            {getStageInfo().subtitle}
-                          </motion.p>
-                        </div>
-                        {/* Info box */}
-                        <div className="mt-4 bg-background/80 rounded-lg px-4 py-3 text-center max-w-sm">
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{getStageInfo().title}</p>
                           <p className="text-xs text-muted-foreground">
-                            Längre möten kan ta upp till 5 minuter. Du kan lämna sidan – vi skickar ett mejl när det är klart.
+                            Längre möten kan ta några minuter
                           </p>
-                        </div>
-                        <div className="flex gap-1">
-                          {[0, 1, 2].map(i => (
-                            <motion.div
-                              key={i}
-                              className="w-2 h-2 rounded-full bg-primary"
-                              animate={{ opacity: [0.3, 1, 0.3] }}
-                              transition={{ duration: 1.2, delay: i * 0.2, repeat: Infinity }}
-                            />
-                          ))}
                         </div>
                       </div>
                     </motion.div>
