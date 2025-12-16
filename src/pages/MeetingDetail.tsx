@@ -76,7 +76,8 @@ const MeetingDetail = () => {
     if (stage === 'transcribing') return { title: 'Transkriberar...' };
     if (stage === 'sis_processing') return { title: 'Identifierar talare...' };
     if (stage === 'uploading' || status === 'uploading') return { title: 'Laddar upp...' };
-    return { title: 'Bearbetar...' };
+    if (status === 'processing') return { title: 'Transkriberar...' };
+    return { title: 'Startar...' };
   };
 
   // Format date helper
@@ -178,26 +179,36 @@ const MeetingDetail = () => {
     return () => { unsubscribe(); };
   }, [id]);
 
-  // Poll for transcription status
+  // Poll for transcription status - fast initially, then slower
   useEffect(() => {
     if (!id || !user || transcriptionDoneRef.current) return;
     if (status === 'done' || status === 'failed') return;
 
     pollingRef.current = true;
+    let pollCount = 0;
 
-    const pollInterval = setInterval(async () => {
-      if (!pollingRef.current || transcriptionDoneRef.current) {
-        clearInterval(pollInterval);
-        return;
-      }
+    const doPoll = async () => {
+      if (!pollingRef.current || transcriptionDoneRef.current) return;
 
       try {
         const asrStatus = await pollASRStatus(id);
+        pollCount++;
+
+        // Update stage immediately for better UX
+        if (asrStatus.stage) {
+          setStage(asrStatus.stage);
+        }
+        
+        // If we get processing/transcribing status, update from uploading
+        if (asrStatus.status === 'processing' || asrStatus.stage === 'transcribing') {
+          if (status === 'uploading') {
+            setStatus('processing');
+          }
+        }
 
         if (asrStatus.status === 'completed' || asrStatus.status === 'done') {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
-          clearInterval(pollInterval);
 
           const newTranscript = asrStatus.transcript || '';
           setTranscript(newTranscript);
@@ -206,7 +217,6 @@ const MeetingDetail = () => {
           setSisMatches(asrStatus.sisMatches || []);
           setStatus('done');
 
-          // CRITICAL: Update the meeting record with the transcript
           try {
             await apiClient.updateMeeting(id, {
               transcript: newTranscript,
@@ -218,12 +228,10 @@ const MeetingDetail = () => {
             console.warn('⚠️ Could not update meeting with transcript:', updateErr);
           }
 
-          // Count meeting usage in the background (don’t block UI)
           void incrementMeetingCount(id).catch((e) => {
             console.warn('⚠️ Could not increment meeting count:', e);
           });
 
-          // Send email notification
           if (user?.email) {
             const authToken = apiClient.getAuthToken();
             if (authToken) {
@@ -242,7 +250,6 @@ const MeetingDetail = () => {
             description: 'Ditt möte har transkriberats.',
           });
 
-          // Update meeting object
           setMeeting(prev => prev ? { ...prev, transcript: newTranscript, transcriptionStatus: 'done' } : null);
           return;
         }
@@ -250,7 +257,6 @@ const MeetingDetail = () => {
         if (asrStatus.status === 'error' || asrStatus.status === 'failed') {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
-          clearInterval(pollInterval);
           setStatus('failed');
           toast({
             title: 'Transkribering misslyckades',
@@ -260,20 +266,24 @@ const MeetingDetail = () => {
           return;
         }
 
-        // Update stage while still processing
-        if (asrStatus.stage) {
-          setStage(asrStatus.stage);
+        // Schedule next poll - fast initially, then slower
+        const delay = pollCount < 10 ? 500 : pollCount < 20 ? 1500 : 3000;
+        if (pollingRef.current && !transcriptionDoneRef.current) {
+          setTimeout(doPoll, delay);
         }
       } catch (e) {
-        // Continue polling silently
+        if (pollingRef.current && !transcriptionDoneRef.current) {
+          setTimeout(doPoll, 2000);
+        }
       }
-    }, 3000);
+    };
+
+    doPoll();
 
     return () => {
       pollingRef.current = false;
-      clearInterval(pollInterval);
     };
-  }, [id, user, status, meeting, toast]);
+  }, [id, user, status, meeting, toast, incrementMeetingCount]);
 
   // Handle delete
   const handleDelete = async () => {
