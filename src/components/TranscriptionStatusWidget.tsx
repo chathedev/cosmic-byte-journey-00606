@@ -16,6 +16,32 @@ export const TranscriptionStatusWidget = ({
 }: TranscriptionStatusWidgetProps) => {
   const completedRef = useRef(false);
   const [hidden, setHidden] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+
+  // Track elapsed time during processing
+  useEffect(() => {
+    if (status === 'processing' && !startTimeRef.current) {
+      startTimeRef.current = Date.now();
+    }
+    
+    if (status === 'done' || status === 'failed') {
+      startTimeRef.current = null;
+      setElapsedSeconds(0);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'processing' || !startTimeRef.current) return;
+    
+    const interval = setInterval(() => {
+      if (startTimeRef.current) {
+        setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [status]);
 
   useEffect(() => {
     if (status === 'done' && !completedRef.current) {
@@ -50,13 +76,19 @@ export const TranscriptionStatusWidget = ({
   }
 
   const getStatusText = () => {
-    switch (status) {
-      case 'uploading':
-        return 'Skickar till servern...';
-      case 'processing':
-        return 'Transkriberar ljud...';
-      default:
-        return 'Bearbetar...';
+    if (status === 'uploading') {
+      return 'Skickar till servern...';
+    }
+    
+    // Processing status with time-based messages
+    if (elapsedSeconds < 30) {
+      return 'Transkriberar...';
+    } else if (elapsedSeconds < 60) {
+      return 'Bearbetar mötet...';
+    } else if (elapsedSeconds < 120) {
+      return 'Tar lite extra tid...';
+    } else {
+      return `Bearbetar... (${Math.floor(elapsedSeconds / 60)}:${(elapsedSeconds % 60).toString().padStart(2, '0')})`;
     }
   };
 
