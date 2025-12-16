@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-
+import { apiClient } from "@/lib/api";
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -122,17 +122,15 @@ export const DigitalMeetingDialog = ({
     }
 
     try {
-      // Step 1: POST audio to /transcribe - backend creates the meeting + returns server-generated meetingId
-      // IMPORTANT: Do NOT call /asr/transcribe directly from the browser (that may not persist a meeting record).
+      // Step 1: POST audio to /asr/transcribe - backend starts transcription and returns server-generated meetingId
       const formData = new FormData();
-      formData.append('audioFile', file, file.name);
-      formData.append('file', file, file.name); // backward-compat field name
+      formData.append('audio', file, file.name);
       formData.append('language', languageCode);
-      formData.append('meetingTitle', meetingTitle);
+      formData.append('title', meetingTitle);
 
-      console.log('📤 Uploading to /transcribe (creates meeting in backend)...');
+      console.log('📤 Step 1: Uploading to /asr/transcribe...');
 
-      const transcribeResponse = await fetch('https://api.tivly.se/transcribe', {
+      const transcribeResponse = await fetch('https://api.tivly.se/asr/transcribe', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -158,23 +156,40 @@ export const DigitalMeetingDialog = ({
       
       console.log('✅ Transcription started with server-generated meetingId:', meetingId);
 
-      // Step 2: Increment meeting count
+      // Step 2: CRITICAL - Create/save the meeting record in backend via PUT /meetings/{meetingId}
+      // Use PUT (not POST) so we use the SAME meetingId from /asr/transcribe
+      console.log('📤 Step 2: Saving meeting record with ID:', meetingId);
+      try {
+        await apiClient.updateMeeting(meetingId, {
+          title: meetingTitle,
+          transcript: '', // Will be updated when transcription completes
+          folder: 'Allmänt',
+          isCompleted: false,
+          source: 'upload',
+        });
+        console.log('✅ Meeting record saved in backend with ID:', meetingId);
+      } catch (saveErr: any) {
+        // If 404, backend doesn't support upsert - log but continue
+        console.warn('⚠️ Could not save meeting record:', saveErr.message);
+      }
+
+      // Step 3: Increment meeting count
       await incrementMeetingCount(meetingId);
 
-      // Step 3: Save pending meeting to sessionStorage for instant display
+      // Step 4: Save pending meeting to sessionStorage for instant display
       const pendingMeeting = {
         id: meetingId,
         title: meetingTitle,
         transcript: '',
         transcriptionStatus: 'processing',
-        folder: 'general',
+        folder: 'Allmänt',
         source: 'upload',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Step 4: Close dialog and redirect
+      // Step 5: Close dialog and redirect
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
