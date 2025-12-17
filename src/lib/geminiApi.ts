@@ -1,27 +1,27 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const API_BASE_URL = "https://api.tivly.se";
+
 export type GeminiModel = 
   | "gemini-2.5-flash"
   | "gemini-2.5-flash-lite"
   | "gemini-2.5-pro"
-  | "gemini-2.0-flash"
-  | "gemini-1.5-flash"
-  | "gemini-1.5-pro";
+  | "gemini-2.0"
+  | "gemini-1.0";
 
 export interface GeminiRequest {
   prompt: string;
   model?: GeminiModel;
   temperature?: number;
   maxOutputTokens?: number;
-  isEnterprise?: boolean;
 }
 
 export interface GeminiResponse {
   success: boolean;
   model: string;
-  text: string;
   response: {
     candidates?: Array<{
+      output?: { text?: string };
       content?: {
         parts?: Array<{ text?: string }>;
       };
@@ -37,40 +37,78 @@ export interface GeminiResponse {
 
 export interface GeminiError {
   error: string;
-  message: string;
-  status?: number;
+  message?: string;
 }
 
 /**
- * Call the Gemini AI endpoint via Supabase edge function.
+ * Get the auth token for API requests
+ */
+async function getAuthToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+  return session.access_token;
+}
+
+/**
+ * Call the Gemini AI endpoint via api.tivly.se backend.
  * 
  * Uses gemini-2.5-flash for enterprise users and gemini-2.5-flash-lite for regular users by default.
  * 
  * @param request - The request parameters
- * @returns The Gemini response with generated text
+ * @param isEnterprise - Whether to use the enterprise model (gemini-2.5-flash)
+ * @returns The Gemini response
  * @throws Error if the request fails
  */
-export async function generateWithGemini(request: GeminiRequest): Promise<GeminiResponse> {
-  const { data, error } = await supabase.functions.invoke<GeminiResponse | GeminiError>("ai-gemini", {
-    body: request,
+export async function generateWithGemini(
+  request: GeminiRequest, 
+  isEnterprise = false
+): Promise<GeminiResponse> {
+  const token = await getAuthToken();
+
+  // Set default model based on enterprise status if not specified
+  const model = request.model || (isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite");
+
+  const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...request,
+      model,
+    }),
   });
 
-  if (error) {
-    console.error("Gemini API error:", error);
-    throw new Error(error.message || "Failed to call Gemini API");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({})) as GeminiError;
+    
+    if (response.status === 400 && errorData.error === "prompt_required") {
+      throw new Error("A prompt is required");
+    }
+    
+    if (response.status === 502) {
+      throw new Error(errorData.message || "Gemini API error - please try again later");
+    }
+    
+    throw new Error(errorData.message || errorData.error || `API error: ${response.status}`);
   }
 
-  if (!data) {
-    throw new Error("No response from Gemini API");
-  }
+  return response.json();
+}
 
-  // Check if response is an error
-  if ("error" in data && !("success" in data)) {
-    const errorData = data as GeminiError;
-    throw new Error(errorData.message || errorData.error);
-  }
-
-  return data as GeminiResponse;
+/**
+ * Extract text from Gemini response
+ */
+export function extractText(response: GeminiResponse): string {
+  // Try the newer format first
+  const text = response.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (text) return text;
+  
+  // Fall back to older format
+  return response.response?.candidates?.[0]?.output?.text || "";
 }
 
 /**
@@ -81,8 +119,8 @@ export async function generateWithGemini(request: GeminiRequest): Promise<Gemini
  * @returns The generated text
  */
 export async function generateText(prompt: string, isEnterprise = false): Promise<string> {
-  const response = await generateWithGemini({ prompt, isEnterprise });
-  return response.text;
+  const response = await generateWithGemini({ prompt }, isEnterprise);
+  return extractText(response);
 }
 
 /**
@@ -103,5 +141,5 @@ export async function generateTextWithModel(
     model,
     ...options,
   });
-  return response.text;
+  return extractText(response);
 }
