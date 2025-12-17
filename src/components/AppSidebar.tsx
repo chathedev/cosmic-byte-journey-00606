@@ -191,6 +191,7 @@ export function AppSidebar() {
     { Icon: FiMail, title: "E-postkampanjer", path: "/admin/email-campaigns" },
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
+    { Icon: FiZap, title: "AI Kostnader", path: "/admin/ai-costs" },
     { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
     { Icon: Eye, title: "Support Panel", action: () => setShowAdminSupport(true) },
   ];
