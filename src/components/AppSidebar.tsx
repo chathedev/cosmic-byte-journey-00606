@@ -19,7 +19,7 @@ import {
   FiMenu,
   FiX,
 } from "react-icons/fi";
-import { Lock, Eye } from "lucide-react";
+import { Lock, Eye, DollarSign } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -150,6 +150,7 @@ export function AppSidebar() {
       else if (path === "/admin/backend") setSelected("Backend");
       else if (path === "/admin/enterprise") setSelected("Enterprise");
       else if (path === "/admin/enterprise/billing") setSelected("Enterprise Billing");
+      else if (path === "/admin/ai-costs") setSelected("AI Kostnader");
     }
   }, [location.pathname]);
 
@@ -192,6 +193,7 @@ export function AppSidebar() {
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
     { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
+    { Icon: DollarSign, title: "AI Kostnader", path: "/admin/ai-costs" },
     { Icon: Eye, title: "Support Panel", action: () => setShowAdminSupport(true) },
   ];
 
