@@ -72,14 +72,25 @@ export interface AdminCosts {
 }
 
 /**
- * Get the auth token for API requests from localStorage (same as api.ts)
+ * Get the bearer token if available. Some environments rely on cookie-based auth.
  */
-function getAuthToken(): string {
+function getAuthTokenMaybe(): string | null {
   const token = localStorage.getItem('authToken');
-  if (!token) {
-    throw new Error("Not authenticated");
+  return token && token.trim().length > 0 ? token : null;
+}
+
+function buildApiHeaders(extra?: HeadersInit): HeadersInit {
+  const token = getAuthTokenMaybe();
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+    ...(extra ?? {}),
+  };
+
+  if (token) {
+    (headers as any).Authorization = `Bearer ${token}`;
   }
-  return token;
+
+  return headers;
 }
 
 /**
@@ -94,14 +105,12 @@ export async function recordAICost(entry: CostEntry): Promise<boolean> {
     return false;
   }
 
-  const token = getAuthToken();
-
   const response = await fetch(`${API_BASE_URL}/ai/cost`, {
     method: "POST",
-    headers: {
+    credentials: "include",
+    headers: buildApiHeaders({
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
+    }),
     body: JSON.stringify({
       service: entry.service || 'ai',
       costUsd: entry.costUsd,
@@ -130,13 +139,10 @@ export async function recordAICost(entry: CostEntry): Promise<boolean> {
  * @returns User costs (or admin snapshot with all users)
  */
 export async function getAICosts(): Promise<{ user?: UserCosts; admin?: AdminCosts }> {
-  const token = getAuthToken();
-
   const response = await fetch(`${API_BASE_URL}/ai/costs`, {
     method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
+    credentials: "include",
+    headers: buildApiHeaders(),
   });
 
   if (!response.ok) {
@@ -168,13 +174,10 @@ export async function getAICosts(): Promise<{ user?: UserCosts; admin?: AdminCos
  * @returns Full admin cost snapshot
  */
 export async function getAdminAICosts(): Promise<AdminCosts> {
-  const token = getAuthToken();
-
   const response = await fetch(`${API_BASE_URL}/admin/ai-costs`, {
     method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
+    credentials: "include",
+    headers: buildApiHeaders(),
   });
 
   if (!response.ok) {
@@ -202,11 +205,9 @@ export async function getAdminAICosts(): Promise<AdminCosts> {
  * @throws Error if the request fails
  */
 export async function generateWithGemini(
-  request: GeminiRequest, 
+  request: GeminiRequest,
   isEnterprise = false
 ): Promise<GeminiResponse> {
-  const token = getAuthToken();
-
   // Set default model based on enterprise status if not specified
   const model = request.model || (isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite");
 
@@ -215,7 +216,6 @@ export async function generateWithGemini(
     model,
   };
 
-  // Add optional parameters if provided
   if (request.temperature !== undefined) {
     requestBody.temperature = request.temperature;
   }
@@ -226,23 +226,24 @@ export async function generateWithGemini(
     requestBody.costUsd = request.costUsd;
   }
 
+  // Prefer bearer token when available, but always include cookies for web auth.
   const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
     method: "POST",
-    headers: {
+    credentials: "include",
+    headers: buildApiHeaders({
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
+    }),
     body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({})) as GeminiError;
-    
+    const errorData = (await response.json().catch(() => ({}))) as GeminiError;
+
     // Handle specific error codes per API docs
     if (response.status === 400 && errorData.error === "prompt_required") {
       throw new Error("En prompt krävs");
     }
-    
+
     if (response.status === 502 && errorData.error === "google_ai_failed") {
       throw new Error(errorData.message || "Gemini API-fel - försök igen senare");
     }
@@ -254,7 +255,7 @@ export async function generateWithGemini(
     if (response.status === 402) {
       throw new Error("Betalning krävs. Vänligen lägg till krediter.");
     }
-    
+
     throw new Error(errorData.message || errorData.error || `API-fel: ${response.status}`);
   }
 
@@ -336,16 +337,15 @@ export async function streamChat({
   onDone: () => void;
   onError: (error: Error) => void;
 }): Promise<void> {
-  const token = getAuthToken();
   const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 
   try {
     const response = await fetch(`${API_BASE_URL}/ai/chat`, {
       method: "POST",
-      headers: {
+      credentials: "include",
+      headers: buildApiHeaders({
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
+      }),
       body: JSON.stringify({
         messages,
         transcript,
