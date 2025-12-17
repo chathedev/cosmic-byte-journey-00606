@@ -99,16 +99,20 @@ export default function BillingSuccessDialog({
               onClick={() => window.open(invoiceUrl, '_blank')}
             >
               <ExternalLink className="mr-2 h-4 w-4" />
-              Visa Faktura
+              Öppna Faktura
             </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              Öppnar fakturan på invoice.stripe.com
+            </p>
 
             {portalUrl && (
               <Button
-                variant="outline"
-                className="w-full"
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground"
                 onClick={() => window.open(portalUrl, '_blank')}
               >
-                Kundportal
+                Kundportal (billing.stripe.com)
               </Button>
             )}
           </div>

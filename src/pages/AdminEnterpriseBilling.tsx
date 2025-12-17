@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical, Plus } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -670,22 +670,14 @@ export default function AdminEnterpriseBilling() {
                                 <div className="flex items-center justify-end gap-1">
                                   {record.invoiceUrl && (
                                     <Button
-                                      variant="ghost"
+                                      variant="outline"
                                       size="sm"
                                       onClick={() => window.open(record.invoiceUrl, '_blank')}
-                                      title="Visa faktura"
+                                      title="Öppna faktura (invoice.stripe.com)"
+                                      className="gap-1"
                                     >
-                                      <ExternalLink className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  {record.portalUrl && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => window.open(record.portalUrl, '_blank')}
-                                      title="Öppna portal"
-                                    >
-                                      <Building2 className="h-4 w-4" />
+                                      <Receipt className="h-3.5 w-3.5" />
+                                      Faktura
                                     </Button>
                                   )}
                                   
@@ -696,6 +688,25 @@ export default function AdminEnterpriseBilling() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                      {record.invoiceUrl && (
+                                        <DropdownMenuItem
+                                          onClick={() => window.open(record.invoiceUrl, '_blank')}
+                                        >
+                                          <ExternalLink className="mr-2 h-4 w-4" />
+                                          Öppna faktura
+                                        </DropdownMenuItem>
+                                      )}
+                                      {record.portalUrl && (
+                                        <DropdownMenuItem
+                                          onClick={() => window.open(record.portalUrl, '_blank')}
+                                        >
+                                          <Building2 className="mr-2 h-4 w-4" />
+                                          Kundportal
+                                        </DropdownMenuItem>
+                                      )}
+                                      {(record.invoiceUrl || record.portalUrl) && record.invoiceId && (
+                                        <DropdownMenuSeparator />
+                                      )}
                                       {record.invoiceId && (
                                         <>
                                           <DropdownMenuItem
