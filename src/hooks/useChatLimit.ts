@@ -1,20 +1,29 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
-// Chat limits per plan (per month)
-const CHAT_LIMITS: Record<string, number | null> = {
-  free: 0,       // No chat access for free
-  pro: 100,      // 100 messages/month for pro
-  enterprise: 500, // 500 messages/month for enterprise
-  unlimited: null, // No limit
+// Monthly chat limits per plan
+const MONTHLY_LIMITS: Record<string, number | null> = {
+  free: 0,
+  pro: 100,
+  enterprise: 500,
+  unlimited: null,
 };
+
+// Hidden rate limits (per hour/day) - applies to all plans
+const HOURLY_LIMIT = 20;
+const DAILY_LIMIT = 50;
 
 interface ChatLimitState {
   chatMessageCount: number;
   chatMessageLimit: number | null;
   isLoading: boolean;
   error: string | null;
+}
+
+interface RateLimitTracker {
+  hourly: { count: number; resetTime: number };
+  daily: { count: number; resetTime: number };
 }
 
 export function useChatLimit() {
@@ -25,20 +34,54 @@ export function useChatLimit() {
     isLoading: false,
     error: null,
   });
+  
+  // Hidden rate limit tracking (client-side, resets on page refresh intentionally)
+  const rateLimitRef = useRef<RateLimitTracker>({
+    hourly: { count: 0, resetTime: Date.now() + 60 * 60 * 1000 },
+    daily: { count: 0, resetTime: Date.now() + 24 * 60 * 60 * 1000 },
+  });
 
-  // Get limit based on plan
-  const getChatLimit = useCallback(() => {
+  // Get monthly limit based on plan
+  const getMonthlyLimit = useCallback(() => {
     if (isAdmin) return null; // Admins have unlimited
     
     const plan = userPlan?.plan?.toLowerCase() || 'free';
     
-    // Check for unlimited plans
-    if (plan === 'unlimited' || plan === 'enterprise') {
-      return CHAT_LIMITS.enterprise; // Enterprise still has high limit
+    if (plan === 'unlimited') return null;
+    if (plan === 'enterprise') return MONTHLY_LIMITS.enterprise;
+    
+    return MONTHLY_LIMITS[plan] ?? MONTHLY_LIMITS.free;
+  }, [userPlan, isAdmin]);
+
+  // Check and update rate limits
+  const checkRateLimits = useCallback((): { allowed: boolean; reason?: string } => {
+    if (isAdmin) return { allowed: true };
+    
+    const now = Date.now();
+    const tracker = rateLimitRef.current;
+    
+    // Reset hourly counter if time passed
+    if (now >= tracker.hourly.resetTime) {
+      tracker.hourly = { count: 0, resetTime: now + 60 * 60 * 1000 };
     }
     
-    return CHAT_LIMITS[plan] ?? CHAT_LIMITS.free;
-  }, [userPlan, isAdmin]);
+    // Reset daily counter if time passed
+    if (now >= tracker.daily.resetTime) {
+      tracker.daily = { count: 0, resetTime: now + 24 * 60 * 60 * 1000 };
+    }
+    
+    // Check hourly limit
+    if (tracker.hourly.count >= HOURLY_LIMIT) {
+      return { allowed: false, reason: 'hourly' };
+    }
+    
+    // Check daily limit
+    if (tracker.daily.count >= DAILY_LIMIT) {
+      return { allowed: false, reason: 'daily' };
+    }
+    
+    return { allowed: true };
+  }, [isAdmin]);
 
   // Fetch current chat count from backend
   const fetchChatCount = useCallback(async () => {
@@ -46,7 +89,7 @@ export function useChatLimit() {
     
     try {
       const data = await apiClient.getChatMessageCount();
-      const limit = getChatLimit();
+      const limit = getMonthlyLimit();
       
       setState({
         chatMessageCount: data.chatMessageCount || 0,
@@ -65,30 +108,40 @@ export function useChatLimit() {
       }));
       return 0;
     }
-  }, [getChatLimit]);
+  }, [getMonthlyLimit]);
 
-  // Check if user can send a message
-  const canSendMessage = useCallback(() => {
-    const limit = getChatLimit();
+  // Check if user can send a message (monthly + rate limits)
+  const canSendMessage = useCallback((): { allowed: boolean; reason?: string } => {
+    // Check rate limits first
+    const rateCheck = checkRateLimits();
+    if (!rateCheck.allowed) {
+      return rateCheck;
+    }
     
-    // No limit = always can send
-    if (limit === null) return true;
+    // Check monthly limit
+    const monthlyLimit = getMonthlyLimit();
+    if (monthlyLimit === null) return { allowed: true };
+    if (state.chatMessageCount >= monthlyLimit) {
+      return { allowed: false, reason: 'monthly' };
+    }
     
-    // Check against current count
-    return state.chatMessageCount < limit;
-  }, [state.chatMessageCount, getChatLimit]);
+    return { allowed: true };
+  }, [state.chatMessageCount, getMonthlyLimit, checkRateLimits]);
 
-  // Get remaining messages
+  // Get remaining messages (monthly only - rate limits are hidden)
   const getRemainingMessages = useCallback(() => {
-    const limit = getChatLimit();
-    
-    if (limit === null) return null; // Unlimited
-    
+    const limit = getMonthlyLimit();
+    if (limit === null) return null;
     return Math.max(0, limit - state.chatMessageCount);
-  }, [state.chatMessageCount, getChatLimit]);
+  }, [state.chatMessageCount, getMonthlyLimit]);
 
   // Increment chat counter (called after successful chat)
   const incrementCounter = useCallback(async (count: number = 1) => {
+    // Update rate limit counters
+    const tracker = rateLimitRef.current;
+    tracker.hourly.count += count;
+    tracker.daily.count += count;
+    
     try {
       const data = await apiClient.incrementChatCounter(count);
       
@@ -109,13 +162,16 @@ export function useChatLimit() {
     }
   }, [state.chatMessageCount]);
 
+  const canSendResult = canSendMessage();
+
   return {
     ...state,
-    chatLimit: getChatLimit(),
-    canSendMessage,
+    chatLimit: getMonthlyLimit(),
+    canSendMessage: () => canSendResult.allowed,
+    canSendMessageResult: canSendResult,
     getRemainingMessages,
     incrementCounter,
     fetchChatCount,
-    isOverLimit: !canSendMessage(),
+    isOverLimit: !canSendResult.allowed,
   };
 }

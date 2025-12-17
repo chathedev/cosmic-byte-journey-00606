@@ -91,7 +91,8 @@ export const Chat = () => {
   const { 
     chatMessageCount, 
     chatLimit, 
-    canSendMessage, 
+    canSendMessage,
+    canSendMessageResult,
     getRemainingMessages, 
     incrementCounter,
     fetchChatCount,
@@ -140,9 +141,15 @@ export const Chat = () => {
 
     // Check chat limit before sending
     if (!canSendMessage()) {
+      const reason = canSendMessageResult.reason;
+      const messages = {
+        hourly: "Du har skickat för många meddelanden. Vänta en stund innan du försöker igen.",
+        daily: "Du har nått dagens gräns. Försök igen imorgon.",
+        monthly: `Du har använt alla dina ${chatLimit} chattmeddelanden denna månad. Uppgradera för att fortsätta.`,
+      };
       toast({
         title: "Chattgräns nådd",
-        description: `Du har använt alla dina ${chatLimit} chattmeddelanden denna månad. Uppgradera för att fortsätta.`,
+        description: messages[reason as keyof typeof messages] || messages.monthly,
         variant: "destructive",
       });
       return;
