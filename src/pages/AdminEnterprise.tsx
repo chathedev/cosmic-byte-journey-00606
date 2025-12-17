@@ -17,6 +17,7 @@ import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Cale
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { UserDetailDialog } from '@/components/UserDetailDialog';
 
 interface CompanyMember {
   email: string;
@@ -153,6 +154,7 @@ export default function AdminEnterprise() {
   const [sisOverview, setSisOverview] = useState<SISCompanyOverview[]>([]);
   const [sisTimestamp, setSisTimestamp] = useState<string | null>(null);
   const [loadingSIS, setLoadingSIS] = useState(false);
+  const [selectedMemberDetail, setSelectedMemberDetail] = useState<{ email: string; plan: string; meetingCount: number } | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1130,7 +1132,15 @@ export default function AdminEnterprise() {
                       // Use SIS overview data for accurate status (falls back to company data)
                       const sisSampleData = getMemberSISStatus(selectedCompany.id, member.email) || member.sisSample;
                       return (
-                      <TableRow key={member.email}>
+                      <TableRow 
+                        key={member.email}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedMemberDetail({ 
+                          email: member.email, 
+                          plan: 'enterprise',
+                          meetingCount: 0 
+                        })}
+                      >
                         <TableCell>
                           <div className="flex flex-col">
                             {member.preferredName && (
@@ -1210,11 +1220,12 @@ export default function AdminEnterprise() {
                           </TableCell>
                         )}
                         <TableCell>{new Date(member.addedAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-right space-x-2">
+                        <TableCell className="text-right space-x-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingMember(member);
                               setShowEditMember(true);
                             }}
@@ -1224,7 +1235,10 @@ export default function AdminEnterprise() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setDeletingMember(member)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingMember(member);
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -2272,6 +2286,13 @@ export default function AdminEnterprise() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* User Detail Dialog for Members */}
+      <UserDetailDialog
+        user={selectedMemberDetail}
+        open={!!selectedMemberDetail}
+        onOpenChange={(open) => !open && setSelectedMemberDetail(null)}
+      />
     </div>
   );
 }
