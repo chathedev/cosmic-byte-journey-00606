@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -162,27 +162,41 @@ export const Chat = () => {
       const abort = new AbortController();
       setController(abort);
 
-      // Auth for api.tivly.se
-      const token = localStorage.getItem('authToken');
+      // Get auth token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseToken = session?.access_token;
+      // Also check localStorage for api.tivly.se auth
+      const localToken = localStorage.getItem('authToken');
+      const token = localToken || supabaseToken;
+
+      if (!token) {
+        throw new Error("Inte inloggad");
+      }
 
       const isEnterprise = userPlan?.plan === 'enterprise';
       const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 
+      // Build prompt from messages and transcript context
+      const systemPrompt = `Du är en intelligent mötesassistent för Tivly. Svara på svenska. Du hjälper användaren med frågor om deras möten.
+
+${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext}` : ''}`;
+
+      const userPrompt = newMessages.map(m => `${m.role === 'user' ? 'Användare' : 'Assistent'}: ${m.content}`).join('\n\n');
+
       const response = await fetch(
-        "https://api.tivly.se/ai/chat",
+        "https://api.tivly.se/ai/gemini",
         {
           method: "POST",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+            "Authorization": `Bearer ${token}`,
           },
           body: JSON.stringify({
-            messages: newMessages,
-            transcript: contextPrefix + transcriptContext,
-            meetingSelected: hasMeetingContext,
-            meetingCount: meetings.length,
+            prompt: `${systemPrompt}\n\n${userPrompt}`,
             model,
+            temperature: 0.7,
+            maxOutputTokens: 2048,
           }),
           signal: abort.signal,
         }
@@ -210,72 +224,44 @@ export const Chat = () => {
         return;
       }
 
-      if (!response.ok || !response.body) {
-        throw new Error("Failed to start stream");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 400 && errorData.error === "prompt_required") {
+          throw new Error("En prompt krävs");
+        }
+        if (response.status === 502 && errorData.error === "google_ai_failed") {
+          throw new Error(errorData.message || "Gemini API-fel");
+        }
+        throw new Error(errorData.message || errorData.error || "API-fel");
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
-      let assistantContent = "";
+      const data = await response.json();
+      
+      // Extract text from Gemini response
+      const assistantContent = 
+        data.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+        data.response?.candidates?.[0]?.output?.text ||
+        "Kunde inte generera svar.";
 
       setStreamingIndex(newMessages.length);
-      setIsThinking(false); // Stop thinking when first content arrives
+      setIsThinking(false);
 
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") {
-            streamDone = true;
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantContent += content;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) =>
-                    i === prev.length - 1 ? { ...m, content: assistantContent } : m
-                  );
-                }
-                return [...prev, { role: "assistant", content: assistantContent }];
-              });
-            }
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
+      // Add assistant message
+      setMessages([...newMessages, { role: "assistant", content: assistantContent }]);
 
       // Check if AI asked for meeting selection
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant" && last.content.includes("[ASK_MEETING]")) {
-          const cleanContent = last.content.replace("[ASK_MEETING]", "").trim();
-          return prev.map((m, i) =>
-            i === prev.length - 1 ? { ...m, content: cleanContent, showMeetingPicker: true } : m
-          );
-        }
-        return prev;
-      });
+      if (assistantContent.includes("[ASK_MEETING]")) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            const cleanContent = last.content.replace("[ASK_MEETING]", "").trim();
+            return prev.map((m, i) =>
+              i === prev.length - 1 ? { ...m, content: cleanContent, showMeetingPicker: true } : m
+            );
+          }
+          return prev;
+        });
+      }
 
       setStreamingIndex(null);
       setIsLoading(false);

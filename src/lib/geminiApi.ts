@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 const API_BASE_URL = "https://api.tivly.se";
 
 export type GeminiModel = 
@@ -72,15 +74,26 @@ export interface AdminCosts {
 }
 
 /**
- * Get the bearer token if available. Some environments rely on cookie-based auth.
+ * Get the best available auth token (localStorage first, then Supabase session)
  */
-function getAuthTokenMaybe(): string | null {
-  const token = localStorage.getItem('authToken');
-  return token && token.trim().length > 0 ? token : null;
+async function getAuthToken(): Promise<string | null> {
+  // Check localStorage first (api.tivly.se auth)
+  const localToken = localStorage.getItem('authToken');
+  if (localToken && localToken.trim().length > 0) {
+    return localToken;
+  }
+  
+  // Fall back to Supabase session
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  } catch {
+    return null;
+  }
 }
 
-function buildApiHeaders(extra?: HeadersInit): HeadersInit {
-  const token = getAuthTokenMaybe();
+async function buildApiHeaders(extra?: HeadersInit): Promise<HeadersInit> {
+  const token = await getAuthToken();
   const headers: HeadersInit = {
     Accept: 'application/json',
     ...(extra ?? {}),
@@ -108,7 +121,7 @@ export async function recordAICost(entry: CostEntry): Promise<boolean> {
   const response = await fetch(`${API_BASE_URL}/ai/cost`, {
     method: "POST",
     credentials: "include",
-    headers: buildApiHeaders({
+    headers: await buildApiHeaders({
       "Content-Type": "application/json",
     }),
     body: JSON.stringify({
@@ -142,7 +155,7 @@ export async function getAICosts(): Promise<{ user?: UserCosts; admin?: AdminCos
   const response = await fetch(`${API_BASE_URL}/ai/costs`, {
     method: "GET",
     credentials: "include",
-    headers: buildApiHeaders(),
+    headers: await buildApiHeaders(),
   });
 
   if (!response.ok) {
@@ -177,7 +190,7 @@ export async function getAdminAICosts(): Promise<AdminCosts> {
   const response = await fetch(`${API_BASE_URL}/admin/ai-costs`, {
     method: "GET",
     credentials: "include",
-    headers: buildApiHeaders(),
+    headers: await buildApiHeaders(),
   });
 
   if (!response.ok) {
@@ -230,7 +243,7 @@ export async function generateWithGemini(
   const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
     method: "POST",
     credentials: "include",
-    headers: buildApiHeaders({
+    headers: await buildApiHeaders({
       "Content-Type": "application/json",
     }),
     body: JSON.stringify(requestBody),
@@ -340,18 +353,21 @@ export async function streamChat({
   const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 
   try {
-    const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+    // Build prompt for /ai/gemini endpoint (non-streaming)
+    const systemPrompt = `Du är en intelligent mötesassistent för Tivly. Svara på svenska.${transcript ? `\n\nMÖTESINNEHÅLL:\n${transcript}` : ''}`;
+    const userPrompt = messages.map(m => `${m.role === 'user' ? 'Användare' : 'Assistent'}: ${m.content}`).join('\n\n');
+
+    const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
       method: "POST",
       credentials: "include",
-      headers: buildApiHeaders({
+      headers: await buildApiHeaders({
         "Content-Type": "application/json",
       }),
       body: JSON.stringify({
-        messages,
-        transcript,
+        prompt: `${systemPrompt}\n\n${userPrompt}`,
         model,
-        meetingSelected,
-        meetingCount,
+        temperature: 0.7,
+        maxOutputTokens: 2048,
       }),
     });
 
@@ -365,65 +381,25 @@ export async function streamChat({
       return;
     }
 
-    if (!response.ok || !response.body) {
+    if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      onError(new Error(errorData.message || errorData.error || "Failed to start stream"));
+      onError(new Error(errorData.message || errorData.error || "API-fel"));
       return;
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let textBuffer = "";
+    const data = await response.json();
+    
+    // Extract text from Gemini response
+    const assistantContent = 
+      data.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data.response?.candidates?.[0]?.output?.text ||
+      "Kunde inte generera svar.";
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      textBuffer += decoder.decode(value, { stream: true });
-
-      let newlineIndex: number;
-      while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-        let line = textBuffer.slice(0, newlineIndex);
-        textBuffer = textBuffer.slice(newlineIndex + 1);
-
-        if (line.endsWith("\r")) line = line.slice(0, -1);
-        if (line.startsWith(":") || line.trim() === "") continue;
-        if (!line.startsWith("data: ")) continue;
-
-        const jsonStr = line.slice(6).trim();
-        if (jsonStr === "[DONE]") {
-          break;
-        }
-
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            onDelta(content);
-          }
-        } catch {
-          // Partial JSON, put back and wait for more
-          textBuffer = line + "\n" + textBuffer;
-          break;
-        }
-      }
-    }
-
-    // Flush remaining buffer
-    if (textBuffer.trim()) {
-      for (let raw of textBuffer.split("\n")) {
-        if (!raw) continue;
-        if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-        if (raw.startsWith(":") || raw.trim() === "") continue;
-        if (!raw.startsWith("data: ")) continue;
-        const jsonStr = raw.slice(6).trim();
-        if (jsonStr === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) onDelta(content);
-        } catch { /* ignore */ }
-      }
+    // Simulate streaming by sending content in chunks
+    const words = assistantContent.split(' ');
+    for (let i = 0; i < words.length; i++) {
+      onDelta(words[i] + (i < words.length - 1 ? ' ' : ''));
+      await new Promise(r => setTimeout(r, 15)); // Small delay for typewriter effect
     }
 
     onDone();
