@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -161,19 +162,31 @@ export const Chat = () => {
       const abort = new AbortController();
       setController(abort);
 
+      // Get auth token for api.tivly.se
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const isEnterprise = userPlan?.plan === 'enterprise';
+      const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
+
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meeting-chat`,
+        "https://api.tivly.se/ai/chat",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            "Authorization": `Bearer ${token}`,
           },
           body: JSON.stringify({
             messages: newMessages,
             transcript: contextPrefix + transcriptContext,
             meetingSelected: hasMeetingContext,
             meetingCount: meetings.length,
+            model,
           }),
           signal: abort.signal,
         }
