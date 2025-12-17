@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
@@ -14,6 +14,8 @@ const MONTHLY_LIMITS: Record<string, number | null> = {
 const HOURLY_LIMIT = 20;
 const DAILY_LIMIT = 50;
 
+const RATE_LIMIT_STORAGE_KEY = 'chat_rate_limits';
+
 interface ChatLimitState {
   chatMessageCount: number;
   chatMessageLimit: number | null;
@@ -26,6 +28,45 @@ interface RateLimitTracker {
   daily: { count: number; resetTime: number };
 }
 
+// Get rate limits from localStorage
+const getRateLimitsFromStorage = (): RateLimitTracker => {
+  try {
+    const stored = localStorage.getItem(RATE_LIMIT_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as RateLimitTracker;
+      const now = Date.now();
+      
+      // Reset if times have passed
+      if (now >= parsed.hourly.resetTime) {
+        parsed.hourly = { count: 0, resetTime: now + 60 * 60 * 1000 };
+      }
+      if (now >= parsed.daily.resetTime) {
+        parsed.daily = { count: 0, resetTime: now + 24 * 60 * 60 * 1000 };
+      }
+      
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse rate limits from storage:', e);
+  }
+  
+  // Default values
+  const now = Date.now();
+  return {
+    hourly: { count: 0, resetTime: now + 60 * 60 * 1000 },
+    daily: { count: 0, resetTime: now + 24 * 60 * 60 * 1000 },
+  };
+};
+
+// Save rate limits to localStorage
+const saveRateLimitsToStorage = (tracker: RateLimitTracker) => {
+  try {
+    localStorage.setItem(RATE_LIMIT_STORAGE_KEY, JSON.stringify(tracker));
+  } catch (e) {
+    console.error('Failed to save rate limits to storage:', e);
+  }
+};
+
 export function useChatLimit() {
   const { userPlan, isAdmin } = useSubscription();
   const [state, setState] = useState<ChatLimitState>({
@@ -35,11 +76,8 @@ export function useChatLimit() {
     error: null,
   });
   
-  // Hidden rate limit tracking (client-side, resets on page refresh intentionally)
-  const rateLimitRef = useRef<RateLimitTracker>({
-    hourly: { count: 0, resetTime: Date.now() + 60 * 60 * 1000 },
-    daily: { count: 0, resetTime: Date.now() + 24 * 60 * 60 * 1000 },
-  });
+  // Rate limit tracking persisted in localStorage
+  const [rateLimit, setRateLimit] = useState<RateLimitTracker>(getRateLimitsFromStorage);
 
   // Get monthly limit based on plan
   const getMonthlyLimit = useCallback(() => {
@@ -53,21 +91,30 @@ export function useChatLimit() {
     return MONTHLY_LIMITS[plan] ?? MONTHLY_LIMITS.free;
   }, [userPlan, isAdmin]);
 
-  // Check and update rate limits
+  // Check and update rate limits (reads from state, which is synced with localStorage)
   const checkRateLimits = useCallback((): { allowed: boolean; reason?: string } => {
     if (isAdmin) return { allowed: true };
     
     const now = Date.now();
-    const tracker = rateLimitRef.current;
+    let tracker = { ...rateLimit };
+    let needsUpdate = false;
     
     // Reset hourly counter if time passed
     if (now >= tracker.hourly.resetTime) {
       tracker.hourly = { count: 0, resetTime: now + 60 * 60 * 1000 };
+      needsUpdate = true;
     }
     
     // Reset daily counter if time passed
     if (now >= tracker.daily.resetTime) {
       tracker.daily = { count: 0, resetTime: now + 24 * 60 * 60 * 1000 };
+      needsUpdate = true;
+    }
+    
+    // Update state and storage if reset happened
+    if (needsUpdate) {
+      setRateLimit(tracker);
+      saveRateLimitsToStorage(tracker);
     }
     
     // Check hourly limit
@@ -81,7 +128,7 @@ export function useChatLimit() {
     }
     
     return { allowed: true };
-  }, [isAdmin]);
+  }, [isAdmin, rateLimit]);
 
   // Fetch current chat count from backend
   const fetchChatCount = useCallback(async () => {
@@ -137,10 +184,13 @@ export function useChatLimit() {
 
   // Increment chat counter (called after successful chat)
   const incrementCounter = useCallback(async (count: number = 1) => {
-    // Update rate limit counters
-    const tracker = rateLimitRef.current;
-    tracker.hourly.count += count;
-    tracker.daily.count += count;
+    // Update rate limit counters in state and localStorage
+    const newTracker = {
+      hourly: { ...rateLimit.hourly, count: rateLimit.hourly.count + count },
+      daily: { ...rateLimit.daily, count: rateLimit.daily.count + count },
+    };
+    setRateLimit(newTracker);
+    saveRateLimitsToStorage(newTracker);
     
     try {
       const data = await apiClient.incrementChatCounter(count);
@@ -160,7 +210,7 @@ export function useChatLimit() {
       }));
       return state.chatMessageCount + count;
     }
-  }, [state.chatMessageCount]);
+  }, [state.chatMessageCount, rateLimit]);
 
   const canSendResult = canSendMessage();
 
