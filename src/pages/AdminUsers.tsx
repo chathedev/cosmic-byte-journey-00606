@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
+import { AdminResetDialog } from '@/components/AdminResetDialog';
 
 interface UserData {
   email: string;
@@ -28,6 +28,8 @@ interface UserData {
   googleId?: string;
   hasUnlimitedInvite: boolean;
   unlimitedInviteNote?: string;
+  chatMessageCount?: number;
+  chatMessageLimit?: number | null;
   meetingUsage?: {
     meetingCount: number;
     meetingLimit: number | null;
@@ -68,7 +70,6 @@ export default function AdminUsers() {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [isAddingAdmin, setIsAddingAdmin] = useState(false);
   const [resetUsageUser, setResetUsageUser] = useState<UserData | null>(null);
-  const [resetNote, setResetNote] = useState('');
   const [isResettingUsage, setIsResettingUsage] = useState(false);
   const [selectedUserDetail, setSelectedUserDetail] = useState<UserData | null>(null);
   const { toast } = useToast();
@@ -333,35 +334,34 @@ export default function AdminUsers() {
     }
   };
 
-  const handleResetUsage = async () => {
+  const handleResetUsage = async (options: { resetMeetings: boolean; resetChat: boolean; note?: string }) => {
     if (!resetUsageUser) return;
     
     setIsResettingUsage(true);
     try {
-      const result = await apiClient.resetUserMonthlyUsage(
-        resetUsageUser.email,
-        resetNote || undefined
-      );
+      const results: string[] = [];
+      
+      if (options.resetMeetings) {
+        await apiClient.resetUserMonthlyUsage(resetUsageUser.email, options.note);
+        results.push('möten');
+      }
+      
+      if (options.resetChat) {
+        await apiClient.resetChatCounter(resetUsageUser.email);
+        results.push('chatt');
+      }
       
       toast({
-        title: "✅ Användningen återställd",
-        description: `${resetUsageUser.email} har nu 0 använda möten denna månad.`,
+        title: "✅ Återställt",
+        description: `${resetUsageUser.email}: ${results.join(' & ')} återställda.`,
       });
       
-      // Update the user in the list with new data
-      setUsers(users.map(u => 
-        u.email === resetUsageUser.email 
-          ? { ...u, meetingUsage: result.meetingUsage }
-          : u
-      ));
-      
       setResetUsageUser(null);
-      setResetNote('');
-      fetchUsers(); // Refresh to get latest data
+      fetchUsers();
     } catch (error) {
       toast({
         title: "Fel",
-        description: error instanceof Error ? error.message : 'Kunde inte återställa användningen',
+        description: error instanceof Error ? error.message : 'Kunde inte återställa',
         variant: "destructive",
       });
     } finally {
@@ -909,58 +909,15 @@ export default function AdminUsers() {
       </AlertDialog>
 
       {/* Reset Usage Dialog */}
-      <AlertDialog open={!!resetUsageUser} onOpenChange={(open) => { if (!open) { setResetUsageUser(null); setResetNote(''); } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset Monthly Usage</AlertDialogTitle>
-            <AlertDialogDescription>
-              Reset meeting usage for <span className="font-semibold text-foreground">{resetUsageUser?.email}</span> back to zero. 
-              This sets a new baseline without deleting meeting history.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="reset-note">Note (optional)</Label>
-              <Textarea
-                id="reset-note"
-                placeholder="e.g., Manual reset for March invoice"
-                value={resetNote}
-                onChange={(e) => setResetNote(e.target.value.slice(0, 500))}
-                className="resize-none"
-                rows={3}
-              />
-              <p className="text-xs text-muted-foreground">
-                {resetNote.length}/500 characters
-              </p>
-            </div>
-            {resetUsageUser && (
-              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                <p className="text-xs text-muted-foreground">Current Usage</p>
-                <p className="text-sm font-medium">
-                  {getUsedMeetings(resetUsageUser)} / {getEffectiveMeetingLimit(resetUsageUser) ?? '∞'} meetings
-                </p>
-              </div>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResettingUsage}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleResetUsage}
-              disabled={isResettingUsage}
-              className="bg-orange-600 text-white hover:bg-orange-700"
-            >
-              {isResettingUsage ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Resetting...
-                </>
-              ) : (
-                'Reset Usage'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AdminResetDialog
+        user={resetUsageUser}
+        open={!!resetUsageUser}
+        onOpenChange={(open) => !open && setResetUsageUser(null)}
+        onReset={handleResetUsage}
+        isResetting={isResettingUsage}
+        getUsedMeetings={getUsedMeetings}
+        getEffectiveMeetingLimit={getEffectiveMeetingLimit}
+      />
 
       {/* User Detail Dialog */}
       <UserDetailDialog
