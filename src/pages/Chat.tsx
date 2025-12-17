@@ -162,10 +162,9 @@ export const Chat = () => {
       const abort = new AbortController();
       setController(abort);
 
-      // Get auth token from Supabase session
+      // Get auth token (prefer localStorage, fall back to Supabase)
       const { data: { session } } = await supabase.auth.getSession();
       const supabaseToken = session?.access_token;
-      // Also check localStorage for api.tivly.se auth
       const localToken = localStorage.getItem('authToken');
       const token = localToken || supabaseToken;
 
@@ -183,60 +182,38 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
 
       const userPrompt = newMessages.map(m => `${m.role === 'user' ? 'Användare' : 'Assistent'}: ${m.content}`).join('\n\n');
 
-      const response = await fetch(
-        "https://api.tivly.se/ai/gemini",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            prompt: `${systemPrompt}\n\n${userPrompt}`,
-            model,
-            temperature: 0.7,
-            maxOutputTokens: 2048,
-          }),
-          signal: abort.signal,
-        }
-      );
+      // Call via Supabase edge function
+      const { data, error: fnError } = await supabase.functions.invoke('ai-gemini', {
+        body: {
+          prompt: `${systemPrompt}\n\n${userPrompt}`,
+          model,
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      if (response.status === 429) {
-        toast({
-          title: "För många förfrågningar",
-          description: "Vänligen vänta en stund innan du försöker igen.",
-          variant: "destructive",
-        });
-        setMessages(messages);
-        setIsLoading(false);
-        return;
+      if (fnError) {
+        console.error('[Chat] Supabase function error:', fnError);
+        throw new Error(fnError.message || 'AI-fel');
       }
 
-      if (response.status === 402) {
-        toast({
-          title: "Betalning krävs",
-          description: "Vänligen lägg till krediter för att använda AI-chatten.",
-          variant: "destructive",
-        });
-        setMessages(messages);
-        setIsLoading(false);
-        return;
+      if (data?.error) {
+        if (data.error === "rate_limited" || data.status === 429) {
+          toast({
+            title: "För många förfrågningar",
+            description: "Vänligen vänta en stund innan du försöker igen.",
+            variant: "destructive",
+          });
+          setMessages(messages);
+          setIsLoading(false);
+          return;
+        }
+        throw new Error(data.message || data.error || "API-fel");
       }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 400 && errorData.error === "prompt_required") {
-          throw new Error("En prompt krävs");
-        }
-        if (response.status === 502 && errorData.error === "google_ai_failed") {
-          throw new Error(errorData.message || "Gemini API-fel");
-        }
-        throw new Error(errorData.message || errorData.error || "API-fel");
-      }
-
-      const data = await response.json();
-      
       // Extract text from Gemini response
       const assistantContent = 
         data.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
