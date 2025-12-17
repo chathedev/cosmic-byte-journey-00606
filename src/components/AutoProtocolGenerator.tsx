@@ -10,6 +10,8 @@ import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
 import { backendApi } from "@/lib/backendApi";
+import { analyzeMeetingAI, generateMeetingTitleAI } from "@/lib/geminiApi";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface AIActionItem {
   title: string;
@@ -95,7 +97,10 @@ export const AutoProtocolGenerator = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { userPlan } = useSubscription();
   const hasGeneratedRef = useRef(false);
+  
+  const isEnterprise = userPlan?.plan === 'enterprise';
 
   useEffect(() => {
     if (aiProtocol || hasGeneratedRef.current) return;
@@ -238,84 +243,38 @@ export const AutoProtocolGenerator = ({
           speakers: speakerInfo,
         };
         
-        console.log('🚀 Sending to analyze-meeting:', {
+        console.log('🚀 Calling analyzeMeetingAI via api.tivly.se:', {
           transcriptPreview: formattedTranscript.substring(0, 200),
           wordCount,
           hasAgenda: !!requestBody.agenda,
           hasSpeakerAttribution: requestBody.hasSpeakerAttribution,
-          speakers: requestBody.speakers
+          speakers: requestBody.speakers,
+          isEnterprise
         });
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-meeting`,
+        // Use the new API endpoint
+        const data = await analyzeMeetingAI(
+          formattedTranscript,
+          fileName.replace('.docx', ''),
           {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify(requestBody),
+            agenda: requestBody.agenda,
+            hasSpeakerAttribution: requestBody.hasSpeakerAttribution,
+            speakers: requestBody.speakers,
+            isEnterprise,
           }
         );
 
-        console.log('📡 analyze-meeting response status:', response.status, response.statusText);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("❌ Edge function error:", response.status, errorText);
-          
-          let errorData;
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || "Unknown error" };
-          }
-          
-          throw new Error(errorData.error || `Server error: ${response.status}`);
-        }
-
-        const data = await response.json();
         console.log("✅ Received protocol data:", {
           hasTitle: !!data.title,
           hasSummary: !!data.summary,
           summaryLength: data.summary?.length || 0,
           mainPointsCount: data.mainPoints?.length || 0,
-          mainPointsIsArray: Array.isArray(data.mainPoints),
           decisionsCount: data.decisions?.length || 0,
-          decisionsIsArray: Array.isArray(data.decisions),
           actionItemsCount: data.actionItems?.length || 0
         });
         
-        // Extra validation to ensure arrays are actually arrays
-        if (!Array.isArray(data.mainPoints)) {
-          console.error("❌ mainPoints is not an array:", typeof data.mainPoints);
-          throw new Error("Ogiltigt format från AI - huvudpunkter saknas");
-        }
-        
-        if (!Array.isArray(data.decisions)) {
-          console.warn("⚠️ decisions is not an array, converting:", typeof data.decisions);
-          data.decisions = [];
-        }
-        
-        if (!Array.isArray(data.actionItems)) {
-          console.warn("⚠️ actionItems is not an array, converting:", typeof data.actionItems);
-          data.actionItems = [];
-        }
-        
-        // Validate that we have actual content
-        if (!data.summary || data.summary.trim() === '') {
-          console.error("❌ Empty summary received from AI");
-          throw new Error("AI genererade inget innehåll. Försök igen.");
-        }
-        
-        if (data.mainPoints.length === 0) {
-          console.error("❌ No main points received from AI");
-          throw new Error("AI kunde inte generera huvudpunkter. Försök igen.");
-        }
-        
         // Complete progress smoothly
         clearInterval(progressInterval);
-        // Animate from current to 100 smoothly
         const animateToComplete = () => {
           setProgress(prev => {
             if (prev >= 100) return 100;

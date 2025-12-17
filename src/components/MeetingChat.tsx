@@ -5,16 +5,13 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageCircle, Send, Loader2, X, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+import { streamChat, ChatMessage } from "@/lib/geminiApi";
 
 interface MeetingChatProps {
   transcript: string;
   meetingTitle: string;
   onClose: () => void;
+  isEnterprise?: boolean;
 }
 
 const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
@@ -53,8 +50,8 @@ const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () =>
   );
 };
 
-export const MeetingChat = ({ transcript, meetingTitle, onClose }: MeetingChatProps) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+export const MeetingChat = ({ transcript, meetingTitle, onClose, isEnterprise = false }: MeetingChatProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessageIndex, setStreamingMessageIndex] = useState<number | null>(null);
@@ -68,7 +65,7 @@ export const MeetingChat = ({ transcript, meetingTitle, onClose }: MeetingChatPr
     }
   }, [messages]);
 
-  const streamChat = async (userMessage: string) => {
+  const handleStreamChat = async (userMessage: string) => {
     // Client-side rate limiting: 2 seconds between requests
     const now = Date.now();
     const timeSinceLastRequest = now - lastRequestTime;
@@ -82,132 +79,62 @@ export const MeetingChat = ({ transcript, meetingTitle, onClose }: MeetingChatPr
     }
     setLastRequestTime(now);
 
-    const newMessages = [...messages, { role: "user" as const, content: userMessage }];
+    const newMessages: ChatMessage[] = [...messages, { role: "user" as const, content: userMessage }];
     setMessages(newMessages);
     setIsLoading(true);
 
+    let assistantContent = "";
+    setStreamingMessageIndex(newMessages.length);
+
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meeting-chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
-          },
-          body: JSON.stringify({
-            messages: newMessages,
-            transcript,
-          }),
-        }
-      );
-
-      if (response.status === 429) {
-        toast({
-          title: "För många förfrågningar",
-          description: "Vänligen vänta en stund innan du försöker igen.",
-          variant: "destructive",
-        });
-        setMessages(messages);
-        setIsLoading(false);
-        return;
-      }
-
-      if (response.status === 402) {
-        toast({
-          title: "Betalning krävs",
-          description: "Vänligen lägg till krediter för att använda AI-chatten.",
-          variant: "destructive",
-        });
-        setMessages(messages);
-        setIsLoading(false);
-        return;
-      }
-
-      if (!response.ok || !response.body) {
-        throw new Error("Failed to start stream");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
-      let assistantContent = "";
-      
-      // Set streaming index
-      setStreamingMessageIndex(newMessages.length);
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") {
-            streamDone = true;
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantContent += content;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) =>
-                    i === prev.length - 1 ? { ...m, content: assistantContent } : m
-                  );
-                }
-                return [...prev, { role: "assistant", content: assistantContent }];
-              });
+      await streamChat({
+        messages: newMessages,
+        transcript,
+        isEnterprise,
+        onDelta: (chunk) => {
+          assistantContent += chunk;
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              return prev.map((m, i) =>
+                i === prev.length - 1 ? { ...m, content: assistantContent } : m
+              );
             }
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
+            return [...prev, { role: "assistant", content: assistantContent }];
+          });
+        },
+        onDone: () => {
+          setStreamingMessageIndex(null);
+          setIsLoading(false);
+        },
+        onError: (error) => {
+          console.error("Chat error:", error);
+          
+          if (error.message.includes("429") || error.message.includes("För många")) {
+            toast({
+              title: "För många förfrågningar",
+              description: "Vänligen vänta en stund innan du försöker igen.",
+              variant: "destructive",
+            });
+          } else if (error.message.includes("402") || error.message.includes("Betalning")) {
+            toast({
+              title: "Betalning krävs",
+              description: "Vänligen lägg till krediter för att använda AI-chatten.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Fel",
+              description: "Kunde inte skicka meddelandet. Försök igen.",
+              variant: "destructive",
+            });
           }
-        }
-      }
-
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (raw.startsWith(":") || raw.trim() === "") continue;
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantContent += content;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) =>
-                    i === prev.length - 1 ? { ...m, content: assistantContent } : m
-                  );
-                }
-                return [...prev, { role: "assistant", content: assistantContent }];
-              });
-            }
-          } catch {}
-        }
-      }
-
-      setStreamingMessageIndex(null);
-      setIsLoading(false);
+          
+          setMessages(messages);
+          setStreamingMessageIndex(null);
+          setIsLoading(false);
+        },
+      });
     } catch (error) {
       console.error("Chat error:", error);
       toast({
@@ -225,7 +152,7 @@ export const MeetingChat = ({ transcript, meetingTitle, onClose }: MeetingChatPr
     if (!input.trim() || isLoading) return;
     const userMessage = input.trim();
     setInput("");
-    streamChat(userMessage);
+    handleStreamChat(userMessage);
   };
 
   return (
