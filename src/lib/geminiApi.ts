@@ -14,6 +14,7 @@ export interface GeminiRequest {
   model?: GeminiModel;
   temperature?: number;
   maxOutputTokens?: number;
+  costUsd?: number; // Optional: records USD cost for this call
 }
 
 export interface GeminiResponse {
@@ -33,6 +34,7 @@ export interface GeminiResponse {
       totalTokenCount?: number;
     };
   };
+  recordedCostUsd: number | null; // Echoed cost that was recorded
 }
 
 export interface GeminiError {
@@ -45,6 +47,32 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface CostEntry {
+  service: string;
+  costUsd: number;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  userEmail?: string; // Admin-only: attribute cost to another user
+}
+
+export interface UserCosts {
+  totalUsd: number;
+  history: Array<{
+    service: string;
+    costUsd: number;
+    description?: string;
+    timestamp: string;
+  }>;
+}
+
+export interface AdminCosts {
+  totalUsd: number;
+  byService: Record<string, number>;
+  byUser: Record<string, { totalUsd: number; history: Array<unknown> }>;
+  history: Array<unknown>;
+  lastUpdated: string;
+}
+
 /**
  * Get the auth token for API requests
  */
@@ -54,6 +82,115 @@ async function getAuthToken(): Promise<string> {
     throw new Error("Not authenticated");
   }
   return session.access_token;
+}
+
+/**
+ * Record an AI cost for any custom action (protocol emails, reports, etc.)
+ * 
+ * @param entry - Cost entry with service, costUsd, description, metadata
+ * @returns Success status
+ */
+export async function recordAICost(entry: CostEntry): Promise<boolean> {
+  if (!entry.costUsd || entry.costUsd <= 0) {
+    console.warn('Invalid cost amount, skipping cost recording');
+    return false;
+  }
+
+  const token = await getAuthToken();
+
+  const response = await fetch(`${API_BASE_URL}/ai/cost`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      service: entry.service || 'ai',
+      costUsd: entry.costUsd,
+      description: entry.description,
+      metadata: entry.metadata,
+      userEmail: entry.userEmail, // Only works for admins
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 400 && errorData.error === 'invalid_cost') {
+      console.error('Invalid cost amount');
+      return false;
+    }
+    console.error('Failed to record AI cost:', errorData);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Get AI costs for the current user (or all users for admins)
+ * 
+ * @returns User costs (or admin snapshot with all users)
+ */
+export async function getAICosts(): Promise<{ user?: UserCosts; admin?: AdminCosts }> {
+  const token = await getAuthToken();
+
+  const response = await fetch(`${API_BASE_URL}/ai/costs`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch AI costs');
+  }
+
+  const data = await response.json();
+  
+  // Non-admin response has { success, user: { totalUsd, history } }
+  // Admin response has { success, totalUsd, byService, byUser, history, lastUpdated }
+  if (data.user) {
+    return { user: data.user };
+  }
+  
+  return {
+    admin: {
+      totalUsd: data.totalUsd,
+      byService: data.byService,
+      byUser: data.byUser,
+      history: data.history,
+      lastUpdated: data.lastUpdated,
+    }
+  };
+}
+
+/**
+ * Get admin AI costs (full snapshot) - requires admin privileges
+ * 
+ * @returns Full admin cost snapshot
+ */
+export async function getAdminAICosts(): Promise<AdminCosts> {
+  const token = await getAuthToken();
+
+  const response = await fetch(`${API_BASE_URL}/admin/ai-costs`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch admin AI costs');
+  }
+
+  const data = await response.json();
+  return {
+    totalUsd: data.totalUsd,
+    byService: data.byService,
+    byUser: data.byUser,
+    history: data.history,
+    lastUpdated: data.lastUpdated,
+  };
 }
 
 /**
@@ -75,34 +212,52 @@ export async function generateWithGemini(
   // Set default model based on enterprise status if not specified
   const model = request.model || (isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite");
 
+  const requestBody: Record<string, unknown> = {
+    prompt: request.prompt,
+    model,
+  };
+
+  // Add optional parameters if provided
+  if (request.temperature !== undefined) {
+    requestBody.temperature = request.temperature;
+  }
+  if (request.maxOutputTokens !== undefined) {
+    requestBody.maxOutputTokens = request.maxOutputTokens;
+  }
+  if (request.costUsd !== undefined && request.costUsd > 0) {
+    requestBody.costUsd = request.costUsd;
+  }
+
   const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      ...request,
-      model,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({})) as GeminiError;
     
+    // Handle specific error codes per API docs
     if (response.status === 400 && errorData.error === "prompt_required") {
-      throw new Error("A prompt is required");
+      throw new Error("En prompt krävs");
     }
     
-    if (response.status === 502) {
-      throw new Error(errorData.message || "Gemini API error - please try again later");
+    if (response.status === 502 && errorData.error === "google_ai_failed") {
+      throw new Error(errorData.message || "Gemini API-fel - försök igen senare");
     }
 
     if (response.status === 429) {
       throw new Error("För många förfrågningar. Vänligen vänta en stund.");
     }
+
+    if (response.status === 402) {
+      throw new Error("Betalning krävs. Vänligen lägg till krediter.");
+    }
     
-    throw new Error(errorData.message || errorData.error || `API error: ${response.status}`);
+    throw new Error(errorData.message || errorData.error || `API-fel: ${response.status}`);
   }
 
   return response.json();
