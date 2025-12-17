@@ -6,9 +6,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ArrowLeft, RefreshCw, DollarSign, Users, Layers, Clock, TrendingUp, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAdminAICosts, AdminCosts } from "@/lib/geminiApi";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+
+type Currency = 'USD' | 'SEK';
 
 export default function AdminAICosts() {
   const { isAdmin } = useSubscription();
@@ -18,6 +23,9 @@ export default function AdminAICosts() {
   const [costsData, setCostsData] = useState<AdminCosts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<Currency>('USD');
+
+  const { rate, convert, loading: rateLoading, lastUpdated: rateUpdated } = useExchangeRate('USD', 'SEK');
 
   const fetchCosts = async () => {
     setIsLoading(true);
@@ -47,12 +55,13 @@ export default function AdminAICosts() {
     fetchCosts();
   }, [isAdmin, navigate]);
 
-  const formatUsd = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+  const formatAmount = (amountUsd: number) => {
+    const amount = currency === 'SEK' ? convert(amountUsd) : amountUsd;
+    return new Intl.NumberFormat(currency === 'SEK' ? 'sv-SE' : 'en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 2,
-      maximumFractionDigits: 4,
+      maximumFractionDigits: currency === 'SEK' ? 2 : 4,
     }).format(amount);
   };
 
@@ -98,19 +107,52 @@ export default function AdminAICosts() {
               <p className="text-xs text-muted-foreground">Admin Dashboard</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchCosts}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Uppdatera
-          </Button>
+          <div className="flex items-center gap-4">
+            {/* Currency Toggle */}
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+              <Label htmlFor="currency-toggle" className={`text-sm font-medium transition-colors ${currency === 'USD' ? 'text-primary' : 'text-muted-foreground'}`}>
+                USD
+              </Label>
+              <Switch
+                id="currency-toggle"
+                checked={currency === 'SEK'}
+                onCheckedChange={(checked) => setCurrency(checked ? 'SEK' : 'USD')}
+                disabled={rateLoading}
+              />
+              <Label htmlFor="currency-toggle" className={`text-sm font-medium transition-colors ${currency === 'SEK' ? 'text-primary' : 'text-muted-foreground'}`}>
+                SEK
+              </Label>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchCosts}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Uppdatera
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-4 space-y-6">
+        {/* Exchange Rate Info */}
+        {currency === 'SEK' && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="flex items-center justify-between py-3">
+              <p className="text-sm text-muted-foreground">
+                Växelkurs: <span className="font-semibold text-foreground">1 USD = {rate.toFixed(2)} SEK</span>
+              </p>
+              {rateUpdated && (
+                <p className="text-xs text-muted-foreground">
+                  Uppdaterad: {rateUpdated.toLocaleTimeString('sv-SE')}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {error && (
           <Card className="border-destructive/50 bg-destructive/5">
             <CardContent className="flex items-center gap-3 py-4">
@@ -135,7 +177,7 @@ export default function AdminAICosts() {
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <p className="text-2xl font-bold text-primary">
-                  {formatUsd(costsData?.totalUsd || 0)}
+                  {formatAmount(costsData?.totalUsd || 0)}
                 </p>
               )}
             </CardContent>
@@ -225,7 +267,7 @@ export default function AdminAICosts() {
                           {service}
                         </Badge>
                       </div>
-                      <span className="font-semibold">{formatUsd(cost)}</span>
+                      <span className="font-semibold">{formatAmount(cost)}</span>
                     </div>
                   ))}
               </div>
@@ -261,7 +303,7 @@ export default function AdminAICosts() {
                             {userData.history?.length || 0} transaktioner
                           </p>
                         </div>
-                        <span className="font-semibold text-primary">{formatUsd(userData.totalUsd)}</span>
+                        <span className="font-semibold text-primary">{formatAmount(userData.totalUsd)}</span>
                       </div>
                     ))}
                 </div>
@@ -312,7 +354,7 @@ export default function AdminAICosts() {
                         </p>
                       </div>
                       <span className="font-semibold text-sm whitespace-nowrap ml-2">
-                        {formatUsd(entry.amountUsd)}
+                        {formatAmount(entry.amountUsd)}
                       </span>
                     </div>
                   ))}
