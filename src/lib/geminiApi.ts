@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const API_BASE_URL = "https://api.tivly.se";
+// Use Supabase edge function for AI calls
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export type GeminiModel = 
   | "gemini-2.5-flash"
@@ -92,6 +93,8 @@ async function getAuthToken(): Promise<string | null> {
   }
 }
 
+const API_BASE_URL = "https://api.tivly.se";
+
 async function buildApiHeaders(extra?: HeadersInit): Promise<HeadersInit> {
   const token = await getAuthToken();
   const headers: HeadersInit = {
@@ -100,7 +103,7 @@ async function buildApiHeaders(extra?: HeadersInit): Promise<HeadersInit> {
   };
 
   if (token) {
-    (headers as any).Authorization = `Bearer ${token}`;
+    (headers as Record<string, string>).Authorization = `Bearer ${token}`;
   }
 
   return headers;
@@ -208,7 +211,7 @@ export async function getAdminAICosts(): Promise<AdminCosts> {
 }
 
 /**
- * Call the Gemini AI endpoint via api.tivly.se backend.
+ * Call the Gemini AI endpoint via Supabase edge function.
  * 
  * Uses gemini-2.5-flash for enterprise users and gemini-2.5-flash-lite for regular users by default.
  * 
@@ -239,40 +242,37 @@ export async function generateWithGemini(
     requestBody.costUsd = request.costUsd;
   }
 
-  // Prefer bearer token when available, but always include cookies for web auth.
-  const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
-    method: "POST",
-    credentials: "include",
-    headers: await buildApiHeaders({
-      "Content-Type": "application/json",
-    }),
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as GeminiError;
-
-    // Handle specific error codes per API docs
-    if (response.status === 400 && errorData.error === "prompt_required") {
-      throw new Error("En prompt krävs");
-    }
-
-    if (response.status === 502 && errorData.error === "google_ai_failed") {
-      throw new Error(errorData.message || "Gemini API-fel - försök igen senare");
-    }
-
-    if (response.status === 429) {
-      throw new Error("För många förfrågningar. Vänligen vänta en stund.");
-    }
-
-    if (response.status === 402) {
-      throw new Error("Betalning krävs. Vänligen lägg till krediter.");
-    }
-
-    throw new Error(errorData.message || errorData.error || `API-fel: ${response.status}`);
+  // Get auth token for the edge function
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("Inte inloggad");
   }
 
-  return response.json();
+  // Call via Supabase edge function
+  const { data, error } = await supabase.functions.invoke('ai-gemini', {
+    body: requestBody,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (error) {
+    console.error('[generateWithGemini] Supabase function error:', error);
+    throw new Error(error.message || 'AI-fel');
+  }
+
+  if (data?.error) {
+    // Handle specific error codes per API docs
+    if (data.error === "prompt_required") {
+      throw new Error("En prompt krävs");
+    }
+    if (data.error === "google_ai_failed") {
+      throw new Error(data.message || "Gemini API-fel - försök igen senare");
+    }
+    throw new Error(data.message || data.error || 'API-fel');
+  }
+
+  return data as GeminiResponse;
 }
 
 /**
@@ -321,8 +321,8 @@ export async function generateTextWithModel(
 }
 
 /**
- * Stream chat with Gemini via api.tivly.se/ai/chat endpoint.
- * Supports SSE streaming for real-time responses.
+ * Stream chat with Gemini via Supabase edge function.
+ * Uses simulated streaming for typewriter effect.
  * 
  * @param messages - Array of chat messages
  * @param transcript - Optional meeting transcript for context
@@ -353,42 +353,41 @@ export async function streamChat({
   const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 
   try {
-    // Build prompt for /ai/gemini endpoint (non-streaming)
+    // Build prompt for edge function
     const systemPrompt = `Du är en intelligent mötesassistent för Tivly. Svara på svenska.${transcript ? `\n\nMÖTESINNEHÅLL:\n${transcript}` : ''}`;
     const userPrompt = messages.map(m => `${m.role === 'user' ? 'Användare' : 'Assistent'}: ${m.content}`).join('\n\n');
 
-    const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
-      method: "POST",
-      credentials: "include",
-      headers: await buildApiHeaders({
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({
+    // Get auth token
+    const token = await getAuthToken();
+    if (!token) {
+      onError(new Error("Inte inloggad"));
+      return;
+    }
+
+    // Call via Supabase edge function
+    const { data, error } = await supabase.functions.invoke('ai-gemini', {
+      body: {
         prompt: `${systemPrompt}\n\n${userPrompt}`,
         model,
         temperature: 0.7,
         maxOutputTokens: 2048,
-      }),
+      },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
-    if (response.status === 429) {
-      onError(new Error("För många förfrågningar. Vänligen vänta en stund."));
+    if (error) {
+      console.error('[streamChat] Supabase function error:', error);
+      onError(new Error(error.message || 'AI-fel'));
       return;
     }
 
-    if (response.status === 402) {
-      onError(new Error("Betalning krävs. Vänligen lägg till krediter."));
+    if (data?.error) {
+      onError(new Error(data.message || data.error || "API-fel"));
       return;
     }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      onError(new Error(errorData.message || errorData.error || "API-fel"));
-      return;
-    }
-
-    const data = await response.json();
-    
     // Extract text from Gemini response
     const assistantContent = 
       data.response?.candidates?.[0]?.content?.parts?.[0]?.text ||

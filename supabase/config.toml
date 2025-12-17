@@ -2,3 +2,6 @@ project_id = "szgvcpseqcpmwyddaosm"
 
 [functions.analyze-meeting]
 verify_jwt = false
+
+[functions.ai-gemini]
+verify_jwt = false
