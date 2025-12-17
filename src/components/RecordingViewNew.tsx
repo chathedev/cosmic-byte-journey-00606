@@ -489,13 +489,27 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
     }
 
     // For browser mode (Free/Pro), check if we have any transcript
-    if (!useAsrMode && !liveTranscript.trim() && !interimText.trim()) {
+    const currentTranscript = (liveTranscript + ' ' + interimText).trim();
+    if (!useAsrMode && !currentTranscript) {
       toast({
         title: 'Ingen text transkriberad',
         description: 'Försäkra dig om att mikrofonen fungerar och tala tydligt.',
         variant: 'destructive',
       });
       return;
+    }
+
+    // Check minimum word count (20 words) for browser mode
+    if (!useAsrMode) {
+      const wordCount = currentTranscript.split(/\s+/).filter(w => w).length;
+      if (wordCount < 20) {
+        toast({
+          title: 'För kort transkription',
+          description: `Minst 20 ord krävs för att generera protokoll. Du har ${wordCount} ord.`,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -708,14 +722,14 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
     onBack();
   };
 
-  // Loading overlay while saving
-  if (isSaving) {
+  // Loading overlay while saving - only for users with library access
+  const canAccessLibraryForOverlay = hasLibraryAccess(userPlan?.plan, isAdmin);
+  if (isSaving && canAccessLibraryForOverlay) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <h2 className="text-lg font-medium">Sparar möte...</h2>
-          <p className="text-sm text-muted-foreground">Omdirigerar till biblioteket</p>
         </div>
       </div>
     );
