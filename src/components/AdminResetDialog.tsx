@@ -103,7 +103,7 @@ export function AdminResetDialog({
                 </label>
                 {user && (
                   <p className="text-xs text-muted-foreground">
-                    Currently: {getUsedMeetings(user)} / {getEffectiveMeetingLimit(user) ?? '∞'} meetings
+                    Currently: {getUsedMeetings(user)}{getEffectiveMeetingLimit(user) !== null ? ` / ${getEffectiveMeetingLimit(user)}` : ''} meetings
                   </p>
                 )}
               </div>
@@ -126,7 +126,7 @@ export function AdminResetDialog({
                   Chat Message Counter
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Currently: {user?.chatMessageCount ?? 0} / {user?.chatMessageLimit ?? '∞'} messages
+                  Currently: {user?.chatMessageCount ?? 0}{user?.chatMessageLimit !== null && user?.chatMessageLimit !== undefined ? ` / ${user.chatMessageLimit}` : ''} messages
                 </p>
               </div>
             </div>
