@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+
 
 interface Message {
   role: "user" | "assistant";
@@ -162,13 +162,8 @@ export const Chat = () => {
       const abort = new AbortController();
       setController(abort);
 
-      // Get auth token for api.tivly.se
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
+      // Auth for api.tivly.se
+      const token = localStorage.getItem('authToken');
 
       const isEnterprise = userPlan?.plan === 'enterprise';
       const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
@@ -177,9 +172,10 @@ export const Chat = () => {
         "https://api.tivly.se/ai/chat",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             messages: newMessages,
