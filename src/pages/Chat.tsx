@@ -571,34 +571,40 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
 
         {/* Input Area */}
         <div className="border-t bg-background p-4 flex-shrink-0">
-          <div className="flex gap-3 max-w-3xl mx-auto w-full">
-            <Input
-              placeholder="Skriv din fråga..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              disabled={isLoading}
-              className="flex-1 h-11 text-base border-border/50 focus-visible:ring-primary"
-            />
-            {isLoading ? (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={handleStop}
-                className="h-11 px-4 hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Loader2 className="w-5 h-5 animate-spin" />
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleSend} 
-                disabled={!input.trim()}
-                size="sm"
-                className="h-11 px-4 bg-primary hover:bg-primary/90"
-              >
-                <Send className="w-5 h-5" />
-              </Button>
-            )}
+          <div className="max-w-3xl mx-auto w-full space-y-2">
+            <div className="flex gap-3">
+              <Input
+                placeholder="Skriv din fråga..."
+                value={input}
+                onChange={(e) => setInput(e.target.value.slice(0, 100))}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+                disabled={isLoading}
+                maxLength={100}
+                className="flex-1 h-11 text-base border-border/50 focus-visible:ring-primary"
+              />
+              {isLoading ? (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={handleStop}
+                  className="h-11 px-4 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleSend} 
+                  disabled={!input.trim() || input.length > 100}
+                  size="sm"
+                  className="h-11 px-4 bg-primary hover:bg-primary/90"
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
+            <p className={`text-xs text-right ${input.length >= 90 ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {input.length}/100
+            </p>
           </div>
         </div>
       </div>

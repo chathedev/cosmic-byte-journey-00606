@@ -246,26 +246,32 @@ export const MeetingChat = ({ transcript, meetingTitle, onClose, isEnterprise = 
 
         {/* Input Area */}
         <div className="p-4 border-t bg-gradient-to-r from-background/50 to-muted/30 backdrop-blur-sm">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Skriv din fråga..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              disabled={isLoading}
-              className="bg-background/80 border-border/50 focus:border-primary/50 rounded-2xl transition-all h-11"
-            />
-            <Button 
-              onClick={handleSend} 
-              disabled={isLoading || !input.trim()}
-              className="h-11 px-5 rounded-2xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Skriv din fråga..."
+                value={input}
+                onChange={(e) => setInput(e.target.value.slice(0, 100))}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                disabled={isLoading}
+                maxLength={100}
+                className="bg-background/80 border-border/50 focus:border-primary/50 rounded-2xl transition-all h-11"
+              />
+              <Button 
+                onClick={handleSend} 
+                disabled={isLoading || !input.trim() || input.length > 100}
+                className="h-11 px-5 rounded-2xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-200 hover:scale-105 active:scale-95"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className={`text-xs text-right ${input.length >= 90 ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {input.length}/100
+            </p>
           </div>
         </div>
       </CardContent>
