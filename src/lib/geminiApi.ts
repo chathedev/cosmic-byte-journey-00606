@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 const API_BASE_URL = "https://api.tivly.se";
 
 export type GeminiModel = 
@@ -74,14 +72,14 @@ export interface AdminCosts {
 }
 
 /**
- * Get the auth token for API requests
+ * Get the auth token for API requests from localStorage (same as api.ts)
  */
-async function getAuthToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
+function getAuthToken(): string {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
     throw new Error("Not authenticated");
   }
-  return session.access_token;
+  return token;
 }
 
 /**
@@ -96,7 +94,7 @@ export async function recordAICost(entry: CostEntry): Promise<boolean> {
     return false;
   }
 
-  const token = await getAuthToken();
+  const token = getAuthToken();
 
   const response = await fetch(`${API_BASE_URL}/ai/cost`, {
     method: "POST",
@@ -132,7 +130,7 @@ export async function recordAICost(entry: CostEntry): Promise<boolean> {
  * @returns User costs (or admin snapshot with all users)
  */
 export async function getAICosts(): Promise<{ user?: UserCosts; admin?: AdminCosts }> {
-  const token = await getAuthToken();
+  const token = getAuthToken();
 
   const response = await fetch(`${API_BASE_URL}/ai/costs`, {
     method: "GET",
@@ -170,7 +168,7 @@ export async function getAICosts(): Promise<{ user?: UserCosts; admin?: AdminCos
  * @returns Full admin cost snapshot
  */
 export async function getAdminAICosts(): Promise<AdminCosts> {
-  const token = await getAuthToken();
+  const token = getAuthToken();
 
   const response = await fetch(`${API_BASE_URL}/admin/ai-costs`, {
     method: "GET",
@@ -207,7 +205,7 @@ export async function generateWithGemini(
   request: GeminiRequest, 
   isEnterprise = false
 ): Promise<GeminiResponse> {
-  const token = await getAuthToken();
+  const token = getAuthToken();
 
   // Set default model based on enterprise status if not specified
   const model = request.model || (isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite");
@@ -338,7 +336,7 @@ export async function streamChat({
   onDone: () => void;
   onError: (error: Error) => void;
 }): Promise<void> {
-  const token = await getAuthToken();
+  const token = getAuthToken();
   const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 
   try {
