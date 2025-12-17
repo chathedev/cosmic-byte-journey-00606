@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { UserDetailDialog } from '@/components/UserDetailDialog';
 
 interface UserData {
   email: string;
@@ -69,6 +70,7 @@ export default function AdminUsers() {
   const [resetUsageUser, setResetUsageUser] = useState<UserData | null>(null);
   const [resetNote, setResetNote] = useState('');
   const [isResettingUsage, setIsResettingUsage] = useState(false);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<UserData | null>(null);
   const { toast } = useToast();
 
   // Filter users based on search
@@ -565,7 +567,11 @@ export default function AdminUsers() {
                     </TableHeader>
                     <TableBody>
                       {filteredUsers.map((user, index) => (
-                        <TableRow key={index}>
+                        <TableRow 
+                          key={index} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedUserDetail(user)}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
@@ -624,12 +630,12 @@ export default function AdminUsers() {
                               })()}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleEditPlan(user)}
+                                onClick={(e) => { e.stopPropagation(); handleEditPlan(user); }}
                                 className="h-9 w-9 hover:bg-primary/10 hover:text-primary transition-all"
                                 title="Edit plan"
                               >
@@ -639,7 +645,7 @@ export default function AdminUsers() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleOpenStripeDashboard(user.email)}
+                                  onClick={(e) => { e.stopPropagation(); handleOpenStripeDashboard(user.email); }}
                                   className="h-9 w-9 hover:bg-accent/10 hover:text-accent transition-all"
                                   title="Open Stripe dashboard"
                                 >
@@ -649,7 +655,7 @@ export default function AdminUsers() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setResetUsageUser(user)}
+                                onClick={(e) => { e.stopPropagation(); setResetUsageUser(user); }}
                                 className="h-9 px-2 hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 transition-all"
                                 title="Reset monthly usage"
                               >
@@ -658,7 +664,7 @@ export default function AdminUsers() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setDeleteUser(user)}
+                                onClick={(e) => { e.stopPropagation(); setDeleteUser(user); }}
                                 className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                                 title="Delete user"
                               >
@@ -675,7 +681,11 @@ export default function AdminUsers() {
                 {/* Mobile Card View */}
                 <div className="lg:hidden divide-y">
                   {filteredUsers.map((user, index) => (
-                    <div key={index} className="p-4">
+                    <div 
+                      key={index} 
+                      className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => setSelectedUserDetail(user)}
+                    >
                       {/* User Header */}
                       <div className="flex items-start gap-3 mb-3">
                         <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
@@ -746,11 +756,11 @@ export default function AdminUsers() {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEditPlan(user)}
+                          onClick={(e) => { e.stopPropagation(); handleEditPlan(user); }}
                           className="flex-1 hover:bg-primary/10 hover:text-primary transition-all"
                         >
                           <Edit className="h-3.5 w-3.5 mr-1.5" />
@@ -760,7 +770,7 @@ export default function AdminUsers() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleOpenStripeDashboard(user.email)}
+                            onClick={(e) => { e.stopPropagation(); handleOpenStripeDashboard(user.email); }}
                             className="flex-1 hover:bg-accent/10 transition-all"
                           >
                             <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
@@ -770,7 +780,7 @@ export default function AdminUsers() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setResetUsageUser(user)}
+                          onClick={(e) => { e.stopPropagation(); setResetUsageUser(user); }}
                           className="h-9 px-2 hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400 transition-all"
                           title="Reset monthly usage"
                         >
@@ -779,7 +789,7 @@ export default function AdminUsers() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setDeleteUser(user)}
+                          onClick={(e) => { e.stopPropagation(); setDeleteUser(user); }}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10 transition-all"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -952,6 +962,13 @@ export default function AdminUsers() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* User Detail Dialog */}
+      <UserDetailDialog
+        user={selectedUserDetail}
+        open={!!selectedUserDetail}
+        onOpenChange={(open) => !open && setSelectedUserDetail(null)}
+        onOpenStripeDashboard={handleOpenStripeDashboard}
+      />
     </>
   );
 }
