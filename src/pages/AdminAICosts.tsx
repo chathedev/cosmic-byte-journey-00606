@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,43 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, RefreshCw, DollarSign, Users, Layers, Clock, TrendingUp, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-interface ServiceBreakdown {
-  [service: string]: number;
-}
-
-interface UserCostData {
-  totalUsd: number;
-  history: Array<{
-    service: string;
-    costUsd: number;
-    description?: string;
-    timestamp: string;
-  }>;
-}
-
-interface AdminCostsData {
-  totalUsd: number;
-  byService: ServiceBreakdown;
-  byUser: Record<string, UserCostData>;
-  history: Array<{
-    service: string;
-    costUsd: number;
-    userEmail?: string;
-    description?: string;
-    timestamp: string;
-  }>;
-  lastUpdated: string;
-}
+import { getAdminAICosts, AdminCosts } from "@/lib/geminiApi";
 
 export default function AdminAICosts() {
-  const { user } = useAuth();
   const { isAdmin } = useSubscription();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [costsData, setCostsData] = useState<AdminCostsData | null>(null);
+  const [costsData, setCostsData] = useState<AdminCosts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,43 +24,8 @@ export default function AdminAICosts() {
     setError(null);
 
     try {
-      // Get auth token from Supabase session or localStorage
-      const { data: { session } } = await supabase.auth.getSession();
-      const supabaseToken = session?.access_token;
-      const localToken = localStorage.getItem('authToken');
-      const token = localToken || supabaseToken;
-
-      if (!token) {
-        throw new Error("Inte inloggad");
-      }
-
-      const response = await fetch("https://api.tivly.se/admin/ai-costs", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Inte behörig");
-        }
-        if (response.status === 403) {
-          throw new Error("Admin-behörighet krävs");
-        }
-        throw new Error("Kunde inte hämta kostnadsdata");
-      }
-
-      const data = await response.json();
-      setCostsData({
-        totalUsd: data.totalUsd || 0,
-        byService: data.byService || {},
-        byUser: data.byUser || {},
-        history: data.history || [],
-        lastUpdated: data.lastUpdated || new Date().toISOString(),
-      });
+      const data = await getAdminAICosts();
+      setCostsData(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Ett fel uppstod";
       setError(message);
@@ -354,7 +289,7 @@ export default function AdminAICosts() {
             ) : (
               <ScrollArea className="h-[400px]">
                 <div className="space-y-2">
-                  {(costsData?.history || []).map((entry, idx) => (
+                  {costsData?.history.map((entry, idx) => (
                     <div key={idx} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
@@ -377,7 +312,7 @@ export default function AdminAICosts() {
                         </p>
                       </div>
                       <span className="font-semibold text-sm whitespace-nowrap ml-2">
-                        {formatUsd(entry.costUsd)}
+                        {formatUsd(entry.amountUsd)}
                       </span>
                     </div>
                   ))}

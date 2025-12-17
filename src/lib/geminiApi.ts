@@ -65,21 +65,25 @@ export interface CostEntry {
   userEmail?: string; // Admin-only: attribute cost to another user
 }
 
+export interface CostHistoryEntry {
+  service: string;
+  amountUsd: number;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  timestamp: string;
+  userEmail?: string;
+}
+
 export interface UserCosts {
   totalUsd: number;
-  history: Array<{
-    service: string;
-    costUsd: number;
-    description?: string;
-    timestamp: string;
-  }>;
+  history: CostHistoryEntry[];
 }
 
 export interface AdminCosts {
   totalUsd: number;
   byService: Record<string, number>;
-  byUser: Record<string, { totalUsd: number; history: Array<unknown> }>;
-  history: Array<unknown>;
+  byUser: Record<string, { totalUsd: number; history: CostHistoryEntry[] }>;
+  history: CostHistoryEntry[];
   lastUpdated: string;
 }
 
