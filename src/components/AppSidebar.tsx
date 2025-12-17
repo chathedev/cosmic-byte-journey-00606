@@ -18,6 +18,7 @@ import {
   FiDatabase,
   FiMenu,
   FiX,
+  FiAlertTriangle,
 } from "react-icons/fi";
 import { Lock, Eye, DollarSign } from "lucide-react";
 import { motion } from "framer-motion";
@@ -331,6 +332,42 @@ export function AppSidebar() {
             )}
           </div>
         </div>
+
+        {/* Enterprise Trial Banner */}
+        {!collapsed && enterpriseMembership?.isMember && enterpriseMembership.company?.trial?.enabled && 
+         !enterpriseMembership.company.trial.expired && 
+         !enterpriseMembership.company.trial.manuallyDisabled &&
+         enterpriseMembership.company.trial.daysRemaining !== null && 
+         enterpriseMembership.company.trial.daysRemaining > 0 && (() => {
+          const daysRemaining = enterpriseMembership.company!.trial!.daysRemaining!;
+          const trialEndDate = new Date();
+          trialEndDate.setDate(trialEndDate.getDate() + daysRemaining);
+          const formattedEndDate = trialEndDate.toLocaleDateString('sv-SE', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          });
+          
+          const getBgColor = () => {
+            if (daysRemaining <= 3) return 'bg-destructive/10 border-destructive/30 text-destructive';
+            if (daysRemaining <= 7) return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-500';
+            return 'bg-primary/10 border-primary/30 text-primary';
+          };
+
+          return (
+            <div className={`mx-3 mb-2 p-3 rounded-lg border ${getBgColor()}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <FiAlertTriangle className="text-sm shrink-0" />
+                <span className="text-xs font-semibold">
+                  {daysRemaining === 1 ? 'Sista dagen' : `${daysRemaining} dagar kvar`}
+                </span>
+              </div>
+              <p className="text-[10px] opacity-80">
+                Testperiod slutar {formattedEndDate}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Navigation Items */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-2 py-3">

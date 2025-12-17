@@ -229,18 +229,13 @@ const EnterpriseTrialCheck = () => {
     return null;
   }
 
-  const showBanner = !trial.expired && trial.daysRemaining !== null && trial.daysRemaining > 0;
-
   return (
-    <>
-      <TrialExpiredOverlay
-        companyName={enterpriseMembership.company.name}
-        daysRemaining={trial.daysRemaining}
-        expired={trial.expired}
-        manuallyDisabled={trial.manuallyDisabled}
-      />
-      {showBanner && <div className="h-[52px]" />}
-    </>
+    <TrialExpiredOverlay
+      companyName={enterpriseMembership.company.name}
+      daysRemaining={trial.daysRemaining}
+      expired={trial.expired}
+      manuallyDisabled={trial.manuallyDisabled}
+    />
   );
 };
 
