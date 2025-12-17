@@ -647,30 +647,40 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           }));
         }
       } else {
-        // Free plan - show protocol page directly, secretly save in background
-        console.log('📋 Free user: Redirecting to protocol page');
+        // Free plan - go directly to protocol generation
+        console.log('📋 Free user: Direct to protocol generation');
         
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
         
-        // Count meeting silently
+        // ALWAYS count meeting for free users - skip cache check to ensure it's counted
         if (!hasIncrementedCountRef.current) {
-          const wasCounted = await meetingStorage.markCountedIfNeeded(meetingId);
-          if (wasCounted) {
-            await incrementMeetingCount(meetingId);
-            await refreshPlan();
-          }
           hasIncrementedCountRef.current = true;
+          try {
+            console.log('📊 Free user: Counting meeting:', meetingId);
+            // Call incrementMeetingCount directly without markCountedIfNeeded to ensure counting
+            await incrementMeetingCount(meetingId);
+            // Mark as counted in backend
+            try {
+              await apiClient.updateMeeting(meetingId, { counted: true });
+            } catch (e) {
+              console.warn('Could not mark meeting as counted:', e);
+            }
+            await refreshPlan();
+            console.log('✅ Free user: Meeting counted successfully');
+          } catch (e) {
+            console.error('Failed to count meeting:', e);
+          }
         }
         
-        // Navigate to protocol page with transcript (don't mention saving)
+        // Navigate directly to protocol page - no delays, no messages
         navigate('/protocol', { 
           state: { 
             transcript: finalTranscript, 
             aiProtocol: null,
-            meetingId // Pass meetingId so protocol page knows it's saved
+            meetingId
           },
           replace: true 
         });
