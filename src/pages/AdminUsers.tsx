@@ -149,6 +149,8 @@ export default function AdminUsers() {
           meetingUsage: summary.meetingUsage || raw.meetingUsage,
           overrides: summary.overrides || raw.overrides,
           stripe: summary.stripe || raw.stripe,
+          chatMessageCount: summary.chatMessageCount ?? raw.chatMessageCount ?? 0,
+          chatMessageLimit: summary.chatMessageLimit ?? raw.chatMessageLimit ?? null,
         };
       });
       
