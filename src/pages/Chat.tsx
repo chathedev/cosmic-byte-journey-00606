@@ -8,13 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles, FileText, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-
+import { useChatLimit } from "@/hooks/useChatLimit";
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -86,6 +87,17 @@ export const Chat = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Chat limit tracking
+  const { 
+    chatMessageCount, 
+    chatLimit, 
+    canSendMessage, 
+    getRemainingMessages, 
+    incrementCounter,
+    fetchChatCount,
+    isOverLimit 
+  } = useChatLimit();
+
   const isPlusUser = hasPlusAccess(user, userPlan);
 
   // Auto-scroll to bottom when messages change
@@ -97,7 +109,11 @@ export const Chat = () => {
 
   useEffect(() => {
     loadMeetings();
-  }, [user]);
+    // Fetch chat count on mount
+    if (isPlusUser) {
+      fetchChatCount();
+    }
+  }, [user, isPlusUser]);
 
   const loadMeetings = async () => {
     if (!user) return;
@@ -119,6 +135,16 @@ export const Chat = () => {
 
     if (!isPlusUser) {
       setShowSubscribeDialog(true);
+      return;
+    }
+
+    // Check chat limit before sending
+    if (!canSendMessage()) {
+      toast({
+        title: "Chattgräns nådd",
+        description: `Du har använt alla dina ${chatLimit} chattmeddelanden denna månad. Uppgradera för att fortsätta.`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -240,6 +266,13 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
         });
       }
 
+      // Increment chat counter after successful message
+      try {
+        await incrementCounter(1);
+      } catch (err) {
+        console.warn('Failed to increment chat counter:', err);
+      }
+
       setStreamingIndex(null);
       setIsLoading(false);
       setIsThinking(false);
@@ -348,7 +381,19 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                 <MessageCircle className="w-5 h-5 text-primary" />
               </div>
-              <h1 className="text-base font-semibold text-foreground">AI Möteschatt</h1>
+              <div>
+                <h1 className="text-base font-semibold text-foreground">AI Möteschatt</h1>
+                {chatLimit !== null && (
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xs ${isOverLimit ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {chatMessageCount}/{chatLimit} meddelanden
+                    </span>
+                    {isOverLimit && (
+                      <AlertTriangle className="w-3 h-3 text-destructive" />
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Select value={selectedMeetingId} onValueChange={setSelectedMeetingId}>

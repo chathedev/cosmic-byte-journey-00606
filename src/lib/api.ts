@@ -2220,6 +2220,63 @@ class ApiClient {
 
     return response.json();
   }
+
+  // ===== CHAT COUNTER METHODS =====
+
+  /**
+   * Get current chat message count for the authenticated user
+   * Returns { success: true, chatMessageCount: number }
+   */
+  async getChatMessageCount(): Promise<{ success: boolean; chatMessageCount: number }> {
+    const response = await this.fetchWithAuth('/me');
+    if (!response.ok) {
+      throw new Error('Failed to get chat message count');
+    }
+    const data = await response.json();
+    const user = data.user || data;
+    return {
+      success: true,
+      chatMessageCount: user.chatMessageCount || 0,
+    };
+  }
+
+  /**
+   * Increment chat message counter
+   * Called after each successful chat message
+   * @param count - Number to increment by (default 1)
+   * @returns { success: true, chatMessageCount: number }
+   */
+  async incrementChatCounter(count: number = 1): Promise<{ success: boolean; chatMessageCount: number }> {
+    const response = await this.fetchWithAuth('/ai/chat-counter/increment', {
+      method: 'POST',
+      body: JSON.stringify({ count }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to increment chat counter' }));
+      // If rate limited or limit exceeded
+      if (response.status === 429) {
+        throw new Error('chat_limit_exceeded');
+      }
+      throw new Error((error as any).error || 'Failed to increment chat counter');
+    }
+    return response.json();
+  }
+
+  /**
+   * Admin: Reset chat counter for a user
+   * @param email - User email to reset
+   * @returns { success: true, chatMessageCount: 0, userEmail: string }
+   */
+  async resetChatCounter(email: string): Promise<{ success: boolean; chatMessageCount: number; userEmail: string }> {
+    const response = await this.fetchWithAuth(`/admin/users/${encodeURIComponent(email)}/chat-counter/reset`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to reset chat counter' }));
+      throw new Error((error as any).error || 'Failed to reset chat counter');
+    }
+    return response.json();
+  }
 }
 
 export const apiClient = new ApiClient();
