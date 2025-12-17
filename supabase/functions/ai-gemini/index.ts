@@ -7,6 +7,15 @@ const corsHeaders = {
 
 const BACKEND_URL = 'https://api.tivly.se';
 
+// Default cost estimates per model (USD) - used when costUsd is not provided
+const MODEL_COSTS: Record<string, number> = {
+  'gemini-2.5-flash': 0.001,
+  'gemini-2.5-flash-lite': 0.0005,
+  'gemini-2.5-pro': 0.005,
+  'gemini-1.5-flash': 0.001,
+  'gemini-1.5-pro': 0.003,
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -26,19 +35,29 @@ serve(async (req) => {
     }
 
     const body = await req.json();
+    const model = body.model || 'gemini-2.5-flash';
+    
+    // Use provided costUsd or fallback to model default
+    const costUsd = body.costUsd ?? MODEL_COSTS[model] ?? 0.001;
+    
     console.log('[ai-gemini] Proxying request to backend:', { 
-      model: body.model, 
-      promptLength: body.prompt?.length 
+      model, 
+      promptLength: body.prompt?.length,
+      costUsd,
     });
 
-    // Forward the request to api.tivly.se
+    // Forward the request to api.tivly.se with cost tracking
     const response = await fetch(`${BACKEND_URL}/ai/gemini`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': authHeader,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        ...body,
+        model,
+        costUsd, // Always include cost for tracking
+      }),
     });
 
     const data = await response.json();
@@ -49,6 +68,11 @@ serve(async (req) => {
         JSON.stringify(data),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Log recorded cost for debugging
+    if (data.recordedCostUsd) {
+      console.log(`[ai-gemini] Cost recorded: $${data.recordedCostUsd} for model ${model}`);
     }
 
     console.log('[ai-gemini] Success, model:', data.model);

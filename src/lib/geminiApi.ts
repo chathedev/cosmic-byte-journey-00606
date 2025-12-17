@@ -7,8 +7,17 @@ export type GeminiModel =
   | "gemini-2.5-flash"
   | "gemini-2.5-flash-lite"
   | "gemini-2.5-pro"
-  | "gemini-2.0"
-  | "gemini-1.0";
+  | "gemini-1.5-flash"
+  | "gemini-1.5-pro";
+
+// Default cost estimates per model (USD)
+export const MODEL_COSTS: Record<GeminiModel, number> = {
+  'gemini-2.5-flash': 0.001,
+  'gemini-2.5-flash-lite': 0.0005,
+  'gemini-2.5-pro': 0.005,
+  'gemini-1.5-flash': 0.001,
+  'gemini-1.5-pro': 0.003,
+};
 
 export interface GeminiRequest {
   prompt: string;
@@ -227,20 +236,17 @@ export async function generateWithGemini(
   // Set default model based on enterprise status if not specified
   const model = request.model || (isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite");
 
+  // Calculate cost estimate for tracking
+  const estimatedCost = request.costUsd ?? MODEL_COSTS[model as GeminiModel] ?? 0.001;
+
   const requestBody: Record<string, unknown> = {
     prompt: request.prompt,
     model,
+    costUsd: estimatedCost, // Always include cost for tracking
   };
 
-  if (request.temperature !== undefined) {
-    requestBody.temperature = request.temperature;
-  }
-  if (request.maxOutputTokens !== undefined) {
-    requestBody.maxOutputTokens = request.maxOutputTokens;
-  }
-  if (request.costUsd !== undefined && request.costUsd > 0) {
-    requestBody.costUsd = request.costUsd;
-  }
+  // Note: temperature and maxOutputTokens are not supported by Vertex AI
+  // They are ignored by the backend per API docs
 
   // Get auth token for the edge function
   const token = await getAuthToken();
@@ -364,13 +370,15 @@ export async function streamChat({
       return;
     }
 
+    // Calculate cost estimate for tracking
+    const estimatedCost = MODEL_COSTS[model as GeminiModel] ?? 0.001;
+
     // Call via Supabase edge function
     const { data, error } = await supabase.functions.invoke('ai-gemini', {
       body: {
         prompt: `${systemPrompt}\n\n${userPrompt}`,
         model,
-        temperature: 0.7,
-        maxOutputTokens: 2048,
+        costUsd: estimatedCost, // Always include cost for tracking
       },
       headers: {
         Authorization: `Bearer ${token}`,
