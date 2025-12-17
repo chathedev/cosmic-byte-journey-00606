@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2 } from "lucide-react";
+import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee } from "lucide-react";
 import { Document, Paragraph, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
@@ -94,6 +94,7 @@ export const AutoProtocolGenerator = ({
   const [documentBlob, setDocumentBlob] = useState<Blob | null>(null);
   const [fileName, setFileName] = useState("Mötesprotokoll.docx");
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showCoffeeHint, setShowCoffeeHint] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -101,6 +102,20 @@ export const AutoProtocolGenerator = ({
   const hasGeneratedRef = useRef(false);
   
   const isEnterprise = userPlan?.plan === 'enterprise';
+  
+  // Detect large transcripts (> 5000 words typically means 100MB+ audio files)
+  const wordCount = transcript.trim().split(/\s+/).filter(w => w).length;
+  const isLargeTranscript = wordCount > 5000;
+  
+  // Show coffee hint after 5 seconds for large transcripts
+  useEffect(() => {
+    if (isGenerating && isLargeTranscript) {
+      const timer = setTimeout(() => setShowCoffeeHint(true), 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowCoffeeHint(false);
+    }
+  }, [isGenerating, isLargeTranscript]);
 
   useEffect(() => {
     if (aiProtocol || hasGeneratedRef.current) return;
@@ -648,13 +663,24 @@ export const AutoProtocolGenerator = ({
         <Card className="w-full max-w-md p-8 space-y-6">
           <div className="flex flex-col items-center space-y-4">
             <div className="relative">
-              <Loader2 className="w-12 h-12 text-primary animate-spin" />
+              {showCoffeeHint ? (
+                <Coffee className="w-12 h-12 text-amber-500 animate-pulse" />
+              ) : (
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+              )}
             </div>
             <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold">Genererar protokoll</h3>
-              <p className="text-sm text-muted-foreground">AI analyserar ditt möte...</p>
+              <h3 className="text-lg font-semibold">
+                {showCoffeeHint ? "Perfekt tillfälle för en kaffe! ☕" : "Genererar protokoll"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {showCoffeeHint 
+                  ? "Stora inspelningar tar lite längre tid att bearbeta." 
+                  : "AI analyserar ditt möte..."}
+              </p>
             </div>
           </div>
+          
           <div className="space-y-2">
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div 
@@ -666,6 +692,24 @@ export const AutoProtocolGenerator = ({
               {Math.round(progress)}%
             </p>
           </div>
+
+          {/* Coffee break message for large transcripts */}
+          {showCoffeeHint && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 animate-fade-in">
+              <div className="flex items-start gap-3">
+                <Coffee className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-600 dark:text-amber-400">
+                    Vänta lugnt – det arbetar på!
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    Även om det verkar ha fastnat, så pågår bearbetningen i bakgrunden. 
+                    Stora möten ({wordCount.toLocaleString('sv-SE')} ord) kräver extra tid för noggrann analys.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     );
