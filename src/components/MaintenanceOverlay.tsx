@@ -11,12 +11,24 @@ export const MaintenanceOverlay = () => {
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const initialLoadDone = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const checkMaintenance = useCallback(async (skipIfLoaded = false) => {
     // Don't update state if we already have data and this is a background refresh
     if (skipIfLoaded && initialLoadDone.current) {
       try {
+        // Cancel any pending request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+        
+        // Add timeout for background requests (3 seconds)
+        const timeoutId = setTimeout(() => abortControllerRef.current?.abort(), 3000);
+        
         const result = await apiClient.getMaintenanceStatus();
+        clearTimeout(timeoutId);
+        
         if (result.success) {
           setMaintenance(result.maintenance);
         }
@@ -27,13 +39,32 @@ export const MaintenanceOverlay = () => {
     }
 
     try {
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
+      // Add timeout for initial request (5 seconds)
+      const timeoutId = setTimeout(() => {
+        abortControllerRef.current?.abort();
+        // Don't block the app - just show it without maintenance
+        setIsLoading(false);
+        initialLoadDone.current = true;
+      }, 5000);
+      
       const result = await apiClient.getMaintenanceStatus();
+      clearTimeout(timeoutId);
+      
       if (result.success) {
         setMaintenance(result.maintenance);
         initialLoadDone.current = true;
       }
     } catch (error) {
-      console.error('Failed to check maintenance status:', error);
+      // Don't log errors for aborted requests
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Failed to check maintenance status:', error);
+      }
       // Don't reset maintenance state on error - keep last known state
       if (!initialLoadDone.current) {
         setMaintenance(null);
@@ -44,13 +75,22 @@ export const MaintenanceOverlay = () => {
   }, []);
 
   useEffect(() => {
+    // Non-blocking initial check - app loads immediately
+    setIsLoading(false);
     checkMaintenance(false);
-    // Background refresh - won't cause UI flicker
-    const interval = setInterval(() => checkMaintenance(true), 30000);
-    return () => clearInterval(interval);
+    
+    // Background refresh - won't cause UI flicker (every 60 seconds instead of 30)
+    const interval = setInterval(() => checkMaintenance(true), 60000);
+    
+    return () => {
+      clearInterval(interval);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [checkMaintenance]);
 
-  if (isLoading) return null;
+  // Never block initial render - show content immediately
   if (!maintenance?.enabled) return null;
 
   // Admins can bypass maintenance mode
