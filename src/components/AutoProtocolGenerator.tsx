@@ -113,11 +113,11 @@ export const AutoProtocolGenerator = ({
         meetingName: fileName.replace('.docx', '')
       });
 
-      if (wordCount < 10) {
+      if (wordCount < 20) {
         console.error('❌ Transcript too short for AI analysis:', wordCount, 'words');
         toast({
           title: "För kort transkription",
-          description: "Transkriptionen är för kort för att generera ett meningsfullt protokoll. Försök spela in ett längre möte.",
+          description: "Transkriptionen måste innehålla minst 20 ord för att generera ett protokoll.",
           variant: "destructive",
           duration: 5000,
         });
