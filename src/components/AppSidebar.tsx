@@ -20,7 +20,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -144,6 +144,7 @@ export function AppSidebar() {
     else if (path === "/agendas") setSelected("Agendor");
     else if (path === "/chat") setSelected("AI Chatt");
     else if (path === "/feedback") setSelected("Feedback");
+    else if (path === "/enterprise/stats") setSelected("Företagsstatistik");
     else if (path.startsWith("/admin")) {
       if (path === "/admin/users") setSelected("Användare");
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
@@ -180,11 +181,16 @@ export function AppSidebar() {
     navigate("/auth");
   };
 
+  // Check if user is enterprise owner or admin
+  const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
+    (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
+
   const navItems = [
     { Icon: FiHome, title: "Hem", path: "/", locked: false },
     { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
     { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
+    ...(isEnterpriseOwnerOrAdmin ? [{ Icon: BarChart3, title: "Företagsstatistik", path: "/enterprise/stats", locked: false }] : []),
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
   ];
 
