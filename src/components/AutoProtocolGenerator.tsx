@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { generateMeetingTitle } from "@/lib/titleGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
+import { ConfirmCloseProtocolDialog } from "@/components/ConfirmCloseProtocolDialog";
 import { backendApi } from "@/lib/backendApi";
 import { analyzeMeetingAI, generateMeetingTitleAI } from "@/lib/geminiApi";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -95,6 +96,9 @@ export const AutoProtocolGenerator = ({
   const [fileName, setFileName] = useState("Mötesprotokoll.docx");
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showCoffeeHint, setShowCoffeeHint] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [hasDownloaded, setHasDownloaded] = useState(false);
+  const [hasShared, setHasShared] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -588,12 +592,34 @@ export const AutoProtocolGenerator = ({
   const handleDownload = () => {
     if (documentBlob) {
       saveAs(documentBlob, fileName);
+      setHasDownloaded(true);
       toast({
         title: "Nedladdning startad",
         description: "Protokollet laddas ner till din enhet.",
         duration: 2000,
       });
     }
+  };
+
+  // Intercept close/back action to show warning
+  const handleCloseAttempt = () => {
+    // Show confirmation dialog for all users when protocol is generated
+    if (generatedProtocol && !isGenerating) {
+      setShowCloseConfirm(true);
+    } else {
+      onBack();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirm(false);
+    onBack();
+  };
+
+  const handleShareFromDialog = () => {
+    setShowCloseConfirm(false);
+    setShowEmailDialog(true);
+    setHasShared(true);
   };
 
   const handleSave = async () => {
@@ -728,7 +754,7 @@ export const AutoProtocolGenerator = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={onBack}
+              onClick={handleCloseAttempt}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Tillbaka
@@ -737,7 +763,10 @@ export const AutoProtocolGenerator = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowEmailDialog(true)}
+                onClick={() => {
+                  setShowEmailDialog(true);
+                  setHasShared(true);
+                }}
                 disabled={!documentBlob}
               >
                 <Share2 className="w-4 h-4 mr-2" />
@@ -766,7 +795,7 @@ export const AutoProtocolGenerator = ({
               {isFreeTrialMode && (
                 <Button
                   size="sm"
-                  onClick={onBack}
+                  onClick={handleCloseAttempt}
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Klar
@@ -886,6 +915,17 @@ export const AutoProtocolGenerator = ({
         onOpenChange={setShowEmailDialog}
         documentBlob={documentBlob}
         fileName={fileName}
+      />
+
+      <ConfirmCloseProtocolDialog
+        open={showCloseConfirm}
+        onOpenChange={setShowCloseConfirm}
+        onConfirmClose={handleConfirmClose}
+        onDownload={handleDownload}
+        onShare={handleShareFromDialog}
+        isFreeUser={isFreeTrialMode}
+        hasDownloaded={hasDownloaded}
+        hasShared={hasShared}
       />
     </div>
   );
