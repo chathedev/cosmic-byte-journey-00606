@@ -51,6 +51,7 @@ import AdminEnterprise from "./pages/AdminEnterprise";
 import AdminEnterpriseBilling from "./pages/AdminEnterpriseBilling";
 import SISRequired from "./pages/SISRequired";
 import AdminAICosts from "./pages/AdminAICosts";
+import EnterpriseStats from "./pages/EnterpriseStats";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -329,6 +330,7 @@ const AppContent = () => {
                 <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
                 <Route path="/admin/ai-costs" element={<AdminRoute><AdminAICosts /></AdminRoute>} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
+                <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

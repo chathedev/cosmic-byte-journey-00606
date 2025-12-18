@@ -2277,6 +2277,55 @@ class ApiClient {
     }
     return response.json();
   }
+
+  /**
+   * Get enterprise company stats (for enterprise members - owners/admins/members)
+   * @param companyId - The company ID to fetch stats for
+   * @returns Company stats with totals and scoreboard
+   */
+  async getEnterpriseCompanyStats(companyId: string): Promise<{
+    company: any;
+    scope: { type: string; memberCount: number };
+    viewer: { email: string; preferredName: string; role: string };
+    totals: {
+      memberCount: number;
+      missingMemberCount: number;
+      limitedMemberCount: number;
+      unlimitedMemberCount: number;
+      totalMeetingCount: number;
+      totalMeetingLimit: number;
+      totalSlotsRemaining: number;
+      activeMemberCount: number;
+      meetingLimitCoveragePercent: number;
+      averageMeetingsPerMember: number;
+    };
+    scoreboard: Array<{
+      email: string;
+      preferredName?: string;
+      plan: string;
+      paymentStatus: string;
+      role: string;
+      verified: boolean;
+      meetingUsage: {
+        meetingCount: number;
+        meetingLimit: number | null;
+        meetingSlotsRemaining: number | null;
+        meetingLimitBase: number | null;
+        override?: any;
+      };
+      usagePercent: number | null;
+      lastLoginAt?: string;
+      lastMeetingAt?: string;
+      updatedAt?: string;
+      missing?: boolean;
+    }>;
+  }> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/stats`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch enterprise company stats');
+    }
+    return response.json();
+  }
 }
 
 export const apiClient = new ApiClient();
