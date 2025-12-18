@@ -146,7 +146,9 @@ export default function EnterpriseStats() {
     }
   };
 
-  if (!enterpriseMembership?.isMember) {
+  const isOwner = enterpriseMembership?.membership?.role === 'owner';
+
+  if (!enterpriseMembership?.isMember || !isOwner) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
@@ -154,7 +156,9 @@ export default function EnterpriseStats() {
             <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold mb-2">Ingen tillgång</h2>
             <p className="text-muted-foreground text-sm mb-4">
-              Du måste vara medlem i ett Enterprise-företag för att se denna sida.
+              {!enterpriseMembership?.isMember 
+                ? "Du måste vara medlem i ett Enterprise-företag för att se denna sida."
+                : "Endast företagsägare har tillgång till översikten."}
             </p>
             <Button onClick={() => navigate('/')} variant="outline">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -186,7 +190,7 @@ export default function EnterpriseStats() {
             </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-                Företagsstatistik
+                Översikt
               </h1>
               <p className="text-muted-foreground text-sm mt-0.5">
                 {isLoading ? (
