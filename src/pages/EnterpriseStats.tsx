@@ -5,19 +5,15 @@ import {
   Users, 
   BarChart3, 
   TrendingUp, 
-  Calendar,
-  Clock,
   Crown,
   Building2,
   ArrowLeft,
   RefreshCw,
-  Infinity,
-  ChevronRight
+  Infinity
 } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { apiClient } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -282,17 +278,17 @@ export default function EnterpriseStats() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <Card className="bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20">
+                <Card className="bg-gradient-to-br from-violet-500/5 to-violet-500/10 border-violet-500/20">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                       <TrendingUp className="h-4 w-4" />
-                      <span>Användning</span>
+                      <span>Snitt/medlem</span>
                     </div>
                     <div className="text-3xl font-bold text-foreground">
-                      {stats?.totals?.meetingLimitCoveragePercent ?? 0}%
+                      {Math.round(stats?.totals?.averageMeetingsPerMember ?? 0)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Av total kapacitet
+                      Möten per medlem
                     </p>
                   </CardContent>
                 </Card>
@@ -303,17 +299,17 @@ export default function EnterpriseStats() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 }}
               >
-                <Card className="bg-gradient-to-br from-violet-500/5 to-violet-500/10 border-violet-500/20">
+                <Card className="bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                      <Calendar className="h-4 w-4" />
-                      <span>Snitt/medlem</span>
+                      <Infinity className="h-4 w-4" />
+                      <span>Plan</span>
                     </div>
-                    <div className="text-3xl font-bold text-foreground">
-                      {stats?.totals?.averageMeetingsPerMember?.toFixed(1) ?? '0'}
+                    <div className="text-2xl font-bold text-foreground">
+                      Enterprise
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Möten per medlem
+                      Obegränsade möten
                     </p>
                   </CardContent>
                 </Card>
@@ -322,39 +318,6 @@ export default function EnterpriseStats() {
           )}
         </div>
 
-        {/* Usage Progress */}
-        {!isLoading && stats && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="mb-8">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Kapacitetsanvändning</CardTitle>
-                <CardDescription>
-                  {stats.totals.totalMeetingCount} av {stats.totals.totalMeetingLimit} möten använda
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Progress 
-                    value={stats.totals.meetingLimitCoveragePercent} 
-                    className="h-3"
-                  />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {stats.totals.totalSlotsRemaining} platser kvar
-                    </span>
-                    <span className="text-muted-foreground">
-                      {stats.totals.limitedMemberCount} begränsade / {stats.totals.unlimitedMemberCount} obegränsade
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
 
         {/* Scoreboard */}
         <motion.div
@@ -403,13 +366,11 @@ export default function EnterpriseStats() {
                         <TableHead className="pl-6">#</TableHead>
                         <TableHead>Medlem</TableHead>
                         <TableHead className="hidden sm:table-cell">Roll</TableHead>
-                        <TableHead className="text-center">Möten</TableHead>
-                        <TableHead className="hidden md:table-cell text-center">Användning</TableHead>
-                        <TableHead className="hidden lg:table-cell pr-6">Senast aktiv</TableHead>
+                        <TableHead className="text-center pr-6">Möten</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stats?.scoreboard?.map((member, index) => (
+                      {stats?.scoreboard?.map((member: any, index: number) => (
                         <TableRow key={member.email} className="group">
                           <TableCell className="pl-6 font-medium text-muted-foreground">
                             {index === 0 && <span className="text-amber-500">🥇</span>}
@@ -437,40 +398,10 @@ export default function EnterpriseStats() {
                           <TableCell className="hidden sm:table-cell">
                             {getRoleBadge(member.role)}
                           </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="font-semibold">
-                                {member.meetingUsage.meetingCount}
-                              </span>
-                              {member.meetingUsage.meetingLimit === null ? (
-                                <Infinity className="h-3 w-3 text-muted-foreground" />
-                              ) : (
-                                <span className="text-muted-foreground text-sm">
-                                  / {member.meetingUsage.meetingLimit}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-center">
-                            {member.usagePercent !== null ? (
-                              <div className="flex items-center justify-center gap-2">
-                                <Progress 
-                                  value={member.usagePercent} 
-                                  className="w-16 h-2"
-                                />
-                                <span className="text-xs text-muted-foreground w-10">
-                                  {member.usagePercent}%
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">∞</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell pr-6">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {formatDate(member.lastMeetingAt || member.lastLoginAt)}
-                            </div>
+                          <TableCell className="text-center pr-6">
+                            <span className="font-semibold text-lg">
+                              {member.recordedMeetingCount ?? member.meetingUsage?.totalMeetingCount ?? 0}
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))}
