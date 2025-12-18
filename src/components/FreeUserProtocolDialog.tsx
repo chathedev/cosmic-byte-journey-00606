@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { saveAs } from "file-saver";
 import { EmailDialog } from "./EmailDialog";
+import { ConfirmCloseProtocolDialog } from "./ConfirmCloseProtocolDialog";
 import { analyzeMeeting } from "@/lib/backend";
 
 interface AIActionItem {
@@ -76,6 +77,9 @@ export const FreeUserProtocolDialog = ({
   const [fileName, setFileName] = useState<string>("");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [showContent, setShowContent] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [hasDownloaded, setHasDownloaded] = useState(false);
+  const [hasShared, setHasShared] = useState(false);
   const { toast } = useToast();
   
   // Check if running on iOS app domain
@@ -249,10 +253,40 @@ export const FreeUserProtocolDialog = ({
   const handleDownload = () => {
     if (documentBlob && fileName) {
       saveAs(documentBlob, fileName);
+      setHasDownloaded(true);
       toast({
         title: "Nedladdning startad!",
         description: `${fileName} laddas ner nu.`,
       });
+    }
+  };
+
+  // Intercept close attempts to show warning
+  const handleCloseAttempt = () => {
+    if (protocol && showContent && !isGenerating) {
+      setShowCloseConfirm(true);
+    } else {
+      onOpenChange(false);
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirm(false);
+    onOpenChange(false);
+  };
+
+  const handleShareFromDialog = () => {
+    setShowCloseConfirm(false);
+    setEmailDialogOpen(true);
+    setHasShared(true);
+  };
+
+  // Intercept dialog onOpenChange
+  const handleDialogOpenChange = (isOpen: boolean) => {
+    if (!isOpen && protocol && showContent && !isGenerating) {
+      setShowCloseConfirm(true);
+    } else {
+      onOpenChange(isOpen);
     }
   };
 
@@ -262,14 +296,14 @@ export const FreeUserProtocolDialog = ({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b p-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold">Genererar protokoll...</h2>
+            <h2 className="text-xl font-bold">{showContent ? 'Ditt protokoll' : 'Genererar protokoll...'}</h2>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onOpenChange(false)}
+              onClick={handleCloseAttempt}
               className="h-8 w-8"
             >
               <X className="h-4 w-4" />
@@ -437,7 +471,10 @@ export const FreeUserProtocolDialog = ({
                       Ladda ner Word
                     </Button>
                     <Button
-                      onClick={() => setEmailDialogOpen(true)}
+                      onClick={() => {
+                        setEmailDialogOpen(true);
+                        setHasShared(true);
+                      }}
                       variant="outline"
                       className="flex-1"
                       size="lg"
@@ -462,6 +499,17 @@ export const FreeUserProtocolDialog = ({
           fileName={fileName}
         />
       )}
+
+      <ConfirmCloseProtocolDialog
+        open={showCloseConfirm}
+        onOpenChange={setShowCloseConfirm}
+        onConfirmClose={handleConfirmClose}
+        onDownload={handleDownload}
+        onShare={handleShareFromDialog}
+        isFreeUser={true}
+        hasDownloaded={hasDownloaded}
+        hasShared={hasShared}
+      />
     </>
   );
 };
