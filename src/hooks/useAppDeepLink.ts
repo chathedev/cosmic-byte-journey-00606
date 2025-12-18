@@ -1,27 +1,52 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isWebBrowser, isNativeApp } from '@/utils/environment';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/lib/api';
 
 const IOS_APP_UNIVERSAL_LINK = 'https://io.tivly.se';
 const APP_OPENED_KEY = 'tivly_app_opened';
 
 /**
  * Hook to handle deep linking from emails and detect if user has the app
- * Automatically redirects enterprise users to the iOS app when coming from email links
+ * Automatically redirects enterprise users and admins to the iOS app when coming from email links
  */
 export const useAppDeepLink = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { enterpriseMembership, isLoading } = useSubscription();
+  const { user, isLoading: authLoading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user?.email) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const roleData = await apiClient.getUserRole(user.email.toLowerCase());
+        setIsAdmin(roleData?.role === 'admin' || roleData?.role === 'owner');
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    if (!authLoading) {
+      checkAdmin();
+    }
+  }, [user, authLoading]);
+
+  const shouldProcessForUser = enterpriseMembership?.isMember || isAdmin;
 
   useEffect(() => {
     // Only process on web browser
     if (!isWebBrowser() || isNativeApp()) return;
-    if (isLoading) return;
+    if (isLoading || authLoading) return;
     
-    // Only for enterprise users
-    if (!enterpriseMembership?.isMember) return;
+    // Only for enterprise users OR admins
+    if (!shouldProcessForUser) return;
 
     const params = new URLSearchParams(location.search);
     const fromEmail = params.get('from') === 'email' || params.get('utm_source') === 'email';
@@ -43,7 +68,7 @@ export const useAppDeepLink = () => {
         window.location.href = deepLink;
       }
     }
-  }, [location, enterpriseMembership, isLoading]);
+  }, [location, enterpriseMembership, isLoading, authLoading, shouldProcessForUser]);
 
   /**
    * Mark that the app was successfully opened
@@ -74,6 +99,8 @@ export const useAppDeepLink = () => {
     getDeepLink,
     openInApp,
     isEnterpriseUser: enterpriseMembership?.isMember || false,
+    isAdmin,
+    shouldShowAppBanner: shouldProcessForUser,
   };
 };
 

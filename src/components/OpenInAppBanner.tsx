@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Smartphone, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/lib/api';
 import { isWebBrowser, isNativeApp } from '@/utils/environment';
 import { useLocation } from 'react-router-dom';
 
@@ -17,13 +19,36 @@ interface OpenInAppBannerProps {
 export const OpenInAppBanner = ({ className }: OpenInAppBannerProps) => {
   const [showBanner, setShowBanner] = useState(false);
   const [isAttemptingOpen, setIsAttemptingOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { enterpriseMembership, isLoading } = useSubscription();
+  const { user, isLoading: authLoading } = useAuth();
   const location = useLocation();
 
+  // Check if user is admin
   useEffect(() => {
-    // Only show for enterprise users on web browser
-    if (isLoading) return;
-    if (!enterpriseMembership?.isMember) return;
+    const checkAdmin = async () => {
+      if (!user?.email) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const roleData = await apiClient.getUserRole(user.email.toLowerCase());
+        setIsAdmin(roleData?.role === 'admin' || roleData?.role === 'owner');
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    if (!authLoading) {
+      checkAdmin();
+    }
+  }, [user, authLoading]);
+
+  const shouldShowForUser = enterpriseMembership?.isMember || isAdmin;
+
+  useEffect(() => {
+    // Only show for enterprise users OR admins on web browser
+    if (isLoading || authLoading) return;
+    if (!shouldShowForUser) return;
     if (!isWebBrowser()) return;
     if (isNativeApp()) return;
 
@@ -43,7 +68,7 @@ export const OpenInAppBanner = ({ className }: OpenInAppBannerProps) => {
     // Show banner with slight delay
     const timer = setTimeout(() => setShowBanner(true), fromEmail ? 500 : 2000);
     return () => clearTimeout(timer);
-  }, [enterpriseMembership, isLoading, location.pathname]);
+  }, [enterpriseMembership, isLoading, authLoading, shouldShowForUser, location.pathname]);
 
   const handleDismiss = () => {
     localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString());
@@ -96,9 +121,9 @@ export const OpenInAppBanner = ({ className }: OpenInAppBannerProps) => {
     }, 1500);
   };
 
-  if (!showBanner || !enterpriseMembership?.isMember) return null;
+  if (!showBanner || !shouldShowForUser) return null;
 
-  const companyName = enterpriseMembership?.company?.name || 'ditt företag';
+  const companyName = enterpriseMembership?.company?.name || (isAdmin ? 'Tivly' : 'ditt företag');
 
   return (
     <div className={`fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg ${className}`}>
