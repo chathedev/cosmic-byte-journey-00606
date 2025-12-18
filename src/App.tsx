@@ -25,6 +25,7 @@ import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
 import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 import { SupportBanner } from "@/components/SupportBanner";
 import { IOSAppPromoDialog } from "@/components/IOSAppPromoDialog";
+import { OpenInAppBanner } from "@/components/OpenInAppBanner";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -295,6 +296,7 @@ const AppContent = () => {
       <SupportBanner />
       <EnterpriseTrialCheck />
       <IOSAppPromoDialog />
+      <OpenInAppBanner />
       <WelcomeGate>
         <EnterpriseSISGate>
           <AppLayout>
