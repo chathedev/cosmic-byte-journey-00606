@@ -45,5 +45,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tivly behöver tillgång till mikrofonen för att spela in möten och skapa protokoll.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Tivly använder taligenkänning för att transkribera dina möten.</string>
 </dict>
 </plist>
