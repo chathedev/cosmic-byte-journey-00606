@@ -477,51 +477,53 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
 
               <TabsContent value="general" className="space-y-3 pt-3">
                 <div className="space-y-3">
-                  {/* Profile section for non-enterprise users */}
-                  <Card className="border-border">
-                    <CardHeader className="p-3 sm:p-4 pb-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                          <User className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                  {/* Profile section for non-enterprise users - hide when nameRequired since it's shown above */}
+                  {!nameRequired && (
+                    <Card className="border-border">
+                      <CardHeader className="p-3 sm:p-4 pb-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                            <User className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-sm sm:text-base">Profil</CardTitle>
+                            <CardDescription className="text-xs mt-0.5 truncate">
+                              {user?.email}
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-sm sm:text-base">Profil</CardTitle>
-                          <CardDescription className="text-xs mt-0.5 truncate">
-                            {user?.email}
-                          </CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-3 sm:p-4 pt-2 space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="preferredNameGeneral" className="text-xs">Visningsnamn</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="preferredNameGeneral"
+                              value={preferredName}
+                              onChange={(e) => setPreferredName(e.target.value)}
+                              placeholder="T.ex. Anna Andersson"
+                              className="flex-1 h-9 text-sm"
+                            />
+                            <Button
+                              onClick={handleSavePreferredName}
+                              disabled={isSavingName || preferredName === (user?.preferredName || '')}
+                              size="sm"
+                              className="h-9 px-3"
+                            >
+                              {isSavingName ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                'Spara'
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            Används för hälsningar och visning i appen
+                          </p>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-3 sm:p-4 pt-2 space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="preferredNameGeneral" className="text-xs">Visningsnamn</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="preferredNameGeneral"
-                            value={preferredName}
-                            onChange={(e) => setPreferredName(e.target.value)}
-                            placeholder="T.ex. Anna Andersson"
-                            className="flex-1 h-9 text-sm"
-                          />
-                          <Button
-                            onClick={handleSavePreferredName}
-                            disabled={isSavingName || preferredName === (user?.preferredName || '')}
-                            size="sm"
-                            className="h-9 px-3"
-                          >
-                            {isSavingName ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              'Spara'
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          Används för hälsningar och visning i appen
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
                   <div className="p-3 border border-border rounded-lg bg-muted/30">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
