@@ -749,17 +749,18 @@ export const AutoProtocolGenerator = ({
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background border-b">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-3 sm:px-4 py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleCloseAttempt}
+              className="self-start"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Tillbaka
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <Button
                 variant="outline"
                 size="sm"
@@ -768,27 +769,30 @@ export const AutoProtocolGenerator = ({
                   setHasShared(true);
                 }}
                 disabled={!documentBlob}
+                className="flex-1 sm:flex-none min-w-0"
               >
-                <Share2 className="w-4 h-4 mr-2" />
-                Dela
+                <Share2 className="w-4 h-4 sm:mr-2 flex-shrink-0" />
+                <span className="hidden sm:inline">Dela</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
                 disabled={!documentBlob}
+                className="flex-1 sm:flex-none min-w-0"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Ladda ner
+                <Download className="w-4 h-4 sm:mr-2 flex-shrink-0" />
+                <span className="hidden sm:inline">Ladda ner</span>
               </Button>
               {/* Hide Save button for free users - they don't have library access */}
               {!isFreeTrialMode && (
                 <Button
                   size="sm"
                   onClick={handleSave}
+                  className="flex-1 sm:flex-none min-w-0"
                 >
-                  <Save className="w-4 h-4 mr-2" />
-                  Spara
+                  <Save className="w-4 h-4 sm:mr-2 flex-shrink-0" />
+                  <span className="hidden sm:inline">Spara</span>
                 </Button>
               )}
               {/* Show "Klar" button for free users to go back */}
@@ -796,9 +800,10 @@ export const AutoProtocolGenerator = ({
                 <Button
                   size="sm"
                   onClick={handleCloseAttempt}
+                  className="flex-1 sm:flex-none min-w-0"
                 >
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Klar
+                  <CheckCircle2 className="w-4 h-4 sm:mr-2 flex-shrink-0" />
+                  <span className="hidden sm:inline">Klar</span>
                 </Button>
               )}
             </div>
