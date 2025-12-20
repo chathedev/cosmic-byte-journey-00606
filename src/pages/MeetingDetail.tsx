@@ -589,20 +589,120 @@ const MeetingDetail = () => {
                         </motion.div>
                       )}
 
-                      {/* Transcript Section */}
+                      {/* Transcript Section with Speaker Segments */}
                       <div className="flex items-center gap-2 mb-4">
                         <CheckCircle2 className="w-5 h-5 text-green-600" />
                         <span className="font-medium">Transkription</span>
+                        {transcriptSegments && transcriptSegments.length > 0 && (
+                          <Badge variant="outline" className="text-xs ml-2">
+                            {transcriptSegments.length} segment
+                          </Badge>
+                        )}
                       </div>
-                      <div className="bg-muted/30 rounded-xl p-6 max-h-[400px] overflow-y-auto prose prose-sm dark:prose-invert">
-                        <motion.p 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.5 }}
-                          className="whitespace-pre-wrap leading-relaxed text-foreground/90"
-                        >
-                          {transcript}
-                        </motion.p>
+                      <div className="bg-muted/30 rounded-xl p-6 max-h-[500px] overflow-y-auto">
+                        {transcriptSegments && transcriptSegments.length > 0 ? (
+                          <div className="space-y-4">
+                            {/* Group consecutive segments by same speaker */}
+                            {(() => {
+                              const grouped: { speakerId: string; text: string; start: number; end: number }[] = [];
+                              for (const seg of transcriptSegments) {
+                                const prev = grouped[grouped.length - 1];
+                                const speakerId = seg.speakerId || 'unknown';
+                                if (prev && prev.speakerId === speakerId) {
+                                  prev.text = `${prev.text}\n${seg.text}`;
+                                  prev.end = seg.end;
+                                } else {
+                                  grouped.push({ speakerId, text: seg.text, start: seg.start, end: seg.end });
+                                }
+                              }
+                              
+                              const getSpeakerName = (speakerId: string): string | null => {
+                                if (!speakerId || speakerId === 'unknown') return null;
+                                // Check sisMatches for name
+                                const match = sisMatches.find(m => m.speakerLabel === speakerId);
+                                if (match?.speakerName) return match.speakerName;
+                                // Check sisSpeakers
+                                const speaker = sisSpeakers.find(s => s.label === speakerId);
+                                if (speaker?.speakerName) return speaker.speakerName;
+                                if (speaker?.bestMatchEmail) return speaker.bestMatchEmail.split('@')[0];
+                                // Fallback to Talare X format
+                                const numMatch = speakerId.match(/speaker_(\d+)/i);
+                                if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
+                                return speakerId;
+                              };
+                              
+                              const getSpeakerColor = (speakerId: string): string => {
+                                const colors = [
+                                  'bg-blue-500',
+                                  'bg-emerald-500',
+                                  'bg-amber-500',
+                                  'bg-purple-500',
+                                  'bg-rose-500',
+                                  'bg-cyan-500',
+                                ];
+                                if (!speakerId) return colors[0];
+                                const index = speakerId.charCodeAt(speakerId.length - 1);
+                                return colors[Math.abs(index) % colors.length];
+                              };
+                              
+                              const formatTime = (time: number): string => {
+                                const totalSeconds = time > 1000 ? Math.floor(time / 1000) : Math.floor(time);
+                                const minutes = Math.floor(totalSeconds / 60);
+                                const seconds = totalSeconds % 60;
+                                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                              };
+                              
+                              return grouped.map((segment, idx) => {
+                                const speakerName = getSpeakerName(segment.speakerId);
+                                const isIdentified = sisMatches.some(m => m.speakerLabel === segment.speakerId) ||
+                                  sisSpeakers.some(s => s.label === segment.speakerId && s.bestMatchEmail);
+                                
+                                return (
+                                  <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                                    className="flex gap-3"
+                                  >
+                                    {speakerName && (
+                                      <div className="flex-shrink-0">
+                                        <div className={`w-8 h-8 rounded-full ${getSpeakerColor(segment.speakerId)} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
+                                          {speakerName.charAt(0).toUpperCase()}
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div className={`flex-1 ${!speakerName ? 'ml-0' : ''}`}>
+                                      {speakerName && (
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="text-sm font-medium">{speakerName}</span>
+                                          {isIdentified && (
+                                            <UserCheck className="w-3 h-3 text-green-500" />
+                                          )}
+                                          <span className="text-xs text-muted-foreground">
+                                            {formatTime(segment.start)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                        {segment.text}
+                                      </p>
+                                    </div>
+                                  </motion.div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        ) : (
+                          <motion.p 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.5 }}
+                            className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
+                          >
+                            {transcript}
+                          </motion.p>
+                        )}
                       </div>
                     </motion.div>
                   ) : null}
