@@ -585,10 +585,10 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
                         <div className="space-y-3">
                           <div className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-muted/30">
                             <div>
-                              <p className="text-[10px] text-muted-foreground">Möten</p>
+                            <p className="text-[10px] text-muted-foreground">Möten</p>
                               <p className="text-sm font-semibold">
                                 {userPlan?.meetingsLimit === null
-                                  ? '∞'
+                                  ? `${userPlan?.meetingsUsed || 0} (Obegränsat)`
                                   : `${userPlan?.meetingsUsed || 0}/${userPlan?.meetingsLimit || 1}`}
                               </p>
                             </div>
@@ -627,10 +627,10 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
 
                             <div className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-muted/30">
                               <div>
-                                <p className="text-[10px] text-muted-foreground">Möten</p>
+                              <p className="text-[10px] text-muted-foreground">Möten</p>
                                 <p className="text-sm font-semibold">
                                   {userPlan?.meetingsLimit === null
-                                    ? '∞'
+                                    ? `${userPlan?.meetingsUsed || 0} (Obegränsat)`
                                     : `${userPlan?.meetingsUsed || 0}/${userPlan?.meetingsLimit || 1}`}
                                 </p>
                               </div>

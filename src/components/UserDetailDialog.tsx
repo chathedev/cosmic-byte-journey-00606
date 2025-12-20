@@ -131,6 +131,9 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
 
   const effectiveLimit = user.meetingUsage?.meetingLimit ?? user.meetingLimit;
   const usedMeetings = user.meetingUsage?.meetingCount ?? user.meetingCount;
+  
+  // Check if user has unlimited access (enterprise, unlimited plan, or null limit)
+  const isUnlimitedPlan = user.plan === 'enterprise' || user.plan === 'unlimited' || effectiveLimit === null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,10 +177,21 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {usedMeetings}
-                      <span className="text-muted-foreground font-normal text-lg">
-                        /{effectiveLimit ?? '∞'}
-                      </span>
+                      {isUnlimitedPlan ? (
+                        <>
+                          {usedMeetings}
+                          <span className="text-muted-foreground font-normal text-lg ml-2">
+                            (Obegränsat)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {usedMeetings}
+                          <span className="text-muted-foreground font-normal text-lg">
+                            /{effectiveLimit}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

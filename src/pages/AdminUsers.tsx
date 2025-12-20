@@ -828,7 +828,11 @@ export default function AdminUsers() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Meetings Used</span>
                 <span className="text-sm font-medium">
-                  {editingUser ? `${getUsedMeetings(editingUser)}/${getEffectiveMeetingLimit(editingUser) ?? '∞'}` : '—'}
+                  {editingUser ? (
+                    getEffectiveMeetingLimit(editingUser) === null 
+                      ? `${getUsedMeetings(editingUser)} (Obegränsat)` 
+                      : `${getUsedMeetings(editingUser)}/${getEffectiveMeetingLimit(editingUser)}`
+                  ) : '—'}
                 </span>
               </div>
             </div>
