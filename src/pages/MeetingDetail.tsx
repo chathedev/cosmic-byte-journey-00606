@@ -463,23 +463,24 @@ const MeetingDetail = () => {
     setShowAgendaDialog(true);
   };
 
-  // Get speaker display name - prioritizes speakerNames map, then Lyra matches, then fallbacks
+  // Get speaker display name - per docs: speakerNames[label] → sisSpeakers[n].speakerName → label → speaker_{n}
   const getSpeakerDisplayName = useCallback((speakerId: string): string | null => {
     if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') return null;
     
-    // 1. First check speakerNames map (from backend/manual rename)
+    // 1. First check speakerNames map (from backend/manual rename) - per docs this is primary
     if (speakerNames[speakerId]) {
       return speakerNames[speakerId];
     }
     
-    // 2. Check lyraMatches for name by label
+    // 2. Check lyraMatches for speakerName by label
     const match = lyraMatches.find(m => 
       m.speakerLabel === speakerId || 
       m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
     );
     if (match?.speakerName) return match.speakerName;
+    if (match?.sampleOwnerEmail) return match.sampleOwnerEmail.split('@')[0];
     
-    // 3. Check lyraSpeakers
+    // 3. Check lyraSpeakers for speakerName or bestMatchEmail
     const speaker = lyraSpeakers.find(s => 
       s.label === speakerId || 
       s.label?.toLowerCase() === speakerId.toLowerCase()
@@ -498,6 +499,25 @@ const MeetingDetail = () => {
     
     return speakerId;
   }, [speakerNames, lyraMatches, lyraSpeakers]);
+
+  // Get confidence percent for a speaker - per docs: sisMatch.confidencePercent for badges
+  const getSpeakerConfidence = useCallback((speakerId: string): number | null => {
+    // Check lyraMatches first
+    const match = lyraMatches.find(m => 
+      m.speakerLabel === speakerId || 
+      m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
+    );
+    if (match?.confidencePercent) return match.confidencePercent;
+    
+    // Check lyraSpeakers similarity (0.0-1.0 → convert to percent)
+    const speaker = lyraSpeakers.find(s => 
+      s.label === speakerId || 
+      s.label?.toLowerCase() === speakerId.toLowerCase()
+    );
+    if (speaker?.similarity != null) return Math.round(speaker.similarity * 100);
+    
+    return null;
+  }, [lyraMatches, lyraSpeakers]);
 
   // Check if speaker is identified via Lyra
   const isSpeakerIdentified = useCallback((speakerId: string): boolean => {
@@ -696,8 +716,8 @@ const MeetingDetail = () => {
                       exit={{ opacity: 0 }}
                       className="space-y-4"
                     >
-                      {/* Speaker Identification Section - only show if we have identified Lyra matches */}
-                      {lyraMatches.length > 0 && (
+                      {/* Speaker Identification Section - show if we have Lyra matches OR lyraSpeakers with bestMatchEmail */}
+                      {(lyraMatches.length > 0 || lyraSpeakers.some(s => s.bestMatchEmail)) && (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -721,37 +741,69 @@ const MeetingDetail = () => {
                             )}
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2">
-                            {/* Deduplicate and combine consecutive same speakers */}
+                            {/* Build speakers from lyraMatches first, then fill in from lyraSpeakers */}
                             {(() => {
-                              const uniqueSpeakers = lyraMatches.reduce((acc, match) => {
-                                const name = speakerNames[match.speakerLabel || ''] || match.speakerName || match.sampleOwnerEmail?.split('@')[0];
-                                if (!name) return acc;
+                              type UniqueSpeaker = { 
+                                name: string; 
+                                confidencePercent: number; 
+                                email?: string; 
+                                speakerLabel?: string; 
+                                count: number; 
+                                learned: boolean;
+                                durationSeconds?: number;
+                              };
+                              
+                              const uniqueSpeakers: UniqueSpeaker[] = [];
+                              const processedLabels = new Set<string>();
+                              
+                              // First add from lyraMatches
+                              for (const match of lyraMatches) {
+                                const label = match.speakerLabel || '';
+                                const name = speakerNames[label] || match.speakerName || match.sampleOwnerEmail?.split('@')[0];
+                                if (!name) continue;
                                 
-                                // Check if this speaker has learning updates
-                                const learningEntry = lyraLearning.find(l => 
-                                  l.email === match.sampleOwnerEmail
-                                );
+                                const learningEntry = lyraLearning.find(l => l.email === match.sampleOwnerEmail);
+                                const existing = uniqueSpeakers.find(s => s.name === name);
                                 
-                                const existing = acc.find(s => s.name === name);
                                 if (existing) {
-                                  // Keep highest confidence
                                   if (match.confidencePercent > existing.confidencePercent) {
                                     existing.confidencePercent = match.confidencePercent;
                                   }
                                   existing.count++;
                                   if (learningEntry?.updated) existing.learned = true;
                                 } else {
-                                  acc.push({ 
+                                  uniqueSpeakers.push({ 
                                     name, 
                                     confidencePercent: match.confidencePercent,
                                     email: match.sampleOwnerEmail,
-                                    speakerLabel: match.speakerLabel,
+                                    speakerLabel: label,
                                     count: 1,
                                     learned: learningEntry?.updated || false,
+                                    durationSeconds: match.durationSeconds ?? undefined,
                                   });
                                 }
-                                return acc;
-                              }, [] as { name: string; confidencePercent: number; email?: string; speakerLabel?: string; count: number; learned: boolean }[]);
+                                if (label) processedLabels.add(label);
+                              }
+                              
+                              // Then add from lyraSpeakers if not already in matches
+                              for (const speaker of lyraSpeakers) {
+                                if (!speaker.bestMatchEmail || processedLabels.has(speaker.label)) continue;
+                                
+                                const name = speakerNames[speaker.label] || speaker.speakerName || speaker.bestMatchEmail.split('@')[0];
+                                const confidencePercent = speaker.similarity != null ? Math.round(speaker.similarity * 100) : 0;
+                                const learningEntry = lyraLearning.find(l => l.email === speaker.bestMatchEmail);
+                                
+                                uniqueSpeakers.push({
+                                  name,
+                                  confidencePercent,
+                                  email: speaker.bestMatchEmail,
+                                  speakerLabel: speaker.label,
+                                  count: 1,
+                                  learned: learningEntry?.updated || false,
+                                  durationSeconds: speaker.durationSeconds ?? undefined,
+                                });
+                                processedLabels.add(speaker.label);
+                              }
                               
                               return uniqueSpeakers.map((speaker, idx) => (
                                 <div
@@ -761,7 +813,7 @@ const MeetingDetail = () => {
                                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
                                     speaker.confidencePercent >= 80 
                                       ? 'bg-green-500/20 text-green-700 dark:text-green-400 ring-2 ring-green-500/30' 
-                                      : speaker.confidencePercent >= 70 
+                                      : speaker.confidencePercent >= 60 
                                         ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 ring-2 ring-blue-500/30'
                                         : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 ring-2 ring-amber-500/30'
                                   }`}>
@@ -780,18 +832,23 @@ const MeetingDetail = () => {
                                       <span className={`text-xs font-medium ${
                                         speaker.confidencePercent >= 80 
                                           ? 'text-green-600 dark:text-green-400' 
-                                          : speaker.confidencePercent >= 70 
+                                          : speaker.confidencePercent >= 60 
                                             ? 'text-blue-600 dark:text-blue-400'
                                             : 'text-amber-600 dark:text-amber-400'
                                       }`}>
                                         {speaker.confidencePercent}% träffsäkerhet
                                       </span>
+                                      {speaker.durationSeconds != null && speaker.durationSeconds > 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          • {Math.round(speaker.durationSeconds)}s
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                   <UserCheck className={`w-4 h-4 ${
                                     speaker.confidencePercent >= 80 
                                       ? 'text-green-500' 
-                                      : speaker.confidencePercent >= 70 
+                                      : speaker.confidencePercent >= 60 
                                         ? 'text-blue-500'
                                         : 'text-amber-500'
                                   }`} />
@@ -866,6 +923,7 @@ const MeetingDetail = () => {
                               {groupedSegments.map((segment, idx) => {
                                 const speakerName = getSpeakerDisplayName(segment.speakerId);
                                 const isIdentified = isSpeakerIdentified(segment.speakerId);
+                                const confidence = getSpeakerConfidence(segment.speakerId);
                                 const isEditing = editingSpeaker === segment.speakerId;
                                 
                                 return (
@@ -874,11 +932,19 @@ const MeetingDetail = () => {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                                    className="flex gap-3"
+                                    className="flex gap-3 group"
                                   >
                                     {speakerName ? (
                                       <div className="flex-shrink-0">
-                                        <div className={`w-9 h-9 rounded-full ${getSpeakerColor(segment.speakerId)} flex items-center justify-center text-white text-sm font-bold shadow-md ring-2 ring-background`}>
+                                        <div className={`w-9 h-9 rounded-full ${
+                                          isIdentified 
+                                            ? (confidence && confidence >= 80 
+                                                ? 'bg-green-500' 
+                                                : confidence && confidence >= 60 
+                                                  ? 'bg-blue-500' 
+                                                  : 'bg-amber-500')
+                                            : getSpeakerColor(segment.speakerId)
+                                        } flex items-center justify-center text-white text-sm font-bold shadow-md ring-2 ring-background`}>
                                           {speakerName.charAt(0).toUpperCase()}
                                         </div>
                                       </div>
@@ -890,14 +956,14 @@ const MeetingDetail = () => {
                                       </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1.5">
+                                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                         {isEditing ? (
                                           <div className="flex items-center gap-2 flex-1">
                                             <Input
                                               value={editingSpeakerValue}
                                               onChange={(e) => setEditingSpeakerValue(e.target.value)}
                                               className="h-7 text-sm w-40"
-                                              placeholder="Ange namn..."
+                                              placeholder="Ange namn eller e-post..."
                                               autoFocus
                                               onKeyDown={(e) => {
                                                 if (e.key === 'Enter') handleSaveSpeakerName();
@@ -937,7 +1003,21 @@ const MeetingDetail = () => {
                                             <span className="text-sm font-semibold text-foreground">
                                               {speakerName || `Talare ${idx + 1}`}
                                             </span>
-                                            {isIdentified && (
+                                            {isIdentified && confidence != null && (
+                                              <Badge 
+                                                variant="outline" 
+                                                className={`text-[10px] px-1.5 py-0 h-4 ${
+                                                  confidence >= 80 
+                                                    ? 'text-green-600 border-green-500/30 bg-green-500/10' 
+                                                    : confidence >= 60 
+                                                      ? 'text-blue-600 border-blue-500/30 bg-blue-500/10'
+                                                      : 'text-amber-600 border-amber-500/30 bg-amber-500/10'
+                                                }`}
+                                              >
+                                                {confidence}%
+                                              </Badge>
+                                            )}
+                                            {isIdentified && !confidence && (
                                               <UserCheck className="w-3.5 h-3.5 text-green-500" />
                                             )}
                                             <Button
