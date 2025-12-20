@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Volume2, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Volume2, Pencil, Save, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
-import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment } from "@/lib/asrService";
+import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry } from "@/lib/asrService";
 import { apiClient } from "@/lib/api";
 import { backendApi } from "@/lib/backendApi";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
@@ -63,6 +63,7 @@ const MeetingDetail = () => {
   const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
   const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
@@ -159,15 +160,11 @@ const MeetingDetail = () => {
                 if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
                   setTranscriptSegments(asrStatus.transcriptSegments);
                 }
-                if (asrStatus.sisSpeakers) {
-                  setLyraSpeakers(asrStatus.sisSpeakers);
-                }
-                if (asrStatus.sisMatches) {
-                  setLyraMatches(asrStatus.sisMatches);
-                }
-                if (asrStatus.speakerNames) {
-                  setSpeakerNames(asrStatus.speakerNames);
-                }
+                // Use Lyra mirror fields when available, fallback to SIS fields
+                setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
+                setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
+                setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+                setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
               } catch (e) {
                 console.log('Could not fetch ASR data for completed meeting:', e);
               }
@@ -264,11 +261,11 @@ const MeetingDetail = () => {
           const newTranscript = asrStatus.transcript || '';
           setTranscript(newTranscript);
           setTranscriptSegments(asrStatus.transcriptSegments || null);
-          setLyraSpeakers(asrStatus.sisSpeakers || []);
-          setLyraMatches(asrStatus.sisMatches || []);
-          if (asrStatus.speakerNames) {
-            setSpeakerNames(asrStatus.speakerNames);
-          }
+          // Use Lyra mirror fields when available, fallback to SIS fields
+          setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
+          setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
+          setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+          setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setStatus('done');
 
           try {
@@ -711,10 +708,17 @@ const MeetingDetail = () => {
                             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                               <Users className="w-4 h-4 text-primary" />
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <span className="text-sm font-semibold">Identifierade talare</span>
                               <p className="text-xs text-muted-foreground">Röstidentifiering via Lyra</p>
                             </div>
+                            {/* Show learning badge if any speaker learned in this meeting */}
+                            {lyraLearning.some(l => l.updated) && (
+                              <Badge variant="outline" className="text-purple-600 border-purple-500/30 bg-purple-500/10 gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                Lyra lärde sig
+                              </Badge>
+                            )}
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2">
                             {/* Deduplicate and combine consecutive same speakers */}
@@ -723,6 +727,11 @@ const MeetingDetail = () => {
                                 const name = speakerNames[match.speakerLabel || ''] || match.speakerName || match.sampleOwnerEmail?.split('@')[0];
                                 if (!name) return acc;
                                 
+                                // Check if this speaker has learning updates
+                                const learningEntry = lyraLearning.find(l => 
+                                  l.email === match.sampleOwnerEmail
+                                );
+                                
                                 const existing = acc.find(s => s.name === name);
                                 if (existing) {
                                   // Keep highest confidence
@@ -730,17 +739,19 @@ const MeetingDetail = () => {
                                     existing.confidencePercent = match.confidencePercent;
                                   }
                                   existing.count++;
+                                  if (learningEntry?.updated) existing.learned = true;
                                 } else {
                                   acc.push({ 
                                     name, 
                                     confidencePercent: match.confidencePercent,
                                     email: match.sampleOwnerEmail,
                                     speakerLabel: match.speakerLabel,
-                                    count: 1
+                                    count: 1,
+                                    learned: learningEntry?.updated || false,
                                   });
                                 }
                                 return acc;
-                              }, [] as { name: string; confidencePercent: number; email?: string; speakerLabel?: string; count: number }[]);
+                              }, [] as { name: string; confidencePercent: number; email?: string; speakerLabel?: string; count: number; learned: boolean }[]);
                               
                               return uniqueSpeakers.map((speaker, idx) => (
                                 <div
@@ -757,7 +768,14 @@ const MeetingDetail = () => {
                                     {speaker.name.charAt(0).toUpperCase()}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{speaker.name}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-medium truncate">{speaker.name}</p>
+                                      {speaker.learned && (
+                                        <span title="Lyra lärde sig från denna talare">
+                                          <Sparkles className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 mt-0.5">
                                       <span className={`text-xs font-medium ${
                                         speaker.confidencePercent >= 80 
