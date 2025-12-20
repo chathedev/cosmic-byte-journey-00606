@@ -88,7 +88,10 @@ export default function EnterpriseStats() {
   const companyId = enterpriseMembership?.company?.id;
 
   const loadStats = async (showRefresh = false) => {
-    if (!companyId) return;
+    if (!companyId) {
+      setIsLoading(false);
+      return;
+    }
     
     if (showRefresh) {
       setIsRefreshing(true);
@@ -100,9 +103,14 @@ export default function EnterpriseStats() {
     try {
       const data = await apiClient.getEnterpriseCompanyStats(companyId);
       setStats(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load enterprise stats:', err);
-      setError('Kunde inte ladda företagsstatistik');
+      // Handle "companyId is not defined" error gracefully
+      if (err?.message?.includes('companyId')) {
+        setError('Företags-ID saknas. Försök ladda om sidan.');
+      } else {
+        setError('Kunde inte ladda företagsstatistik');
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -110,7 +118,11 @@ export default function EnterpriseStats() {
   };
 
   useEffect(() => {
-    loadStats();
+    if (companyId) {
+      loadStats();
+    } else {
+      setIsLoading(false);
+    }
   }, [companyId]);
 
   const formatDate = (dateString?: string) => {
