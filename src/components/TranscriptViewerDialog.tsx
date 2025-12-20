@@ -297,17 +297,18 @@ export function TranscriptViewerDialog({
   const handleCopy = async () => {
     try {
       let textToCopy = transcript;
-      
+
       if (segments && segments.length > 0) {
         textToCopy = segments
-          .map(s => {
+          .map((s) => {
             const speakerKey = getSpeakerFromSegment(s);
             const displayName = getSpeakerDisplayName(speakerKey);
-            return `[${displayName}] ${s.text}`;
+            // If speaker is unknown/unavailable, copy without a speaker prefix.
+            return displayName ? `[${displayName}] ${s.text}` : s.text;
           })
-          .join('\n\n');
+          .join("\n\n");
       }
-      
+
       await navigator.clipboard.writeText(textToCopy);
       toast({
         title: "Kopierat!",
@@ -331,46 +332,51 @@ export function TranscriptViewerDialog({
   // 4. label (original diarization label if readable)
   // 5. speaker_{n} fallback → "Talare N" for Swedish UI
   const getSpeakerDisplayName = useCallback((speaker: string): string => {
+    // Never show "unknown" to users.
+    if (!speaker || speaker === "unknown") {
+      return "";
+    }
+
     // 1. First check speakerNames map (backend cache or manual rename)
     // Per docs: "Use speakerNames[label]" - this is keyed by the diarization label
     if (speakerNames[speaker]) {
       return speakerNames[speaker];
     }
-    
+
     // 2. Check sisSpeakers[n].speakerName (backend-decorated alias)
     // Per docs: "Fall back to sisSpeakers[n].speakerName"
-    const sisSpeaker = sisSpeakers?.find(s => s.label === speaker);
+    const sisSpeaker = sisSpeakers?.find((s) => s.label === speaker);
     if (sisSpeaker?.speakerName) {
       return sisSpeaker.speakerName;
     }
-    
+
     // 2b. Per docs: also check sisSpeakers by bestMatchEmail when speakerLabel is sanitized
-    const sisSpeakerByEmail = sisSpeakers?.find(s => {
-      const matchForSpeaker = sisMatches?.find(m => m.speakerLabel === speaker);
+    const sisSpeakerByEmail = sisSpeakers?.find((s) => {
+      const matchForSpeaker = sisMatches?.find((m) => m.speakerLabel === speaker);
       return matchForSpeaker && s.bestMatchEmail === matchForSpeaker.sampleOwnerEmail && s.speakerName;
     });
     if (sisSpeakerByEmail?.speakerName) {
       return sisSpeakerByEmail.speakerName;
     }
-    
+
     // 3. Check sisMatches[i]?.speakerName (per docs: "use sisMatches[i]?.speakerName when rendering")
-    const matchWithLabel = sisMatches?.find(m => m.speakerLabel === speaker);
+    const matchWithLabel = sisMatches?.find((m) => m.speakerLabel === speaker);
     if (matchWithLabel?.speakerName) {
       return matchWithLabel.speakerName;
     }
-    
+
     // 3b. Check computed sisIdentifiedSpeakers map for resolved aliases
     const sisInfo = sisIdentifiedSpeakers[speaker];
     if (sisInfo?.hasAlias && sisInfo.name) {
       return sisInfo.name;
     }
-    
+
     // 4. Per docs: "fall back to the label itself"
     // Use the label as-is if it's human-readable (not speaker_N pattern)
     if (speaker && !speaker.match(/^speaker_\d+$/i)) {
       return speaker;
     }
-    
+
     // 5. Fall back to "Talare X" format for Swedish UI
     const match = speaker.match(/speaker_(\d+)/i);
     if (match) {
@@ -387,15 +393,36 @@ export function TranscriptViewerDialog({
     return sisIdentifiedSpeakers[speaker]?.confidence || 0;
   };
 
-  const uniqueSpeakers = segments 
-    ? [...new Set(segments.map(s => getSpeakerFromSegment(s)))].filter(s => s !== 'unknown').sort()
+  const uniqueSpeakers = segments
+    ? [...new Set(segments.map((s) => getSpeakerFromSegment(s)))].filter((s) => s !== "unknown").sort()
     : [];
 
-  const identifiedCount = uniqueSpeakers.filter(s => isSISIdentified(s)).length;
+  const hasSpeakerLabels = useMemo(() => {
+    return !!segments?.some((s) => getSpeakerFromSegment(s) !== "unknown");
+  }, [segments]);
 
-  const totalDuration = segments && segments.length > 0
-    ? Math.max(...segments.map(s => s.end))
-    : 0;
+  const groupedSegments = useMemo(() => {
+    if (!segments || segments.length === 0) return [] as Array<{ speakerKey: string; start: number; end: number; text: string }>;
+
+    const out: Array<{ speakerKey: string; start: number; end: number; text: string }> = [];
+    for (const seg of segments) {
+      const rawKey = getSpeakerFromSegment(seg);
+      const speakerKey = rawKey === "unknown" ? "" : rawKey;
+
+      const prev = out[out.length - 1];
+      if (prev && prev.speakerKey === speakerKey) {
+        prev.end = seg.end;
+        prev.text = `${prev.text}\n${seg.text}`;
+      } else {
+        out.push({ speakerKey, start: seg.start, end: seg.end, text: seg.text });
+      }
+    }
+    return out;
+  }, [segments]);
+
+  const identifiedCount = uniqueSpeakers.filter((s) => isSISIdentified(s)).length;
+
+  const totalDuration = segments && segments.length > 0 ? Math.max(...segments.map((s) => s.end)) : 0;
 
   // Start editing a speaker name
   const startEditing = (speakerId: string) => {
@@ -685,17 +712,101 @@ export function TranscriptViewerDialog({
         <ScrollArea className="flex-1 max-h-[55vh]">
           <div className="px-5 py-4">
             {speakerIdentificationEnabled && segments && segments.length > 0 ? (
-              <div className="space-y-0">
-                {segments.map((segment, index) => {
-                  const speakerKey = getSpeakerFromSegment(segment);
-                  const isIdentified = isSISIdentified(speakerKey);
-                  const confidence = getSISConfidence(speakerKey);
-                  const displayName = getSpeakerDisplayName(speakerKey);
-                  const hasCustomName = !!speakerNames[speakerKey];
-                  const sisInfo = sisIdentifiedSpeakers[speakerKey];
-                  const voiceLearned = sisInfo && sisLearning.some(l => l.email === sisInfo.email && l.updated);
-                  
-                  return (
+              hasSpeakerLabels ? (
+                <div className="space-y-0">
+                  {groupedSegments.map((segment, index) => {
+                    const speakerKey = segment.speakerKey;
+                    const displayName = speakerKey ? getSpeakerDisplayName(speakerKey) : "";
+                    const showSpeaker = !!(speakerKey && displayName);
+
+                    const isIdentified = speakerKey ? isSISIdentified(speakerKey) : false;
+                    const confidence = speakerKey ? getSISConfidence(speakerKey) : 0;
+                    const hasCustomName = speakerKey ? !!speakerNames[speakerKey] : false;
+                    const sisInfo = speakerKey ? sisIdentifiedSpeakers[speakerKey] : undefined;
+                    const voiceLearned = !!(sisInfo && sisLearning.some((l) => l.email === sisInfo.email && l.updated));
+
+                    const initials = displayName
+                      ? displayName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()
+                      : "";
+
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: Math.min(index * 0.02, 0.5), duration: 0.15 }}
+                        className="py-3 border-b border-border/30 last:border-0"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          {showSpeaker ? (
+                            <div
+                              className={`relative w-5 h-5 rounded-full ${getSpeakerBgColor(speakerKey)} flex items-center justify-center flex-shrink-0 mt-0.5`}
+                            >
+                              <span className="text-[8px] font-semibold text-white">{initials}</span>
+                              {voiceLearned && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background" />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="w-5 flex-shrink-0" />
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              {showSpeaker && (
+                                <span
+                                  className={`text-xs font-medium ${
+                                    voiceLearned
+                                      ? "text-emerald-700 dark:text-emerald-400"
+                                      : isIdentified
+                                        ? "text-emerald-700 dark:text-emerald-400"
+                                        : hasCustomName
+                                          ? "text-blue-700 dark:text-blue-400"
+                                          : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {displayName}
+                                </span>
+                              )}
+
+                              {showSpeaker && isIdentified && (
+                                <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}%`}>
+                                  <Volume2
+                                    className={`w-2.5 h-2.5 ${
+                                      confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-500" : "text-amber-500"
+                                    }`}
+                                  />
+                                  <span
+                                    className={`text-[9px] ${
+                                      confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-600" : "text-amber-600"
+                                    }`}
+                                  >
+                                    {Math.round(confidence * 100)}%
+                                  </span>
+                                </div>
+                              )}
+
+                              <span className="text-[10px] text-muted-foreground/50 ml-auto">{formatTime(segment.start)}</span>
+                            </div>
+                            <p className="text-[13px] leading-relaxed text-foreground/85 whitespace-pre-wrap">
+                              {segment.text}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                // Speaker identification enabled, but backend didn't provide speaker labels.
+                // Show a clean, time-split transcript without any "unknown" speaker UI.
+                <div className="space-y-0">
+                  {groupedSegments.map((segment, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0 }}
@@ -704,54 +815,22 @@ export function TranscriptViewerDialog({
                       className="py-3 border-b border-border/30 last:border-0"
                     >
                       <div className="flex items-start gap-2.5">
-                        <div className={`relative w-5 h-5 rounded-full ${getSpeakerBgColor(speakerKey)} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                          <span className="text-[8px] font-semibold text-white">
-                            {displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </span>
-                          {voiceLearned && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background" />
-                          )}
-                        </div>
-                        
+                        <div className="w-5 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className={`text-xs font-medium ${
-                              voiceLearned
-                                ? 'text-emerald-700 dark:text-emerald-400'
-                                : isIdentified 
-                                  ? 'text-emerald-700 dark:text-emerald-400' 
-                                  : hasCustomName 
-                                    ? 'text-blue-700 dark:text-blue-400'
-                                    : 'text-muted-foreground'
-                            }`}>
-                              {displayName}
-                            </span>
-                           {/* Per docs: confidence badge from sisSpeakers.similarity */}
-                            {isIdentified && (
-                              <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}%`}>
-                                <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-500' : 'text-amber-500'}`} />
-                                <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                  {Math.round(confidence * 100)}%
-                                </span>
-                              </div>
-                            )}
-                            <span className="text-[10px] text-muted-foreground/50 ml-auto">
-                              {formatTime(segment.start)}
-                            </span>
+                            <span className="text-[10px] text-muted-foreground/50 ml-auto">{formatTime(segment.start)}</span>
                           </div>
-                          <p className="text-[13px] leading-relaxed text-foreground/85">
+                          <p className="text-[13px] leading-relaxed text-foreground/85 whitespace-pre-wrap">
                             {segment.text}
                           </p>
                         </div>
                       </div>
                     </motion.div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )
             ) : (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/85">
-                {transcript}
-              </p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/85">{transcript}</p>
             )}
           </div>
         </ScrollArea>
