@@ -207,17 +207,20 @@ export default function AdminEnterpriseCompanyDetail() {
     setLoadingStats(true);
     try {
       const token = localStorage.getItem('authToken');
-      
-      // Fetch AI costs and user details for all members in parallel
       const memberEmails = company.members.map(m => m.email);
       
-      // Fetch AI costs
-      const costsResponse = await fetch(`https://api.tivly.se/ai/costs`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
-      });
+      // Fetch AI costs and user details in parallel
+      const [costsResponse, ...memberResponses] = await Promise.all([
+        fetch(`https://api.tivly.se/ai/costs`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          },
+        }),
+        ...memberEmails.map(email => 
+          apiClient.getAdminUserDetail(email).catch(() => null)
+        )
+      ]);
       
       let aiCostsByUser: Record<string, number> = {};
       if (costsResponse.ok) {
@@ -229,32 +232,24 @@ export default function AdminEnterpriseCompanyDetail() {
         }
       }
       
-      // Fetch user details to get meeting counts
-      const memberDetails = await Promise.all(
-        memberEmails.map(async (email) => {
-          try {
-            const data = await apiClient.getAdminUserDetail(email);
-            return {
-              email: email.toLowerCase(),
-              meetingCount: data.meetingCount ?? data.meetings?.length ?? data.plan?.meetingsUsed ?? 0,
-              aiCostUsd: aiCostsByUser[email.toLowerCase()] || 0,
-            };
-          } catch {
-            return {
-              email: email.toLowerCase(),
-              meetingCount: 0,
-              aiCostUsd: aiCostsByUser[email.toLowerCase()] || 0,
-            };
-          }
-        })
-      );
-      
-      const totalMeetings = memberDetails.reduce((sum, m) => sum + m.meetingCount, 0);
-      const totalAiCostUsd = memberDetails.reduce((sum, m) => sum + m.aiCostUsd, 0);
-      
+      // Process member details - use totalMeetingCount from meetingUsage
       const memberStats: Record<string, { meetingCount: number; aiCostUsd: number }> = {};
-      memberDetails.forEach(m => {
-        memberStats[m.email] = { meetingCount: m.meetingCount, aiCostUsd: m.aiCostUsd };
+      let totalMeetings = 0;
+      let totalAiCostUsd = 0;
+      
+      memberEmails.forEach((email, idx) => {
+        const response = memberResponses[idx];
+        const userData = response?.user || response;
+        const emailLower = email.toLowerCase();
+        
+        // Get totalMeetingCount from meetingUsage.totalMeetingCount
+        const meetingCount = userData?.meetingUsage?.totalMeetingCount ?? 
+                            userData?.meetings?.length ?? 0;
+        const aiCostUsd = aiCostsByUser[emailLower] || 0;
+        
+        memberStats[emailLower] = { meetingCount, aiCostUsd };
+        totalMeetings += meetingCount;
+        totalAiCostUsd += aiCostUsd;
       });
       
       setCompanyStats({ totalMeetings, totalAiCostUsd, memberStats });
@@ -762,111 +757,71 @@ export default function AdminEnterpriseCompanyDetail() {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        {/* Stats Grid - Minimalistic */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Medlemmar
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{company.members.length}</div>
-              <p className="text-xs text-muted-foreground">{activeMembers} aktiva</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Totalt möten
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingStats ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold text-foreground">{companyStats?.totalMeetings ?? 0}</div>
-                  <p className="text-xs text-muted-foreground">Alla medlemmar</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                AI-kostnad
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingStats ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold text-foreground">
-                    {companyStats?.totalAiCostUsd 
-                      ? `$${companyStats.totalAiCostUsd.toFixed(2)}`
-                      : '$0.00'
-                    }
-                  </div>
-                  <p className="text-xs text-muted-foreground">Totalt för företaget</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Domäner
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{company.domains?.length || 0}</div>
-              <p className="text-xs text-muted-foreground truncate">{company.domains?.join(', ') || 'Inga'}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Dataläge
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg font-bold text-foreground">
-                {company.dataAccessMode === 'individual' ? 'Individuell' : 'Delad'}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {company.dataAccessMode === 'individual' ? 'Egen data' : 'Gemensam'}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Volume2 className="h-4 w-4" />
-                SIS
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-lg font-bold text-foreground">
-                    {sisEnabled ? `${sisReadyCount}/${company.members.length}` : 'Av'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {sisEnabled ? 'Verifierade' : 'Inaktiverad'}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Medlemmar</p>
+                  <p className="text-2xl font-bold">{company.members.length}</p>
                 </div>
-                <Switch
-                  checked={sisEnabled}
-                  onCheckedChange={handleToggleSIS}
-                  disabled={isSubmitting}
-                />
+                <Users className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Totalt möten</p>
+                  {loadingStats ? (
+                    <Loader2 className="h-5 w-5 animate-spin mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold">{companyStats?.totalMeetings ?? 0}</p>
+                  )}
+                </div>
+                <FileText className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">AI-kostnad</p>
+                  {loadingStats ? (
+                    <Loader2 className="h-5 w-5 animate-spin mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold">
+                      ${(companyStats?.totalAiCostUsd ?? 0).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">SIS</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-2xl font-bold">
+                      {sisEnabled ? `${sisReadyCount}/${company.members.length}` : 'Av'}
+                    </p>
+                    <Switch
+                      checked={sisEnabled}
+                      onCheckedChange={handleToggleSIS}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                <Volume2 className="h-8 w-8 text-muted-foreground/30" />
               </div>
             </CardContent>
           </Card>

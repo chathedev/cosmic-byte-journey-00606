@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, User, CreditCard, FileText, Calendar, TrendingUp, ExternalLink, DollarSign, RefreshCw, FolderOpen } from 'lucide-react';
+import { Loader2, User, CreditCard, FileText, Calendar, TrendingUp, ExternalLink, DollarSign, RefreshCw, FolderOpen, Building2 } from 'lucide-react';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
@@ -23,10 +23,14 @@ interface UserData {
   googleId?: string;
   hasUnlimitedInvite?: boolean;
   unlimitedInviteNote?: string;
+  preferredName?: string;
+  totalMeetingCount?: number;
   meetingUsage?: {
     meetingCount: number;
     meetingLimit: number | null;
     meetingSlotsRemaining: number | null;
+    totalMeetingCount?: number;
+    lastResetAt?: string;
     override?: any;
   };
   overrides?: {
@@ -44,6 +48,11 @@ interface UserData {
     priceId?: string;
     cancelAtPeriodEnd?: boolean;
     lastSyncAt?: string;
+  };
+  enterprise?: {
+    companyId: string;
+    companyName: string;
+    role: string;
   };
 }
 
@@ -89,35 +98,45 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
   const fetchUserDetails = async (email: string) => {
     setLoadingUser(true);
     try {
-      const data = await apiClient.getAdminUserDetail(email);
-      // Normalize the response data
+      const response = await apiClient.getAdminUserDetail(email);
+      // Handle the nested response structure: { user: {...}, summary: {...} }
+      const data = response.user || response;
+      const summary = response.summary || {};
+      
+      // Get total meeting count from meetingUsage.totalMeetingCount
+      const totalMeetings = data.meetingUsage?.totalMeetingCount ?? 
+                            summary.meetingUsage?.totalMeetingCount ?? 
+                            summary.meetingUsage?.actualMeetingCount ??
+                            data.meetings?.length ?? 0;
+      
       const normalized: UserData = {
         email: data.email || email,
-        plan: data.plan?.plan || data.plan?.type || data.planTier || user?.plan || 'free',
-        paymentStatus: data.paymentStatus || data.plan?.paymentStatus,
-        meetingCount: data.meetingCount ?? data.meetings?.length ?? data.plan?.meetingsUsed ?? 0,
-        meetingLimit: data.plan?.meetingsLimit ?? null,
-        folderCount: data.folderCount ?? data.folders?.length ?? 0,
-        createdAt: data.createdAt || data.created,
-        lastLoginAt: data.lastLoginAt || data.lastLogin || data.lastActivity,
-        isVerified: data.isVerified ?? data.emailVerified ?? true,
+        plan: data.plan || summary.plan || user?.plan || 'free',
+        paymentStatus: data.paymentStatus || summary.paymentStatus,
+        meetingCount: data.meetingCount ?? summary.meetingCount ?? 0,
+        meetingLimit: data.meetingLimit ?? summary.meetingLimit ?? null,
+        folderCount: data.folders?.length ?? summary.folderCount ?? 0,
+        createdAt: data.createdAt,
+        lastLoginAt: data.lastLoginAt,
+        isVerified: data.isVerified ?? true,
         googleId: data.googleId,
-        hasUnlimitedInvite: data.hasUnlimitedInvite || !!data.unlimitedInvite,
-        unlimitedInviteNote: data.unlimitedInviteNote || data.unlimitedInvite?.note,
-        meetingUsage: data.meetingUsage || {
-          meetingCount: data.meetingCount ?? data.plan?.meetingsUsed ?? 0,
-          meetingLimit: data.plan?.meetingsLimit ?? null,
-          meetingSlotsRemaining: data.plan?.meetingsLimit 
-            ? (data.plan.meetingsLimit - (data.meetingCount ?? data.plan?.meetingsUsed ?? 0)) 
-            : null,
+        hasUnlimitedInvite: summary.hasUnlimitedInvite || !!data.unlimitedInvite,
+        unlimitedInviteNote: summary.unlimitedInviteNote,
+        preferredName: data.preferredName,
+        totalMeetingCount: totalMeetings,
+        meetingUsage: data.meetingUsage || summary.meetingUsage || {
+          meetingCount: data.meetingCount ?? 0,
+          meetingLimit: data.meetingLimit ?? null,
+          meetingSlotsRemaining: null,
+          totalMeetingCount: totalMeetings,
         },
-        overrides: data.overrides,
-        stripe: data.stripe,
+        overrides: summary.overrides || data.overrides,
+        stripe: summary.stripe || data.stripe,
+        enterprise: data.enterprise,
       };
       setUserData(normalized);
     } catch (error) {
       console.error('Failed to fetch user details:', error);
-      // Fallback to basic data from props
       setUserData({
         email: user?.email || '',
         plan: user?.plan || 'enterprise',
@@ -188,6 +207,7 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
 
   const effectiveLimit = displayData.meetingUsage?.meetingLimit ?? displayData.meetingLimit;
   const usedMeetings = displayData.meetingUsage?.meetingCount ?? displayData.meetingCount;
+  const totalMeetings = displayData.meetingUsage?.totalMeetingCount ?? displayData.totalMeetingCount ?? usedMeetings;
   
   // Check if user has unlimited access (enterprise, unlimited plan, or null limit)
   const isUnlimitedPlan = displayData.plan === 'enterprise' || displayData.plan === 'unlimited' || effectiveLimit === null;
@@ -241,27 +261,23 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                           <FileText className="h-4 w-4" />
-                          Möten
+                          Möten (totalt)
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          {isUnlimitedPlan ? (
-                            <>
-                              {usedMeetings}
-                              <span className="text-muted-foreground font-normal text-lg ml-2">
-                                (Obegränsat)
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              {usedMeetings}
-                              <span className="text-muted-foreground font-normal text-lg">
-                                /{effectiveLimit}
-                              </span>
-                            </>
+                          {totalMeetings}
+                          {isUnlimitedPlan && (
+                            <span className="text-muted-foreground font-normal text-sm ml-2">
+                              Obegränsat
+                            </span>
                           )}
                         </div>
+                        {usedMeetings !== totalMeetings && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {usedMeetings} denna period
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
 
@@ -277,6 +293,27 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
                       </CardContent>
                     </Card>
                   </div>
+
+                  {displayData.enterprise && (
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          Enterprise
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Företag</span>
+                          <span className="font-medium">{displayData.enterprise.companyName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Roll</span>
+                          <Badge variant="outline">{displayData.enterprise.role}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Card>
                     <CardHeader className="pb-2">
