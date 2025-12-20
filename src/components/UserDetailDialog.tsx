@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, User, CreditCard, FileText, Calendar, TrendingUp, ExternalLink, DollarSign, RefreshCw } from 'lucide-react';
+import { Loader2, User, CreditCard, FileText, Calendar, TrendingUp, ExternalLink, DollarSign, RefreshCw, FolderOpen } from 'lucide-react';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
+import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 
 interface UserData {
@@ -59,7 +60,7 @@ interface UserCostData {
 }
 
 interface UserDetailDialogProps {
-  user: UserData | null;
+  user: { email: string; plan?: string; meetingCount?: number } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenStripeDashboard?: (email: string) => void;
@@ -68,6 +69,8 @@ interface UserDetailDialogProps {
 const API_BASE_URL = "https://api.tivly.se";
 
 export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboard }: UserDetailDialogProps) {
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
   const [costs, setCosts] = useState<UserCostData | null>(null);
   const [loadingCosts, setLoadingCosts] = useState(false);
   const [currency, setCurrency] = useState<'USD' | 'SEK'>('SEK');
@@ -75,9 +78,56 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
 
   useEffect(() => {
     if (open && user?.email) {
+      fetchUserDetails(user.email);
       fetchUserCosts(user.email);
+    } else {
+      setUserData(null);
+      setCosts(null);
     }
   }, [open, user?.email]);
+
+  const fetchUserDetails = async (email: string) => {
+    setLoadingUser(true);
+    try {
+      const data = await apiClient.getAdminUserDetail(email);
+      // Normalize the response data
+      const normalized: UserData = {
+        email: data.email || email,
+        plan: data.plan?.plan || data.plan?.type || data.planTier || user?.plan || 'free',
+        paymentStatus: data.paymentStatus || data.plan?.paymentStatus,
+        meetingCount: data.meetingCount ?? data.meetings?.length ?? data.plan?.meetingsUsed ?? 0,
+        meetingLimit: data.plan?.meetingsLimit ?? null,
+        folderCount: data.folderCount ?? data.folders?.length ?? 0,
+        createdAt: data.createdAt || data.created,
+        lastLoginAt: data.lastLoginAt || data.lastLogin || data.lastActivity,
+        isVerified: data.isVerified ?? data.emailVerified ?? true,
+        googleId: data.googleId,
+        hasUnlimitedInvite: data.hasUnlimitedInvite || !!data.unlimitedInvite,
+        unlimitedInviteNote: data.unlimitedInviteNote || data.unlimitedInvite?.note,
+        meetingUsage: data.meetingUsage || {
+          meetingCount: data.meetingCount ?? data.plan?.meetingsUsed ?? 0,
+          meetingLimit: data.plan?.meetingsLimit ?? null,
+          meetingSlotsRemaining: data.plan?.meetingsLimit 
+            ? (data.plan.meetingsLimit - (data.meetingCount ?? data.plan?.meetingsUsed ?? 0)) 
+            : null,
+        },
+        overrides: data.overrides,
+        stripe: data.stripe,
+      };
+      setUserData(normalized);
+    } catch (error) {
+      console.error('Failed to fetch user details:', error);
+      // Fallback to basic data from props
+      setUserData({
+        email: user?.email || '',
+        plan: user?.plan || 'enterprise',
+        meetingCount: user?.meetingCount ?? 0,
+        meetingLimit: null,
+      });
+    } finally {
+      setLoadingUser(false);
+    }
+  };
 
   const fetchUserCosts = async (email: string) => {
     setLoadingCosts(true);
@@ -129,11 +179,18 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
 
   if (!user) return null;
 
-  const effectiveLimit = user.meetingUsage?.meetingLimit ?? user.meetingLimit;
-  const usedMeetings = user.meetingUsage?.meetingCount ?? user.meetingCount;
+  const displayData = userData || {
+    email: user.email,
+    plan: user.plan || 'enterprise',
+    meetingCount: user.meetingCount ?? 0,
+    meetingLimit: null,
+  };
+
+  const effectiveLimit = displayData.meetingUsage?.meetingLimit ?? displayData.meetingLimit;
+  const usedMeetings = displayData.meetingUsage?.meetingCount ?? displayData.meetingCount;
   
   // Check if user has unlimited access (enterprise, unlimited plan, or null limit)
-  const isUnlimitedPlan = user.plan === 'enterprise' || user.plan === 'unlimited' || effectiveLimit === null;
+  const isUnlimitedPlan = displayData.plan === 'enterprise' || displayData.plan === 'unlimited' || effectiveLimit === null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -148,11 +205,17 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
             <div className="flex-1 min-w-0">
               <p className="text-lg font-semibold truncate">{user.email}</p>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant={user.plan === 'free' ? 'outline' : 'default'}>
-                  {user.plan}
-                </Badge>
-                {user.googleId && <Badge variant="secondary">Google</Badge>}
-                {user.isVerified && <Badge variant="outline" className="text-green-600">Verified</Badge>}
+                {loadingUser ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Badge variant={displayData.plan === 'free' ? 'outline' : 'default'}>
+                      {displayData.plan}
+                    </Badge>
+                    {displayData.googleId && <Badge variant="secondary">Google</Badge>}
+                    {displayData.isVerified && <Badge variant="outline" className="text-green-600">Verifierad</Badge>}
+                  </>
+                )}
               </div>
             </div>
           </DialogTitle>
@@ -160,113 +223,121 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
 
         <Tabs defaultValue="overview" className="mt-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="costs">AI Costs</TabsTrigger>
-            <TabsTrigger value="billing">Billing</TabsTrigger>
+            <TabsTrigger value="overview">Översikt</TabsTrigger>
+            <TabsTrigger value="costs">AI-kostnader</TabsTrigger>
+            <TabsTrigger value="billing">Fakturering</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[50vh] mt-4">
             <TabsContent value="overview" className="space-y-4 pr-4">
-              <div className="grid grid-cols-2 gap-3">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Meetings
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {isUnlimitedPlan ? (
-                        <>
-                          {usedMeetings}
-                          <span className="text-muted-foreground font-normal text-lg ml-2">
-                            (Obegränsat)
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          {usedMeetings}
-                          <span className="text-muted-foreground font-normal text-lg">
-                            /{effectiveLimit}
-                          </span>
-                        </>
+              {loadingUser ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Möten
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {isUnlimitedPlan ? (
+                            <>
+                              {usedMeetings}
+                              <span className="text-muted-foreground font-normal text-lg ml-2">
+                                (Obegränsat)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {usedMeetings}
+                              <span className="text-muted-foreground font-normal text-lg">
+                                /{effectiveLimit}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <FolderOpen className="h-4 w-4" />
+                          Mappar
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{displayData.folderCount ?? 0}</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Kontodetaljer</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Skapad</span>
+                        <span>{formatDate(displayData.createdAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Senast inloggad</span>
+                        <span>{formatDate(displayData.lastLoginAt)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Betalningsstatus</span>
+                        <Badge variant={displayData.paymentStatus === 'paid' ? 'default' : 'outline'}>
+                          {displayData.paymentStatus === 'paid' ? 'Betald' : displayData.paymentStatus || 'Ej tillgänglig'}
+                        </Badge>
+                      </div>
+                      {displayData.hasUnlimitedInvite && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Obegränsad inbjudan</span>
+                          <span className="text-green-600">Ja</span>
+                        </div>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Folders
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{user.folderCount ?? 0}</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Account Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Created</span>
-                    <span>{formatDate(user.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Last Login</span>
-                    <span>{formatDate(user.lastLoginAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Payment Status</span>
-                    <Badge variant={user.paymentStatus === 'paid' ? 'default' : 'outline'}>
-                      {user.paymentStatus || 'N/A'}
-                    </Badge>
-                  </div>
-                  {user.hasUnlimitedInvite && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Unlimited Invite</span>
-                      <span className="text-green-600">Yes</span>
-                    </div>
+                  {displayData.overrides?.meeting?.isActive && (
+                    <Card className="border-amber-500/30 bg-amber-500/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-amber-600">Override aktiv</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm space-y-1">
+                        <div className="flex justify-between">
+                          <span>Typ</span>
+                          <Badge variant="outline">{displayData.overrides.meeting.type}</Badge>
+                        </div>
+                        {displayData.overrides.meeting.extraMeetings && (
+                          <div className="flex justify-between">
+                            <span>Extra möten</span>
+                            <span>+{displayData.overrides.meeting.extraMeetings}</span>
+                          </div>
+                        )}
+                        {displayData.overrides.meeting.expiresAt && (
+                          <div className="flex justify-between">
+                            <span>Utgår</span>
+                            <span>{formatDate(displayData.overrides.meeting.expiresAt)}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   )}
-                </CardContent>
-              </Card>
-
-              {user.overrides?.meeting?.isActive && (
-                <Card className="border-amber-500/30 bg-amber-500/5">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-amber-600">Override Active</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span>Type</span>
-                      <Badge variant="outline">{user.overrides.meeting.type}</Badge>
-                    </div>
-                    {user.overrides.meeting.extraMeetings && (
-                      <div className="flex justify-between">
-                        <span>Extra Meetings</span>
-                        <span>+{user.overrides.meeting.extraMeetings}</span>
-                      </div>
-                    )}
-                    {user.overrides.meeting.expiresAt && (
-                      <div className="flex justify-between">
-                        <span>Expires</span>
-                        <span>{formatDate(user.overrides.meeting.expiresAt)}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                </>
               )}
             </TabsContent>
 
             <TabsContent value="costs" className="space-y-4 pr-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">AI Usage Costs</h3>
+                <h3 className="text-sm font-medium">AI-användningskostnader</h3>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -296,7 +367,7 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <TrendingUp className="h-4 w-4" />
-                        Total AI Cost
+                        Total AI-kostnad
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -313,7 +384,7 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
 
                   {costs?.history && costs.history.length > 0 ? (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Recent Activity</h4>
+                      <h4 className="text-sm font-medium">Senaste aktivitet</h4>
                       {costs.history.slice(0, 20).map((entry, idx) => (
                         <div key={idx} className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 text-sm">
                           <div className="flex flex-col">
@@ -335,7 +406,7 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      No AI usage recorded
+                      Ingen AI-användning registrerad
                     </div>
                   )}
                 </>
@@ -343,42 +414,46 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
             </TabsContent>
 
             <TabsContent value="billing" className="space-y-4 pr-4">
-              {user.stripe?.hasCustomer ? (
+              {loadingUser ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : displayData.stripe?.hasCustomer ? (
                 <>
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
                         <CreditCard className="h-4 w-4" />
-                        Stripe Status
+                        Stripe-status
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Customer</span>
-                        <Badge variant="default">Active</Badge>
+                        <span className="text-muted-foreground">Kund</span>
+                        <Badge variant="default">Aktiv</Badge>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subscription</span>
-                        <Badge variant={user.stripe.hasSubscription ? 'default' : 'outline'}>
-                          {user.stripe.hasSubscription ? 'Active' : 'None'}
+                        <span className="text-muted-foreground">Prenumeration</span>
+                        <Badge variant={displayData.stripe.hasSubscription ? 'default' : 'outline'}>
+                          {displayData.stripe.hasSubscription ? 'Aktiv' : 'Ingen'}
                         </Badge>
                       </div>
-                      {user.stripe.subscriptionId && (
+                      {displayData.stripe.subscriptionId && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Subscription ID</span>
-                          <span className="font-mono text-xs">{user.stripe.subscriptionId.slice(-8)}</span>
+                          <span className="text-muted-foreground">Prenumerations-ID</span>
+                          <span className="font-mono text-xs">{displayData.stripe.subscriptionId.slice(-8)}</span>
                         </div>
                       )}
-                      {user.stripe.cancelAtPeriodEnd && (
+                      {displayData.stripe.cancelAtPeriodEnd && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cancels At Period End</span>
-                          <Badge variant="destructive">Yes</Badge>
+                          <span className="text-muted-foreground">Avslutas vid periodens slut</span>
+                          <Badge variant="destructive">Ja</Badge>
                         </div>
                       )}
-                      {user.stripe.lastSyncAt && (
+                      {displayData.stripe.lastSyncAt && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Last Sync</span>
-                          <span>{formatDate(user.stripe.lastSyncAt)}</span>
+                          <span className="text-muted-foreground">Senast synkad</span>
+                          <span>{formatDate(displayData.stripe.lastSyncAt)}</span>
                         </div>
                       )}
                     </CardContent>
@@ -390,14 +465,14 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
                       onClick={() => onOpenStripeDashboard(user.email)}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Stripe Dashboard
+                      Öppna Stripe Dashboard
                     </Button>
                   )}
                 </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No Stripe customer record</p>
+                  <p>Ingen Stripe-kundpost</p>
                 </div>
               )}
             </TabsContent>

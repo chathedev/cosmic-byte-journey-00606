@@ -132,6 +132,14 @@ export default function AdminEnterpriseCompanyDetail() {
   const [companyMeetings, setCompanyMeetings] = useState<any>(null);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
 
+  // Company stats
+  const [companyStats, setCompanyStats] = useState<{
+    totalMeetings: number;
+    totalAiCostUsd: number;
+    memberStats: Record<string, { meetingCount: number; aiCostUsd: number }>;
+  } | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+
   const loadCompany = useCallback(async () => {
     if (!companyId) {
       toast({
@@ -191,6 +199,77 @@ export default function AdminEnterpriseCompanyDetail() {
   useEffect(() => {
     loadCompany();
   }, [loadCompany]);
+
+  // Load company-wide stats (meetings + AI costs for all members)
+  const loadCompanyStats = useCallback(async () => {
+    if (!company?.members) return;
+    
+    setLoadingStats(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      // Fetch AI costs and user details for all members in parallel
+      const memberEmails = company.members.map(m => m.email);
+      
+      // Fetch AI costs
+      const costsResponse = await fetch(`https://api.tivly.se/ai/costs`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+      
+      let aiCostsByUser: Record<string, number> = {};
+      if (costsResponse.ok) {
+        const costsData = await costsResponse.json();
+        if (costsData.byUser) {
+          Object.entries(costsData.byUser).forEach(([email, data]: [string, any]) => {
+            aiCostsByUser[email.toLowerCase()] = data.totalUsd || 0;
+          });
+        }
+      }
+      
+      // Fetch user details to get meeting counts
+      const memberDetails = await Promise.all(
+        memberEmails.map(async (email) => {
+          try {
+            const data = await apiClient.getAdminUserDetail(email);
+            return {
+              email: email.toLowerCase(),
+              meetingCount: data.meetingCount ?? data.meetings?.length ?? data.plan?.meetingsUsed ?? 0,
+              aiCostUsd: aiCostsByUser[email.toLowerCase()] || 0,
+            };
+          } catch {
+            return {
+              email: email.toLowerCase(),
+              meetingCount: 0,
+              aiCostUsd: aiCostsByUser[email.toLowerCase()] || 0,
+            };
+          }
+        })
+      );
+      
+      const totalMeetings = memberDetails.reduce((sum, m) => sum + m.meetingCount, 0);
+      const totalAiCostUsd = memberDetails.reduce((sum, m) => sum + m.aiCostUsd, 0);
+      
+      const memberStats: Record<string, { meetingCount: number; aiCostUsd: number }> = {};
+      memberDetails.forEach(m => {
+        memberStats[m.email] = { meetingCount: m.meetingCount, aiCostUsd: m.aiCostUsd };
+      });
+      
+      setCompanyStats({ totalMeetings, totalAiCostUsd, memberStats });
+    } catch (error) {
+      console.error('Failed to load company stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [company?.members]);
+
+  useEffect(() => {
+    if (company?.members) {
+      loadCompanyStats();
+    }
+  }, [company?.members, loadCompanyStats]);
 
   const handleUpdateCompany = async (formData: FormData) => {
     if (!company) return;
@@ -684,7 +763,7 @@ export default function AdminEnterpriseCompanyDetail() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -695,6 +774,47 @@ export default function AdminEnterpriseCompanyDetail() {
             <CardContent>
               <div className="text-2xl font-bold text-foreground">{company.members.length}</div>
               <p className="text-xs text-muted-foreground">{activeMembers} aktiva</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Totalt möten
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingStats ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">{companyStats?.totalMeetings ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Alla medlemmar</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                AI-kostnad
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingStats ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">
+                    {companyStats?.totalAiCostUsd 
+                      ? `$${companyStats.totalAiCostUsd.toFixed(2)}`
+                      : '$0.00'
+                    }
+                  </div>
+                  <p className="text-xs text-muted-foreground">Totalt för företaget</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -721,7 +841,7 @@ export default function AdminEnterpriseCompanyDetail() {
                 {company.dataAccessMode === 'individual' ? 'Individuell' : 'Delad'}
               </div>
               <p className="text-xs text-muted-foreground">
-                {company.dataAccessMode === 'individual' ? 'Egen data per medlem' : 'Gemensamt bibliotek'}
+                {company.dataAccessMode === 'individual' ? 'Egen data' : 'Gemensam'}
               </p>
             </CardContent>
           </Card>
@@ -888,43 +1008,63 @@ export default function AdminEnterpriseCompanyDetail() {
                     <TableRow>
                       <TableHead>Medlem</TableHead>
                       <TableHead>Roll</TableHead>
-                      <TableHead>Titel</TableHead>
+                      <TableHead>Möten</TableHead>
+                      <TableHead>AI-kostnad</TableHead>
                       <TableHead>Status</TableHead>
                       {sisEnabled && <TableHead>SIS</TableHead>}
-                      <TableHead>Tillagd</TableHead>
                       <TableHead className="text-right">Åtgärder</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {company.members.map((member) => (
-                      <TableRow
-                        key={member.email}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedMemberDetail({
-                          email: member.email,
-                          plan: 'enterprise',
-                          meetingCount: 0
-                        })}
-                      >
-                        <TableCell>
-                          <div className="flex flex-col">
-                            {member.preferredName && (
-                              <span className="font-medium">{member.preferredName}</span>
+                    {company.members.map((member) => {
+                      const memberStats = companyStats?.memberStats[member.email.toLowerCase()];
+                      return (
+                        <TableRow
+                          key={member.email}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedMemberDetail({
+                            email: member.email,
+                            plan: 'enterprise',
+                            meetingCount: memberStats?.meetingCount ?? 0
+                          })}
+                        >
+                          <TableCell>
+                            <div className="flex flex-col">
+                              {member.preferredName && (
+                                <span className="font-medium">{member.preferredName}</span>
+                              )}
+                              <span className={member.preferredName ? "text-sm text-muted-foreground" : "font-medium"}>
+                                {member.email}
+                              </span>
+                              {member.title && (
+                                <span className="text-xs text-muted-foreground">{member.title}</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{member.role}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {loadingStats ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <span className="font-medium">{memberStats?.meetingCount ?? 0}</span>
                             )}
-                            <span className={member.preferredName ? "text-sm text-muted-foreground" : "font-medium"}>
-                              {member.email}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{member.role}</Badge>
-                        </TableCell>
-                        <TableCell>{member.title || '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
-                            {member.status === 'active' ? 'Aktiv' : 'Inaktiv'}
-                          </Badge>
-                        </TableCell>
+                          </TableCell>
+                          <TableCell>
+                            {loadingStats ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <span className="text-sm">
+                                ${(memberStats?.aiCostUsd ?? 0).toFixed(2)}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
+                              {member.status === 'active' ? 'Aktiv' : 'Inaktiv'}
+                            </Badge>
+                          </TableCell>
                         {sisEnabled && (
                           <TableCell>
                             <div className="flex flex-col gap-1">
@@ -1004,7 +1144,6 @@ export default function AdminEnterpriseCompanyDetail() {
                             </div>
                           </TableCell>
                         )}
-                        <TableCell>{new Date(member.addedAt).toLocaleDateString('sv-SE')}</TableCell>
                         <TableCell className="text-right space-x-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
@@ -1029,7 +1168,8 @@ export default function AdminEnterpriseCompanyDetail() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
