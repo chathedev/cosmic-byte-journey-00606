@@ -13,11 +13,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Receipt, Volume2, CheckCircle2, XCircle, RotateCcw, RefreshCw, Clock } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ChevronRight, Calendar, FileText, TrendingUp, Volume2, CheckCircle2, XCircle, RotateCcw, RefreshCw, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
+import { CompanyBillingSection } from '@/components/CompanyBillingSection';
 
 interface CompanyMember {
   email: string;
@@ -616,14 +617,6 @@ export default function AdminEnterprise() {
             <p className="text-muted-foreground mt-1">Hantera företag, medlemmar och möten</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/admin/enterprise/billing')}
-            >
-              <Receipt className="h-4 w-4 mr-2" />
-              Billing
-            </Button>
             <Button 
               variant="outline" 
               size="sm"
@@ -1250,6 +1243,13 @@ export default function AdminEnterprise() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Billing Section - Integrated with 3s real-time updates */}
+            <CompanyBillingSection 
+              companyId={selectedCompany.id}
+              companyName={selectedCompany.name}
+              contactEmail={selectedCompany.contactEmail}
+            />
           </div>
         )}
       </div>

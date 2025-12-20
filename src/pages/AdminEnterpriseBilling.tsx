@@ -297,8 +297,8 @@ export default function AdminEnterpriseBilling() {
   };
 
   const handleRefreshInvoice = async (record: BillingRecord) => {
-    if (!record.invoiceId) {
-      toast.error('Inget faktura-ID');
+    if (!record.invoiceId || !selectedCompanyId) {
+      toast.error('Inget faktura-ID eller företag valt');
       return;
     }
 
@@ -318,8 +318,8 @@ export default function AdminEnterpriseBilling() {
   };
 
   const handleSendInvoice = async (record: BillingRecord) => {
-    if (!record.invoiceId) {
-      toast.error('Inget faktura-ID');
+    if (!record.invoiceId || !selectedCompanyId) {
+      toast.error('Inget faktura-ID eller företag valt');
       return;
     }
 
@@ -339,7 +339,12 @@ export default function AdminEnterpriseBilling() {
   };
 
   const handleDeleteEntry = async () => {
-    if (!deleteEntryId) return;
+    if (!deleteEntryId || !selectedCompanyId) {
+      toast.error('Ingen post eller företag valt');
+      setDeleteDialogOpen(false);
+      setDeleteEntryId(null);
+      return;
+    }
 
     try {
       await apiClient.deleteInvoiceHistoryEntry(selectedCompanyId, deleteEntryId);
