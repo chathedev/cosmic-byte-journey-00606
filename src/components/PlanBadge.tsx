@@ -120,7 +120,7 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
         )}
         {isUnlimited && (
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-            {used} / obegränsat
+            Obegränsat
           </span>
         )}
         {/* On iOS app, never show upgrade button - Apple compliance */}
