@@ -585,18 +585,8 @@ export default function AdminEnterprise() {
     setShowTrialDialog(true);
   };
 
-  const viewCompanyDetails = async (companyId: string) => {
-    try {
-      const data = await apiClient.getEnterpriseCompany(companyId);
-      setSelectedCompany(data.company);
-    } catch (error) {
-      console.error('Failed to load company details:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load company details',
-        variant: 'destructive',
-      });
-    }
+  const viewCompanyDetails = (companyId: string) => {
+    navigate(`/admin/enterprise/${companyId}`);
   };
 
   if (loading) {
@@ -610,10 +600,10 @@ export default function AdminEnterprise() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
+        {/* Rubrik */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Enterprise Management</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Företagshantering</h1>
             <p className="text-muted-foreground mt-1">Hantera företag, medlemmar och möten</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -634,11 +624,11 @@ export default function AdminEnterprise() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Statistik */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Companies</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Totalt Företag</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{summaries.length}</div>
@@ -646,7 +636,7 @@ export default function AdminEnterprise() {
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active Companies</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Aktiva Företag</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -656,7 +646,7 @@ export default function AdminEnterprise() {
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Members</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Totalt Medlemmar</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
@@ -666,107 +656,106 @@ export default function AdminEnterprise() {
           </Card>
         </div>
 
-        {/* Companies List or Details */}
-        {!selectedCompany ? (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Companies</CardTitle>
-                  <CardDescription>All enterprise companies in the system</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  {sisTimestamp && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Uppdaterad: {new Date(sisTimestamp).toLocaleTimeString('sv-SE')}
-                    </span>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={loadSISOverview}
-                    disabled={loadingSIS}
-                  >
-                    {loadingSIS ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+        {/* Företagslista */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Företag</CardTitle>
+                <CardDescription>Alla enterprise-företag i systemet</CardDescription>
               </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Active Members</TableHead>
-                    <TableHead>SIS Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {summaries.map((summary) => {
-                    const sisData = getSISDataForCompany(summary.id);
-                    return (
-                      <TableRow key={summary.id}>
-                        <TableCell className="font-medium">{summary.name}</TableCell>
-                        <TableCell>
-                          <Badge variant={summary.status === 'active' ? 'default' : 'secondary'}>
-                            {summary.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{summary.memberCount}</TableCell>
-                        <TableCell>{summary.activeMemberCount}</TableCell>
-                        <TableCell>
-                          {sisData ? (
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                <span className="text-sm text-muted-foreground">
-                                  {sisData.sisReadyCount}/{sisData.memberCount}
-                                </span>
-                              </div>
-                              {sisData.sisReadyCount === sisData.memberCount && sisData.memberCount > 0 ? (
-                                <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
-                                  Komplett
-                                </Badge>
-                              ) : sisData.sisReadyCount > 0 ? (
-                                <Badge variant="secondary" className="text-xs">
-                                  Delvis
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-muted-foreground text-xs">
-                                  Ingen
-                                </Badge>
-                              )}
+              <div className="flex items-center gap-2">
+                {sisTimestamp && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Uppdaterad: {new Date(sisTimestamp).toLocaleTimeString('sv-SE')}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadSISOverview}
+                  disabled={loadingSIS}
+                >
+                  {loadingSIS ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Företag</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Medlemmar</TableHead>
+                  <TableHead>Aktiva</TableHead>
+                  <TableHead>SIS-status</TableHead>
+                  <TableHead className="text-right">Åtgärder</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summaries.map((summary) => {
+                  const sisData = getSISDataForCompany(summary.id);
+                  return (
+                    <TableRow key={summary.id}>
+                      <TableCell className="font-medium">{summary.name}</TableCell>
+                      <TableCell>
+                        <Badge variant={summary.status === 'active' ? 'default' : 'secondary'}>
+                          {summary.status === 'active' ? 'Aktiv' : 'Inaktiv'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{summary.memberCount}</TableCell>
+                      <TableCell>{summary.activeMemberCount}</TableCell>
+                      <TableCell>
+                        {sisData ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                              <span className="text-sm text-muted-foreground">
+                                {sisData.sisReadyCount}/{sisData.memberCount}
+                              </span>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => viewCompanyDetails(summary.id)}
-                          >
-                            View Details
-                            <ChevronRight className="h-4 w-4 ml-1" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ) : (
+                            {sisData.sisReadyCount === sisData.memberCount && sisData.memberCount > 0 ? (
+                              <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
+                                Komplett
+                              </Badge>
+                            ) : sisData.sisReadyCount > 0 ? (
+                              <Badge variant="secondary" className="text-xs">
+                                Delvis
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-muted-foreground text-xs">
+                                Ingen
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => viewCompanyDetails(summary.id)}
+                        >
+                          Visa detaljer
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
           <div className="space-y-6">
             {/* Company Details */}
             <Card>
