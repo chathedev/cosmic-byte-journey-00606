@@ -49,6 +49,7 @@ import AdminBackend from "./pages/AdminBackend";
 import AdminEmailCampaigns from "./pages/AdminEmailCampaigns";
 import AdminEnterprise from "./pages/AdminEnterprise";
 import AdminEnterpriseBilling from "./pages/AdminEnterpriseBilling";
+import AdminEnterpriseCompanyDetail from "./pages/AdminEnterpriseCompanyDetail";
 import SISRequired from "./pages/SISRequired";
 import AdminAICosts from "./pages/AdminAICosts";
 import EnterpriseStats from "./pages/EnterpriseStats";
@@ -327,6 +328,7 @@ const AppContent = () => {
                 <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
                 <Route path="/admin/email-campaigns" element={<AdminRoute><AdminEmailCampaigns /></AdminRoute>} />
                 <Route path="/admin/enterprise" element={<AdminRoute><AdminEnterprise /></AdminRoute>} />
+                <Route path="/admin/enterprise/:companyId" element={<AdminRoute><AdminEnterpriseCompanyDetail /></AdminRoute>} />
                 <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
                 <Route path="/admin/ai-costs" element={<AdminRoute><AdminAICosts /></AdminRoute>} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
