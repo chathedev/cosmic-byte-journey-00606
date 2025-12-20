@@ -118,13 +118,18 @@ export interface TranscriptSegment {
   words?: TranscriptWord[];
 }
 
-// SIS Learning entry for voice training feedback
-export interface SISLearningEntry {
+// Lyra Learning entry for voice training feedback
+// Per docs: sisLearning/lyraLearning entries show when learning is applied
+export interface LyraLearningEntry {
   email: string;
   similarity: number;
+  similarityPercent?: number; // Alternative field name from some endpoints
   matchedSegments?: number;
-  updated?: boolean;
+  updated?: boolean; // Show "learning applied" badge when true
 }
+
+// Re-export for backwards compatibility
+export type SISLearningEntry = LyraLearningEntry;
 
 // Backend stage values for detailed progress tracking
 export type ASRStage = 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error';
@@ -137,12 +142,20 @@ export interface ASRStatus {
   transcriptSegments?: TranscriptSegment[];
   error?: string;
   duration?: number;
+  // Legacy SIS fields (still used by backend)
   sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];
   sisMatch?: SISMatch;
   sisSpeakers?: SISSpeaker[];
-  speakerNames?: Record<string, string>; // Pre-loaded speaker aliases from backend
-  sisLearning?: SISLearningEntry[]; // Voice learning results
+  sisLearning?: LyraLearningEntry[];
+  // Lyra mirror fields (preferred for frontend use)
+  lyraStatus?: SISStatusType;
+  lyraMatches?: SISMatch[];
+  lyraSpeakers?: SISSpeaker[];
+  lyraLearning?: LyraLearningEntry[];
+  lyraSpeakerNames?: Record<string, string>;
+  // Unified speaker names map
+  speakerNames?: Record<string, string>;
 }
 
 export interface UploadProgress {
@@ -345,6 +358,7 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       });
     }
     
+    // Return both SIS and Lyra mirror fields for compatibility
     return {
       status: data.status || 'queued',
       stage: data.stage as ASRStage | undefined,
@@ -353,12 +367,20 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       transcriptSegments: data.transcriptSegments,
       error: data.error,
       duration: data.duration,
-      sisStatus: data.sisStatus,
-      sisMatches: data.sisMatches || [],
-      sisMatch: data.sisMatch,
-      sisSpeakers: data.sisSpeakers || [],
-      speakerNames: data.speakerNames || {},
-      sisLearning: data.sisLearning || [],
+      // Legacy SIS fields
+      sisStatus: data.sisStatus || data.lyraStatus,
+      sisMatches: data.sisMatches || data.lyraMatches || [],
+      sisMatch: data.sisMatch || data.lyraMatch,
+      sisSpeakers: data.sisSpeakers || data.lyraSpeakers || [],
+      sisLearning: data.sisLearning || data.lyraLearning || [],
+      // Lyra mirror fields (preferred)
+      lyraStatus: data.lyraStatus || data.sisStatus,
+      lyraMatches: data.lyraMatches || data.sisMatches || [],
+      lyraSpeakers: data.lyraSpeakers || data.sisSpeakers || [],
+      lyraLearning: data.lyraLearning || data.sisLearning || [],
+      lyraSpeakerNames: data.lyraSpeakerNames || data.speakerNames || {},
+      // Unified speaker names
+      speakerNames: data.speakerNames || data.lyraSpeakerNames || {},
     };
   } catch (error: any) {
     // Network error - keep polling as queued
