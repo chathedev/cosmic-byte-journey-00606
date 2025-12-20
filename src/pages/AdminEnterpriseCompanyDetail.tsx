@@ -12,12 +12,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ArrowLeft, Calendar, FileText, TrendingUp, Volume2, CheckCircle2, XCircle, RotateCcw, RefreshCw, Clock, Globe, Shield, Database, Sparkles } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Building2, Mail, ArrowLeft, Calendar, FileText, TrendingUp, Volume2, CheckCircle2, XCircle, RotateCcw, RefreshCw, Clock, Globe, Shield, Database, Sparkles, CreditCard, AlertTriangle, Lock, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
 import { CompanyBillingSection } from '@/components/CompanyBillingSection';
+
+interface SISSample {
+  status: 'ready' | 'processing' | 'error' | 'missing' | null;
+  speakerName?: string | null;
+  uploadedAt?: string | null;
+  lastTranscribedAt?: string | null;
+  lastCheckedAt?: string | null;
+  lastMatchScore?: number | null;
+  matchCount?: number;
+}
 
 interface CompanyMember {
   email: string;
@@ -31,11 +41,22 @@ interface CompanyMember {
   updatedAt: string;
   addedBy: string;
   updatedBy: string;
-  sisSample?: {
-    status: 'ready' | 'processing' | 'error' | null;
-    uploadedAt?: string;
-    lastMatchScore?: number;
-  };
+  sisSample?: SISSample;
+}
+
+interface BillingRecord {
+  id: string;
+  billingType: 'one_time' | 'recurring';
+  amountSek: number;
+  oneTimeAmountSek?: number | null;
+  combineOneTime?: boolean;
+  status: string;
+  invoiceId?: string;
+  invoiceUrl?: string;
+  subscriptionId?: string | null;
+  portalUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Company {
@@ -55,12 +76,12 @@ interface Company {
     startsAt: string;
     endsAt: string;
     daysTotal: number;
-    daysRemaining: number | null;
-    expired: boolean;
+    daysRemaining?: number | null;
+    expired?: boolean;
     configuredBy: string;
-    manuallyDisabled: boolean;
-    disabledAt: string | null;
-    disabledBy: string | null;
+    manuallyDisabled?: boolean;
+    disabledAt?: string | null;
+    disabledBy?: string | null;
   };
   preferences?: {
     meetingCreatorVisibility?: 'shared_only' | 'always' | 'hidden';
@@ -69,6 +90,9 @@ interface Company {
     allowAdminFolderLock?: boolean;
     speakerIdentificationEnabled?: boolean;
   };
+  billingCustomerId?: string;
+  billingHistory?: BillingRecord[];
+  billingStatus?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -121,8 +145,36 @@ export default function AdminEnterpriseCompanyDetail() {
 
     try {
       setLoading(true);
-      const data = await apiClient.getEnterpriseCompany(companyId);
-      setCompany(data.company);
+      
+      // Fetch company data and SIS data in parallel
+      const [companyData, sisData] = await Promise.all([
+        apiClient.getEnterpriseCompany(companyId),
+        apiClient.getSISCompanies().catch(() => null), // Don't fail if SIS fetch fails
+      ]);
+      
+      let companyWithSIS = companyData.company;
+      
+      // Merge SIS data into company members if available
+      if (sisData?.companies) {
+        const sisCompany = sisData.companies.find(c => c.id === companyId);
+        if (sisCompany) {
+          companyWithSIS = {
+            ...companyWithSIS,
+            members: companyWithSIS.members.map(member => {
+              const sisMember = sisCompany.members.find(m => m.email.toLowerCase() === member.email.toLowerCase());
+              if (sisMember) {
+                return {
+                  ...member,
+                  sisSample: sisMember.sisSample,
+                };
+              }
+              return member;
+            }),
+          };
+        }
+      }
+      
+      setCompany(companyWithSIS);
     } catch (error: any) {
       console.error('Failed to load company:', error);
       toast({
@@ -486,9 +538,88 @@ export default function AdminEnterpriseCompanyDetail() {
   const sisEnabled = company.preferences?.speakerIdentificationEnabled ?? false;
   const sisReadyCount = company.members.filter(m => m.sisSample?.status === 'ready').length;
 
+  // Billing status helpers
+  const hasUnpaidInvoice = company.billingHistory?.some(b => b.status === 'open' || b.status === 'draft');
+  const lastPaidInvoice = company.billingHistory?.find(b => b.status === 'paid');
+  
+  // Trial calculation - compute days remaining from endsAt
+  const getTrialDaysRemaining = () => {
+    if (!company.trial?.enabled || !company.trial.endsAt) return null;
+    const endsAt = new Date(company.trial.endsAt);
+    const now = new Date();
+    const diff = Math.ceil((endsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diff);
+  };
+
+  const trialDaysRemaining = getTrialDaysRemaining();
+  const isTrialExpired = company.trial?.enabled && trialDaysRemaining !== null && trialDaysRemaining <= 0;
+  
+  // Check if company is locked (trial expired with no payment)
+  const isCompanyLocked = isTrialExpired && !lastPaidInvoice;
+
+  // Get billing status label
+  const getBillingStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'paid': return 'Betald';
+      case 'open': return 'Öppen';
+      case 'draft': return 'Utkast';
+      case 'void': return 'Annullerad';
+      case 'uncollectible': return 'Ej indrivningsbar';
+      default: return status || 'Ingen';
+    }
+  };
+
+  const getBillingStatusVariant = (status?: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    switch (status) {
+      case 'paid': return 'default';
+      case 'open': return 'destructive';
+      case 'draft': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Locked Company Warning */}
+        {isCompanyLocked && (
+          <Card className="border-destructive bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="rounded-full p-2 bg-destructive/10">
+                  <Lock className="h-6 w-6 text-destructive" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive">Företaget är låst</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Testperioden har gått ut och ingen betalning har registrerats. Användare måste kontakta{' '}
+                    <span className="font-medium">{company.contactEmail || 'företagsadmin'}</span> för att aktivera åtkomst.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Unpaid Invoice Warning */}
+        {hasUnpaidInvoice && !isCompanyLocked && (
+          <Card className="border-yellow-500/50 bg-yellow-500/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="rounded-full p-2 bg-yellow-500/10">
+                  <AlertTriangle className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-yellow-700">Obetald faktura</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Det finns öppna fakturor som väntar på betalning.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -621,9 +752,9 @@ export default function AdminEnterpriseCompanyDetail() {
           </Card>
         </div>
 
-        {/* Trial Status */}
+        {/* Trial Status - only show if trial exists */}
         {company.trial && (
-          <Card className={company.trial.expired ? 'border-destructive/50' : company.trial.enabled ? 'border-yellow-500/50' : ''}>
+          <Card className={isTrialExpired ? 'border-destructive/50' : company.trial.enabled ? 'border-yellow-500/50' : company.trial.manuallyDisabled ? 'border-green-500/50' : ''}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -631,7 +762,7 @@ export default function AdminEnterpriseCompanyDetail() {
                   <CardTitle className="text-base">Testperiod</CardTitle>
                 </div>
                 <div className="flex gap-2">
-                  {company.trial.enabled && !company.trial.expired && (
+                  {company.trial.enabled && !isTrialExpired && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -641,35 +772,87 @@ export default function AdminEnterpriseCompanyDetail() {
                       Ta bort test
                     </Button>
                   )}
-                  {(company.trial.manuallyDisabled || !company.trial.enabled) && (
+                  {(company.trial.manuallyDisabled || !company.trial.enabled || isTrialExpired) && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setShowTrialDialog(true)}
                     >
-                      {company.trial.manuallyDisabled ? 'Återställ' : 'Skapa test'}
+                      {company.trial.manuallyDisabled ? 'Återställ' : isTrialExpired ? 'Förläng' : 'Skapa test'}
                     </Button>
                   )}
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4 text-sm">
-                <Badge variant={company.trial.expired ? 'destructive' : company.trial.enabled ? 'secondary' : 'outline'}>
-                  {company.trial.expired ? 'Utgången' : company.trial.enabled ? 'Aktiv' : 'Inaktiv'}
+              <div className="flex items-center gap-4 text-sm flex-wrap">
+                <Badge variant={isTrialExpired ? 'destructive' : company.trial.enabled ? 'secondary' : company.trial.manuallyDisabled ? 'default' : 'outline'}>
+                  {isTrialExpired ? 'Utgången' : company.trial.enabled ? 'Aktiv' : company.trial.manuallyDisabled ? 'Full tillgång' : 'Inaktiv'}
                 </Badge>
-                {company.trial.daysRemaining !== null && (
-                  <span className="text-muted-foreground">
-                    {company.trial.daysRemaining} dagar kvar av {company.trial.daysTotal}
+                {/* Only show days remaining when trial is enabled and not manually disabled */}
+                {company.trial.enabled && !company.trial.manuallyDisabled && trialDaysRemaining !== null && (
+                  <span className={`${isTrialExpired ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {isTrialExpired 
+                      ? `Utgången sedan ${Math.abs(trialDaysRemaining)} dagar` 
+                      : `${trialDaysRemaining} dagar kvar av ${company.trial.daysTotal}`
+                    }
                   </span>
                 )}
                 {company.trial.manuallyDisabled && (
-                  <span className="text-green-600">Full tillgång aktiverad</span>
+                  <span className="text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Full tillgång aktiverad
+                  </span>
+                )}
+                {company.trial.endsAt && company.trial.enabled && (
+                  <span className="text-muted-foreground text-xs">
+                    Slutar: {new Date(company.trial.endsAt).toLocaleDateString('sv-SE')}
+                  </span>
                 )}
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Billing Status Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Faktureringsstatus</CardTitle>
+              </div>
+              {company.billingCustomerId && (
+                <Badge variant="outline" className="text-xs">
+                  Stripe: {company.billingCustomerId.slice(0, 12)}...
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4 text-sm flex-wrap">
+              <Badge variant={getBillingStatusVariant(company.billingStatus)}>
+                {getBillingStatusLabel(company.billingStatus)}
+              </Badge>
+              {company.billingHistory && company.billingHistory.length > 0 && (
+                <span className="text-muted-foreground">
+                  {company.billingHistory.length} fakturor
+                </span>
+              )}
+              {lastPaidInvoice && (
+                <span className="text-muted-foreground">
+                  Senast betald: {new Date(lastPaidInvoice.updatedAt).toLocaleDateString('sv-SE')}
+                </span>
+              )}
+              {hasUnpaidInvoice && (
+                <span className="text-yellow-600 flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  Har obetalda fakturor
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Tabs for Members and Billing */}
         <Tabs defaultValue="members" className="w-full">
@@ -744,57 +927,79 @@ export default function AdminEnterpriseCompanyDetail() {
                         </TableCell>
                         {sisEnabled && (
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              {member.sisSample?.status === 'ready' ? (
-                                <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Verifierad
-                                </Badge>
-                              ) : member.sisSample?.status === 'processing' ? (
-                                <Badge variant="secondary">
-                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                  Bearbetas
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-muted-foreground">
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Ej verifierad
-                                </Badge>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                {member.sisSample?.status === 'ready' ? (
+                                  <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Verifierad
+                                  </Badge>
+                                ) : member.sisSample?.status === 'processing' ? (
+                                  <Badge variant="secondary">
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Bearbetas
+                                  </Badge>
+                                ) : member.sisSample?.status === 'error' ? (
+                                  <Badge variant="destructive">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Fel
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-muted-foreground">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Saknas
+                                  </Badge>
+                                )}
+                                {member.sisSample?.status === 'ready' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0"
+                                    disabled={resettingSISEmail === member.email}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      setResettingSISEmail(member.email);
+                                      try {
+                                        await apiClient.resetUserSIS(member.email);
+                                        toast({
+                                          title: 'SIS-prov återställt',
+                                          description: `Be ${member.preferredName || member.email} ladda upp ett nytt röstprov.`,
+                                        });
+                                        loadCompany();
+                                      } catch (error: any) {
+                                        toast({
+                                          title: 'Kunde inte återställa SIS',
+                                          description: error?.message || 'Ett oväntat fel uppstod',
+                                          variant: 'destructive',
+                                        });
+                                      } finally {
+                                        setResettingSISEmail(null);
+                                      }
+                                    }}
+                                    title="Återställ SIS-prov"
+                                  >
+                                    {resettingSISEmail === member.email ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <RotateCcw className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                              {/* Show speaker name if available */}
+                              {member.sisSample?.speakerName && (
+                                <span className="text-xs text-muted-foreground truncate max-w-[150px]" title={member.sisSample.speakerName}>
+                                  {member.sisSample.speakerName}
+                                </span>
                               )}
-                              {member.sisSample?.status === 'ready' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  disabled={resettingSISEmail === member.email}
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    setResettingSISEmail(member.email);
-                                    try {
-                                      await apiClient.resetUserSIS(member.email);
-                                      toast({
-                                        title: 'SIS-prov återställt',
-                                        description: `Be ${member.preferredName || member.email} ladda upp ett nytt röstprov.`,
-                                      });
-                                      loadCompany();
-                                    } catch (error: any) {
-                                      toast({
-                                        title: 'Kunde inte återställa SIS',
-                                        description: error?.message || 'Ett oväntat fel uppstod',
-                                        variant: 'destructive',
-                                      });
-                                    } finally {
-                                      setResettingSISEmail(null);
-                                    }
-                                  }}
-                                  title="Återställ SIS-prov"
-                                >
-                                  {resettingSISEmail === member.email ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <RotateCcw className="h-3 w-3" />
+                              {/* Show match info if available */}
+                              {member.sisSample?.status === 'ready' && member.sisSample?.matchCount !== undefined && member.sisSample.matchCount > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {member.sisSample.matchCount} matchningar
+                                  {member.sisSample.lastMatchScore !== null && member.sisSample.lastMatchScore !== undefined && (
+                                    <> ({Math.round(member.sisSample.lastMatchScore * 100)}%)</>
                                   )}
-                                </Button>
+                                </span>
                               )}
                             </div>
                           </TableCell>
