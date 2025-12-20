@@ -260,7 +260,7 @@ export function SISVoiceSampleDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Volume2 className="h-5 w-5 text-primary" />
-            Röstprov för Talaridentifiering
+            Röstprov för Lyra
           </DialogTitle>
           <DialogDescription>
             Spela in ditt röstprov för att kunna identifieras automatiskt i mötesinspelningar.

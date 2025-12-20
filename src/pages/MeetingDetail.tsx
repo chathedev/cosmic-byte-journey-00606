@@ -1,16 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Volume2 } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Volume2, Pencil, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
 import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment } from "@/lib/asrService";
 import { apiClient } from "@/lib/api";
+import { backendApi } from "@/lib/backendApi";
 import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
@@ -19,9 +22,7 @@ import { MeetingChat } from "@/components/MeetingChat";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
-// Removed typing effect - using simple fade animation instead
-
-interface AgendaSISSpeaker {
+interface AgendaLyraSpeaker {
   label: string;
   segments: { start: number; end: number }[];
   durationSeconds: number;
@@ -29,7 +30,7 @@ interface AgendaSISSpeaker {
   similarity?: number;
 }
 
-interface AgendaSISMatch {
+interface AgendaLyraMatch {
   speakerName: string;
   speakerLabel: string;
   confidencePercent: number;
@@ -42,8 +43,8 @@ interface MeetingDataForDialog {
   title: string;
   createdAt: string;
   transcriptSegments?: { speakerId: string; text: string; start: number; end: number }[];
-  sisSpeakers?: AgendaSISSpeaker[];
-  sisMatches?: AgendaSISMatch[];
+  sisSpeakers?: AgendaLyraSpeaker[];
+  sisMatches?: AgendaLyraMatch[];
 }
 
 const MeetingDetail = () => {
@@ -59,14 +60,23 @@ const MeetingDetail = () => {
   const [stage, setStage] = useState<'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
-  const [sisSpeakers, setSisSpeakers] = useState<SISSpeaker[]>([]);
-  const [sisMatches, setSisMatches] = useState<SISMatch[]>([]);
+  const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
+  const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
   const [pendingMeetingData, setPendingMeetingData] = useState<MeetingDataForDialog | null>(null);
   const [selectedProtocol, setSelectedProtocol] = useState<{ transcript: string; aiProtocol: any } | null>(null);
   const [chatMeeting, setChatMeeting] = useState<MeetingSession | null>(null);
+  
+  // Editing states
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
+  const [editingSpeakerValue, setEditingSpeakerValue] = useState('');
+  const [isSavingSpeaker, setIsSavingSpeaker] = useState(false);
+  const [isEditingTranscript, setIsEditingTranscript] = useState(false);
+  const [editedTranscript, setEditedTranscript] = useState('');
+  const [isSavingTranscript, setIsSavingTranscript] = useState(false);
 
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
@@ -108,8 +118,6 @@ const MeetingDetail = () => {
             pendingMeeting = JSON.parse(pendingMeetingJson);
             if (pendingMeeting?.id === id) {
               const uploadStatus = getUploadStatus(id);
-              // Only override when we actually have background-upload status.
-              // If we already have a pendingMeeting (from normal upload flow), keep its status.
               if (uploadStatus) {
                 pendingMeeting.transcriptionStatus = uploadStatus.status === 'complete' ? 'processing' : 'uploading';
               }
@@ -144,7 +152,7 @@ const MeetingDetail = () => {
             setTranscript(fetchedMeeting.transcript);
             setStatus('done');
             
-            // For completed meetings, also fetch SIS data from ASR if segments not loaded
+            // For completed meetings, also fetch Lyra data from ASR if segments not loaded
             if (!fetchedMeeting.transcriptSegments || fetchedMeeting.transcriptSegments.length === 0) {
               try {
                 const asrStatus = await pollASRStatus(id);
@@ -152,14 +160,27 @@ const MeetingDetail = () => {
                   setTranscriptSegments(asrStatus.transcriptSegments);
                 }
                 if (asrStatus.sisSpeakers) {
-                  setSisSpeakers(asrStatus.sisSpeakers);
+                  setLyraSpeakers(asrStatus.sisSpeakers);
                 }
                 if (asrStatus.sisMatches) {
-                  setSisMatches(asrStatus.sisMatches);
+                  setLyraMatches(asrStatus.sisMatches);
+                }
+                if (asrStatus.speakerNames) {
+                  setSpeakerNames(asrStatus.speakerNames);
                 }
               } catch (e) {
                 console.log('Could not fetch ASR data for completed meeting:', e);
               }
+            }
+            
+            // Load speaker names from backend
+            try {
+              const namesData = await backendApi.getSpeakerNames(id);
+              if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
+                setSpeakerNames(prev => ({ ...prev, ...namesData.speakerNames }));
+              }
+            } catch (e) {
+              console.log('Could not fetch speaker names:', e);
             }
           } else {
             setStatus('processing');
@@ -243,8 +264,11 @@ const MeetingDetail = () => {
           const newTranscript = asrStatus.transcript || '';
           setTranscript(newTranscript);
           setTranscriptSegments(asrStatus.transcriptSegments || null);
-          setSisSpeakers(asrStatus.sisSpeakers || []);
-          setSisMatches(asrStatus.sisMatches || []);
+          setLyraSpeakers(asrStatus.sisSpeakers || []);
+          setLyraMatches(asrStatus.sisMatches || []);
+          if (asrStatus.speakerNames) {
+            setSpeakerNames(asrStatus.speakerNames);
+          }
           setStatus('done');
 
           try {
@@ -338,20 +362,71 @@ const MeetingDetail = () => {
     }
   };
 
+  // Handle save speaker name
+  const handleSaveSpeakerName = useCallback(async () => {
+    if (!id || !editingSpeaker || !editingSpeakerValue.trim()) return;
+    
+    setIsSavingSpeaker(true);
+    try {
+      const newNames = { ...speakerNames, [editingSpeaker]: editingSpeakerValue.trim() };
+      await backendApi.saveSpeakerNames(id, newNames);
+      setSpeakerNames(newNames);
+      setEditingSpeaker(null);
+      setEditingSpeakerValue('');
+      toast({
+        title: 'Namn sparat',
+        description: 'Talarnamnet har uppdaterats och kommer att användas i framtiden.',
+      });
+    } catch (error) {
+      console.error('Failed to save speaker name:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte spara talarnamnet.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingSpeaker(false);
+    }
+  }, [id, editingSpeaker, editingSpeakerValue, speakerNames, toast]);
+
+  // Handle save transcript
+  const handleSaveTranscript = useCallback(async () => {
+    if (!id || !editedTranscript.trim()) return;
+    
+    setIsSavingTranscript(true);
+    try {
+      await apiClient.updateMeeting(id, { transcript: editedTranscript.trim() });
+      setTranscript(editedTranscript.trim());
+      setIsEditingTranscript(false);
+      toast({
+        title: 'Transkription sparad',
+        description: 'Dina ändringar har sparats.',
+      });
+    } catch (error) {
+      console.error('Failed to save transcript:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte spara transkriptionen.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingTranscript(false);
+    }
+  }, [id, editedTranscript, toast]);
 
   // Handle create protocol
   const handleCreateProtocol = async () => {
     if (!meeting || !transcript) return;
 
-    // Fetch SIS data for protocol
+    // Fetch Lyra data for protocol
     let fetchedSegments: { speakerId: string; text: string; start: number; end: number }[] | undefined;
-    let fetchedSisSpeakers: AgendaSISSpeaker[] = [];
-    let fetchedSisMatches: AgendaSISMatch[] = [];
+    let fetchedLyraSpeakers: AgendaLyraSpeaker[] = [];
+    let fetchedLyraMatches: AgendaLyraMatch[] = [];
 
     try {
       const asrStatus = await pollASRStatus(meeting.id);
       if (asrStatus.sisSpeakers) {
-        fetchedSisSpeakers = asrStatus.sisSpeakers.map(s => ({
+        fetchedLyraSpeakers = asrStatus.sisSpeakers.map(s => ({
           label: s.label,
           segments: s.segments || [],
           durationSeconds: s.durationSeconds || 0,
@@ -360,7 +435,7 @@ const MeetingDetail = () => {
         }));
       }
       if (asrStatus.sisMatches) {
-        fetchedSisMatches = asrStatus.sisMatches.map(m => ({
+        fetchedLyraMatches = asrStatus.sisMatches.map(m => ({
           speakerName: m.speakerName || '',
           speakerLabel: m.speakerLabel || '',
           confidencePercent: m.confidencePercent || 0,
@@ -369,14 +444,14 @@ const MeetingDetail = () => {
       }
       if (asrStatus.transcriptSegments) {
         fetchedSegments = asrStatus.transcriptSegments.map(seg => ({
-          speakerId: seg.speakerId,
+          speakerId: seg.speakerId || '',
           text: seg.text,
           start: seg.start,
           end: seg.end,
         }));
       }
     } catch (e) {
-      console.warn('Could not fetch SIS data for protocol:', e);
+      console.warn('Could not fetch Lyra data for protocol:', e);
     }
 
     setPendingMeetingData({
@@ -385,11 +460,58 @@ const MeetingDetail = () => {
       title: meeting.title,
       createdAt: meeting.createdAt,
       transcriptSegments: fetchedSegments,
-      sisSpeakers: fetchedSisSpeakers.length > 0 ? fetchedSisSpeakers : undefined,
-      sisMatches: fetchedSisMatches.length > 0 ? fetchedSisMatches : undefined,
+      sisSpeakers: fetchedLyraSpeakers.length > 0 ? fetchedLyraSpeakers : undefined,
+      sisMatches: fetchedLyraMatches.length > 0 ? fetchedLyraMatches : undefined,
     });
     setShowAgendaDialog(true);
   };
+
+  // Get speaker display name - prioritizes speakerNames map, then Lyra matches, then fallbacks
+  const getSpeakerDisplayName = useCallback((speakerId: string): string | null => {
+    if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') return null;
+    
+    // 1. First check speakerNames map (from backend/manual rename)
+    if (speakerNames[speakerId]) {
+      return speakerNames[speakerId];
+    }
+    
+    // 2. Check lyraMatches for name by label
+    const match = lyraMatches.find(m => 
+      m.speakerLabel === speakerId || 
+      m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
+    );
+    if (match?.speakerName) return match.speakerName;
+    
+    // 3. Check lyraSpeakers
+    const speaker = lyraSpeakers.find(s => 
+      s.label === speakerId || 
+      s.label?.toLowerCase() === speakerId.toLowerCase()
+    );
+    if (speaker?.speakerName) return speaker.speakerName;
+    if (speaker?.bestMatchEmail) return speaker.bestMatchEmail.split('@')[0];
+    
+    // 4. Fallback to Talare X format for speaker_X patterns
+    const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
+    if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
+    
+    // 5. If it's a single letter like 'A', 'B', convert to Talare A, Talare B
+    if (/^[A-Z]$/i.test(speakerId)) {
+      return `Talare ${speakerId.toUpperCase()}`;
+    }
+    
+    return speakerId;
+  }, [speakerNames, lyraMatches, lyraSpeakers]);
+
+  // Check if speaker is identified via Lyra
+  const isSpeakerIdentified = useCallback((speakerId: string): boolean => {
+    return lyraMatches.some(m => 
+      m.speakerLabel === speakerId || 
+      m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
+    ) || lyraSpeakers.some(s => 
+      (s.label === speakerId || s.label?.toLowerCase() === speakerId.toLowerCase()) && 
+      s.bestMatchEmail
+    );
+  }, [lyraMatches, lyraSpeakers]);
 
   // If showing protocol generator
   if (selectedProtocol) {
@@ -418,6 +540,48 @@ const MeetingDetail = () => {
 
   const isProcessing = status === 'uploading' || status === 'processing';
   const hasTranscript = !!transcript && transcript.trim().length > 0;
+
+  // Helper functions for rendering
+  const getSpeakerColor = (speakerId: string): string => {
+    const colors = [
+      'bg-blue-500',
+      'bg-emerald-500',
+      'bg-amber-500',
+      'bg-purple-500',
+      'bg-rose-500',
+      'bg-cyan-500',
+      'bg-indigo-500',
+      'bg-teal-500',
+    ];
+    if (!speakerId || speakerId === 'unknown') return 'bg-muted-foreground/50';
+    const index = speakerId.charCodeAt(speakerId.length - 1);
+    return colors[Math.abs(index) % colors.length];
+  };
+  
+  const formatTime = (time: number): string => {
+    const totalSeconds = time > 1000 ? Math.floor(time / 1000) : Math.floor(time);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Group consecutive segments by same speaker
+  const groupedSegments = transcriptSegments ? (() => {
+    const grouped: { speakerId: string; text: string; start: number; end: number }[] = [];
+    for (const seg of transcriptSegments) {
+      const prev = grouped[grouped.length - 1];
+      const rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || 'unknown';
+      const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
+      
+      if (prev && prev.speakerId === speakerId) {
+        prev.text = `${prev.text}\n${seg.text}`;
+        prev.end = seg.end;
+      } else {
+        grouped.push({ speakerId, text: seg.text, start: seg.start, end: seg.end });
+      }
+    }
+    return grouped;
+  })() : [];
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">
@@ -535,8 +699,8 @@ const MeetingDetail = () => {
                       exit={{ opacity: 0 }}
                       className="space-y-4"
                     >
-                      {/* Speaker Identification Section - only show if we have identified SIS matches */}
-                      {sisMatches.length > 0 && (
+                      {/* Speaker Identification Section - only show if we have identified Lyra matches */}
+                      {lyraMatches.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -549,14 +713,14 @@ const MeetingDetail = () => {
                             </div>
                             <div>
                               <span className="text-sm font-semibold">Identifierade talare</span>
-                              <p className="text-xs text-muted-foreground">Röstidentifiering via SIS</p>
+                              <p className="text-xs text-muted-foreground">Röstidentifiering via Lyra</p>
                             </div>
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2">
                             {/* Deduplicate and combine consecutive same speakers */}
                             {(() => {
-                              const uniqueSpeakers = sisMatches.reduce((acc, match) => {
-                                const name = match.speakerName || match.sampleOwnerEmail?.split('@')[0];
+                              const uniqueSpeakers = lyraMatches.reduce((acc, match) => {
+                                const name = speakerNames[match.speakerLabel || ''] || match.speakerName || match.sampleOwnerEmail?.split('@')[0];
                                 if (!name) return acc;
                                 
                                 const existing = acc.find(s => s.name === name);
@@ -571,11 +735,12 @@ const MeetingDetail = () => {
                                     name, 
                                     confidencePercent: match.confidencePercent,
                                     email: match.sampleOwnerEmail,
+                                    speakerLabel: match.speakerLabel,
                                     count: 1
                                   });
                                 }
                                 return acc;
-                              }, [] as { name: string; confidencePercent: number; email?: string; count: number }[]);
+                              }, [] as { name: string; confidencePercent: number; email?: string; speakerLabel?: string; count: number }[]);
                               
                               return uniqueSpeakers.map((speaker, idx) => (
                                 <div
@@ -628,89 +793,62 @@ const MeetingDetail = () => {
                             {transcriptSegments.length} segment
                           </Badge>
                         )}
+                        {!isEditingTranscript && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-auto gap-1 text-xs"
+                            onClick={() => {
+                              setEditedTranscript(transcript || '');
+                              setIsEditingTranscript(true);
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Redigera
+                          </Button>
+                        )}
                       </div>
-                      <div className="bg-muted/30 rounded-xl p-6 max-h-[500px] overflow-y-auto">
-                        {transcriptSegments && transcriptSegments.length > 0 ? (
-                          <div className="space-y-4">
-                            {/* Group consecutive segments by same speaker */}
-                            {(() => {
-                              const grouped: { speakerId: string; text: string; start: number; end: number }[] = [];
-                              for (const seg of transcriptSegments) {
-                                const prev = grouped[grouped.length - 1];
-                                // Handle different speakerId formats - could be speakerId, speaker, or in different cases
-                                const rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || 'unknown';
-                                const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
-                                
-                                if (prev && prev.speakerId === speakerId) {
-                                  prev.text = `${prev.text}\n${seg.text}`;
-                                  prev.end = seg.end;
-                                } else {
-                                  grouped.push({ speakerId, text: seg.text, start: seg.start, end: seg.end });
-                                }
-                              }
-                              
-                              const getSpeakerName = (speakerId: string): string | null => {
-                                if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') return null;
-                                
-                                // Check sisMatches for name by label
-                                const match = sisMatches.find(m => 
-                                  m.speakerLabel === speakerId || 
-                                  m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
-                                );
-                                if (match?.speakerName) return match.speakerName;
-                                
-                                // Check sisSpeakers
-                                const speaker = sisSpeakers.find(s => 
-                                  s.label === speakerId || 
-                                  s.label?.toLowerCase() === speakerId.toLowerCase()
-                                );
-                                if (speaker?.speakerName) return speaker.speakerName;
-                                if (speaker?.bestMatchEmail) return speaker.bestMatchEmail.split('@')[0];
-                                
-                                // Fallback to Talare X format for speaker_X patterns
-                                const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
-                                if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
-                                
-                                // If it's a single letter like 'A', 'B', convert to Talare A, Talare B
-                                if (/^[A-Z]$/i.test(speakerId)) {
-                                  return `Talare ${speakerId.toUpperCase()}`;
-                                }
-                                
-                                return speakerId;
-                              };
-                              
-                              const getSpeakerColor = (speakerId: string): string => {
-                                const colors = [
-                                  'bg-blue-500',
-                                  'bg-emerald-500',
-                                  'bg-amber-500',
-                                  'bg-purple-500',
-                                  'bg-rose-500',
-                                  'bg-cyan-500',
-                                  'bg-indigo-500',
-                                  'bg-teal-500',
-                                ];
-                                if (!speakerId || speakerId === 'unknown') return 'bg-muted-foreground/50';
-                                const index = speakerId.charCodeAt(speakerId.length - 1);
-                                return colors[Math.abs(index) % colors.length];
-                              };
-                              
-                              const formatTime = (time: number): string => {
-                                const totalSeconds = time > 1000 ? Math.floor(time / 1000) : Math.floor(time);
-                                const minutes = Math.floor(totalSeconds / 60);
-                                const seconds = totalSeconds % 60;
-                                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                              };
-                              
-                              return grouped.map((segment, idx) => {
-                                const speakerName = getSpeakerName(segment.speakerId);
-                                const isIdentified = sisMatches.some(m => 
-                                  m.speakerLabel === segment.speakerId || 
-                                  m.speakerLabel?.toLowerCase() === segment.speakerId.toLowerCase()
-                                ) || sisSpeakers.some(s => 
-                                  (s.label === segment.speakerId || s.label?.toLowerCase() === segment.speakerId.toLowerCase()) && 
-                                  s.bestMatchEmail
-                                );
+
+                      {isEditingTranscript ? (
+                        <div className="space-y-3">
+                          <Textarea
+                            value={editedTranscript}
+                            onChange={(e) => setEditedTranscript(e.target.value)}
+                            className="min-h-[300px] text-sm"
+                            placeholder="Redigera transkriptionen..."
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEditingTranscript(false)}
+                              disabled={isSavingTranscript}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Avbryt
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleSaveTranscript}
+                              disabled={isSavingTranscript || !editedTranscript.trim()}
+                            >
+                              {isSavingTranscript ? (
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4 mr-1" />
+                              )}
+                              Spara
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-muted/30 rounded-xl p-6 max-h-[500px] overflow-y-auto">
+                          {groupedSegments.length > 0 ? (
+                            <div className="space-y-4">
+                              {groupedSegments.map((segment, idx) => {
+                                const speakerName = getSpeakerDisplayName(segment.speakerId);
+                                const isIdentified = isSpeakerIdentified(segment.speakerId);
+                                const isEditing = editingSpeaker === segment.speakerId;
                                 
                                 return (
                                   <motion.div
@@ -735,11 +873,67 @@ const MeetingDetail = () => {
                                     )}
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 mb-1.5">
-                                        <span className="text-sm font-semibold text-foreground">
-                                          {speakerName || 'Okänd talare'}
-                                        </span>
-                                        {isIdentified && (
-                                          <UserCheck className="w-3.5 h-3.5 text-green-500" />
+                                        {isEditing ? (
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <Input
+                                              value={editingSpeakerValue}
+                                              onChange={(e) => setEditingSpeakerValue(e.target.value)}
+                                              className="h-7 text-sm w-40"
+                                              placeholder="Ange namn..."
+                                              autoFocus
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleSaveSpeakerName();
+                                                if (e.key === 'Escape') {
+                                                  setEditingSpeaker(null);
+                                                  setEditingSpeakerValue('');
+                                                }
+                                              }}
+                                            />
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-7 w-7 p-0"
+                                              onClick={handleSaveSpeakerName}
+                                              disabled={isSavingSpeaker}
+                                            >
+                                              {isSavingSpeaker ? (
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                              ) : (
+                                                <Save className="w-3 h-3" />
+                                              )}
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-7 w-7 p-0"
+                                              onClick={() => {
+                                                setEditingSpeaker(null);
+                                                setEditingSpeakerValue('');
+                                              }}
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <span className="text-sm font-semibold text-foreground">
+                                              {speakerName || `Talare ${idx + 1}`}
+                                            </span>
+                                            {isIdentified && (
+                                              <UserCheck className="w-3.5 h-3.5 text-green-500" />
+                                            )}
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                                              onClick={() => {
+                                                setEditingSpeaker(segment.speakerId);
+                                                setEditingSpeakerValue(speakerName || '');
+                                              }}
+                                            >
+                                              <Pencil className="w-3 h-3" />
+                                            </Button>
+                                          </>
                                         )}
                                         <span className="text-xs text-muted-foreground ml-auto">
                                           {formatTime(segment.start)}
@@ -751,20 +945,20 @@ const MeetingDetail = () => {
                                     </div>
                                   </motion.div>
                                 );
-                              });
-                            })()}
-                          </div>
-                        ) : (
-                          <motion.p 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.5 }}
-                            className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
-                          >
-                            {transcript}
-                          </motion.p>
-                        )}
-                      </div>
+                              })}
+                            </div>
+                          ) : (
+                            <motion.p 
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.5 }}
+                              className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
+                            >
+                              {transcript}
+                            </motion.p>
+                          )}
+                        </div>
+                      )}
                     </motion.div>
                   ) : null}
                 </AnimatePresence>

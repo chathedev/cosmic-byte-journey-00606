@@ -368,7 +368,7 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
                         </Button>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        Används för hälsningar, talaridentifiering (SIS) och visning i möten
+                        Används för hälsningar, talaridentifiering (Lyra) och visning i möten
                       </p>
                     </div>
                   </CardContent>
