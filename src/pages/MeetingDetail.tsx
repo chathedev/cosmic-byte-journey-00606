@@ -128,9 +128,39 @@ const MeetingDetail = () => {
         const fetchedMeeting = await meetingStorage.getMeeting(id);
         if (fetchedMeeting) {
           setMeeting(fetchedMeeting);
+          
+          // Load segments from meeting if available
+          if (fetchedMeeting.transcriptSegments && fetchedMeeting.transcriptSegments.length > 0) {
+            setTranscriptSegments(fetchedMeeting.transcriptSegments.map(seg => ({
+              speakerId: seg.speaker || 'unknown',
+              text: seg.text,
+              start: seg.start,
+              end: seg.end,
+              confidence: seg.confidence || 0,
+            })));
+          }
+          
           if (fetchedMeeting.transcript && fetchedMeeting.transcript.trim().length > 0) {
             setTranscript(fetchedMeeting.transcript);
             setStatus('done');
+            
+            // For completed meetings, also fetch SIS data from ASR if segments not loaded
+            if (!fetchedMeeting.transcriptSegments || fetchedMeeting.transcriptSegments.length === 0) {
+              try {
+                const asrStatus = await pollASRStatus(id);
+                if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
+                  setTranscriptSegments(asrStatus.transcriptSegments);
+                }
+                if (asrStatus.sisSpeakers) {
+                  setSisSpeakers(asrStatus.sisSpeakers);
+                }
+                if (asrStatus.sisMatches) {
+                  setSisMatches(asrStatus.sisMatches);
+                }
+              } catch (e) {
+                console.log('Could not fetch ASR data for completed meeting:', e);
+              }
+            }
           } else {
             setStatus('processing');
           }
@@ -607,7 +637,10 @@ const MeetingDetail = () => {
                               const grouped: { speakerId: string; text: string; start: number; end: number }[] = [];
                               for (const seg of transcriptSegments) {
                                 const prev = grouped[grouped.length - 1];
-                                const speakerId = seg.speakerId || 'unknown';
+                                // Handle different speakerId formats - could be speakerId, speaker, or in different cases
+                                const rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || 'unknown';
+                                const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
+                                
                                 if (prev && prev.speakerId === speakerId) {
                                   prev.text = `${prev.text}\n${seg.text}`;
                                   prev.end = seg.end;
@@ -617,17 +650,32 @@ const MeetingDetail = () => {
                               }
                               
                               const getSpeakerName = (speakerId: string): string | null => {
-                                if (!speakerId || speakerId === 'unknown') return null;
-                                // Check sisMatches for name
-                                const match = sisMatches.find(m => m.speakerLabel === speakerId);
+                                if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') return null;
+                                
+                                // Check sisMatches for name by label
+                                const match = sisMatches.find(m => 
+                                  m.speakerLabel === speakerId || 
+                                  m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
+                                );
                                 if (match?.speakerName) return match.speakerName;
+                                
                                 // Check sisSpeakers
-                                const speaker = sisSpeakers.find(s => s.label === speakerId);
+                                const speaker = sisSpeakers.find(s => 
+                                  s.label === speakerId || 
+                                  s.label?.toLowerCase() === speakerId.toLowerCase()
+                                );
                                 if (speaker?.speakerName) return speaker.speakerName;
                                 if (speaker?.bestMatchEmail) return speaker.bestMatchEmail.split('@')[0];
-                                // Fallback to Talare X format
-                                const numMatch = speakerId.match(/speaker_(\d+)/i);
+                                
+                                // Fallback to Talare X format for speaker_X patterns
+                                const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
                                 if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
+                                
+                                // If it's a single letter like 'A', 'B', convert to Talare A, Talare B
+                                if (/^[A-Z]$/i.test(speakerId)) {
+                                  return `Talare ${speakerId.toUpperCase()}`;
+                                }
+                                
                                 return speakerId;
                               };
                               
@@ -639,8 +687,10 @@ const MeetingDetail = () => {
                                   'bg-purple-500',
                                   'bg-rose-500',
                                   'bg-cyan-500',
+                                  'bg-indigo-500',
+                                  'bg-teal-500',
                                 ];
-                                if (!speakerId) return colors[0];
+                                if (!speakerId || speakerId === 'unknown') return 'bg-muted-foreground/50';
                                 const index = speakerId.charCodeAt(speakerId.length - 1);
                                 return colors[Math.abs(index) % colors.length];
                               };
@@ -654,8 +704,13 @@ const MeetingDetail = () => {
                               
                               return grouped.map((segment, idx) => {
                                 const speakerName = getSpeakerName(segment.speakerId);
-                                const isIdentified = sisMatches.some(m => m.speakerLabel === segment.speakerId) ||
-                                  sisSpeakers.some(s => s.label === segment.speakerId && s.bestMatchEmail);
+                                const isIdentified = sisMatches.some(m => 
+                                  m.speakerLabel === segment.speakerId || 
+                                  m.speakerLabel?.toLowerCase() === segment.speakerId.toLowerCase()
+                                ) || sisSpeakers.some(s => 
+                                  (s.label === segment.speakerId || s.label?.toLowerCase() === segment.speakerId.toLowerCase()) && 
+                                  s.bestMatchEmail
+                                );
                                 
                                 return (
                                   <motion.div
@@ -665,26 +720,32 @@ const MeetingDetail = () => {
                                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                                     className="flex gap-3"
                                   >
-                                    {speakerName && (
+                                    {speakerName ? (
                                       <div className="flex-shrink-0">
-                                        <div className={`w-8 h-8 rounded-full ${getSpeakerColor(segment.speakerId)} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
+                                        <div className={`w-9 h-9 rounded-full ${getSpeakerColor(segment.speakerId)} flex items-center justify-center text-white text-sm font-bold shadow-md ring-2 ring-background`}>
                                           {speakerName.charAt(0).toUpperCase()}
                                         </div>
                                       </div>
-                                    )}
-                                    <div className={`flex-1 ${!speakerName ? 'ml-0' : ''}`}>
-                                      {speakerName && (
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <span className="text-sm font-medium">{speakerName}</span>
-                                          {isIdentified && (
-                                            <UserCheck className="w-3 h-3 text-green-500" />
-                                          )}
-                                          <span className="text-xs text-muted-foreground">
-                                            {formatTime(segment.start)}
-                                          </span>
+                                    ) : (
+                                      <div className="flex-shrink-0">
+                                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+                                          <Volume2 className="w-4 h-4 text-muted-foreground" />
                                         </div>
-                                      )}
-                                      <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1.5">
+                                        <span className="text-sm font-semibold text-foreground">
+                                          {speakerName || 'Okänd talare'}
+                                        </span>
+                                        {isIdentified && (
+                                          <UserCheck className="w-3.5 h-3.5 text-green-500" />
+                                        )}
+                                        <span className="text-xs text-muted-foreground ml-auto">
+                                          {formatTime(segment.start)}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed bg-background/50 rounded-lg p-3 border border-border/30">
                                         {segment.text}
                                       </p>
                                     </div>
