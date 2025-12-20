@@ -123,6 +123,7 @@ export default function AdminEnterpriseCompanyDetail() {
 
   // SIS reset
   const [resettingSISEmail, setResettingSISEmail] = useState<string | null>(null);
+  const [confirmSISReset, setConfirmSISReset] = useState<CompanyMember | null>(null);
 
   // User detail
   const [selectedMemberDetail, setSelectedMemberDetail] = useState<{ email: string; plan: string; meetingCount: number } | null>(null);
@@ -1051,25 +1052,9 @@ export default function AdminEnterpriseCompanyDetail() {
                                     size="sm"
                                     className="h-6 w-6 p-0"
                                     disabled={resettingSISEmail === member.email}
-                                    onClick={async (e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      setResettingSISEmail(member.email);
-                                      try {
-                                        await apiClient.resetUserSIS(member.email);
-                                        toast({
-                                          title: 'SIS-prov återställt',
-                                          description: `Be ${member.preferredName || member.email} ladda upp ett nytt röstprov.`,
-                                        });
-                                        loadCompany();
-                                      } catch (error: any) {
-                                        toast({
-                                          title: 'Kunde inte återställa SIS',
-                                          description: error?.message || 'Ett oväntat fel uppstod',
-                                          variant: 'destructive',
-                                        });
-                                      } finally {
-                                        setResettingSISEmail(null);
-                                      }
+                                      setConfirmSISReset(member);
                                     }}
                                     title="Återställ SIS-prov"
                                   >
@@ -1485,6 +1470,61 @@ export default function AdminEnterpriseCompanyDetail() {
         open={!!selectedMemberDetail}
         onOpenChange={(open) => !open && setSelectedMemberDetail(null)}
       />
+
+      {/* SIS Reset Confirmation Dialog */}
+      <AlertDialog open={!!confirmSISReset} onOpenChange={(open) => !open && setConfirmSISReset(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Återställ SIS-prov?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Du är på väg att återställa SIS-provet för <strong>{confirmSISReset?.preferredName || confirmSISReset?.email}</strong>.
+              </p>
+              <p className="text-destructive font-medium">
+                Detta raderar det befintliga röstprovet och användaren måste ladda upp ett nytt prov för att aktivera talaridentifiering.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={resettingSISEmail !== null}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!confirmSISReset) return;
+                
+                setResettingSISEmail(confirmSISReset.email);
+                try {
+                  await apiClient.resetUserSIS(confirmSISReset.email);
+                  toast({
+                    title: 'SIS-prov återställt',
+                    description: `Be ${confirmSISReset.preferredName || confirmSISReset.email} ladda upp ett nytt röstprov.`,
+                  });
+                  loadCompany();
+                } catch (error: any) {
+                  toast({
+                    title: 'Kunde inte återställa SIS',
+                    description: error?.message || 'Ett oväntat fel uppstod',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setResettingSISEmail(null);
+                  setConfirmSISReset(null);
+                }
+              }}
+            >
+              {resettingSISEmail ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Ja, återställ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
