@@ -505,56 +505,87 @@ const MeetingDetail = () => {
                       exit={{ opacity: 0 }}
                       className="space-y-4"
                     >
-                      {/* Speaker Identification Section - only show if we have SIS data */}
+                      {/* Speaker Identification Section - only show if we have identified SIS matches */}
                       {sisMatches.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.1 }}
-                          className="bg-primary/5 border border-primary/20 rounded-lg p-4"
+                          className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-5"
                         >
-                          <div className="flex items-center gap-2 mb-3">
-                            <Users className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium">Identifierade talare</span>
-                            <Badge variant="outline" className="text-xs ml-auto">
-                              {sisMatches.length} {sisMatches.length === 1 ? 'talare' : 'talare'}
-                            </Badge>
+                          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-primary/10">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                              <Users className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <span className="text-sm font-semibold">Identifierade talare</span>
+                              <p className="text-xs text-muted-foreground">Röstidentifiering via SIS</p>
+                            </div>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {sisMatches.map((match, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center gap-2 bg-background/80 rounded-full px-3 py-1.5 border border-border/50"
-                              >
-                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                                  {match.confidencePercent >= 70 ? (
-                                    <UserCheck className="w-3 h-3 text-primary" />
-                                  ) : (
-                                    <Volume2 className="w-3 h-3 text-muted-foreground" />
-                                  )}
-                                </div>
-                                <span className="text-sm font-medium">
-                                  {match.speakerName || match.sampleOwnerEmail?.split('@')[0] || `Talare ${idx + 1}`}
-                                </span>
-                                {match.confidencePercent >= 60 && (
-                                  <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                    match.confidencePercent >= 80 
-                                      ? 'bg-green-500/20 text-green-700 dark:text-green-400' 
-                                      : match.confidencePercent >= 70 
-                                        ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
-                                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {/* Deduplicate and combine consecutive same speakers */}
+                            {(() => {
+                              const uniqueSpeakers = sisMatches.reduce((acc, match) => {
+                                const name = match.speakerName || match.sampleOwnerEmail?.split('@')[0];
+                                if (!name) return acc;
+                                
+                                const existing = acc.find(s => s.name === name);
+                                if (existing) {
+                                  // Keep highest confidence
+                                  if (match.confidencePercent > existing.confidencePercent) {
+                                    existing.confidencePercent = match.confidencePercent;
+                                  }
+                                  existing.count++;
+                                } else {
+                                  acc.push({ 
+                                    name, 
+                                    confidencePercent: match.confidencePercent,
+                                    email: match.sampleOwnerEmail,
+                                    count: 1
+                                  });
+                                }
+                                return acc;
+                              }, [] as { name: string; confidencePercent: number; email?: string; count: number }[]);
+                              
+                              return uniqueSpeakers.map((speaker, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-3 bg-background/60 backdrop-blur-sm rounded-lg p-3 border border-border/30 hover:border-primary/30 transition-colors"
+                                >
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                                    speaker.confidencePercent >= 80 
+                                      ? 'bg-green-500/20 text-green-700 dark:text-green-400 ring-2 ring-green-500/30' 
+                                      : speaker.confidencePercent >= 70 
+                                        ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 ring-2 ring-blue-500/30'
+                                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 ring-2 ring-amber-500/30'
                                   }`}>
-                                    {match.confidencePercent}%
-                                  </span>
-                                )}
-                              </div>
-                            ))}
+                                    {speaker.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{speaker.name}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className={`text-xs font-medium ${
+                                        speaker.confidencePercent >= 80 
+                                          ? 'text-green-600 dark:text-green-400' 
+                                          : speaker.confidencePercent >= 70 
+                                            ? 'text-blue-600 dark:text-blue-400'
+                                            : 'text-amber-600 dark:text-amber-400'
+                                      }`}>
+                                        {speaker.confidencePercent}% träffsäkerhet
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <UserCheck className={`w-4 h-4 ${
+                                    speaker.confidencePercent >= 80 
+                                      ? 'text-green-500' 
+                                      : speaker.confidencePercent >= 70 
+                                        ? 'text-blue-500'
+                                        : 'text-amber-500'
+                                  }`} />
+                                </div>
+                              ));
+                            })()}
                           </div>
-                          {sisSpeakers.length > sisMatches.length && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {sisSpeakers.length - sisMatches.length} okänd(a) talare upptäckt(a)
-                            </p>
-                          )}
                         </motion.div>
                       )}
 
