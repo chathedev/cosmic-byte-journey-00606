@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -505,6 +505,60 @@ const MeetingDetail = () => {
                       exit={{ opacity: 0 }}
                       className="space-y-4"
                     >
+                      {/* Speaker Identification Section - only show if we have SIS data */}
+                      {sisMatches.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 }}
+                          className="bg-primary/5 border border-primary/20 rounded-lg p-4"
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <Users className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-medium">Identifierade talare</span>
+                            <Badge variant="outline" className="text-xs ml-auto">
+                              {sisMatches.length} {sisMatches.length === 1 ? 'talare' : 'talare'}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {sisMatches.map((match, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 bg-background/80 rounded-full px-3 py-1.5 border border-border/50"
+                              >
+                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                                  {match.confidencePercent >= 70 ? (
+                                    <UserCheck className="w-3 h-3 text-primary" />
+                                  ) : (
+                                    <Volume2 className="w-3 h-3 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <span className="text-sm font-medium">
+                                  {match.speakerName || match.sampleOwnerEmail?.split('@')[0] || `Talare ${idx + 1}`}
+                                </span>
+                                {match.confidencePercent >= 60 && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                    match.confidencePercent >= 80 
+                                      ? 'bg-green-500/20 text-green-700 dark:text-green-400' 
+                                      : match.confidencePercent >= 70 
+                                        ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
+                                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                                  }`}>
+                                    {match.confidencePercent}%
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {sisSpeakers.length > sisMatches.length && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {sisSpeakers.length - sisMatches.length} okänd(a) talare upptäckt(a)
+                            </p>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Transcript Section */}
                       <div className="flex items-center gap-2 mb-4">
                         <CheckCircle2 className="w-5 h-5 text-green-600" />
                         <span className="font-medium">Transkription</span>
