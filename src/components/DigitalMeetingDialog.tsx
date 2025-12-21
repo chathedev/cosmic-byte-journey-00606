@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { SubscribeDialog } from "./SubscribeDialog";
-import { applyProxyHeadersToXhr, getAsrTranscribeTarget } from "@/lib/asrTranscribeGateway";
+import { uploadToAsr } from "@/lib/asrUpload";
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -167,134 +167,22 @@ export const DigitalMeetingDialog = ({
 
     const traceId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const transcribeTarget = getAsrTranscribeTarget(file.size);
+    console.log('📤 Starting upload via fetch...', { traceId, fileName: file.name, size: file.size });
 
     try {
-      // Step 1: POST audio to /asr/transcribe - backend starts transcription and returns server-generated meetingId
-      const formData = new FormData();
-      formData.append('audio', file, file.name);
-      formData.append('language', languageCode);
-      formData.append('title', meetingTitle);
-      formData.append('traceId', traceId);
-
-      // No longer using proxy - direct upload only
-      // (proxy caused HTTP/2 stalls)
-
-      console.log('📤 Step 1: Uploading to /asr/transcribe (XHR)...', {
+      const result = await uploadToAsr({
+        file,
+        language: languageCode,
+        title: meetingTitle,
         traceId,
-        url: transcribeTarget.url,
+        onProgress: (percent) => setUploadProgress(percent),
       });
 
-      const transcribeResult = await new Promise<any>((resolve, reject) => {
-        const STALL_MS = 120000; // 2 min without byte progress
-        const MAX_TOTAL_MS = 30 * 60 * 1000; // 30 min hard cap
-
-        const xhr = new XMLHttpRequest();
-        xhr.withCredentials = false;
-
-        let lastLoaded = 0;
-        let lastProgressAt = Date.now();
-        let lastLoggedPercent = -1;
-
-        const watchdog = window.setInterval(() => {
-          const now = Date.now();
-          const stalledFor = now - lastProgressAt;
-
-          if (stalledFor > STALL_MS) {
-            console.error('🧱 /asr/transcribe stalled (no progress):', { traceId, stalledFor });
-            try { xhr.abort(); } catch {}
-            window.clearInterval(watchdog);
-            reject(new Error('Uppladdningen verkar ha fastnat. Försök igen.'));
-          }
-        }, 5000);
-
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            if (e.loaded > lastLoaded) {
-              lastLoaded = e.loaded;
-              lastProgressAt = Date.now();
-            }
-
-            const percent = Math.min(95, Math.round((e.loaded / e.total) * 95));
-            setUploadProgress((p) => Math.max(p, percent));
-
-            // Log every 10% to avoid spam
-            const bucket = Math.floor(percent / 10) * 10;
-            if (bucket !== lastLoggedPercent) {
-              lastLoggedPercent = bucket;
-              console.log('📶 /asr/transcribe upload progress:', { traceId, percent: bucket, loaded: e.loaded, total: e.total });
-            }
-          } else {
-            // Still update lastProgressAt if bytes are reported
-            if ((e as any).loaded && (e as any).loaded > lastLoaded) {
-              lastLoaded = (e as any).loaded;
-              lastProgressAt = Date.now();
-            }
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          window.clearInterval(watchdog);
-          setUploadProgress(100);
-
-          const preview = (xhr.responseText || '').slice(0, 500);
-          console.log('📦 /asr/transcribe response:', { traceId, status: xhr.status, preview });
-
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText));
-            } catch {
-              reject(new Error('Ogiltigt svar från servern'));
-            }
-            return;
-          }
-
-          // Non-2xx
-          let msg = `Uppladdningen misslyckades (${xhr.status})`;
-          try {
-            const parsed = JSON.parse(xhr.responseText);
-            msg = parsed?.error || parsed?.message || msg;
-          } catch {
-            // ignore
-          }
-          reject(new Error(msg));
-        });
-
-        xhr.addEventListener('error', () => {
-          window.clearInterval(watchdog);
-          reject(new Error('Nätverksfel vid uppladdning'));
-        });
-
-        xhr.addEventListener('timeout', () => {
-          window.clearInterval(watchdog);
-          reject(new Error('Uppladdningen tog för lång tid (timeout)'));
-        });
-
-        xhr.addEventListener('abort', () => {
-          window.clearInterval(watchdog);
-        });
-
-        xhr.open('POST', transcribeTarget.url);
-        xhr.timeout = MAX_TOTAL_MS;
-
-        // Always use Bearer auth (direct upload only now)
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-        // Do NOT set Content-Type manually for FormData
-        xhr.send(formData);
-
-        // If nothing happens at all (no progress events), still abort after MAX_TOTAL_MS via xhr.timeout
-        console.log('🛰️ /asr/transcribe XHR started:', { traceId, fileName: file.name, size: file.size, type: file.type, language: languageCode });
-      });
-
-      // Get the server-generated meetingId from response
-      const meetingId = transcribeResult.meetingId || transcribeResult.meeting_id || transcribeResult.id;
-
-      if (!meetingId) {
-        console.error('No meetingId in response:', transcribeResult);
-        throw new Error('Inget meetingId returnerades från transkriberingstjänsten');
+      if (!result.success || !result.meetingId) {
+        throw new Error(result.error || 'Uppladdningen misslyckades');
       }
 
+      const meetingId = result.meetingId;
       console.log('✅ Upload complete - meetingId:', meetingId, '| traceId:', traceId);
 
       // Save pending meeting to sessionStorage for instant display on meeting page
