@@ -18,11 +18,17 @@ console.log("=".repeat(60));
 if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').then((registration) => {
-        console.log('Service Worker registered:', registration);
-      }).catch((error) => {
-        console.log('Service Worker registration failed:', error);
-      });
+      navigator.serviceWorker
+        .register('/sw.js?v=tivly-v4')
+        .then((registration) => {
+          console.log('Service Worker registered:', registration);
+          console.log('SW active script:', registration.active?.scriptURL);
+          console.log('SW controller:', navigator.serviceWorker.controller?.scriptURL);
+          registration.update?.().catch(() => {});
+        })
+        .catch((error) => {
+          console.log('Service Worker registration failed:', error);
+        });
     });
   } else {
     // In dev, ensure no old SWs linger which can cause blank screens
