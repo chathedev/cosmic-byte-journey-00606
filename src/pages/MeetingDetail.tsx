@@ -63,6 +63,7 @@ const MeetingDetail = () => {
   const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
+  const [isSISDisabled, setIsSISDisabled] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
@@ -178,6 +179,9 @@ const MeetingDetail = () => {
                 setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
                 setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
                 setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+                // Check if SIS/LYRA is disabled
+                const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
+                setIsSISDisabled(sisDisabled);
               } catch (e) {
                 console.log('Could not fetch ASR data for completed meeting:', e);
               }
@@ -271,6 +275,9 @@ const MeetingDetail = () => {
         
         const isFullyDone = mainDone && asrStatus.transcript && (stageDone || lyraOrSisDone);
         
+        // Check if SIS/LYRA is explicitly disabled
+        const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
+        
         if (isFullyDone) {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
@@ -282,6 +289,7 @@ const MeetingDetail = () => {
           setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
           setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+          setIsSISDisabled(sisDisabled);
           setStatus('done');
           setStage('done');
 
@@ -734,7 +742,8 @@ const MeetingDetail = () => {
 
     // If SIS/Lyra ran (status done) but found NO matches AND no segments with speakers,
     // create a default "Talare 1" so users can still name the speaker for learning
-    if (speakers.length === 0 && status === 'done' && hasTranscript) {
+    // Only do this if SIS is NOT disabled
+    if (speakers.length === 0 && status === 'done' && hasTranscript && !isSISDisabled) {
       const defaultLabel = 'speaker_0';
       const namesSource = isEditing ? editedSpeakerNames : speakerNames;
       const name = namesSource[defaultLabel] || 'Talare 1';
@@ -905,7 +914,8 @@ const MeetingDetail = () => {
   };
 
   const displayTranscript = isEditing ? editedTranscript : (transcript || '');
-  const hasSegments = groupedSegments.length > 0 && !isEditing;
+  // Only show speaker-attributed segments if SIS/LYRA is enabled
+  const hasSegments = groupedSegments.length > 0 && !isEditing && !isSISDisabled;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
@@ -1055,7 +1065,7 @@ const MeetingDetail = () => {
                       {meeting.source === 'live' ? 'Live-inspelning' : 'Uppladdad'}
                     </Badge>
                   )}
-                  {lyraLearning.some(l => l.updated) && (
+                  {!isSISDisabled && lyraLearning.some(l => l.updated) && (
                     <Badge variant="outline" className="gap-1.5 text-purple-600 border-purple-500/30 bg-purple-500/5">
                       <Sparkles className="w-3.5 h-3.5" />
                       Lyra lärde sig
@@ -1063,8 +1073,8 @@ const MeetingDetail = () => {
                   )}
                 </div>
 
-                {/* Speakers Section */}
-                {uniqueSpeakers.length > 0 && (
+                {/* Speakers Section - Only show when SIS/LYRA is enabled */}
+                {uniqueSpeakers.length > 0 && !isSISDisabled && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
