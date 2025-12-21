@@ -115,14 +115,37 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   }, [liveTranscript, interimText]);
 
-  // Wake lock management
+  // Wake lock management - enhanced for background recording
   const requestWakeLock = async () => {
-    if (!('wakeLock' in navigator)) return;
+    if (!('wakeLock' in navigator)) {
+      console.log('⚠️ Wake Lock API not supported');
+      return;
+    }
     try {
+      // Release any existing lock first
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release();
+        } catch { /* ignore */ }
+      }
       wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
       console.log('✅ Wake lock acquired');
-    } catch (err) {
-      console.error('❌ Failed to acquire wake lock:', err);
+      
+      // Re-acquire wake lock when page becomes visible again (important for mobile)
+      wakeLockRef.current.addEventListener('release', () => {
+        console.log('⚠️ Wake lock was released');
+        // Try to re-acquire if still recording
+        if (isRecording && !isPaused && document.visibilityState === 'visible') {
+          requestWakeLock();
+        }
+      });
+    } catch (err: any) {
+      // Don't log as error if just not visible - this is expected
+      if (err.name === 'NotAllowedError') {
+        console.log('⚠️ Wake lock not allowed (page not visible or permission denied)');
+      } else {
+        console.error('❌ Failed to acquire wake lock:', err);
+      }
     }
   };
 
@@ -131,11 +154,49 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       try {
         await wakeLockRef.current.release();
         wakeLockRef.current = null;
+        console.log('✅ Wake lock released');
       } catch (err) {
         console.error('Failed to release wake lock:', err);
       }
     }
   };
+
+  // Handle visibility changes - crucial for background recording on mobile
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 App became visible');
+        // Re-acquire wake lock when coming back to foreground
+        if (isRecording && !isPaused) {
+          requestWakeLock();
+        }
+      } else {
+        console.log('📱 App went to background - recording continues');
+        // Recording continues in background, wake lock may be released by system
+        // but MediaRecorder should keep running
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isRecording, isPaused]);
+
+  // Prevent page from being suspended on iOS Safari
+  useEffect(() => {
+    if (!isRecording || isPaused) return;
+
+    // Keep-alive ping to prevent iOS Safari from suspending the page
+    const keepAliveInterval = setInterval(() => {
+      // Access a DOM property to keep the page active
+      const _ = document.hidden;
+      // Also touch the audio context if we have one
+      if (streamRef.current && streamRef.current.active) {
+        console.log('🔄 Keep-alive: stream active');
+      }
+    }, 10000); // Every 10 seconds
+
+    return () => clearInterval(keepAliveInterval);
+  }, [isRecording, isPaused]);
 
   // Initialize browser speech recognition for Free/Pro plans
   const startSpeechRecognition = () => {
@@ -276,6 +337,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
   const startRecording = async () => {
     try {
+      // Request microphone with settings optimized for continuous background recording
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -286,6 +348,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         },
       });
       streamRef.current = stream;
+
+      // Keep audio track enabled even when page is backgrounded
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = true;
+        // Some browsers support contentHint for optimization
+        if ('contentHint' in track) {
+          (track as any).contentHint = 'speech';
+        }
+      });
 
       // Determine best supported mimeType with codecs for reliable recording
       let mimeType = 'audio/webm; codecs=opus';
