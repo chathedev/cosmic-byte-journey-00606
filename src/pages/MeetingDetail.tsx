@@ -816,10 +816,20 @@ const MeetingDetail = () => {
   // Get display name for a speaker in segments
   const getSegmentSpeakerName = (speakerId: string): string => {
     if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') {
+      // If there's only 1 speaker and they're identified, use their name even for "unknown" segments
+      if (uniqueSpeakers.length === 1 && uniqueSpeakers[0].isIdentified) {
+        return uniqueSpeakers[0].name;
+      }
       return 'Talare';
     }
     
-    // Check edited names first if in edit mode
+    // First check uniqueSpeakers - this already has all the resolved names including context verification
+    const resolvedSpeaker = uniqueSpeakers.find(s => s.label === speakerId);
+    if (resolvedSpeaker) {
+      return resolvedSpeaker.name;
+    }
+    
+    // Check edited names if in edit mode
     const namesSource = isEditing ? editedSpeakerNames : speakerNames;
     if (namesSource[speakerId]) {
       return namesSource[speakerId];
@@ -841,6 +851,11 @@ const MeetingDetail = () => {
     }
     if (speaker?.bestMatchEmail) {
       return speaker.bestMatchEmail.split('@')[0];
+    }
+    
+    // If only 1 speaker exists and no direct match, assume it's that speaker
+    if (uniqueSpeakers.length === 1) {
+      return uniqueSpeakers[0].name;
     }
     
     // Fallback to "Talare X"
