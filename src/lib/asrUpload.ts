@@ -66,30 +66,80 @@ export async function uploadToAsr(options: AsrUploadOptions): Promise<AsrUploadR
     return { success: false, error: 'Ingen autentisering (token saknas)' };
   }
 
-  // Build minimal FormData per spec
+  const logPrefix = `[ASR:${traceId || 'no-trace'}]`;
+
+  // Validate file is a proper File/Blob with content
+  if (!(file instanceof Blob)) {
+    console.error(`${logPrefix} CRITICAL: file is not a Blob/File instance`);
+    return { success: false, error: 'Ogiltig fil (inte en Blob/File)' };
+  }
+
+  if (file.size < 100) {
+    console.error(`${logPrefix} CRITICAL: file.size is ${file.size} bytes - too small`);
+    return { success: false, error: 'Filen verkar vara tom' };
+  }
+
+  console.log(`${logPrefix} File validation passed:`, {
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    isBlob: file instanceof Blob,
+    isFile: file instanceof File,
+  });
+
+  // Read file into ArrayBuffer to ensure we have the actual bytes
+  // This prevents issues where the file handle might be stale
+  let fileBlob: Blob;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    console.log(`${logPrefix} Read ${arrayBuffer.byteLength} bytes into ArrayBuffer`);
+    
+    if (arrayBuffer.byteLength !== file.size) {
+      console.warn(`${logPrefix} WARNING: ArrayBuffer size (${arrayBuffer.byteLength}) differs from file.size (${file.size})`);
+    }
+    
+    if (arrayBuffer.byteLength < 100) {
+      return { success: false, error: 'Kunde inte läsa filinnehåll' };
+    }
+
+    // Create a fresh Blob from the ArrayBuffer
+    fileBlob = new Blob([arrayBuffer], { type: file.type || 'audio/mpeg' });
+    console.log(`${logPrefix} Created fresh Blob: ${fileBlob.size} bytes, type: ${fileBlob.type}`);
+  } catch (readErr: any) {
+    console.error(`${logPrefix} Failed to read file:`, readErr);
+    return { success: false, error: 'Kunde inte läsa filen: ' + (readErr?.message || 'okänt fel') };
+  }
+
+  // Build FormData fresh - never reuse
   const formData = new FormData();
-  formData.append('audio', file, file.name);
+  formData.append('audio', fileBlob, file.name);
   if (language) formData.append('language', language);
   if (title) formData.append('title', title);
   if (traceId) formData.append('traceId', traceId);
 
-  const logPrefix = `[ASR:${traceId || 'no-trace'}]`;
+  // Debug: verify FormData contains the file
+  const formDataEntries = Array.from(formData.entries());
+  console.log(`${logPrefix} FormData entries:`, formDataEntries.map(([k, v]) => 
+    v instanceof Blob ? `${k}: Blob(${v.size} bytes, ${v.type})` : `${k}: ${v}`
+  ));
 
-  console.log(`${logPrefix} Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB) to ${ASR_ENDPOINT}`);
+  console.log(`${logPrefix} Uploading ${file.name} (${(fileBlob.size / 1024 / 1024).toFixed(2)}MB) to ${ASR_ENDPOINT}`);
   console.log(`${logPrefix} Auth header:`, authMode === 'omit' ? 'OMITTED' : token ? `Bearer (len=${token.length})` : 'MISSING');
 
-  // Signal progress start (milestone)
+  // Signal progress start
   options.onProgress?.(5);
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 min timeout
 
+    // Build headers - do NOT set Content-Type, browser sets it with boundary
     const headers: HeadersInit = {};
     if (authMode !== 'omit' && token) {
       headers['Authorization'] = `Bearer ${token}`;
-      // Do NOT set Content-Type - browser sets it with boundary for FormData
     }
+
+    options.onProgress?.(10);
 
     const response = await fetch(ASR_ENDPOINT, {
       method: 'POST',
@@ -149,19 +199,6 @@ export async function uploadToAsr(options: AsrUploadOptions): Promise<AsrUploadR
     }
 
     console.error(`${logPrefix} Fetch error:`, err);
-
-    // If auth upload failed, try a minimal no-auth probe to distinguish "network" vs "preflight/auth-header".
-    if (authMode !== 'omit') {
-      const probe = await probeAsrWithoutAuth(traceId);
-      if (probe.ok) {
-        return {
-          success: false,
-          error:
-            'Uppladdningen stoppades i webbläsaren innan POST gick igenom med Authorization. ' +
-            'Probe utan Authorization nådde backend (se console). Detta tyder på CORS/preflight för Authorization-header.',
-        };
-      }
-    }
 
     return { success: false, error: err?.message || 'Nätverksfel vid uppladdning' };
   }
