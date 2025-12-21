@@ -96,17 +96,7 @@ export function useTranscriptionPolling(
         // First try the ASR status endpoint
         const asrStatus = await pollASRStatus(meetingId);
         
-        // Check for full completion:
-        // - status must be 'completed' or 'done'
-        // - AND stage must be 'done' OR lyraStatus/sisStatus must be 'done'
-        const mainDone = asrStatus.status === 'completed' || asrStatus.status === 'done';
-        const lyraOrSisDone = asrStatus.lyraStatus === 'done' || asrStatus.sisStatus === 'done' || 
-                              asrStatus.lyraStatus === 'no_samples' || asrStatus.sisStatus === 'no_samples' ||
-                              asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
-        const stageDone = asrStatus.stage === 'done';
-        const isFullyDone = mainDone && asrStatus.transcript && (stageDone || lyraOrSisDone);
-        
-        if (isFullyDone) {
+        if ((asrStatus.status === 'completed' || asrStatus.status === 'done') && asrStatus.transcript) {
           // Per docs: ASR completed - use Lyra mirror fields (preferred) with SIS fallbacks
           console.log('✅ Transcription complete via ASR status:', meetingId);
           

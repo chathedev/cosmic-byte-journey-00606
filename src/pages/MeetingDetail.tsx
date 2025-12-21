@@ -248,26 +248,13 @@ const MeetingDetail = () => {
         }
         
         // If we get processing/transcribing status, update from uploading
-        if (asrStatus.status === 'processing' || asrStatus.stage === 'transcribing' || asrStatus.stage === 'sis_processing') {
+        if (asrStatus.status === 'processing' || asrStatus.stage === 'transcribing') {
           if (status === 'uploading') {
             setStatus('processing');
           }
         }
 
-        // Check for full completion:
-        // - status must be 'completed' or 'done'
-        // - AND stage must be 'done' (not 'sis_processing')
-        // - OR lyraStatus/sisStatus must be 'done' (not 'processing')
-        const mainDone = asrStatus.status === 'completed' || asrStatus.status === 'done';
-        const lyraOrSisDone = asrStatus.lyraStatus === 'done' || asrStatus.sisStatus === 'done' || 
-                              asrStatus.lyraStatus === 'no_samples' || asrStatus.sisStatus === 'no_samples' ||
-                              asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
-        const stageDone = asrStatus.stage === 'done';
-        
-        // Per docs: fully done when stage === 'done' OR (status done AND lyra/sis done)
-        const isFullyDone = mainDone && asrStatus.transcript && (stageDone || lyraOrSisDone);
-        
-        if (isFullyDone) {
+        if (asrStatus.status === 'completed' || asrStatus.status === 'done') {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
 
@@ -280,18 +267,6 @@ const MeetingDetail = () => {
           setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setStatus('done');
-          setStage('done');
-
-          // Log completion details
-          console.log('✅ ASR completed:', {
-            meetingId: id,
-            transcriptLength: newTranscript.length,
-            segments: asrStatus.transcriptSegments?.length || 0,
-            lyraStatus: asrStatus.lyraStatus,
-            lyraSpeakers: asrStatus.lyraSpeakers?.length || 0,
-            lyraMatches: asrStatus.lyraMatches?.length || 0,
-            speakerNames: asrStatus.speakerNames,
-          });
 
           try {
             await apiClient.updateMeeting(id, {
@@ -384,35 +359,15 @@ const MeetingDetail = () => {
     }
   };
 
-  // Handle save speaker name - per docs: PUT /meetings/:meetingId/speaker-names
-  // Backend updates meeting record and persists alias for future Lyra learning
+  // Handle save speaker name
   const handleSaveSpeakerName = useCallback(async () => {
     if (!id || !editingSpeaker || !editingSpeakerValue.trim()) return;
     
     setIsSavingSpeaker(true);
     try {
       const newNames = { ...speakerNames, [editingSpeaker]: editingSpeakerValue.trim() };
-      const response = await backendApi.saveSpeakerNames(id, newNames);
-      
-      // Use returned speakerNames from backend (may include auto-applied aliases)
-      setSpeakerNames(response.speakerNames || newNames);
-      
-      // Update lyraLearning if learning was triggered
-      if (response.sisLearning && response.sisLearning.length > 0) {
-        setLyraLearning(prev => {
-          const existing = [...prev];
-          response.sisLearning?.forEach(entry => {
-            const idx = existing.findIndex(e => e.email === entry.email);
-            if (idx >= 0) {
-              existing[idx] = entry;
-            } else {
-              existing.push(entry);
-            }
-          });
-          return existing;
-        });
-      }
-      
+      await backendApi.saveSpeakerNames(id, newNames);
+      setSpeakerNames(newNames);
       setEditingSpeaker(null);
       setEditingSpeakerValue('');
       toast({
@@ -455,35 +410,6 @@ const MeetingDetail = () => {
       setIsSavingTranscript(false);
     }
   }, [id, editedTranscript, toast]);
-
-  // Refresh Lyra/speaker data from ASR status
-  const refreshLyraData = useCallback(async () => {
-    if (!id) return;
-    
-    try {
-      const asrStatus = await pollASRStatus(id);
-      
-      // Update all Lyra/speaker data from fresh ASR status
-      if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
-        setTranscriptSegments(asrStatus.transcriptSegments);
-      }
-      setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
-      setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
-      setSpeakerNames(prev => ({
-        ...prev,
-        ...(asrStatus.speakerNames || asrStatus.lyraSpeakerNames || {})
-      }));
-      setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
-      
-      console.log('🔄 Lyra data refreshed:', {
-        speakers: asrStatus.lyraSpeakers?.length || 0,
-        matches: asrStatus.lyraMatches?.length || 0,
-        speakerNames: asrStatus.speakerNames,
-      });
-    } catch (error) {
-      console.error('Failed to refresh Lyra data:', error);
-    }
-  }, [id]);
 
   // Handle create protocol
   const handleCreateProtocol = async () => {

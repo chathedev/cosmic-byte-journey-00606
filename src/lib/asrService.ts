@@ -101,30 +101,20 @@ export interface ASRResult {
 }
 
 export interface TranscriptWord {
-  word: string;  // Backend uses 'word' not 'text'
-  text?: string; // Legacy alias
+  text: string;
   start: number;
   end: number;
   confidence?: number;
   speaker?: string;
 }
 
-// Backend transcript segment format from ASR
 export interface TranscriptSegment {
-  id?: number;
-  seek?: number;
   speakerId?: string;  // ElevenLabs uses speakerId
   speaker?: string;    // Keep for backwards compatibility
   text: string;
   start: number;
   end: number;
   confidence?: number;
-  // Whisper-style fields from backend
-  tokens?: number[];
-  temperature?: number;
-  avg_logprob?: number;
-  compression_ratio?: number;
-  no_speech_prob?: number;
   words?: TranscriptWord[];
 }
 
@@ -145,38 +135,25 @@ export type SISLearningEntry = LyraLearningEntry;
 export type ASRStage = 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error';
 
 export interface ASRStatus {
-  meetingId?: string;
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
   stage?: ASRStage; // More granular stage from backend
   progress?: number;
   transcript?: string;
   transcriptSegments?: TranscriptSegment[];
-  // Word-level timing from backend
-  words?: TranscriptWord[];
   error?: string;
   duration?: number;
-  // Backend metadata
-  engine?: string;
-  language?: string;
-  durationMs?: number;
-  wavDurationSec?: number;
-  metadata?: Record<string, any>;
-  updatedAt?: string;
   // Legacy SIS fields (still used by backend)
   sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];
   sisMatch?: SISMatch;
   sisSpeakers?: SISSpeaker[];
   sisLearning?: LyraLearningEntry[];
-  sisError?: string | null;
   // Lyra mirror fields (preferred for frontend use)
   lyraStatus?: SISStatusType;
   lyraMatches?: SISMatch[];
-  lyraMatch?: SISMatch;
   lyraSpeakers?: SISSpeaker[];
   lyraLearning?: LyraLearningEntry[];
   lyraSpeakerNames?: Record<string, string>;
-  lyraError?: string | null;
   // Unified speaker names map
   speakerNames?: Record<string, string>;
 }
@@ -383,37 +360,25 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     
     // Return both SIS and Lyra mirror fields for compatibility
     return {
-      meetingId: data.meetingId,
       status: data.status || 'queued',
       stage: data.stage as ASRStage | undefined,
       progress: data.progress,
       transcript: data.transcript,
       transcriptSegments: data.transcriptSegments,
-      words: data.words,
-      error: data.error || data.sisError || data.lyraError,
+      error: data.error,
       duration: data.duration,
-      // Backend metadata
-      engine: data.engine,
-      language: data.language,
-      durationMs: data.durationMs,
-      wavDurationSec: data.wavDurationSec,
-      metadata: data.metadata,
-      updatedAt: data.updatedAt,
       // Legacy SIS fields
       sisStatus: data.sisStatus || data.lyraStatus,
       sisMatches: data.sisMatches || data.lyraMatches || [],
       sisMatch: data.sisMatch || data.lyraMatch,
       sisSpeakers: data.sisSpeakers || data.lyraSpeakers || [],
       sisLearning: data.sisLearning || data.lyraLearning || [],
-      sisError: data.sisError,
       // Lyra mirror fields (preferred)
       lyraStatus: data.lyraStatus || data.sisStatus,
       lyraMatches: data.lyraMatches || data.sisMatches || [],
-      lyraMatch: data.lyraMatch || data.sisMatch,
       lyraSpeakers: data.lyraSpeakers || data.sisSpeakers || [],
       lyraLearning: data.lyraLearning || data.sisLearning || [],
       lyraSpeakerNames: data.lyraSpeakerNames || data.speakerNames || {},
-      lyraError: data.lyraError,
       // Unified speaker names
       speakerNames: data.speakerNames || data.lyraSpeakerNames || {},
     };
@@ -657,52 +622,44 @@ export async function waitForASRCompletion(
     const status = await pollASRStatus(meetingId);
     onProgress?.(status);
     
-    // Check for full completion:
-    // - status must be 'completed' or 'done'
-    // - AND stage must be 'done' OR lyraStatus/sisStatus must be 'done'
-    const mainDone = status.status === 'completed' || status.status === 'done';
-    const lyraOrSisDone = status.lyraStatus === 'done' || status.sisStatus === 'done' || 
-                          status.lyraStatus === 'no_samples' || status.sisStatus === 'no_samples' ||
-                          status.lyraStatus === 'disabled' || status.sisStatus === 'disabled';
-    const stageDone = status.stage === 'done';
-    const isFullyDone = mainDone && status.transcript && (stageDone || lyraOrSisDone);
-    
-    if (isFullyDone) {
-      debugLog('✅ ASR completed!');
-      if (status.lyraStatus || status.sisStatus) {
-        debugLog(`🔍 Lyra status: ${status.lyraStatus || status.sisStatus}`);
-      }
-      if (status.lyraMatch || status.sisMatch) {
-        const match = status.lyraMatch || status.sisMatch!;
-        debugLog(`🎯 Best match: ${match.sampleOwnerEmail} (${match.confidencePercent}%)${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}`);
-      }
-      return {
-        success: true,
-        transcript: status.transcript,
-        transcriptSegments: status.transcriptSegments,
-        duration: status.duration,
-        meetingId,
-        sisStatus: status.sisStatus,
-        sisMatches: status.sisMatches,
-        sisMatch: status.sisMatch,
-        sisSpeakers: status.sisSpeakers,
-      };
-    }
-    
-    if (status.status === 'error' || status.status === 'failed') {
-      debugError('❌ ASR failed:', status.error);
-      return {
-        success: false,
-        error: status.error || 'Transcription failed',
-        meetingId
-      };
-    }
-    
-    // Still processing
-    if (status.status === 'queued') {
-      debugLog('🔄 ASR status: queued');
-    } else if (status.status === 'processing') {
-      debugLog('🔄 ASR status: processing', status.stage || '', status.progress ? `${status.progress}%` : '');
+    switch (status.status) {
+      case 'queued':
+        debugLog('🔄 ASR status: queued');
+        break;
+        
+      case 'processing':
+        debugLog('🔄 ASR status: processing', status.progress ? `${status.progress}%` : '');
+        break;
+        
+      case 'completed':
+      case 'done':
+        debugLog('✅ ASR completed!');
+        if (status.sisStatus) {
+          debugLog(`🔍 SIS status: ${status.sisStatus}`);
+        }
+        if (status.sisMatch) {
+          debugLog(`🎯 Best SIS match: ${status.sisMatch.sampleOwnerEmail} (${status.sisMatch.confidencePercent}%)${status.sisMatch.speakerLabel ? ` [${status.sisMatch.speakerLabel}]` : ''}`);
+        }
+        return {
+          success: true,
+          transcript: status.transcript,
+          transcriptSegments: status.transcriptSegments,
+          duration: status.duration,
+          meetingId,
+          sisStatus: status.sisStatus,
+          sisMatches: status.sisMatches,
+          sisMatch: status.sisMatch,
+          sisSpeakers: status.sisSpeakers,
+        };
+        
+      case 'error':
+      case 'failed':
+        debugError('❌ ASR failed:', status.error);
+        return {
+          success: false,
+          error: status.error || 'Transcription failed',
+          meetingId
+        };
     }
     
     // Wait before next poll

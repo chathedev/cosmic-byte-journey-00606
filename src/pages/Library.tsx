@@ -209,30 +209,19 @@ const Library = () => {
       try {
         // First try the ASR status endpoint for real-time progress
         const asrStatus = await pollASRStatus(currentPendingId);
-
-        // Only treat as complete when the backend is FULLY done per docs:
-        // - status: done/completed
-        // - and transcript present
-        // - and either stage === done OR lyra/sis finished (done/no_samples/disabled)
-        const mainDone = asrStatus.status === 'completed' || asrStatus.status === 'done';
-        const lyraOrSisDone = asrStatus.lyraStatus === 'done' || asrStatus.sisStatus === 'done' ||
-                              asrStatus.lyraStatus === 'no_samples' || asrStatus.sisStatus === 'no_samples' ||
-                              asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
-        const stageDone = asrStatus.stage === 'done';
-        const isFullyDone = mainDone && asrStatus.transcript && (stageDone || lyraOrSisDone);
-
-        if (isFullyDone) {
+        
+        if ((asrStatus.status === 'completed' || asrStatus.status === 'done') && asrStatus.transcript) {
           // ASR completed with transcript!
           console.log('✅ Transcript found via ASR status:', asrStatus.transcript.substring(0, 100));
           transcriptionDoneRef.current = true;
           pendingMeetingIdRef.current = null;
           sessionStorage.removeItem('pendingMeeting');
           clearInterval(pollInterval);
-
+          
           // Get meeting title for email
           const currentMeeting = meetingsRef.current.find(m => m.id === currentPendingId);
           const meetingTitle = currentMeeting?.title || 'Möte';
-
+          
           // Save transcript to backend via apiClient
           try {
             await apiClient.updateMeeting(currentPendingId, {
@@ -242,7 +231,7 @@ const Library = () => {
           } catch (saveError) {
             console.error('Failed to save transcript:', saveError);
           }
-
+          
           // Send email notification using apiClient token (not Supabase session)
           console.log('📧 Attempting to send transcription email:', { userEmail: user?.email, hasUser: !!user });
           if (user?.email) {
@@ -267,18 +256,18 @@ const Library = () => {
           } else {
             console.log('📧 No user email available');
           }
-
-          setMeetings(prev => prev.map(m =>
-            m.id === currentPendingId
-              ? { ...m, transcript: asrStatus.transcript!, transcriptionStatus: 'done' as const }
+          
+          setMeetings(prev => prev.map(m => 
+            m.id === currentPendingId 
+              ? { ...m, transcript: asrStatus.transcript!, transcriptionStatus: 'done' as const } 
               : m
           ));
-
+          
           toast({
             title: 'Transkribering klar!',
             description: 'Ditt möte har transkriberats och sparats.',
           });
-
+          
           // Dispatch event for other listeners
           window.dispatchEvent(new CustomEvent('transcriptionComplete', {
             detail: { meetingId: currentPendingId, transcript: asrStatus.transcript }

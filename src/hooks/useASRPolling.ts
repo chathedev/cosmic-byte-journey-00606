@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry } from '@/lib/asrService';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -51,17 +51,7 @@ export function useASRPolling(
         setStatus(result.status);
         setProgress(result.progress);
         
-        // Check for full completion:
-        // - status must be 'completed' or 'done'
-        // - AND stage must be 'done' OR lyraStatus/sisStatus must be 'done'
-        const mainDone = result.status === 'completed' || result.status === 'done';
-        const lyraOrSisDone = result.lyraStatus === 'done' || result.sisStatus === 'done' || 
-                              result.lyraStatus === 'no_samples' || result.sisStatus === 'no_samples' ||
-                              result.lyraStatus === 'disabled' || result.sisStatus === 'disabled';
-        const stageDone = result.stage === 'done';
-        const isFullyDone = mainDone && result.transcript && (stageDone || lyraOrSisDone);
-        
-        if (isFullyDone) {
+        if (result.status === 'completed' || result.status === 'done') {
           setTranscript(result.transcript || null);
           setTranscriptSegments(result.transcriptSegments || null);
           setLyraStatus(result.lyraStatus || result.sisStatus || null);
