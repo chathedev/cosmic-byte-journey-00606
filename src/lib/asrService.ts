@@ -101,48 +101,84 @@ export interface ASRResult {
 }
 
 export interface TranscriptWord {
-  text: string;
+  word: string;  // Backend uses 'word' not 'text'
+  text?: string; // Legacy alias
   start: number;
   end: number;
   confidence?: number;
   speaker?: string;
 }
 
+// Backend transcript segment format from ASR
 export interface TranscriptSegment {
+  id?: number;
+  seek?: number;
   speakerId?: string;  // ElevenLabs uses speakerId
   speaker?: string;    // Keep for backwards compatibility
   text: string;
   start: number;
   end: number;
   confidence?: number;
+  // Whisper-style fields from backend
+  tokens?: number[];
+  temperature?: number;
+  avg_logprob?: number;
+  compression_ratio?: number;
+  no_speech_prob?: number;
   words?: TranscriptWord[];
 }
 
-// SIS Learning entry for voice training feedback
-export interface SISLearningEntry {
+// Lyra Learning entry for voice training feedback
+// Per docs: sisLearning/lyraLearning entries show when learning is applied
+export interface LyraLearningEntry {
   email: string;
   similarity: number;
+  similarityPercent?: number; // Alternative field name from some endpoints
   matchedSegments?: number;
-  updated?: boolean;
+  updated?: boolean; // Show "learning applied" badge when true
 }
+
+// Re-export for backwards compatibility
+export type SISLearningEntry = LyraLearningEntry;
 
 // Backend stage values for detailed progress tracking
 export type ASRStage = 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error';
 
 export interface ASRStatus {
+  meetingId?: string;
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
   stage?: ASRStage; // More granular stage from backend
   progress?: number;
   transcript?: string;
   transcriptSegments?: TranscriptSegment[];
+  // Word-level timing from backend
+  words?: TranscriptWord[];
   error?: string;
   duration?: number;
+  // Backend metadata
+  engine?: string;
+  language?: string;
+  durationMs?: number;
+  wavDurationSec?: number;
+  metadata?: Record<string, any>;
+  updatedAt?: string;
+  // Legacy SIS fields (still used by backend)
   sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];
   sisMatch?: SISMatch;
   sisSpeakers?: SISSpeaker[];
-  speakerNames?: Record<string, string>; // Pre-loaded speaker aliases from backend
-  sisLearning?: SISLearningEntry[]; // Voice learning results
+  sisLearning?: LyraLearningEntry[];
+  sisError?: string | null;
+  // Lyra mirror fields (preferred for frontend use)
+  lyraStatus?: SISStatusType;
+  lyraMatches?: SISMatch[];
+  lyraMatch?: SISMatch;
+  lyraSpeakers?: SISSpeaker[];
+  lyraLearning?: LyraLearningEntry[];
+  lyraSpeakerNames?: Record<string, string>;
+  lyraError?: string | null;
+  // Unified speaker names map
+  speakerNames?: Record<string, string>;
 }
 
 export interface UploadProgress {
@@ -345,20 +381,41 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       });
     }
     
+    // Return both SIS and Lyra mirror fields for compatibility
     return {
+      meetingId: data.meetingId,
       status: data.status || 'queued',
       stage: data.stage as ASRStage | undefined,
       progress: data.progress,
       transcript: data.transcript,
       transcriptSegments: data.transcriptSegments,
-      error: data.error,
+      words: data.words,
+      error: data.error || data.sisError || data.lyraError,
       duration: data.duration,
-      sisStatus: data.sisStatus,
-      sisMatches: data.sisMatches || [],
-      sisMatch: data.sisMatch,
-      sisSpeakers: data.sisSpeakers || [],
-      speakerNames: data.speakerNames || {},
-      sisLearning: data.sisLearning || [],
+      // Backend metadata
+      engine: data.engine,
+      language: data.language,
+      durationMs: data.durationMs,
+      wavDurationSec: data.wavDurationSec,
+      metadata: data.metadata,
+      updatedAt: data.updatedAt,
+      // Legacy SIS fields
+      sisStatus: data.sisStatus || data.lyraStatus,
+      sisMatches: data.sisMatches || data.lyraMatches || [],
+      sisMatch: data.sisMatch || data.lyraMatch,
+      sisSpeakers: data.sisSpeakers || data.lyraSpeakers || [],
+      sisLearning: data.sisLearning || data.lyraLearning || [],
+      sisError: data.sisError,
+      // Lyra mirror fields (preferred)
+      lyraStatus: data.lyraStatus || data.sisStatus,
+      lyraMatches: data.lyraMatches || data.sisMatches || [],
+      lyraMatch: data.lyraMatch || data.sisMatch,
+      lyraSpeakers: data.lyraSpeakers || data.sisSpeakers || [],
+      lyraLearning: data.lyraLearning || data.sisLearning || [],
+      lyraSpeakerNames: data.lyraSpeakerNames || data.speakerNames || {},
+      lyraError: data.lyraError,
+      // Unified speaker names
+      speakerNames: data.speakerNames || data.lyraSpeakerNames || {},
     };
   } catch (error: any) {
     // Network error - keep polling as queued
@@ -377,7 +434,11 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
  * - Returns sisMatches, sisSpeakers, and the same normalized speakerNames map
  * - Poll this endpoint for real-time speaker-identification progress
  */
-export async function pollSISStatus(meetingId: string): Promise<SISStatus & { speakerNames?: Record<string, string>; transcript?: string }> {
+export async function pollSISStatus(meetingId: string): Promise<SISStatus & { 
+  speakerNames?: Record<string, string>; 
+  transcript?: string;
+  lyraLearning?: LyraLearningEntry[];
+}> {
   const token = localStorage.getItem('authToken');
   const headers: HeadersInit = {
     'Content-Type': 'application/json'
@@ -431,17 +492,143 @@ export async function pollSISStatus(meetingId: string): Promise<SISStatus & { sp
     
     return {
       status: data.sisStatus || data.status || 'queued',
-      sisSpeakers: data.sisSpeakers || [],
-      sisMatches: data.sisMatches || [],
-      sisMatch: data.sisMatch,
+      sisSpeakers: data.sisSpeakers || data.lyraSpeakers || [],
+      sisMatches: data.sisMatches || data.lyraMatches || [],
+      sisMatch: data.sisMatch || data.lyraMatches?.[0],
       sisError: data.sisError,
       transcript: data.transcript,
-      speakerNames: data.speakerNames || {},
+      speakerNames: data.speakerNames || data.lyraSpeakerNames || {},
+      lyraLearning: data.lyraLearning || data.sisLearning || [],
     };
   } catch (error: any) {
     debugLog('🔍 SIS status network error');
     return {
       status: 'queued',
+    };
+  }
+}
+
+/**
+ * Poll Lyra status for real-time speaker identification progress
+ * Per docs: GET /asr/lyra-status?meetingId=<meetingId>
+ * - Returns status, sisSpeakers, sisMatches, sisMatch, sisError, transcript
+ * - Response also includes Lyra mirror fields: lyraStatus, lyraMatches, lyraSpeakers, lyraSpeakerNames, lyraLearning
+ */
+export async function pollLyraStatus(meetingId: string): Promise<{
+  status: SISStatusType;
+  lyraSpeakers: SISSpeaker[];
+  lyraMatches: SISMatch[];
+  lyraMatch?: SISMatch;
+  lyraError?: string;
+  lyraLearning: LyraLearningEntry[];
+  speakerNames: Record<string, string>;
+  transcript?: string;
+  // Legacy aliases
+  sisSpeakers: SISSpeaker[];
+  sisMatches: SISMatch[];
+  sisMatch?: SISMatch;
+}> {
+  const token = localStorage.getItem('authToken');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const response = await fetch(`${BACKEND_API_URL}/asr/lyra-status?meetingId=${encodeURIComponent(meetingId)}`, {
+      method: 'GET',
+      headers,
+    });
+
+    // 404 = job not registered yet or no Lyra data
+    if (response.status === 404) {
+      debugLog('🔍 Lyra status: 404 - no Lyra data yet');
+      return {
+        status: 'queued',
+        lyraSpeakers: [],
+        lyraMatches: [],
+        lyraLearning: [],
+        speakerNames: {},
+        sisSpeakers: [],
+        sisMatches: [],
+      };
+    }
+
+    if (!response.ok) {
+      debugLog('🔍 Lyra status check error:', response.status);
+      return {
+        status: 'queued',
+        lyraSpeakers: [],
+        lyraMatches: [],
+        lyraLearning: [],
+        speakerNames: {},
+        sisSpeakers: [],
+        sisMatches: [],
+      };
+    }
+
+    const data = await response.json();
+    const status = data.lyraStatus || data.sisStatus || data.status || 'queued';
+    debugLog('🔍 Lyra status:', status);
+    
+    const lyraSpeakers = data.lyraSpeakers || data.sisSpeakers || [];
+    const lyraMatches = data.lyraMatches || data.sisMatches || [];
+    const lyraLearning = data.lyraLearning || data.sisLearning || [];
+    const speakerNames = data.lyraSpeakerNames || data.speakerNames || {};
+    
+    // Per docs: log speaker info for debugging
+    if (lyraSpeakers.length > 0) {
+      debugLog('🗣️ Lyra speakers:', lyraSpeakers.length);
+      lyraSpeakers.forEach((speaker: SISSpeaker) => {
+        const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
+        const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
+        const nameInfo = speakerNames[speaker.label] ? ` "${speakerNames[speaker.label]}"` : '';
+        debugLog(`   - ${speaker.label}${nameInfo}: ${duration}${matchInfo}`);
+      });
+    }
+    
+    if (lyraMatches.length > 0) {
+      debugLog('🎯 Lyra matches:', lyraMatches.length);
+      lyraMatches.forEach((match: SISMatch) => {
+        const autoPersisted = match.confidencePercent >= 60 ? ' [auto-persisted]' : '';
+        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}%${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}${autoPersisted}`);
+      });
+    }
+    
+    if (lyraLearning.length > 0) {
+      debugLog('📚 Lyra learning:', lyraLearning.length);
+      lyraLearning.forEach((entry: LyraLearningEntry) => {
+        const updated = entry.updated ? ' [UPDATED]' : '';
+        debugLog(`   - ${entry.email}: ${entry.similarityPercent || Math.round((entry.similarity || 0) * 100)}%${updated}`);
+      });
+    }
+    
+    return {
+      status,
+      lyraSpeakers,
+      lyraMatches,
+      lyraMatch: lyraMatches[0],
+      lyraError: data.lyraError || data.sisError,
+      lyraLearning,
+      speakerNames,
+      transcript: data.transcript,
+      // Legacy aliases
+      sisSpeakers: lyraSpeakers,
+      sisMatches: lyraMatches,
+      sisMatch: lyraMatches[0],
+    };
+  } catch (error: any) {
+    debugLog('🔍 Lyra status network error');
+    return {
+      status: 'queued',
+      lyraSpeakers: [],
+      lyraMatches: [],
+      lyraLearning: [],
+      speakerNames: {},
+      sisSpeakers: [],
+      sisMatches: [],
     };
   }
 }
@@ -470,44 +657,52 @@ export async function waitForASRCompletion(
     const status = await pollASRStatus(meetingId);
     onProgress?.(status);
     
-    switch (status.status) {
-      case 'queued':
-        debugLog('🔄 ASR status: queued');
-        break;
-        
-      case 'processing':
-        debugLog('🔄 ASR status: processing', status.progress ? `${status.progress}%` : '');
-        break;
-        
-      case 'completed':
-      case 'done':
-        debugLog('✅ ASR completed!');
-        if (status.sisStatus) {
-          debugLog(`🔍 SIS status: ${status.sisStatus}`);
-        }
-        if (status.sisMatch) {
-          debugLog(`🎯 Best SIS match: ${status.sisMatch.sampleOwnerEmail} (${status.sisMatch.confidencePercent}%)${status.sisMatch.speakerLabel ? ` [${status.sisMatch.speakerLabel}]` : ''}`);
-        }
-        return {
-          success: true,
-          transcript: status.transcript,
-          transcriptSegments: status.transcriptSegments,
-          duration: status.duration,
-          meetingId,
-          sisStatus: status.sisStatus,
-          sisMatches: status.sisMatches,
-          sisMatch: status.sisMatch,
-          sisSpeakers: status.sisSpeakers,
-        };
-        
-      case 'error':
-      case 'failed':
-        debugError('❌ ASR failed:', status.error);
-        return {
-          success: false,
-          error: status.error || 'Transcription failed',
-          meetingId
-        };
+    // Check for full completion:
+    // - status must be 'completed' or 'done'
+    // - AND stage must be 'done' OR lyraStatus/sisStatus must be 'done'
+    const mainDone = status.status === 'completed' || status.status === 'done';
+    const lyraOrSisDone = status.lyraStatus === 'done' || status.sisStatus === 'done' || 
+                          status.lyraStatus === 'no_samples' || status.sisStatus === 'no_samples' ||
+                          status.lyraStatus === 'disabled' || status.sisStatus === 'disabled';
+    const stageDone = status.stage === 'done';
+    const isFullyDone = mainDone && status.transcript && (stageDone || lyraOrSisDone);
+    
+    if (isFullyDone) {
+      debugLog('✅ ASR completed!');
+      if (status.lyraStatus || status.sisStatus) {
+        debugLog(`🔍 Lyra status: ${status.lyraStatus || status.sisStatus}`);
+      }
+      if (status.lyraMatch || status.sisMatch) {
+        const match = status.lyraMatch || status.sisMatch!;
+        debugLog(`🎯 Best match: ${match.sampleOwnerEmail} (${match.confidencePercent}%)${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}`);
+      }
+      return {
+        success: true,
+        transcript: status.transcript,
+        transcriptSegments: status.transcriptSegments,
+        duration: status.duration,
+        meetingId,
+        sisStatus: status.sisStatus,
+        sisMatches: status.sisMatches,
+        sisMatch: status.sisMatch,
+        sisSpeakers: status.sisSpeakers,
+      };
+    }
+    
+    if (status.status === 'error' || status.status === 'failed') {
+      debugError('❌ ASR failed:', status.error);
+      return {
+        success: false,
+        error: status.error || 'Transcription failed',
+        meetingId
+      };
+    }
+    
+    // Still processing
+    if (status.status === 'queued') {
+      debugLog('🔄 ASR status: queued');
+    } else if (status.status === 'processing') {
+      debugLog('🔄 ASR status: processing', status.stage || '', status.progress ? `${status.progress}%` : '');
     }
     
     // Wait before next poll
