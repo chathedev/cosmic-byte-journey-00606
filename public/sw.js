@@ -1,6 +1,6 @@
 // Lightweight, fast SW optimized for Firebase + React
 // Cache version - increment this to force cache refresh
-const CACHE_VERSION = 'tivly-v3';
+const CACHE_VERSION = 'tivly-v4';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-512.png',
@@ -56,13 +56,15 @@ async function networkFirst(request) {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
 
-  // Bypass Service Worker entirely for ASR uploads (streamed multipart/form-data)
-  // IMPORTANT: Do not intercept, clone, or respondWith for these requests.
-  if (request.method === 'POST' && url.pathname.startsWith('/asr/')) {
+  // IMPORTANT: Never intercept non-GET requests.
+  // This prevents Service Worker involvement from breaking streamed request bodies
+  // (e.g. multipart/form-data uploads like POST /asr/*).
+  if (request.method !== 'GET') {
     return;
   }
+
+  const url = new URL(request.url);
 
   // Never intercept cross-origin (prevents SW from affecting api.tivly.se requests)
   if (url.origin !== self.location.origin) {
@@ -72,11 +74,6 @@ self.addEventListener('fetch', (event) => {
   // Never cache dev server or module transforms
   if (url.pathname.startsWith('/@vite') || url.pathname.startsWith('/src/')) {
     return; // Let browser handle normally
-  }
-
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return;
   }
 
   // Use network-first for same-origin GET assets
