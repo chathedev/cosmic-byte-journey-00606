@@ -805,7 +805,75 @@ const MeetingDetail = () => {
     return null;
   })();
 
+  // Helper to format seconds to MM:SS
+  const formatTimestamp = (seconds: number): string => {
+    if (!seconds && seconds !== 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Get display name for a speaker in segments
+  const getSegmentSpeakerName = (speakerId: string): string => {
+    if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') {
+      return 'Talare';
+    }
+    
+    // Check edited names first if in edit mode
+    const namesSource = isEditing ? editedSpeakerNames : speakerNames;
+    if (namesSource[speakerId]) {
+      return namesSource[speakerId];
+    }
+    
+    // Check lyraMatches for identified name
+    const match = lyraMatches.find(m => m.speakerLabel === speakerId);
+    if (match?.speakerName) {
+      return match.speakerName;
+    }
+    if (match?.sampleOwnerEmail) {
+      return match.sampleOwnerEmail.split('@')[0];
+    }
+    
+    // Check lyraSpeakers
+    const speaker = lyraSpeakers.find(s => s.label === speakerId);
+    if (speaker?.speakerName) {
+      return speaker.speakerName;
+    }
+    if (speaker?.bestMatchEmail) {
+      return speaker.bestMatchEmail.split('@')[0];
+    }
+    
+    // Fallback to "Talare X"
+    const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
+    if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
+    if (/^[A-Z]$/i.test(speakerId)) return `Talare ${speakerId.toUpperCase()}`;
+    
+    // Find index in unique speakers
+    const idx = uniqueSpeakers.findIndex(s => s.label === speakerId);
+    return `Talare ${idx >= 0 ? idx + 1 : 1}`;
+  };
+
+  // Get speaker color class based on speaker index
+  const getSpeakerColorClass = (speakerId: string): string => {
+    const colors = [
+      'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+      'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+      'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+      'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+      'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+      'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
+    ];
+    
+    if (!speakerId || speakerId === 'unknown') {
+      return 'bg-muted text-muted-foreground border-border';
+    }
+    
+    const idx = uniqueSpeakers.findIndex(s => s.label === speakerId);
+    return colors[idx >= 0 ? idx % colors.length : 0];
+  };
+
   const displayTranscript = isEditing ? editedTranscript : (transcript || '');
+  const hasSegments = groupedSegments.length > 0 && !isEditing;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
@@ -1097,7 +1165,35 @@ const MeetingDetail = () => {
                         className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
                         placeholder="Redigera transkriptionen..."
                       />
+                    ) : hasSegments ? (
+                      // Show segments with speaker attribution
+                      <div className="space-y-4">
+                        {groupedSegments.map((segment, idx) => {
+                          const speakerName = getSegmentSpeakerName(segment.speakerId);
+                          const colorClass = getSpeakerColorClass(segment.speakerId);
+                          const timestamp = formatTimestamp(segment.start);
+                          
+                          return (
+                            <div key={idx} className="group">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${colorClass}`}>
+                                  {speakerName}
+                                </span>
+                                {timestamp && (
+                                  <span className="text-[10px] text-muted-foreground/60 font-mono tabular-nums">
+                                    {timestamp}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-0.5">
+                                {segment.text}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
+                      // Fallback to plain text display
                       <div className="prose prose-sm max-w-none dark:prose-invert">
                         <div className="space-y-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
                           {displayTranscript}
