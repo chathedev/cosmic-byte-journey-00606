@@ -33,16 +33,30 @@ const getSpeakerFromSegment = (segment: TranscriptSegment): string => {
 };
 
 // Confidence thresholds for SIS match (per docs):
-// - >= 60% → alias is auto-persisted by backend
-// - ~0.72+ triggers voice learning (embedding rollback)
-// - 80-100% = Very strong match (high confidence, same person)
-// - 70-79% = Strong match (likely same person, shows "secure X%" badge)
-// - 60-69% = Moderate match; alias persisted but show caution
-// - 0-59% = Noise; treat as not the same person
-const SIS_AUTO_PERSIST_THRESHOLD = 0.60; // >= 60 → alias is auto-persisted
-const SIS_STRONG_THRESHOLD = 0.70; // Minimum for confident attribution
-const SIS_VERY_STRONG_THRESHOLD = 0.80; // High confidence
-const SIS_LEARNING_THRESHOLD = 0.72; // Per docs: threshold for voice learning
+// < 75%  → reject / unknown
+// 75–84% → probable
+// 85–92% → verified
+// 92%+   → strong verification
+const SIS_DISPLAY_THRESHOLD = 0.75; // 75% minimum to show identified name
+const SIS_PROBABLE_THRESHOLD = 0.75;
+const SIS_VERIFIED_THRESHOLD = 0.85;
+const SIS_STRONG_THRESHOLD = 0.92;
+
+// Human-readable verification labels
+const getVerificationLabel = (confidence: number): string => {
+  const percent = confidence * 100;
+  if (percent >= 92) return 'Stark verifiering';
+  if (percent >= 85) return 'Verifierad';
+  if (percent >= 75) return 'Trolig';
+  return 'Okänd';
+};
+
+const getVerificationColorClass = (confidence: number): string => {
+  const percent = confidence * 100;
+  if (percent >= 85) return 'text-emerald-600 dark:text-emerald-400';
+  if (percent >= 75) return 'text-blue-600 dark:text-blue-400';
+  return 'text-muted-foreground';
+};
 
 // Helper: Check if this is a single-speaker meeting with owner match (verified by context)
 // When there's only 1 speaker and they match the recording owner, treat as verified without showing raw %
@@ -171,10 +185,10 @@ export function TranscriptViewerDialog({
   // Per docs: 
   // - Use speakerLabel from sisMatches/sisSpeakers as the key
   // - Look up the human friendly alias in speakerNames
-  // - sisSpeakers[n] carries bestMatchEmail plus the similarity percent for "secure X%" badge
-  // - Check sisMatch.confidencePercent (>= 60 → alias is auto-persisted)
+  // - sisSpeakers[n] carries bestMatchEmail plus the similarity percent
+  // - Only show speakers with >= 75% confidence (display threshold)
   const sisIdentifiedSpeakers = useMemo(() => {
-    const map: Record<string, { 
+    const map: Record<string, {
       name: string; 
       email: string; 
       confidence: number; 
@@ -195,12 +209,13 @@ export function TranscriptViewerDialog({
     
     // Per docs: sisSpeakers[n].bestMatchEmail + similarity for "secure X%" badge
     // Use this to resolve labels even when speakerLabel is missing
+    // Only consider matches at or above the display threshold (75%)
     if (sisSpeakers && sisSpeakers.length > 0 && segments && segments.length > 0) {
       transcriptSpeakerIds.forEach(speakerId => {
         const speakerSegments = segments.filter(s => getSpeakerFromSegment(s) === speakerId);
         
         for (const sisSpeaker of sisSpeakers) {
-          if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_AUTO_PERSIST_THRESHOLD && sisSpeaker.bestMatchEmail) {
+          if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_DISPLAY_THRESHOLD && sisSpeaker.bestMatchEmail) {
             const hasOverlap = speakerSegments.some(seg => 
               sisSpeaker.segments?.some(sisSeg => hasTimeOverlap(seg, sisSeg))
             );
@@ -219,8 +234,8 @@ export function TranscriptViewerDialog({
                 confidencePercent,
                 speakerLabel: sisSpeaker.label,
                 hasAlias,
-                canLearn: sisSpeaker.similarity >= SIS_LEARNING_THRESHOLD,
-                isAutoPersisted: sisSpeaker.similarity >= SIS_AUTO_PERSIST_THRESHOLD,
+                canLearn: sisSpeaker.similarity >= SIS_VERIFIED_THRESHOLD,
+                isAutoPersisted: sisSpeaker.similarity >= SIS_PROBABLE_THRESHOLD,
               };
               break;
             }
@@ -230,9 +245,10 @@ export function TranscriptViewerDialog({
       
       // Per docs: If only one speaker in transcript and one in sisSpeakers, map directly
       // This handles cases where time overlap doesn't match due to segment timing differences
+      // Only consider matches at or above the display threshold (75%)
       if (Object.keys(map).length === 0 && transcriptSpeakerIds.length === 1 && sisSpeakers.length === 1) {
         const sisSpeaker = sisSpeakers[0];
-        if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_AUTO_PERSIST_THRESHOLD && sisSpeaker.bestMatchEmail) {
+        if (sisSpeaker.similarity && sisSpeaker.similarity >= SIS_DISPLAY_THRESHOLD && sisSpeaker.bestMatchEmail) {
           const matchWithName = sisMatches?.find(m => m.sampleOwnerEmail === sisSpeaker.bestMatchEmail);
           const speakerName = sisSpeaker.speakerName || matchWithName?.speakerName || sisSpeaker.bestMatchEmail.split('@')[0];
           const hasAlias = !!(sisSpeaker.speakerName || matchWithName?.speakerName);
@@ -245,8 +261,8 @@ export function TranscriptViewerDialog({
             confidencePercent,
             speakerLabel: sisSpeaker.label,
             hasAlias,
-            canLearn: sisSpeaker.similarity >= SIS_LEARNING_THRESHOLD,
-            isAutoPersisted: sisSpeaker.similarity >= SIS_AUTO_PERSIST_THRESHOLD,
+            canLearn: sisSpeaker.similarity >= SIS_VERIFIED_THRESHOLD,
+            isAutoPersisted: sisSpeaker.similarity >= SIS_PROBABLE_THRESHOLD,
           };
         }
       }
@@ -254,12 +270,13 @@ export function TranscriptViewerDialog({
     
     // Per docs: Also check sisMatches for speakerLabel mapping (fallback resolution)
     // sisMatches now carry speakerName, speakerLabel, confidencePercent, and matched transcript snippet
+    // Only consider matches at or above the display threshold (75%)
     if (sisMatches && sisMatches.length > 0) {
       sisMatches.forEach(match => {
         const label = match.speakerLabel;
-        // Per docs: use confidencePercent >= 60 for auto-persist
+        // Per docs: use confidencePercent >= 75 for display
         const confidenceRatio = match.score;
-        if (label && confidenceRatio >= SIS_AUTO_PERSIST_THRESHOLD && !map[label]) {
+        if (label && confidenceRatio >= SIS_DISPLAY_THRESHOLD && !map[label]) {
           // Per docs: use sisMatches[i]?.speakerName when rendering
           const sisSpeaker = sisSpeakers?.find(s => s.label === label || s.bestMatchEmail === match.sampleOwnerEmail);
           const speakerName = sisSpeaker?.speakerName || match.speakerName || match.sampleOwnerEmail.split('@')[0];
@@ -272,16 +289,17 @@ export function TranscriptViewerDialog({
             confidencePercent: match.confidencePercent,
             speakerLabel: label,
             hasAlias,
-            canLearn: confidenceRatio >= SIS_LEARNING_THRESHOLD,
-            isAutoPersisted: confidenceRatio >= SIS_AUTO_PERSIST_THRESHOLD,
+            canLearn: confidenceRatio >= SIS_VERIFIED_THRESHOLD,
+            isAutoPersisted: confidenceRatio >= SIS_PROBABLE_THRESHOLD,
           };
         }
       });
       
       // Per docs: Fallback - if sisMatches has no speakerLabel, use sisSpeakers.bestMatchEmail to resolve
       // Check sisSpeakers[i].bestMatchEmail to see which sample generated the alias
+      // Only consider matches at or above the display threshold (75%)
       sisMatches.forEach(match => {
-        if (!match.speakerLabel && match.score >= SIS_AUTO_PERSIST_THRESHOLD) {
+        if (!match.speakerLabel && match.score >= SIS_DISPLAY_THRESHOLD) {
           // Find sisSpeaker with matching bestMatchEmail
           const sisSpeaker = sisSpeakers?.find(s => s.bestMatchEmail === match.sampleOwnerEmail);
           if (sisSpeaker?.label && !map[sisSpeaker.label]) {
@@ -295,8 +313,8 @@ export function TranscriptViewerDialog({
               confidencePercent: match.confidencePercent,
               speakerLabel: sisSpeaker.label,
               hasAlias,
-              canLearn: match.score >= SIS_LEARNING_THRESHOLD,
-              isAutoPersisted: match.score >= SIS_AUTO_PERSIST_THRESHOLD,
+              canLearn: match.score >= SIS_VERIFIED_THRESHOLD,
+              isAutoPersisted: match.score >= SIS_PROBABLE_THRESHOLD,
             };
           }
         }
@@ -397,8 +415,10 @@ export function TranscriptViewerDialog({
     return `Talare ${speaker}`;
   }, [speakerNames, sisSpeakers, sisMatches, sisIdentifiedSpeakers]);
 
+  // Only treat speaker as identified if confidence meets display threshold (75%)
   const isSISIdentified = (speaker: string): boolean => {
-    return !!sisIdentifiedSpeakers[speaker];
+    const info = sisIdentifiedSpeakers[speaker];
+    return !!info && info.confidence >= SIS_DISPLAY_THRESHOLD;
   };
 
   const getSISConfidence = (speaker: string): number => {
@@ -702,17 +722,17 @@ export function TranscriptViewerDialog({
                       )}
                     </div>
                     <span className="text-[11px] font-medium">{displayName}</span>
-                {/* Per docs: "secure X%" confidence badge from sisSpeakers.similarity */}
+                {/* Per docs: show human-readable verification labels instead of raw % */}
                     {isIdentified && (
                       shouldShowRawPercent ? (
-                        <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}% - röstmatchning`}>
-                          <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`} />
-                          <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {Math.round(confidence * 100)}%
+                        <div className="flex items-center gap-0.5" title={getVerificationLabel(confidence)}>
+                          <Volume2 className={`w-2.5 h-2.5 ${getVerificationColorClass(confidence)}`} />
+                          <span className={`text-[9px] ${getVerificationColorClass(confidence)}`}>
+                            {getVerificationLabel(confidence)}
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-0.5" title="Verifierad - röstmatchning">
+                        <div className="flex items-center gap-0.5" title="Verifierad">
                           <Volume2 className="w-2.5 h-2.5 text-emerald-600" />
                         </div>
                       )
@@ -810,18 +830,14 @@ export function TranscriptViewerDialog({
 
                               {showSpeaker && isIdentified && (
                                 shouldShowRawPercent ? (
-                                  <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}%`}>
+                                  <div className="flex items-center gap-0.5" title={getVerificationLabel(confidence)}>
                                     <Volume2
-                                      className={`w-2.5 h-2.5 ${
-                                        confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-500" : "text-amber-500"
-                                      }`}
+                                      className={`w-2.5 h-2.5 ${getVerificationColorClass(confidence)}`}
                                     />
                                     <span
-                                      className={`text-[9px] ${
-                                        confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-600" : "text-amber-600"
-                                      }`}
+                                      className={`text-[9px] ${getVerificationColorClass(confidence)}`}
                                     >
-                                      {Math.round(confidence * 100)}%
+                                      {getVerificationLabel(confidence)}
                                     </span>
                                   </div>
                                 ) : (
