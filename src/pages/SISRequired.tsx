@@ -10,8 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MIN_RECORDING_TIME = 10;
-const MAX_RECORDING_TIME = 30;
+const MIN_RECORDING_TIME = 20; // 20 seconds minimum for ~220-260 words
+const MAX_RECORDING_TIME = 90; // 90 seconds maximum
 
 type Step = 'intro' | 'name' | 'tips' | 'record' | 'review' | 'uploading' | 'success';
 
@@ -79,7 +79,12 @@ export default function SISRequired() {
 
   const companyName = enterpriseMembership?.company?.name || 'Enterprise';
 
-  const sampleText = `Hej, jag heter ${speakerName || '[ditt namn]'} och arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen. Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt.`;
+  // ~220-260 words for optimal voice sample quality
+  const sampleText = `Hej, jag heter ${speakerName || '[ditt namn]'} och arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen och gå igenom vad vi åstadkommit sedan förra mötet.
+
+Jag vill gärna dela med mig av mina tankar kring detta projekt. Det är viktigt att vi alla är överens om nästa steg framåt. Vi har sett goda resultat hittills och jag tror att vi kan nå våra mål om vi fortsätter på samma sätt.
+
+Sammanfattningsvis tycker jag att vi har gjort stora framsteg denna vecka. Låt oss boka in ett uppföljningsmöte nästa vecka för att gå igenom resultaten i detalj. Det finns några utmaningar vi behöver adressera, men jag är övertygad om att vi kan lösa dem tillsammans. Tack för era insatser och engagemang i projektet.`;
 
   // Save state whenever step or name changes
   useEffect(() => {
