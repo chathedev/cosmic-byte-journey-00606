@@ -79,6 +79,15 @@ const MeetingDetail = () => {
   const [editedTranscript, setEditedTranscript] = useState('');
   const [isSavingTranscript, setIsSavingTranscript] = useState(false);
 
+  // Speaker identification UX thresholds (per docs)
+  const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
+  const getSISVerificationLabel = (percent: number) => {
+    if (percent >= 92) return 'Stark verifiering';
+    if (percent >= 85) return 'Verifierad';
+    if (percent >= 75) return 'Trolig';
+    return 'Okänd';
+  };
+
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
 
@@ -434,12 +443,18 @@ const MeetingDetail = () => {
   // Handle save transcript
   const handleSaveTranscript = useCallback(async () => {
     if (!id || !editedTranscript.trim()) return;
-    
+
     setIsSavingTranscript(true);
     try {
-      await apiClient.updateMeeting(id, { transcript: editedTranscript.trim() });
-      setTranscript(editedTranscript.trim());
+      const nextTranscript = editedTranscript.trim();
+      await apiClient.updateMeeting(id, { transcript: nextTranscript });
+
+      setTranscript(nextTranscript);
+      setMeeting((prev) =>
+        prev ? { ...prev, transcript: nextTranscript, updatedAt: new Date().toISOString() } : prev
+      );
       setIsEditingTranscript(false);
+
       toast({
         title: 'Transkription sparad',
         description: 'Dina ändringar har sparats.',
@@ -455,6 +470,37 @@ const MeetingDetail = () => {
       setIsSavingTranscript(false);
     }
   }, [id, editedTranscript, toast]);
+
+  const handleResetTranscriptFromASR = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const asrStatus = await pollASRStatus(id);
+      const asrTranscript = (asrStatus.transcript || '').trim();
+
+      if (!asrTranscript) {
+        toast({
+          title: 'Ingen ASR-transkription',
+          description: 'Det finns ingen automatisk version att återställa från ännu.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setEditedTranscript(asrTranscript);
+      toast({
+        title: 'Återställd från ASR',
+        description: 'Spara för att använda den automatiska versionen.',
+      });
+    } catch (error) {
+      console.error('Failed to reset transcript from ASR:', error);
+      toast({
+        title: 'Fel',
+        description: 'Kunde inte hämta ASR-transkriptionen.',
+        variant: 'destructive',
+      });
+    }
+  }, [id, toast]);
 
   // Refresh Lyra/speaker data from ASR status
   const refreshLyraData = useCallback(async () => {
@@ -551,16 +597,21 @@ const MeetingDetail = () => {
       m.speakerLabel === speakerId || 
       m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
     );
-    if (match?.speakerName) return match.speakerName;
-    if (match?.sampleOwnerEmail) return match.sampleOwnerEmail.split('@')[0];
+    if (match && match.confidencePercent >= SIS_DISPLAY_THRESHOLD_PERCENT) {
+      if (match.speakerName) return match.speakerName;
+      if (match.sampleOwnerEmail) return match.sampleOwnerEmail.split('@')[0];
+    }
     
     // 3. Check lyraSpeakers for speakerName or bestMatchEmail
     const speaker = lyraSpeakers.find(s => 
       s.label === speakerId || 
       s.label?.toLowerCase() === speakerId.toLowerCase()
     );
-    if (speaker?.speakerName) return speaker.speakerName;
-    if (speaker?.bestMatchEmail) return speaker.bestMatchEmail.split('@')[0];
+    const speakerConfidencePercent = speaker?.similarity != null ? Math.round(speaker.similarity * 100) : 0;
+    if (speaker?.bestMatchEmail && speakerConfidencePercent >= SIS_DISPLAY_THRESHOLD_PERCENT) {
+      if (speaker.speakerName) return speaker.speakerName;
+      return speaker.bestMatchEmail.split('@')[0];
+    }
     
     // 4. Fallback to Talare X format for speaker_X patterns
     const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
@@ -593,16 +644,34 @@ const MeetingDetail = () => {
     return null;
   }, [lyraMatches, lyraSpeakers]);
 
-  // Check if speaker is identified via Lyra
+  // Check if speaker is identified via Lyra (confidence buckets per docs)
   const isSpeakerIdentified = useCallback((speakerId: string): boolean => {
+    const ownerEmail = user?.email?.toLowerCase();
+
+    // Single speaker + same owner email: treat as verified-by-context
+    if (ownerEmail) {
+      if (lyraMatches.length === 1) {
+        const m = lyraMatches[0];
+        if ((m.speakerLabel || '').toLowerCase() === speakerId.toLowerCase() && (m.sampleOwnerEmail || '').toLowerCase() === ownerEmail) {
+          return true;
+        }
+      }
+      if (lyraSpeakers.length === 1) {
+        const s = lyraSpeakers[0];
+        if ((s.label || '').toLowerCase() === speakerId.toLowerCase() && (s.bestMatchEmail || '').toLowerCase() === ownerEmail) {
+          return true;
+        }
+      }
+    }
+
     return lyraMatches.some(m => 
-      m.speakerLabel === speakerId || 
-      m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
-    ) || lyraSpeakers.some(s => 
-      (s.label === speakerId || s.label?.toLowerCase() === speakerId.toLowerCase()) && 
-      s.bestMatchEmail
-    );
-  }, [lyraMatches, lyraSpeakers]);
+      (m.speakerLabel === speakerId || m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()) &&
+      (m.confidencePercent ?? 0) >= SIS_DISPLAY_THRESHOLD_PERCENT
+    ) || lyraSpeakers.some(s => {
+      const p = s.similarity != null ? Math.round(s.similarity * 100) : 0;
+      return (s.label === speakerId || s.label?.toLowerCase() === speakerId.toLowerCase()) && !!s.bestMatchEmail && p >= SIS_DISPLAY_THRESHOLD_PERCENT;
+    });
+  }, [lyraMatches, lyraSpeakers, user?.email]);
 
   // If showing protocol generator
   if (selectedProtocol) {
@@ -879,55 +948,54 @@ const MeetingDetail = () => {
                                 processedLabels.add(speaker.label);
                               }
                               
-                              return uniqueSpeakers.map((speaker, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-3 bg-background/60 backdrop-blur-sm rounded-lg p-3 border border-border/30 hover:border-primary/30 transition-colors"
-                                >
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-                                    speaker.confidencePercent >= 80 
-                                      ? 'bg-green-500/20 text-green-700 dark:text-green-400 ring-2 ring-green-500/30' 
-                                      : speaker.confidencePercent >= 60 
-                                        ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 ring-2 ring-blue-500/30'
-                                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 ring-2 ring-amber-500/30'
-                                  }`}>
-                                    {speaker.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <p className="text-sm font-medium truncate">{speaker.name}</p>
-                                      {speaker.learned && (
-                                        <span title="Lyra lärde sig från denna talare">
-                                          <Sparkles className="w-3 h-3 text-purple-500 flex-shrink-0" />
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className={`text-xs font-medium ${
-                                        speaker.confidencePercent >= 80 
-                                          ? 'text-green-600 dark:text-green-400' 
-                                          : speaker.confidencePercent >= 60 
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : 'text-amber-600 dark:text-amber-400'
-                                      }`}>
-                                        {speaker.confidencePercent}% träffsäkerhet
-                                      </span>
-                                      {speaker.durationSeconds != null && speaker.durationSeconds > 0 && (
-                                        <span className="text-xs text-muted-foreground">
-                                          • {Math.round(speaker.durationSeconds)}s
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <UserCheck className={`w-4 h-4 ${
-                                    speaker.confidencePercent >= 80 
-                                      ? 'text-green-500' 
-                                      : speaker.confidencePercent >= 60 
-                                        ? 'text-blue-500'
-                                        : 'text-amber-500'
-                                  }`} />
-                                </div>
-                              ));
+                               const displaySpeakers = uniqueSpeakers.filter((s) => {
+                                 // Single speaker + same owner email: verified by context
+                                 const ownerEmail = user?.email?.toLowerCase();
+                                 const contextVerified = !!ownerEmail && uniqueSpeakers.length === 1 && (s.email || '').toLowerCase() === ownerEmail;
+                                 return contextVerified || s.confidencePercent >= SIS_DISPLAY_THRESHOLD_PERCENT;
+                               });
+                               
+                               return displaySpeakers.map((speaker, idx) => {
+                                 const ownerEmail = user?.email?.toLowerCase();
+                                 const contextVerified = !!ownerEmail && displaySpeakers.length === 1 && (speaker.email || '').toLowerCase() === ownerEmail;
+                                 const label = contextVerified ? 'Verifierad (kontext)' : getSISVerificationLabel(speaker.confidencePercent);
+
+                                 const tint = contextVerified || speaker.confidencePercent >= 85
+                                   ? 'bg-green-500/20 text-green-700 dark:text-green-400 ring-2 ring-green-500/30'
+                                   : 'bg-blue-500/20 text-blue-700 dark:text-blue-400 ring-2 ring-blue-500/30';
+
+                                 return (
+                                   <div
+                                     key={idx}
+                                     className="flex items-center gap-3 bg-background/60 backdrop-blur-sm rounded-lg p-3 border border-border/30 hover:border-primary/30 transition-colors"
+                                   >
+                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${tint}`}>
+                                       {speaker.name.charAt(0).toUpperCase()}
+                                     </div>
+                                     <div className="flex-1 min-w-0">
+                                       <div className="flex items-center gap-2">
+                                         <p className="text-sm font-medium truncate">{speaker.name}</p>
+                                         {speaker.learned && (
+                                           <span title="Lyra lärde sig från denna talare">
+                                             <Sparkles className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                                           </span>
+                                         )}
+                                       </div>
+                                       <div className="flex items-center gap-2 mt-0.5">
+                                         <span className="text-xs font-medium text-muted-foreground">
+                                           {label}
+                                         </span>
+                                         {speaker.durationSeconds != null && speaker.durationSeconds > 0 && (
+                                           <span className="text-xs text-muted-foreground">
+                                             • {Math.round(speaker.durationSeconds)}s
+                                           </span>
+                                         )}
+                                       </div>
+                                     </div>
+                                     <UserCheck className={`w-4 h-4 ${contextVerified || speaker.confidencePercent >= 85 ? 'text-green-500' : 'text-blue-500'}`} />
+                                   </div>
+                                 );
+                               });
                             })()}
                           </div>
                         </motion.div>
@@ -977,6 +1045,14 @@ const MeetingDetail = () => {
                               Avbryt
                             </Button>
                             <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleResetTranscriptFromASR}
+                              disabled={isSavingTranscript}
+                            >
+                              Återställ från ASR
+                            </Button>
+                            <Button
                               size="sm"
                               onClick={handleSaveTranscript}
                               disabled={isSavingTranscript || !editedTranscript.trim()}
@@ -991,143 +1067,146 @@ const MeetingDetail = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-muted/30 rounded-xl p-6 max-h-[500px] overflow-y-auto">
-                          {groupedSegments.length > 0 ? (
-                            <div className="space-y-4">
-                              {groupedSegments.map((segment, idx) => {
-                                const speakerName = getSpeakerDisplayName(segment.speakerId);
-                                const isIdentified = isSpeakerIdentified(segment.speakerId);
-                                const confidence = getSpeakerConfidence(segment.speakerId);
-                                const isEditing = editingSpeaker === segment.speakerId;
-                                
-                                return (
-                                  <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                                    className="flex gap-3 group"
-                                  >
-                                    {speakerName ? (
-                                      <div className="flex-shrink-0">
-                                        <div className={`w-9 h-9 rounded-full ${
-                                          isIdentified 
-                                            ? (confidence && confidence >= 80 
-                                                ? 'bg-green-500' 
-                                                : confidence && confidence >= 60 
-                                                  ? 'bg-blue-500' 
-                                                  : 'bg-amber-500')
-                                            : getSpeakerColor(segment.speakerId)
-                                        } flex items-center justify-center text-white text-sm font-bold shadow-md ring-2 ring-background`}>
-                                          {speakerName.charAt(0).toUpperCase()}
+                        <div className="bg-muted/30 rounded-xl p-6 max-h-[500px] overflow-y-auto space-y-4">
+                          <motion.p 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.5 }}
+                            className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
+                          >
+                            {transcript}
+                          </motion.p>
+
+                          {groupedSegments.length > 0 && (
+                            <details className="rounded-lg border border-border/40 bg-background/40 p-4">
+                              <summary className="cursor-pointer text-sm font-medium text-foreground/90">
+                                Visa talarsegment
+                              </summary>
+                              <div className="mt-4 space-y-4">
+                                {groupedSegments.map((segment, idx) => {
+                                  const speakerName = getSpeakerDisplayName(segment.speakerId);
+                                  const isIdentified = isSpeakerIdentified(segment.speakerId);
+                                  const confidence = getSpeakerConfidence(segment.speakerId);
+                                  const isEditing = editingSpeaker === segment.speakerId;
+
+                                  const badgeClass = confidence != null && confidence >= 92
+                                    ? 'text-green-600 border-green-500/30 bg-green-500/10'
+                                    : confidence != null && confidence >= 85
+                                      ? 'text-green-600 border-green-500/30 bg-green-500/10'
+                                      : 'text-blue-600 border-blue-500/30 bg-blue-500/10';
+
+                                  return (
+                                    <motion.div
+                                      key={idx}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                                      className="flex gap-3 group"
+                                    >
+                                      {speakerName ? (
+                                        <div className="flex-shrink-0">
+                                          <div className={`w-9 h-9 rounded-full ${
+                                            isIdentified 
+                                              ? (confidence && confidence >= 85 
+                                                  ? 'bg-green-500' 
+                                                  : 'bg-blue-500')
+                                              : getSpeakerColor(segment.speakerId)
+                                          } flex items-center justify-center text-white text-sm font-bold shadow-md ring-2 ring-background`}>
+                                            {speakerName.charAt(0).toUpperCase()}
+                                          </div>
                                         </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex-shrink-0">
-                                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-                                          <Volume2 className="w-4 h-4 text-muted-foreground" />
+                                      ) : (
+                                        <div className="flex-shrink-0">
+                                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+                                            <Volume2 className="w-4 h-4 text-muted-foreground" />
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                        {isEditing ? (
-                                          <div className="flex items-center gap-2 flex-1">
-                                            <Input
-                                              value={editingSpeakerValue}
-                                              onChange={(e) => setEditingSpeakerValue(e.target.value)}
-                                              className="h-7 text-sm w-40"
-                                              placeholder="Ange namn eller e-post..."
-                                              autoFocus
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleSaveSpeakerName();
-                                                if (e.key === 'Escape') {
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                          {isEditing ? (
+                                            <div className="flex items-center gap-2 flex-1">
+                                              <Input
+                                                value={editingSpeakerValue}
+                                                onChange={(e) => setEditingSpeakerValue(e.target.value)}
+                                                className="h-7 text-sm w-40"
+                                                placeholder="Ange namn eller e-post..."
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleSaveSpeakerName();
+                                                  if (e.key === 'Escape') {
+                                                    setEditingSpeaker(null);
+                                                    setEditingSpeakerValue('');
+                                                  }
+                                                }}
+                                              />
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 w-7 p-0"
+                                                onClick={handleSaveSpeakerName}
+                                                disabled={isSavingSpeaker}
+                                              >
+                                                {isSavingSpeaker ? (
+                                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                  <Save className="w-3 h-3" />
+                                                )}
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 w-7 p-0"
+                                                onClick={() => {
                                                   setEditingSpeaker(null);
                                                   setEditingSpeakerValue('');
-                                                }
-                                              }}
-                                            />
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-7 w-7 p-0"
-                                              onClick={handleSaveSpeakerName}
-                                              disabled={isSavingSpeaker}
-                                            >
-                                              {isSavingSpeaker ? (
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                              ) : (
-                                                <Save className="w-3 h-3" />
-                                              )}
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-7 w-7 p-0"
-                                              onClick={() => {
-                                                setEditingSpeaker(null);
-                                                setEditingSpeakerValue('');
-                                              }}
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </Button>
-                                          </div>
-                                        ) : (
-                                          <>
-                                            <span className="text-sm font-semibold text-foreground">
-                                              {speakerName || `Talare ${idx + 1}`}
-                                            </span>
-                                            {isIdentified && confidence != null && (
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`text-[10px] px-1.5 py-0 h-4 ${
-                                                  confidence >= 80 
-                                                    ? 'text-green-600 border-green-500/30 bg-green-500/10' 
-                                                    : confidence >= 60 
-                                                      ? 'text-blue-600 border-blue-500/30 bg-blue-500/10'
-                                                      : 'text-amber-600 border-amber-500/30 bg-amber-500/10'
-                                                }`}
+                                                }}
                                               >
-                                                {confidence}%
-                                              </Badge>
-                                            )}
-                                            {isIdentified && !confidence && (
-                                              <UserCheck className="w-3.5 h-3.5 text-green-500" />
-                                            )}
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
-                                              onClick={() => {
-                                                setEditingSpeaker(segment.speakerId);
-                                                setEditingSpeakerValue(speakerName || '');
-                                              }}
-                                            >
-                                              <Pencil className="w-3 h-3" />
-                                            </Button>
-                                          </>
-                                        )}
-                                        <span className="text-xs text-muted-foreground ml-auto">
-                                          {formatTime(segment.start)}
-                                        </span>
+                                                <X className="w-3 h-3" />
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <span className="text-sm font-semibold text-foreground">
+                                                {speakerName || `Talare ${idx + 1}`}
+                                              </span>
+                                              {isIdentified && confidence != null && (
+                                                <Badge
+                                                  variant="outline"
+                                                  className={`text-[10px] px-1.5 py-0 h-4 ${badgeClass}`}
+                                                >
+                                                  {getSISVerificationLabel(confidence)}
+                                                </Badge>
+                                              )}
+                                              {isIdentified && confidence == null && (
+                                                <UserCheck className="w-3.5 h-3.5 text-green-500" />
+                                              )}
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                                                onClick={() => {
+                                                  setEditingSpeaker(segment.speakerId);
+                                                  setEditingSpeakerValue(speakerName || '');
+                                                }}
+                                              >
+                                                <Pencil className="w-3 h-3" />
+                                              </Button>
+                                            </>
+                                          )}
+                                          <span className="text-xs text-muted-foreground ml-auto">
+                                            {formatTime(segment.start)}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed bg-background/50 rounded-lg p-3 border border-border/30">
+                                          {segment.text}
+                                        </p>
                                       </div>
-                                      <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed bg-background/50 rounded-lg p-3 border border-border/30">
-                                        {segment.text}
-                                      </p>
-                                    </div>
-                                  </motion.div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <motion.p 
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.5 }}
-                              className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
-                            >
-                              {transcript}
-                            </motion.p>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            </details>
                           )}
                         </div>
                       )}
