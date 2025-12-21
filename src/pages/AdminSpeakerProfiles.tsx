@@ -86,12 +86,14 @@ const AdminSpeakerProfiles = () => {
   }, [selectedCompanyId]);
 
   const handleLink = async () => {
-    if (!linkingProfile || !linkEmail.trim()) return;
+    if (!linkingProfile || !linkEmail.trim() || !selectedCompanyId) return;
     
     setIsLinking(true);
     try {
+      // Use selectedCompanyId from state - more reliable than profile.companyId
+      const companyId = linkingProfile.companyId || selectedCompanyId;
       await backendApi.linkSpeakerProfile(
-        linkingProfile.companyId || '',
+        companyId,
         linkingProfile.name,
         linkEmail.trim()
       );
@@ -117,8 +119,12 @@ const AdminSpeakerProfiles = () => {
   };
 
   const handleUnlink = async (profile: SpeakerProfile) => {
+    if (!selectedCompanyId) return;
+    
     try {
-      await backendApi.unlinkSpeakerProfile(profile.companyId || '', profile.name);
+      // Use selectedCompanyId from state - more reliable than profile.companyId
+      const companyId = profile.companyId || selectedCompanyId;
+      await backendApi.unlinkSpeakerProfile(companyId, profile.name);
       
       toast({
         title: 'Länk borttagen',
@@ -136,11 +142,13 @@ const AdminSpeakerProfiles = () => {
   };
 
   const handleDelete = async () => {
-    if (!deletingProfile) return;
+    if (!deletingProfile || !selectedCompanyId) return;
     
     setIsDeleting(true);
     try {
-      await backendApi.deleteSpeakerProfile(deletingProfile.companyId || '', deletingProfile.name);
+      // Use selectedCompanyId from state - more reliable than profile.companyId
+      const companyId = deletingProfile.companyId || selectedCompanyId;
+      await backendApi.deleteSpeakerProfile(companyId, deletingProfile.name);
       
       toast({
         title: 'Profil borttagen',
