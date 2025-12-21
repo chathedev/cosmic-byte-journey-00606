@@ -2,6 +2,7 @@
 // Uploads happen in background while user is redirected to library
 
 import { debugLog, debugError } from './debugLogger';
+import { applyProxyHeadersToXhr, getAsrTranscribeTarget } from './asrTranscribeGateway';
 
 const BACKEND_API_URL = 'https://api.tivly.se';
 
@@ -105,12 +106,16 @@ async function executeUpload(meetingId: string): Promise<void> {
 
   debugLog('🚀 Background upload starting:', { meetingId, traceId, size: upload.file.size, type: upload.file.type });
 
+  const token = localStorage.getItem('authToken');
+  const transcribeTarget = getAsrTranscribeTarget(upload.file.size);
+
   const formData = new FormData();
   formData.append('audio', upload.file, upload.file.name);
   formData.append('meetingId', meetingId);
   formData.append('language', upload.language);
-
-  const token = localStorage.getItem('authToken');
+  if (transcribeTarget.useProxy && token) {
+    formData.append('backendAuthToken', token);
+  }
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -199,10 +204,12 @@ async function executeUpload(meetingId: string): Promise<void> {
         window.clearInterval(watchdog);
       });
 
-      xhr.open('POST', `${BACKEND_API_URL}/asr/transcribe`);
+      xhr.open('POST', transcribeTarget.url);
       xhr.timeout = MAX_TOTAL_MS;
 
-      if (token) {
+      if (transcribeTarget.useProxy) {
+        applyProxyHeadersToXhr(xhr);
+      } else if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
 

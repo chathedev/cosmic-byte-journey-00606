@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { SubscribeDialog } from "./SubscribeDialog";
+import { applyProxyHeadersToXhr, getAsrTranscribeTarget } from "@/lib/asrTranscribeGateway";
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -166,16 +167,25 @@ export const DigitalMeetingDialog = ({
 
     const traceId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+    const transcribeTarget = getAsrTranscribeTarget(file.size);
+
     try {
       // Step 1: POST audio to /asr/transcribe - backend starts transcription and returns server-generated meetingId
       const formData = new FormData();
       formData.append('audio', file, file.name);
       formData.append('language', languageCode);
       formData.append('title', meetingTitle);
-      // Safe “backend-visible” trace without triggering CORS preflight headers
       formData.append('traceId', traceId);
 
-      console.log('📤 Step 1: Uploading to /asr/transcribe (XHR)...', { traceId });
+      // For proxy uploads we pass the external auth token in the body (never log it)
+      if (transcribeTarget.useProxy) {
+        formData.append('backendAuthToken', token);
+      }
+
+      console.log('📤 Step 1: Uploading to /asr/transcribe (XHR)...', {
+        traceId,
+        via: transcribeTarget.useProxy ? 'proxy' : 'direct',
+      });
 
       const transcribeResult = await new Promise<any>((resolve, reject) => {
         const STALL_MS = 120000; // 2 min without byte progress
@@ -266,11 +276,15 @@ export const DigitalMeetingDialog = ({
           window.clearInterval(watchdog);
         });
 
-        xhr.open('POST', 'https://api.tivly.se/asr/transcribe');
+        xhr.open('POST', transcribeTarget.url);
         xhr.timeout = MAX_TOTAL_MS;
 
-        // Bearer auth (same token as rest of app)
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        if (transcribeTarget.useProxy) {
+          applyProxyHeadersToXhr(xhr);
+        } else {
+          // Bearer auth (same token as rest of app)
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
 
         // Do NOT set Content-Type manually for FormData
         xhr.send(formData);
