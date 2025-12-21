@@ -58,6 +58,12 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Bypass Service Worker entirely for ASR uploads (streamed multipart/form-data)
+  // IMPORTANT: Do not intercept, clone, or respondWith for these requests.
+  if (request.method === 'POST' && url.pathname.startsWith('/asr/')) {
+    return;
+  }
+
   // Never intercept cross-origin (prevents SW from affecting api.tivly.se requests)
   if (url.origin !== self.location.origin) {
     return;
