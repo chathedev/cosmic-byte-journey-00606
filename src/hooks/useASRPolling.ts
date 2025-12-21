@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment } from '@/lib/asrService';
 
 const POLL_INTERVAL_MS = 3000;
 
 interface UseASRPollingOptions {
-  onComplete?: (transcript: string, lyraMatches?: SISMatch[], lyraMatch?: SISMatch, lyraSpeakers?: SISSpeaker[]) => void;
+  onComplete?: (transcript: string, sisMatches?: SISMatch[], sisMatch?: SISMatch, sisSpeakers?: SISSpeaker[]) => void;
   onError?: (error: string) => void;
 }
 
@@ -18,12 +18,10 @@ export function useASRPolling(
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
-  const [lyraStatus, setLyraStatus] = useState<SISStatusType | null>(null);
-  const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
-  const [lyraMatch, setLyraMatch] = useState<SISMatch | null>(null);
-  const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
-  const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
-  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [sisStatus, setSisStatus] = useState<SISStatusType | null>(null);
+  const [sisMatches, setSisMatches] = useState<SISMatch[]>([]);
+  const [sisMatch, setSisMatch] = useState<SISMatch | null>(null);
+  const [sisSpeakers, setSisSpeakers] = useState<SISSpeaker[]>([]);
   
   const pollingRef = useRef(false);
   const meetingIdRef = useRef(meetingId);
@@ -54,34 +52,31 @@ export function useASRPolling(
         if (result.status === 'completed' || result.status === 'done') {
           setTranscript(result.transcript || null);
           setTranscriptSegments(result.transcriptSegments || null);
-          setLyraStatus(result.lyraStatus || result.sisStatus || null);
-          setLyraMatches(result.lyraMatches || result.sisMatches || []);
-          setLyraMatch(result.lyraMatches?.[0] || result.sisMatch || null);
-          setLyraSpeakers(result.lyraSpeakers || result.sisSpeakers || []);
-          setLyraLearning(result.lyraLearning || result.sisLearning || []);
-          setSpeakerNames(result.lyraSpeakerNames || result.speakerNames || {});
+          setSisStatus(result.sisStatus || null);
+          setSisMatches(result.sisMatches || []);
+          setSisMatch(result.sisMatch || null);
+          setSisSpeakers(result.sisSpeakers || []);
           stopPolling();
           
-          // Log Lyra results
-          if (result.lyraStatus || result.sisStatus) {
-            console.log(`🔍 Lyra status: ${result.lyraStatus || result.sisStatus}`);
+          // Log SIS results
+          if (result.sisStatus) {
+            console.log(`🔍 SIS status: ${result.sisStatus}`);
           }
-          const speakers = result.lyraSpeakers || result.sisSpeakers || [];
-          if (speakers.length > 0) {
-            console.log(`🗣️ Lyra speakers: ${speakers.length}`);
-            speakers.forEach(speaker => {
+          if (result.sisSpeakers && result.sisSpeakers.length > 0) {
+            console.log(`🗣️ SIS speakers: ${result.sisSpeakers.length}`);
+            result.sisSpeakers.forEach(speaker => {
               const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
               const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
-              console.log(`   - ${speaker.label}: ${duration}${matchInfo}`);
+              const matchCount = speaker.matches?.length ? ` [${speaker.matches.length} sample(s)]` : '';
+              console.log(`   - ${speaker.label}: ${duration}${matchInfo}${matchCount}`);
             });
           }
-          const matches = result.lyraMatches || result.sisMatches || [];
-          if (matches[0]) {
-            const match = matches[0];
-            console.log(`🎯 Best Lyra match: ${match.sampleOwnerEmail} (${match.confidencePercent}%)`);
+          if (result.sisMatch) {
+            const wordsInfo = result.sisMatch.matchedWords != null ? `(${result.sisMatch.matchedWords} words)` : '';
+            console.log(`🎯 Best SIS match: ${result.sisMatch.sampleOwnerEmail} (${result.sisMatch.confidencePercent}%) ${wordsInfo}${result.sisMatch.speakerLabel ? ` [${result.sisMatch.speakerLabel}]` : ''}`);
           }
           
-          options.onComplete?.(result.transcript || '', matches, matches[0], speakers);
+          options.onComplete?.(result.transcript || '', result.sisMatches, result.sisMatch, result.sisSpeakers);
           return;
         }
         
@@ -93,12 +88,15 @@ export function useASRPolling(
         }
       } catch (e: any) {
         console.error('Polling error:', e);
+        // Continue polling on network errors
       }
       
+      // Wait before next poll
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
     }
   }, [options, stopPolling]);
 
+  // Auto-start polling when meetingId changes
   useEffect(() => {
     if (meetingId) {
       startPolling(meetingId);
@@ -118,18 +116,11 @@ export function useASRPolling(
     transcriptSegments,
     error,
     isPolling,
-    lyraStatus,
-    lyraMatches,
-    lyraMatch,
-    lyraSpeakers,
-    lyraLearning,
-    speakerNames,
+    sisStatus,
+    sisMatches,
+    sisMatch,
+    sisSpeakers,
     stopPolling,
     startPolling,
-    // Legacy aliases for backwards compatibility
-    sisStatus: lyraStatus,
-    sisMatches: lyraMatches,
-    sisMatch: lyraMatch,
-    sisSpeakers: lyraSpeakers,
   };
 }

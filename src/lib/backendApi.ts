@@ -1,14 +1,13 @@
-import { LyraLearningEntry, SISLearningEntry } from './asrService';
+import { SISLearningEntry } from './asrService';
 
 const BACKEND_URL = 'https://api.tivly.se';
 
 // Re-export for convenience
-export type { LyraLearningEntry, SISLearningEntry };
+export type { SISLearningEntry };
 
 export interface SpeakerNamesResponse {
   speakerNames: Record<string, string>;
-  sisLearning?: LyraLearningEntry[];
-  lyraLearning?: LyraLearningEntry[];
+  sisLearning?: SISLearningEntry[];
 }
 
 export interface DashboardData {
@@ -352,11 +351,9 @@ export const backendApi = {
     return response.json();
   },
 
-  // Speaker Names Management - Lyra Voice Learning Integration
+  // Speaker Names Management - Voice Learning Integration
   // Per docs: PUT /meetings/:meetingId/speaker-names with { speakerNames: { label: name } }
-  // Backend validates, updates meeting record, associates with Lyra voices, persists aliases
-  // If a user manually labels a speaker with a name that uniquely matches an existing Lyra alias,
-  // Lyra will associate that label to the member for future meetings and learning.
+  // Backend validates, updates meeting record, associates with SIS voices, persists aliases
   async saveSpeakerNames(meetingId: string, speakerNames: Record<string, string>): Promise<SpeakerNamesResponse> {
     // Validate: speakerNames must be object with non-empty string values (per docs)
     const cleanedNames: Record<string, string> = {};
@@ -366,7 +363,7 @@ export const backendApi = {
       }
     }
 
-    console.log(`[Lyra] PUT /meetings/${meetingId}/speaker-names:`, cleanedNames);
+    console.log(`[SIS] PUT /meetings/${meetingId}/speaker-names:`, cleanedNames);
 
     const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
       method: 'PUT',
@@ -383,21 +380,18 @@ export const backendApi = {
     const data = await response.json();
     
     // Log voice learning results per docs section 4
-    // Use lyraLearning if available, fallback to sisLearning
-    const learningData = data.lyraLearning || data.sisLearning || [];
-    if (learningData.length > 0) {
-      console.log('[Lyra] Voice learning results:');
-      learningData.forEach((entry: SISLearningEntry) => {
+    if (data.sisLearning && data.sisLearning.length > 0) {
+      console.log('[SIS] Voice learning results (sisLearning):');
+      data.sisLearning.forEach((entry: SISLearningEntry) => {
         const status = entry.updated ? '✓ LEARNED' : '○ Matched';
-        const similarity = entry.similarityPercent || Math.round(entry.similarity * 100);
-        console.log(`  ${status} ${entry.email}: ${similarity}% (${entry.matchedSegments || 0} segments)`);
+        console.log(`  ${status} ${entry.email}: ${Math.round(entry.similarity * 100)}% (${entry.matchedSegments || 0} segments)`);
       });
     }
 
     // Return the updated speakerNames from backend (which may include auto-applied aliases)
     return {
-      speakerNames: data.speakerNames || data.lyraSpeakerNames || cleanedNames,
-      sisLearning: learningData,
+      speakerNames: data.speakerNames || cleanedNames,
+      sisLearning: data.sisLearning || [],
     };
   },
 
@@ -405,7 +399,7 @@ export const backendApi = {
   // Backend resolves missing state and returns sanitized speakerNames map
   async getSpeakerNames(meetingId: string): Promise<SpeakerNamesResponse> {
     try {
-      console.log(`[Lyra] GET /meetings/${meetingId}/speaker-names`);
+      console.log(`[SIS] GET /meetings/${meetingId}/speaker-names`);
       
       const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/speaker-names`, {
         method: 'GET',
@@ -415,27 +409,25 @@ export const backendApi = {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('[Lyra] Speaker names not found (404) - returning empty');
+          console.log('[SIS] Speaker names not found (404) - returning empty');
           return { speakerNames: {}, sisLearning: [] };
         }
-        console.warn('[Lyra] Could not fetch speaker names:', response.status);
+        console.warn('[SIS] Could not fetch speaker names:', response.status);
         return { speakerNames: {}, sisLearning: [] };
       }
 
       const data = await response.json();
       
-      // Use lyraSpeakerNames if available, fallback to speakerNames
-      const names = data.lyraSpeakerNames || data.speakerNames || {};
-      if (Object.keys(names).length > 0) {
-        console.log('[Lyra] Loaded speaker names:', names);
+      if (data.speakerNames && Object.keys(data.speakerNames).length > 0) {
+        console.log('[SIS] Loaded speaker names:', data.speakerNames);
       }
       
       return {
-        speakerNames: names,
-        sisLearning: data.lyraLearning || data.sisLearning || [],
+        speakerNames: data.speakerNames || {},
+        sisLearning: data.sisLearning || [],
       };
     } catch (error) {
-      console.warn('[Lyra] Get speaker names error:', error);
+      console.warn('[SIS] Get speaker names error:', error);
       return { speakerNames: {}, sisLearning: [] };
     }
   },
