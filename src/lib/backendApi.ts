@@ -158,6 +158,24 @@ const getAuthHeaders = () => {
   };
 };
 
+const sanitizeSpeakerNamesMap = (speakerNames: Record<string, string> | null | undefined) => {
+  const out: Record<string, string> = {};
+  if (!speakerNames) return out;
+
+  for (const [rawKey, rawValue] of Object.entries(speakerNames)) {
+    const key = String(rawKey ?? '').trim();
+    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+
+    if (!key) continue;
+    if (key.toLowerCase() === 'unknown') continue;
+    if (!value) continue;
+
+    out[key] = value;
+  }
+
+  return out;
+};
+
 export const backendApi = {
   async getDashboard(): Promise<DashboardData> {
     const response = await fetch(`${BACKEND_URL}/admin/backend/dashboard`, {
@@ -358,13 +376,9 @@ export const backendApi = {
   // If a user manually labels a speaker with a name that uniquely matches an existing Lyra alias,
   // Lyra will associate that label to the member for future meetings and learning.
   async saveSpeakerNames(meetingId: string, speakerNames: Record<string, string>): Promise<SpeakerNamesResponse> {
-    // Validate: speakerNames must be object with non-empty string values (per docs)
-    const cleanedNames: Record<string, string> = {};
-    for (const [key, value] of Object.entries(speakerNames)) {
-      if (typeof value === 'string' && value.trim()) {
-        cleanedNames[key] = value.trim();
-      }
-    }
+    // Validate + sanitize (per docs): object with non-empty string values.
+    // Also: never persist a synthetic "unknown" key.
+    const cleanedNames = sanitizeSpeakerNamesMap(speakerNames);
 
     console.log(`[Lyra] PUT /meetings/${meetingId}/speaker-names:`, cleanedNames);
 
@@ -381,7 +395,7 @@ export const backendApi = {
     }
 
     const data = await response.json();
-    
+
     // Log voice learning results per docs section 4
     // Use lyraLearning if available, fallback to sisLearning
     const learningData = data.lyraLearning || data.sisLearning || [];
@@ -394,9 +408,11 @@ export const backendApi = {
       });
     }
 
+    const returnedNamesRaw = (data.speakerNames || data.lyraSpeakerNames || cleanedNames) as Record<string, string>;
+
     // Return the updated speakerNames from backend (which may include auto-applied aliases)
     return {
-      speakerNames: data.speakerNames || data.lyraSpeakerNames || cleanedNames,
+      speakerNames: sanitizeSpeakerNamesMap(returnedNamesRaw),
       sisLearning: learningData,
     };
   },
@@ -425,7 +441,7 @@ export const backendApi = {
       const data = await response.json();
       
       // Use lyraSpeakerNames if available, fallback to speakerNames
-      const names = data.lyraSpeakerNames || data.speakerNames || {};
+      const names = sanitizeSpeakerNamesMap((data.lyraSpeakerNames || data.speakerNames || {}) as Record<string, string>);
       if (Object.keys(names).length > 0) {
         console.log('[Lyra] Loaded speaker names:', names);
       }
