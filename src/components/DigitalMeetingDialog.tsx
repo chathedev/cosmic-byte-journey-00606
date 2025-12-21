@@ -46,6 +46,25 @@ const UPLOAD_TIPS = [
   "Tips: Granska din transkription direkt när den är klar",
 ];
 
+// Format long file names with smart truncation
+const formatFileName = (name: string, maxLength: number = 30): string => {
+  if (name.length <= maxLength) return name;
+  
+  const lastDotIndex = name.lastIndexOf('.');
+  const ext = lastDotIndex > 0 ? name.slice(lastDotIndex) : '';
+  const baseName = lastDotIndex > 0 ? name.slice(0, lastDotIndex) : name;
+  
+  // Reserve space for extension and ellipsis
+  const availableLength = maxLength - ext.length - 3;
+  if (availableLength <= 0) return name.slice(0, maxLength - 3) + '...';
+  
+  // Show start and end of filename
+  const startLength = Math.ceil(availableLength * 0.6);
+  const endLength = availableLength - startLength;
+  
+  return baseName.slice(0, startLength) + '...' + baseName.slice(-endLength) + ext;
+};
+
 export const DigitalMeetingDialog = ({ 
   open, 
   onOpenChange, 
@@ -341,9 +360,9 @@ export const DigitalMeetingDialog = ({
                       <FileAudio className="w-5 h-5 text-primary" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {selectedFile.name}
+                  <div className="flex-1 min-w-0 max-w-[200px] sm:max-w-[300px]">
+                    <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>
+                      {formatFileName(selectedFile.name, 30)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {fileSizeMB.toFixed(2)} MB
