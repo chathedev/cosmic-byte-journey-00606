@@ -399,11 +399,7 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
  * - Returns sisMatches, sisSpeakers, and the same normalized speakerNames map
  * - Poll this endpoint for real-time speaker-identification progress
  */
-export async function pollSISStatus(meetingId: string): Promise<SISStatus & { 
-  speakerNames?: Record<string, string>; 
-  transcript?: string;
-  lyraLearning?: LyraLearningEntry[];
-}> {
+export async function pollSISStatus(meetingId: string): Promise<SISStatus & { speakerNames?: Record<string, string>; transcript?: string }> {
   const token = localStorage.getItem('authToken');
   const headers: HeadersInit = {
     'Content-Type': 'application/json'
@@ -457,143 +453,17 @@ export async function pollSISStatus(meetingId: string): Promise<SISStatus & {
     
     return {
       status: data.sisStatus || data.status || 'queued',
-      sisSpeakers: data.sisSpeakers || data.lyraSpeakers || [],
-      sisMatches: data.sisMatches || data.lyraMatches || [],
-      sisMatch: data.sisMatch || data.lyraMatches?.[0],
+      sisSpeakers: data.sisSpeakers || [],
+      sisMatches: data.sisMatches || [],
+      sisMatch: data.sisMatch,
       sisError: data.sisError,
       transcript: data.transcript,
-      speakerNames: data.speakerNames || data.lyraSpeakerNames || {},
-      lyraLearning: data.lyraLearning || data.sisLearning || [],
+      speakerNames: data.speakerNames || {},
     };
   } catch (error: any) {
     debugLog('🔍 SIS status network error');
     return {
       status: 'queued',
-    };
-  }
-}
-
-/**
- * Poll Lyra status for real-time speaker identification progress
- * Per docs: GET /asr/lyra-status?meetingId=<meetingId>
- * - Returns status, sisSpeakers, sisMatches, sisMatch, sisError, transcript
- * - Response also includes Lyra mirror fields: lyraStatus, lyraMatches, lyraSpeakers, lyraSpeakerNames, lyraLearning
- */
-export async function pollLyraStatus(meetingId: string): Promise<{
-  status: SISStatusType;
-  lyraSpeakers: SISSpeaker[];
-  lyraMatches: SISMatch[];
-  lyraMatch?: SISMatch;
-  lyraError?: string;
-  lyraLearning: LyraLearningEntry[];
-  speakerNames: Record<string, string>;
-  transcript?: string;
-  // Legacy aliases
-  sisSpeakers: SISSpeaker[];
-  sisMatches: SISMatch[];
-  sisMatch?: SISMatch;
-}> {
-  const token = localStorage.getItem('authToken');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json'
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  try {
-    const response = await fetch(`${BACKEND_API_URL}/asr/lyra-status?meetingId=${encodeURIComponent(meetingId)}`, {
-      method: 'GET',
-      headers,
-    });
-
-    // 404 = job not registered yet or no Lyra data
-    if (response.status === 404) {
-      debugLog('🔍 Lyra status: 404 - no Lyra data yet');
-      return {
-        status: 'queued',
-        lyraSpeakers: [],
-        lyraMatches: [],
-        lyraLearning: [],
-        speakerNames: {},
-        sisSpeakers: [],
-        sisMatches: [],
-      };
-    }
-
-    if (!response.ok) {
-      debugLog('🔍 Lyra status check error:', response.status);
-      return {
-        status: 'queued',
-        lyraSpeakers: [],
-        lyraMatches: [],
-        lyraLearning: [],
-        speakerNames: {},
-        sisSpeakers: [],
-        sisMatches: [],
-      };
-    }
-
-    const data = await response.json();
-    const status = data.lyraStatus || data.sisStatus || data.status || 'queued';
-    debugLog('🔍 Lyra status:', status);
-    
-    const lyraSpeakers = data.lyraSpeakers || data.sisSpeakers || [];
-    const lyraMatches = data.lyraMatches || data.sisMatches || [];
-    const lyraLearning = data.lyraLearning || data.sisLearning || [];
-    const speakerNames = data.lyraSpeakerNames || data.speakerNames || {};
-    
-    // Per docs: log speaker info for debugging
-    if (lyraSpeakers.length > 0) {
-      debugLog('🗣️ Lyra speakers:', lyraSpeakers.length);
-      lyraSpeakers.forEach((speaker: SISSpeaker) => {
-        const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
-        const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
-        const nameInfo = speakerNames[speaker.label] ? ` "${speakerNames[speaker.label]}"` : '';
-        debugLog(`   - ${speaker.label}${nameInfo}: ${duration}${matchInfo}`);
-      });
-    }
-    
-    if (lyraMatches.length > 0) {
-      debugLog('🎯 Lyra matches:', lyraMatches.length);
-      lyraMatches.forEach((match: SISMatch) => {
-        const autoPersisted = match.confidencePercent >= 60 ? ' [auto-persisted]' : '';
-        debugLog(`   - ${match.sampleOwnerEmail}: ${match.confidencePercent}%${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}${autoPersisted}`);
-      });
-    }
-    
-    if (lyraLearning.length > 0) {
-      debugLog('📚 Lyra learning:', lyraLearning.length);
-      lyraLearning.forEach((entry: LyraLearningEntry) => {
-        const updated = entry.updated ? ' [UPDATED]' : '';
-        debugLog(`   - ${entry.email}: ${entry.similarityPercent || Math.round((entry.similarity || 0) * 100)}%${updated}`);
-      });
-    }
-    
-    return {
-      status,
-      lyraSpeakers,
-      lyraMatches,
-      lyraMatch: lyraMatches[0],
-      lyraError: data.lyraError || data.sisError,
-      lyraLearning,
-      speakerNames,
-      transcript: data.transcript,
-      // Legacy aliases
-      sisSpeakers: lyraSpeakers,
-      sisMatches: lyraMatches,
-      sisMatch: lyraMatches[0],
-    };
-  } catch (error: any) {
-    debugLog('🔍 Lyra status network error');
-    return {
-      status: 'queued',
-      lyraSpeakers: [],
-      lyraMatches: [],
-      lyraLearning: [],
-      speakerNames: {},
-      sisSpeakers: [],
-      sisMatches: [],
     };
   }
 }

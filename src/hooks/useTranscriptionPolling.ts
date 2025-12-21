@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment } from '@/lib/asrService';
 import { meetingStorage } from '@/utils/meetingStorage';
 
 const POLL_INTERVAL_MS = 4000; // Poll every 4 seconds
 const MAX_POLL_ATTEMPTS = 450; // Max ~30 minutes
 
-// Per docs: TranscriptionState holds both legacy SIS and Lyra mirror fields
 export interface TranscriptionState {
   status: 'idle' | 'uploading' | 'processing' | 'done' | 'failed';
   stage?: ASRStage; // More granular stage from backend
@@ -13,31 +12,14 @@ export interface TranscriptionState {
   transcript: string | null;
   transcriptSegments: TranscriptSegment[] | null;
   error: string | null;
-  // Legacy SIS fields (for backwards compatibility)
   sisStatus: SISStatusType | null;
   sisMatches: SISMatch[];
   sisMatch: SISMatch | null;
   sisSpeakers: SISSpeaker[];
-  // Lyra mirror fields (preferred for frontend use)
-  lyraStatus?: SISStatusType | null;
-  lyraMatches?: SISMatch[];
-  lyraSpeakers?: SISSpeaker[];
-  lyraLearning?: LyraLearningEntry[];
-  // Per docs: speakerNames[label] is the preferred way to display speaker names
-  speakerNames?: Record<string, string>;
 }
 
-// Per docs: onComplete now includes Lyra learning and speakerNames
 interface UseTranscriptionPollingOptions {
-  onComplete?: (
-    meetingId: string, 
-    transcript: string, 
-    lyraMatches?: SISMatch[], 
-    lyraMatch?: SISMatch, 
-    lyraSpeakers?: SISSpeaker[],
-    lyraLearning?: LyraLearningEntry[],
-    speakerNames?: Record<string, string>
-  ) => void;
+  onComplete?: (meetingId: string, transcript: string, sisMatches?: SISMatch[], sisMatch?: SISMatch, sisSpeakers?: SISSpeaker[]) => void;
   onError?: (meetingId: string, error: string) => void;
 }
 
@@ -65,7 +47,7 @@ export function useTranscriptionPolling(
     pollingRef.current[meetingId] = true;
     attemptsRef.current[meetingId] = 0;
 
-    // Set initial processing state with both legacy and Lyra fields
+    // Set initial processing state
     setStates(prev => ({
       ...prev,
       [meetingId]: {
@@ -75,17 +57,10 @@ export function useTranscriptionPolling(
         transcript: null,
         transcriptSegments: null,
         error: null,
-        // Legacy SIS fields
         sisStatus: null,
         sisMatches: [],
         sisMatch: null,
         sisSpeakers: [],
-        // Lyra mirror fields
-        lyraStatus: null,
-        lyraMatches: [],
-        lyraSpeakers: [],
-        lyraLearning: [],
-        speakerNames: {},
       }
     }));
 
@@ -96,41 +71,18 @@ export function useTranscriptionPolling(
         // First try the ASR status endpoint
         const asrStatus = await pollASRStatus(meetingId);
         
-        if ((asrStatus.status === 'completed' || asrStatus.status === 'done') && asrStatus.transcript) {
-          // Per docs: ASR completed - use Lyra mirror fields (preferred) with SIS fallbacks
+        if (asrStatus.status === 'completed' && asrStatus.transcript) {
+          // ASR completed!
           console.log('✅ Transcription complete via ASR status:', meetingId);
-          
-          const lyraStatus = asrStatus.lyraStatus || asrStatus.sisStatus;
-          const lyraMatches = asrStatus.lyraMatches || asrStatus.sisMatches || [];
-          const lyraSpeakers = asrStatus.lyraSpeakers || asrStatus.sisSpeakers || [];
-          const lyraLearning = asrStatus.lyraLearning || asrStatus.sisLearning || [];
-          const speakerNames = asrStatus.speakerNames || asrStatus.lyraSpeakerNames || {};
-          
-          if (lyraStatus) {
-            console.log(`🔍 Lyra status: ${lyraStatus}`);
+          if (asrStatus.sisStatus) {
+            console.log(`🔍 SIS status: ${asrStatus.sisStatus}`);
           }
-          if (lyraSpeakers.length > 0) {
-            console.log(`🗣️ Lyra speakers: ${lyraSpeakers.length}`);
-            lyraSpeakers.forEach(speaker => {
-              const duration = speaker.durationSeconds != null ? `${speaker.durationSeconds.toFixed(1)}s` : 'N/A';
-              const matchInfo = speaker.bestMatchEmail ? ` → ${speaker.bestMatchEmail} (${((speaker.similarity || 0) * 100).toFixed(0)}%)` : '';
-              console.log(`   - ${speaker.label}: ${duration}${matchInfo}`);
-            });
+          if (asrStatus.sisSpeakers && asrStatus.sisSpeakers.length > 0) {
+            console.log(`🗣️ SIS speakers: ${asrStatus.sisSpeakers.length}`);
           }
-          if (lyraMatches[0]) {
-            const match = lyraMatches[0];
-            console.log(`🎯 Best Lyra match: ${match.sampleOwnerEmail} (${match.confidencePercent}%)${match.speakerLabel ? ` [${match.speakerLabel}]` : ''}`);
+          if (asrStatus.sisMatch) {
+            console.log(`🎯 SIS match: ${asrStatus.sisMatch.sampleOwnerEmail} (${asrStatus.sisMatch.confidencePercent}%)${asrStatus.sisMatch.speakerLabel ? ` [${asrStatus.sisMatch.speakerLabel}]` : ''}`);
           }
-          if (lyraLearning.length > 0) {
-            console.log(`📚 Lyra learning entries: ${lyraLearning.length}`);
-            lyraLearning.forEach(entry => {
-              console.log(`   - ${entry.email}: ${entry.similarityPercent || Math.round((entry.similarity || 0) * 100)}%${entry.updated ? ' [updated]' : ''}`);
-            });
-          }
-          if (Object.keys(speakerNames).length > 0) {
-            console.log(`📝 Speaker names:`, speakerNames);
-          }
-          
           pollingRef.current[meetingId] = false;
           
           setStates(prev => ({
@@ -141,29 +93,14 @@ export function useTranscriptionPolling(
               transcript: asrStatus.transcript!,
               transcriptSegments: asrStatus.transcriptSegments || null,
               error: null,
-              // Legacy SIS fields
               sisStatus: asrStatus.sisStatus || null,
               sisMatches: asrStatus.sisMatches || [],
               sisMatch: asrStatus.sisMatch || null,
               sisSpeakers: asrStatus.sisSpeakers || [],
-              // Lyra mirror fields (preferred)
-              lyraStatus,
-              lyraMatches,
-              lyraSpeakers,
-              lyraLearning,
-              speakerNames,
             }
           }));
           
-          options.onComplete?.(
-            meetingId, 
-            asrStatus.transcript, 
-            lyraMatches, 
-            lyraMatches[0], 
-            lyraSpeakers,
-            lyraLearning,
-            speakerNames
-          );
+          options.onComplete?.(meetingId, asrStatus.transcript, asrStatus.sisMatches, asrStatus.sisMatch, asrStatus.sisSpeakers);
           return;
         }
 
@@ -183,11 +120,6 @@ export function useTranscriptionPolling(
               sisMatches: [],
               sisMatch: null,
               sisSpeakers: [],
-              lyraStatus: null,
-              lyraMatches: [],
-              lyraSpeakers: [],
-              lyraLearning: [],
-              speakerNames: {},
             }
           }));
           
@@ -218,11 +150,6 @@ export function useTranscriptionPolling(
           console.log('✅ Transcription complete via meeting data:', meetingId);
           pollingRef.current[meetingId] = false;
           
-          const lyraMatches = asrStatus.lyraMatches || asrStatus.sisMatches || [];
-          const lyraSpeakers = asrStatus.lyraSpeakers || asrStatus.sisSpeakers || [];
-          const lyraLearning = asrStatus.lyraLearning || asrStatus.sisLearning || [];
-          const speakerNames = asrStatus.speakerNames || asrStatus.lyraSpeakerNames || {};
-          
           setStates(prev => ({
             ...prev,
             [meetingId]: {
@@ -235,23 +162,10 @@ export function useTranscriptionPolling(
               sisMatches: asrStatus.sisMatches || [],
               sisMatch: asrStatus.sisMatch || null,
               sisSpeakers: asrStatus.sisSpeakers || [],
-              lyraStatus: asrStatus.lyraStatus || asrStatus.sisStatus || null,
-              lyraMatches,
-              lyraSpeakers,
-              lyraLearning,
-              speakerNames,
             }
           }));
           
-          options.onComplete?.(
-            meetingId, 
-            meeting.transcript, 
-            lyraMatches, 
-            lyraMatches[0], 
-            lyraSpeakers,
-            lyraLearning,
-            speakerNames
-          );
+          options.onComplete?.(meetingId, meeting.transcript, asrStatus.sisMatches, asrStatus.sisMatch, asrStatus.sisSpeakers);
           return;
         }
 
@@ -279,11 +193,6 @@ export function useTranscriptionPolling(
           sisMatches: [],
           sisMatch: null,
           sisSpeakers: [],
-          lyraStatus: null,
-          lyraMatches: [],
-          lyraSpeakers: [],
-          lyraLearning: [],
-          speakerNames: {},
         }
       }));
       options.onError?.(meetingId, 'Tidsgränsen överskreds');
