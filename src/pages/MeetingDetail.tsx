@@ -310,10 +310,15 @@ const MeetingDetail = () => {
             }
           }
 
-          toast({
-            title: 'Transkribering klar!',
-            description: 'Ditt möte har transkriberats.',
-          });
+          // Only show toast if not already shown for this meeting
+          const toastKey = `transcription_toast_shown_${id}`;
+          if (!localStorage.getItem(toastKey)) {
+            localStorage.setItem(toastKey, 'true');
+            toast({
+              title: 'Transkribering klar!',
+              description: 'Ditt möte har transkriberats.',
+            });
+          }
 
           setMeeting(prev => prev ? { ...prev, transcript: newTranscript, transcriptionStatus: 'done' } : null);
           return;
