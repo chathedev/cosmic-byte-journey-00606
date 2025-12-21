@@ -1,32 +1,29 @@
 // Shared helper for ASR upload routing.
-// Some environments experience HTTP/2 transport errors when uploading directly to the external ASR endpoint.
-// We route *small* uploads via a Lovable Cloud backend function proxy for reliability,
-// while keeping direct upload for large files to avoid edge body-size limits.
+// We always upload directly to the external ASR API to avoid streaming issues
+// with Supabase Edge Functions. The proxy approach caused HTTP/2 stalls.
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-
-export const ASR_TRANSCRIBE_PROXY_MAX_BYTES = 20 * 1024 * 1024; // 20MB
+export const DIRECT_ASR_URL = 'https://api.tivly.se/asr/transcribe';
 
 export type AsrTranscribeTarget = {
-  useProxy: boolean;
+  useProxy: false;
   url: string;
 };
 
-export function getAsrTranscribeTarget(fileSizeBytes: number): AsrTranscribeTarget {
-  const canProxy = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-  const useProxy = canProxy && fileSizeBytes <= ASR_TRANSCRIBE_PROXY_MAX_BYTES;
-
+/**
+ * Always returns direct upload target - proxy approach removed due to
+ * HTTP/2 streaming issues with Supabase Edge Functions
+ */
+export function getAsrTranscribeTarget(_fileSizeBytes: number): AsrTranscribeTarget {
   return {
-    useProxy,
-    url: useProxy
-      ? `${SUPABASE_URL}/functions/v1/asr-transcribe-proxy`
-      : `https://api.tivly.se/asr/transcribe`,
+    useProxy: false,
+    url: DIRECT_ASR_URL,
   };
 }
 
-export function applyProxyHeadersToXhr(xhr: XMLHttpRequest) {
-  if (!SUPABASE_ANON_KEY) return;
-  xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
-  xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
+/**
+ * No-op - proxy headers no longer needed since we always use direct upload
+ * @deprecated Proxy approach removed
+ */
+export function applyProxyHeadersToXhr(_xhr: XMLHttpRequest) {
+  // No-op - always use direct upload with Bearer token
 }

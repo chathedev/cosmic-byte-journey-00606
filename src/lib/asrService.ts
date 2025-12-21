@@ -226,14 +226,11 @@ export async function uploadAudioForTranscription(
   const token = localStorage.getItem('authToken');
   const transcribeTarget = getAsrTranscribeTarget(file.size);
 
-  // Build FormData
+  // Build FormData - no proxy token needed (always direct upload now)
   const formData = new FormData();
   formData.append('audio', file);
   formData.append('meetingId', meetingId);
   formData.append('language', language);
-  if (transcribeTarget.useProxy && token) {
-    formData.append('backendAuthToken', token);
-  }
 
   try {
     // Use XMLHttpRequest for upload progress tracking
@@ -295,9 +292,8 @@ export async function uploadAudioForTranscription(
       xhr.open('POST', transcribeTarget.url);
       xhr.timeout = 600000; // 10 minute timeout for large files
 
-      if (transcribeTarget.useProxy) {
-        applyProxyHeadersToXhr(xhr);
-      } else if (token) {
+      // Always use Bearer auth (direct upload only now)
+      if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
 
