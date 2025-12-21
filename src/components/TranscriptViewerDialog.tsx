@@ -44,6 +44,18 @@ const SIS_STRONG_THRESHOLD = 0.70; // Minimum for confident attribution
 const SIS_VERY_STRONG_THRESHOLD = 0.80; // High confidence
 const SIS_LEARNING_THRESHOLD = 0.72; // Per docs: threshold for voice learning
 
+// Helper: Check if this is a single-speaker meeting with owner match (verified by context)
+// When there's only 1 speaker and they match the recording owner, treat as verified without showing raw %
+const isSingleSpeakerOwnerMatch = (
+  uniqueSpeakerCount: number,
+  sisIdentifiedCount: number,
+  ownerEmail?: string,
+  matchedEmail?: string
+): boolean => {
+  return uniqueSpeakerCount === 1 && sisIdentifiedCount === 1 && 
+         !!ownerEmail && !!matchedEmail && ownerEmail === matchedEmail;
+};
+
 interface TranscriptViewerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -610,6 +622,14 @@ export function TranscriptViewerDialog({
                 const sisInfo = sisIdentifiedSpeakers[speakerId];
                 const voiceLearned = sisInfo && sisLearning.some(l => l.email === sisInfo.email && l.updated);
                 
+                // Hide raw % for single-speaker meetings where the owner matches (verified by context)
+                const shouldShowRawPercent = !isSingleSpeakerOwnerMatch(
+                  uniqueSpeakers.length,
+                  identifiedCount,
+                  sisInfo?.email,
+                  sisInfo?.email // Same person - use their own email as both owner and match
+                ) && !voiceLearned; // Also hide % when voice is already learned
+                
                 if (isEditing) {
                   return (
                     <div key={speakerId} className="flex items-center gap-1 bg-background rounded-md border border-primary/50 shadow-sm px-1.5 py-0.5">
@@ -684,12 +704,18 @@ export function TranscriptViewerDialog({
                     <span className="text-[11px] font-medium">{displayName}</span>
                 {/* Per docs: "secure X%" confidence badge from sisSpeakers.similarity */}
                     {isIdentified && (
-                      <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}% - röstmatchning`}>
-                        <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`} />
-                        <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {Math.round(confidence * 100)}%
-                        </span>
-                      </div>
+                      shouldShowRawPercent ? (
+                        <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}% - röstmatchning`}>
+                          <Volume2 className={`w-2.5 h-2.5 ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`} />
+                          <span className={`text-[9px] ${confidence >= SIS_VERY_STRONG_THRESHOLD ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {Math.round(confidence * 100)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-0.5" title="Verifierad - röstmatchning">
+                          <Volume2 className="w-2.5 h-2.5 text-emerald-600" />
+                        </div>
+                      )
                     )}
                     {canRename(speakerId) && (
                       <Pencil className="w-2.5 h-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -724,6 +750,14 @@ export function TranscriptViewerDialog({
                     const hasCustomName = speakerKey ? !!speakerNames[speakerKey] : false;
                     const sisInfo = speakerKey ? sisIdentifiedSpeakers[speakerKey] : undefined;
                     const voiceLearned = !!(sisInfo && sisLearning.some((l) => l.email === sisInfo.email && l.updated));
+                    
+                    // Hide raw % for single-speaker meetings where the owner matches (verified by context)
+                    const shouldShowRawPercent = !isSingleSpeakerOwnerMatch(
+                      uniqueSpeakers.length,
+                      identifiedCount,
+                      sisInfo?.email,
+                      sisInfo?.email
+                    ) && !voiceLearned;
 
                     const initials = displayName
                       ? displayName
@@ -775,20 +809,26 @@ export function TranscriptViewerDialog({
                               )}
 
                               {showSpeaker && isIdentified && (
-                                <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}%`}>
-                                  <Volume2
-                                    className={`w-2.5 h-2.5 ${
-                                      confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-500" : "text-amber-500"
-                                    }`}
-                                  />
-                                  <span
-                                    className={`text-[9px] ${
-                                      confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-600" : "text-amber-600"
-                                    }`}
-                                  >
-                                    {Math.round(confidence * 100)}%
-                                  </span>
-                                </div>
+                                shouldShowRawPercent ? (
+                                  <div className="flex items-center gap-0.5" title={`Säker ${Math.round(confidence * 100)}%`}>
+                                    <Volume2
+                                      className={`w-2.5 h-2.5 ${
+                                        confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-500" : "text-amber-500"
+                                      }`}
+                                    />
+                                    <span
+                                      className={`text-[9px] ${
+                                        confidence >= SIS_VERY_STRONG_THRESHOLD ? "text-emerald-600" : "text-amber-600"
+                                      }`}
+                                    >
+                                      {Math.round(confidence * 100)}%
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-0.5" title="Verifierad">
+                                    <Volume2 className="w-2.5 h-2.5 text-emerald-500" />
+                                  </div>
+                                )
                               )}
 
                               <span className="text-[10px] text-muted-foreground/50 ml-auto">{formatTime(segment.start)}</span>
