@@ -732,7 +732,7 @@ const MeetingDetail = () => {
       const prev = grouped[grouped.length - 1];
       const rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || 'unknown';
       const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
-      
+
       if (prev && prev.speakerId === speakerId) {
         prev.text = `${prev.text}\n${seg.text}`;
         prev.end = seg.end;
@@ -743,6 +743,14 @@ const MeetingDetail = () => {
     return grouped;
   })() : [];
 
+  // If the user has manually edited the transcript, show the saved transcript as the source of truth.
+  // Otherwise, render the segmented version (speaker UI) as the primary view.
+  const segmentsAreCanonicalTranscript = (() => {
+    if (!transcript || groupedSegments.length === 0) return false;
+    const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
+    const segmentsText = groupedSegments.map((s) => s.text).join(' ');
+    return normalize(transcript) === normalize(segmentsText);
+  })();
   return (
     <div className="min-h-screen bg-background animate-fade-in">
       {/* Header */}
@@ -1062,9 +1070,9 @@ const MeetingDetail = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-xl max-h-[600px] overflow-y-auto">
-                          {groupedSegments.length > 0 ? (
-                            <div className="space-y-1">
+                        <div className="rounded-xl max-h-[600px] overflow-y-auto bg-muted/20 border border-border/40 p-4">
+                          {groupedSegments.length > 0 && segmentsAreCanonicalTranscript ? (
+                            <div className="space-y-3">
                               {groupedSegments.map((segment, idx) => {
                                 const manualName = speakerNames[segment.speakerId];
                                 const isIdentified = isSpeakerIdentified(segment.speakerId);
@@ -1073,22 +1081,6 @@ const MeetingDetail = () => {
                                 const displayName = resolvedName || 'Okänd talare';
                                 const isEditing = editingSpeaker === segment.speakerId;
                                 const canEdit = !!segment.speakerId && String(segment.speakerId).toLowerCase() !== 'unknown';
-
-                                // Speaker colors for horizontal accent line
-                                const speakerColors = [
-                                  'from-blue-500 to-blue-400',
-                                  'from-emerald-500 to-emerald-400',
-                                  'from-amber-500 to-amber-400',
-                                  'from-purple-500 to-purple-400',
-                                  'from-rose-500 to-rose-400',
-                                  'from-cyan-500 to-cyan-400',
-                                ];
-                                const colorIndex = segment.speakerId ? Math.abs(segment.speakerId.charCodeAt(segment.speakerId.length - 1)) % speakerColors.length : 0;
-                                const lineGradient = isIdentified && confidence != null && confidence >= 85
-                                  ? 'from-primary to-primary/70'
-                                  : isIdentified
-                                    ? 'from-accent to-accent/70'
-                                    : speakerColors[colorIndex];
 
                                 const badgeClass = confidence != null && confidence >= 85
                                   ? 'border-primary/30 text-primary bg-primary/10'
@@ -1100,19 +1092,15 @@ const MeetingDetail = () => {
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: Math.min(idx * 0.015, 0.2) }}
-                                    className="group"
+                                    className="group rounded-lg border border-border/40 bg-background/40 p-3"
                                   >
-                                    {/* Horizontal colored accent line */}
-                                    <div className={`h-[2px] bg-gradient-to-r ${lineGradient} rounded-full mb-2`} />
-                                    
-                                    {/* Speaker name row */}
-                                    <div className="flex items-center gap-2 mb-1.5 px-1">
+                                    <div className="flex items-center gap-2">
                                       {isEditing ? (
                                         <div className="flex items-center gap-2 min-w-0">
                                           <Input
                                             value={editingSpeakerValue}
                                             onChange={(e) => setEditingSpeakerValue(e.target.value)}
-                                            className="h-7 text-sm w-[140px]"
+                                            className="h-7 text-sm w-[160px]"
                                             placeholder="Namn..."
                                             autoFocus
                                             onKeyDown={(e) => {
@@ -1150,13 +1138,13 @@ const MeetingDetail = () => {
                                         </div>
                                       ) : (
                                         <>
-                                          <span className="text-xs font-semibold text-foreground/80">
+                                          <span className="text-xs font-semibold text-foreground/90 truncate">
                                             {displayName}
                                           </span>
                                           {isIdentified && confidence != null && (
                                             <Badge
                                               variant="outline"
-                                              className={`text-[9px] px-1.5 py-0 h-4 ${badgeClass}`}
+                                              className={`text-[10px] px-1.5 py-0 h-4 ${badgeClass}`}
                                             >
                                               {getSISVerificationLabel(confidence)}
                                             </Badge>
@@ -1168,21 +1156,20 @@ const MeetingDetail = () => {
                                             <Button
                                               size="sm"
                                               variant="ghost"
-                                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
+                                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
                                               onClick={() => {
                                                 setEditingSpeaker(segment.speakerId);
                                                 setEditingSpeakerValue(manualName || resolvedName || '');
                                               }}
                                             >
-                                              <Pencil className="w-2.5 h-2.5" />
+                                              <Pencil className="w-3 h-3" />
                                             </Button>
                                           )}
                                         </>
                                       )}
                                     </div>
 
-                                    {/* Transcript text */}
-                                    <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed px-1 pb-4">
+                                    <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
                                       {segment.text}
                                     </p>
                                   </motion.div>
@@ -1190,11 +1177,11 @@ const MeetingDetail = () => {
                               })}
                             </div>
                           ) : (
-                            <motion.p 
+                            <motion.p
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ duration: 0.5 }}
-                              className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm p-4 bg-muted/30 rounded-xl"
+                              className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
                             >
                               {transcript}
                             </motion.p>
