@@ -643,6 +643,7 @@ const MeetingDetail = () => {
   };
 
   // Get unique speakers for display - include ALL speakers for editing, not just identified ones
+  // When SIS/Lyra is enabled but has no matches, still show "Talare 1", "Talare 2", etc. for learning
   const uniqueSpeakers = (() => {
     const speakers: { 
       label: string; 
@@ -701,7 +702,7 @@ const MeetingDetail = () => {
       speakerIndex++;
     }
 
-    // Finally, add any unique speakers from segments that weren't in matches/speakers
+    // Add any unique speakers from segments that weren't in matches/speakers
     if (transcriptSegments) {
       const segmentLabels = new Set<string>();
       for (const seg of transcriptSegments) {
@@ -724,6 +725,23 @@ const MeetingDetail = () => {
           speakerIndex++;
         }
       }
+    }
+
+    // If SIS/Lyra ran (status done) but found NO matches AND no segments with speakers,
+    // create a default "Talare 1" so users can still name the speaker for learning
+    if (speakers.length === 0 && status === 'done' && hasTranscript) {
+      const defaultLabel = 'speaker_0';
+      const namesSource = isEditing ? editedSpeakerNames : speakerNames;
+      const name = namesSource[defaultLabel] || 'Talare 1';
+      
+      speakers.push({
+        label: defaultLabel,
+        name,
+        confidence: 0,
+        learned: false,
+        email: undefined,
+        isIdentified: false,
+      });
     }
 
     return speakers;
@@ -959,8 +977,11 @@ const MeetingDetail = () => {
                         <div className="text-left">
                           <span className="font-medium text-sm">Talare</span>
                           <p className="text-xs text-muted-foreground">
-                            {uniqueSpeakers.length} talare
-                            {uniqueSpeakers.some(s => s.isIdentified) && ' • Röstidentifiering via Lyra'}
+                            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'}
+                            {uniqueSpeakers.some(s => s.isIdentified) 
+                              ? ' • Röstidentifiering via Lyra'
+                              : uniqueSpeakers.length > 0 && ' • Namnge för att lära Lyra'
+                            }
                           </p>
                         </div>
                       </div>
