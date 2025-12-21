@@ -12,7 +12,7 @@
 // Accepts: MP3, WAV, M4A - backend handles all conversion
 
 import { debugLog, debugError } from './debugLogger';
-import { applyProxyHeadersToXhr, getAsrTranscribeTarget } from './asrTranscribeGateway';
+import { uploadToAsr } from './asrUpload';
 
 const BACKEND_API_URL = 'https://api.tivly.se';
 const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
@@ -215,92 +215,32 @@ export async function uploadAudioForTranscription(
     return { success: false, error: 'Filen är tom' };
   }
 
-  // Validate file size (100MB limit)
-  if (fileSizeMB > 100) {
-    return { success: false, error: `Filen är för stor (${fileSizeMB.toFixed(0)}MB). Max 100MB.` };
+  // Validate file size (500MB limit per spec)
+  if (fileSizeMB > 500) {
+    return { success: false, error: `Filen är för stor (${fileSizeMB.toFixed(0)}MB). Max 500MB.` };
   }
 
   onUploadProgress?.(10);
 
-  // Decide whether to use proxy (small files) or direct (large files)
-  const token = localStorage.getItem('authToken');
-  const transcribeTarget = getAsrTranscribeTarget(file.size);
-
-  // Build FormData - no proxy token needed (always direct upload now)
-  const formData = new FormData();
-  formData.append('audio', file);
-  formData.append('meetingId', meetingId);
-  formData.append('language', language);
+  const traceId = `asr-${meetingId}-${Date.now().toString(36)}`;
 
   try {
-    // Use XMLHttpRequest for upload progress tracking
-    const result = await new Promise<{ success: boolean; meetingId?: string; error?: string }>((resolve) => {
-      const xhr = new XMLHttpRequest();
-
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 90); // 0-90% for upload
-          onUploadProgress?.(percent);
-        }
-      });
-
-      xhr.addEventListener('load', () => {
-        onUploadProgress?.(100);
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-
-            // Expected response: { status: "queued", meetingId }
-            if (data.status === 'queued' || data.status === 'processing') {
-              debugLog('✅ ASR: Upload successful, processing started');
-              resolve({
-                success: true,
-                meetingId: data.meetingId || meetingId
-              });
-            } else if (data.error) {
-              resolve({ success: false, error: data.error });
-            } else {
-              resolve({ success: true, meetingId: meetingId });
-            }
-          } catch {
-            resolve({ success: false, error: 'Invalid response from server' });
-          }
-        } else if (xhr.status === 413) {
-          resolve({
-            success: false,
-            error: 'Filen är för stor. Max 100MB.'
-          });
-        } else {
-          let errorMsg = 'Upload failed';
-          try {
-            const errorData = JSON.parse(xhr.responseText);
-            errorMsg = errorData.error || errorData.message || errorMsg;
-          } catch { /* ignore */ }
-          resolve({ success: false, error: errorMsg });
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        resolve({ success: false, error: 'Network error during upload' });
-      });
-
-      xhr.addEventListener('timeout', () => {
-        resolve({ success: false, error: 'Upload timed out' });
-      });
-
-      xhr.open('POST', transcribeTarget.url);
-      xhr.timeout = 600000; // 10 minute timeout for large files
-
-      // Always use Bearer auth (direct upload only now)
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
-
-      xhr.send(formData);
+    const result = await uploadToAsr({
+      file,
+      language,
+      traceId,
+      onProgress: (percent) => onUploadProgress?.(percent),
     });
 
-    return result;
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    debugLog('✅ ASR: Upload successful, processing started');
+    return {
+      success: true,
+      meetingId: result.meetingId || meetingId,
+    };
 
   } catch (error: any) {
     debugError('❌ ASR upload error:', error);

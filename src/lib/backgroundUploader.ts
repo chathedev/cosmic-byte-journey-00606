@@ -2,9 +2,7 @@
 // Uploads happen in background while user is redirected to library
 
 import { debugLog, debugError } from './debugLogger';
-import { applyProxyHeadersToXhr, getAsrTranscribeTarget } from './asrTranscribeGateway';
-
-const BACKEND_API_URL = 'https://api.tivly.se';
+import { uploadToAsr } from './asrUpload';
 
 interface PendingUpload {
   meetingId: string;
@@ -92,10 +90,6 @@ async function executeUpload(meetingId: string): Promise<void> {
   const upload = pendingUploads.get(meetingId);
   if (!upload) return;
 
-  // Hard limits to avoid “stuck pending” forever
-  const STALL_MS = 120000; // 2 minutes without progress → fail
-  const MAX_TOTAL_MS = 30 * 60 * 1000; // 30 minutes total cap
-
   upload.status = 'uploading';
   upload.progress = 0;
   upload.startedAt = Date.now();
@@ -106,112 +100,28 @@ async function executeUpload(meetingId: string): Promise<void> {
 
   debugLog('🚀 Background upload starting:', { meetingId, traceId, size: upload.file.size, type: upload.file.type });
 
-  const token = localStorage.getItem('authToken');
-  const transcribeTarget = getAsrTranscribeTarget(upload.file.size);
-
-  const formData = new FormData();
-  formData.append('audio', upload.file, upload.file.name);
-  formData.append('meetingId', meetingId);
-  formData.append('language', upload.language);
-  // No proxy token needed - always direct upload now
-
   try {
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      let lastLoaded = 0;
-
-      // Cookies are not required for ASR upload (we authenticate via Bearer token).
-      // Avoid withCredentials to reduce CORS/proxy quirks that can cause “pending” hangs.
-      xhr.withCredentials = false;
-
-      const watchdog = window.setInterval(() => {
-        const now = Date.now();
-        const stalledFor = now - upload.lastProgressAt;
-        const totalFor = now - upload.startedAt;
-
-        if (totalFor > MAX_TOTAL_MS) {
-          debugError('⏱️ Background upload exceeded max total time:', { meetingId, traceId, totalFor });
-          try { xhr.abort(); } catch {}
-          window.clearInterval(watchdog);
-          reject(new Error('Upload timed out'));
-          return;
-        }
-
-        if (upload.progress < 100 && stalledFor > STALL_MS) {
-          debugError('🧱 Background upload stalled:', { meetingId, traceId, stalledFor, progress: upload.progress });
-          try { xhr.abort(); } catch {}
-          window.clearInterval(watchdog);
-          reject(new Error('Uppladdningen verkar ha fastnat. Försök igen.'));
-        }
-      }, 5000);
-
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          // Only treat as progress if bytes move forward
-          if (e.loaded > lastLoaded) {
-            lastLoaded = e.loaded;
-            upload.lastProgressAt = Date.now();
-          }
-
-          const percent = Math.round((e.loaded / e.total) * 95);
-          upload.progress = Math.max(upload.progress, percent);
-          notifyListeners(meetingId, upload);
-        }
-      });
-
-      xhr.addEventListener('load', () => {
-        window.clearInterval(watchdog);
-
-        debugLog('📦 Background upload response:', {
-          meetingId,
-          traceId,
-          status: xhr.status,
-          responseTextPreview: (xhr.responseText || '').slice(0, 300),
-        });
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          upload.status = 'complete';
-          upload.progress = 100;
-          upload.lastProgressAt = Date.now();
-          notifyListeners(meetingId, upload);
-          debugLog('✅ Background upload complete:', { meetingId, traceId });
-          resolve();
-        } else {
-          let errorMsg = 'Upload failed';
-          try {
-            const errorData = JSON.parse(xhr.responseText);
-            errorMsg = errorData.error || errorData.message || errorMsg;
-          } catch {
-            // ignore
-          }
-          reject(new Error(errorMsg));
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        window.clearInterval(watchdog);
-        reject(new Error('Network error'));
-      });
-
-      xhr.addEventListener('timeout', () => {
-        window.clearInterval(watchdog);
-        reject(new Error('Upload timed out'));
-      });
-
-      xhr.addEventListener('abort', () => {
-        window.clearInterval(watchdog);
-      });
-
-      xhr.open('POST', transcribeTarget.url);
-      xhr.timeout = MAX_TOTAL_MS;
-
-      // Always use Bearer auth (direct upload only now)
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
-
-      xhr.send(formData);
+    const result = await uploadToAsr({
+      file: upload.file,
+      language: upload.language,
+      traceId,
+      onProgress: (percent) => {
+        upload.progress = percent;
+        upload.lastProgressAt = Date.now();
+        notifyListeners(meetingId, upload);
+      },
     });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Upload failed');
+    }
+
+    upload.status = 'complete';
+    upload.progress = 100;
+    upload.lastProgressAt = Date.now();
+    notifyListeners(meetingId, upload);
+    debugLog('✅ Background upload complete:', { meetingId, traceId });
+
   } catch (error: any) {
     debugError('❌ Background upload failed:', { meetingId, traceId, error: error?.message || String(error) });
 
@@ -235,8 +145,6 @@ async function executeUpload(meetingId: string): Promise<void> {
     upload.error = error.message || 'Upload failed after retries';
     notifyListeners(meetingId, upload);
 
-    // Note: Don't try to PUT to /meetings/{id} - meeting may not exist yet
-    // The backend handles error states via /asr/status endpoint
     console.error('Upload failed for meeting:', meetingId);
   }
 }
