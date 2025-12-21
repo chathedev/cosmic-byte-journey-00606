@@ -23,7 +23,7 @@ const AdminSpeakerProfiles = () => {
   const [profiles, setProfiles] = useState<SpeakerProfile[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Link dialog state
@@ -37,15 +37,32 @@ const AdminSpeakerProfiles = () => {
   const [deletingProfile, setDeletingProfile] = useState<SpeakerProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchData = async () => {
+  const fetchCompanies = async () => {
+    try {
+      const companiesData = await apiClient.getEnterpriseCompanies().catch(() => ({ companies: [] }));
+      const companyList = companiesData.companies || [];
+      setCompanies(companyList);
+      
+      // Auto-select first company if none selected
+      if (companyList.length > 0 && !selectedCompanyId) {
+        setSelectedCompanyId(companyList[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch companies:', error);
+    }
+  };
+
+  const fetchProfiles = async () => {
+    if (!selectedCompanyId) {
+      setProfiles([]);
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      const [profilesData, companiesData] = await Promise.all([
-        backendApi.getSpeakerProfiles(selectedCompanyId === 'all' ? undefined : selectedCompanyId),
-        apiClient.getEnterpriseCompanies().catch(() => ({ companies: [] })),
-      ]);
+      const profilesData = await backendApi.getSpeakerProfiles(selectedCompanyId);
       setProfiles(profilesData);
-      setCompanies(companiesData.companies || []);
     } catch (error) {
       console.error('Failed to fetch speaker profiles:', error);
       toast({
@@ -59,7 +76,13 @@ const AdminSpeakerProfiles = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchCompanies();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      fetchProfiles();
+    }
   }, [selectedCompanyId]);
 
   const handleLink = async () => {
@@ -81,7 +104,7 @@ const AdminSpeakerProfiles = () => {
       setLinkDialogOpen(false);
       setLinkingProfile(null);
       setLinkEmail('');
-      fetchData();
+      fetchProfiles();
     } catch (error: any) {
       toast({
         title: 'Fel',
@@ -102,7 +125,7 @@ const AdminSpeakerProfiles = () => {
         description: `${profile.name} är inte längre länkad.`,
       });
       
-      fetchData();
+      fetchProfiles();
     } catch (error: any) {
       toast({
         title: 'Fel',
@@ -126,7 +149,7 @@ const AdminSpeakerProfiles = () => {
       
       setDeleteDialogOpen(false);
       setDeletingProfile(null);
-      fetchData();
+      fetchProfiles();
     } catch (error: any) {
       toast({
         title: 'Fel',
@@ -177,7 +200,7 @@ const AdminSpeakerProfiles = () => {
               Hantera manuellt namngivna röstprofiler för automatisk taligenkänning
             </p>
           </div>
-          <Button onClick={fetchData} variant="outline" className="gap-2">
+          <Button onClick={fetchProfiles} variant="outline" className="gap-2">
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             Uppdatera
           </Button>
@@ -204,15 +227,18 @@ const AdminSpeakerProfiles = () => {
                 <Label htmlFor="company" className="sr-only">Företag</Label>
                 <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Alla företag" />
+                    <SelectValue placeholder="Välj företag..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Alla företag</SelectItem>
-                    {companies.map(company => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
+                    {companies.length === 0 ? (
+                      <SelectItem value="none" disabled>Inga företag</SelectItem>
+                    ) : (
+                      companies.map(company => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
