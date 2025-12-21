@@ -743,13 +743,65 @@ const MeetingDetail = () => {
     return grouped;
   })() : [];
 
-  // If the user has manually edited the transcript, show the saved transcript as the source of truth.
-  // Otherwise, render the segmented version (speaker UI) as the primary view.
-  const segmentsAreCanonicalTranscript = (() => {
-    if (!transcript || groupedSegments.length === 0) return false;
+  // Infer a primary speaker label when diarization labels are missing (e.g., segments have "unknown" but Lyra has 1 clear match).
+  const inferredPrimarySpeakerId = (() => {
+    const matchLabels = Array.from(
+      new Set(
+        lyraMatches
+          .filter((m) => (m.confidencePercent ?? 0) >= SIS_DISPLAY_THRESHOLD_PERCENT && !!m.speakerLabel)
+          .map((m) => String(m.speakerLabel))
+      )
+    );
+    if (matchLabels.length === 1) return matchLabels[0];
+
+    const speakerLabels = Array.from(
+      new Set(
+        lyraSpeakers
+          .filter((s) => {
+            const p = s.similarity != null ? Math.round(s.similarity * 100) : 0;
+            return !!s.bestMatchEmail && p >= SIS_DISPLAY_THRESHOLD_PERCENT;
+          })
+          .map((s) => String(s.label))
+      )
+    );
+    if (speakerLabels.length === 1) return speakerLabels[0];
+
+    const nonUnknown = Array.from(
+      new Set(
+        groupedSegments
+          .map((s) => String(s.speakerId))
+          .filter((s) => s && s.toLowerCase() !== 'unknown')
+      )
+    );
+    if (nonUnknown.length === 1) return nonUnknown[0];
+
+    return null;
+  })();
+
+  // Always render a segmented view if we have segments.
+  // If the user edits the transcript, we keep the speaker UI by rendering the edited transcript as a single “segment”.
+  const segmentsToRender = (() => {
+    if (groupedSegments.length === 0) return [] as typeof groupedSegments;
+    if (!transcript) return groupedSegments;
+
     const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
     const segmentsText = groupedSegments.map((s) => s.text).join(' ');
-    return normalize(transcript) === normalize(segmentsText);
+
+    if (normalize(transcript) === normalize(segmentsText)) return groupedSegments;
+
+    const fallbackSpeakerId =
+      inferredPrimarySpeakerId ||
+      groupedSegments.find((s) => String(s.speakerId).toLowerCase() !== 'unknown')?.speakerId ||
+      'unknown';
+
+    return [
+      {
+        speakerId: fallbackSpeakerId,
+        text: transcript,
+        start: groupedSegments[0]?.start ?? 0,
+        end: groupedSegments[groupedSegments.length - 1]?.end ?? groupedSegments[0]?.end ?? 0,
+      },
+    ];
   })();
   return (
     <div className="min-h-screen bg-background animate-fade-in">
@@ -1071,16 +1123,22 @@ const MeetingDetail = () => {
                         </div>
                       ) : (
                         <div className="rounded-xl max-h-[600px] overflow-y-auto bg-muted/20 border border-border/40 p-4">
-                          {groupedSegments.length > 0 && segmentsAreCanonicalTranscript ? (
+                          {segmentsToRender.length > 0 ? (
                             <div className="space-y-3">
-                              {groupedSegments.map((segment, idx) => {
-                                const manualName = speakerNames[segment.speakerId];
-                                const isIdentified = isSpeakerIdentified(segment.speakerId);
-                                const confidence = getSpeakerConfidence(segment.speakerId);
-                                const resolvedName = manualName || (isIdentified ? getSpeakerDisplayName(segment.speakerId) : null);
+                              {segmentsToRender.map((segment, idx) => {
+                                const speakerIdForUi =
+                                  String(segment.speakerId).toLowerCase() === 'unknown' && inferredPrimarySpeakerId
+                                    ? inferredPrimarySpeakerId
+                                    : segment.speakerId;
+
+                                const manualName = speakerNames[speakerIdForUi];
+                                const resolvedName = manualName || getSpeakerDisplayName(speakerIdForUi);
                                 const displayName = resolvedName || 'Okänd talare';
-                                const isEditing = editingSpeaker === segment.speakerId;
-                                const canEdit = !!segment.speakerId && String(segment.speakerId).toLowerCase() !== 'unknown';
+
+                                const isIdentified = isSpeakerIdentified(speakerIdForUi);
+                                const confidence = getSpeakerConfidence(speakerIdForUi);
+                                const isEditing = editingSpeaker === speakerIdForUi;
+                                const canEdit = !!speakerIdForUi && String(speakerIdForUi).toLowerCase() !== 'unknown';
 
                                 const badgeClass = confidence != null && confidence >= 85
                                   ? 'border-primary/30 text-primary bg-primary/10'
@@ -1088,7 +1146,7 @@ const MeetingDetail = () => {
 
                                 return (
                                   <motion.div
-                                    key={`${segment.speakerId}-${segment.start}-${idx}`}
+                                    key={`${speakerIdForUi}-${segment.start}-${idx}`}
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: Math.min(idx * 0.015, 0.2) }}
@@ -1158,7 +1216,7 @@ const MeetingDetail = () => {
                                               variant="ghost"
                                               className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
                                               onClick={() => {
-                                                setEditingSpeaker(segment.speakerId);
+                                                setEditingSpeaker(speakerIdForUi);
                                                 setEditingSpeakerValue(manualName || resolvedName || '');
                                               }}
                                             >
