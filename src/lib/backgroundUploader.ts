@@ -117,8 +117,9 @@ async function executeUpload(meetingId: string): Promise<void> {
       const xhr = new XMLHttpRequest();
       let lastLoaded = 0;
 
-      // Match fetch({ credentials: 'include' }) behavior
-      xhr.withCredentials = true;
+      // Cookies are not required for ASR upload (we authenticate via Bearer token).
+      // Avoid withCredentials to reduce CORS/proxy quirks that can cause “pending” hangs.
+      xhr.withCredentials = false;
 
       const watchdog = window.setInterval(() => {
         const now = Date.now();

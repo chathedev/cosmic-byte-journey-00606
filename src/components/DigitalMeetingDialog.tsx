@@ -53,6 +53,7 @@ export const DigitalMeetingDialog = ({
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
@@ -161,40 +162,132 @@ export const DigitalMeetingDialog = ({
       return;
     }
 
+    setUploadProgress(0);
+
+    const traceId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
     try {
       // Step 1: POST audio to /asr/transcribe - backend starts transcription and returns server-generated meetingId
       const formData = new FormData();
       formData.append('audio', file, file.name);
       formData.append('language', languageCode);
       formData.append('title', meetingTitle);
+      // Safe “backend-visible” trace without triggering CORS preflight headers
+      formData.append('traceId', traceId);
 
-      console.log('📤 Step 1: Uploading to /asr/transcribe...');
+      console.log('📤 Step 1: Uploading to /asr/transcribe (XHR)...', { traceId });
 
-      const transcribeResponse = await fetch('https://api.tivly.se/asr/transcribe', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
+      const transcribeResult = await new Promise<any>((resolve, reject) => {
+        const STALL_MS = 120000; // 2 min without byte progress
+        const MAX_TOTAL_MS = 30 * 60 * 1000; // 30 min hard cap
+
+        const xhr = new XMLHttpRequest();
+        xhr.withCredentials = false;
+
+        let lastLoaded = 0;
+        let lastProgressAt = Date.now();
+        let lastLoggedPercent = -1;
+
+        const watchdog = window.setInterval(() => {
+          const now = Date.now();
+          const stalledFor = now - lastProgressAt;
+
+          if (stalledFor > STALL_MS) {
+            console.error('🧱 /asr/transcribe stalled (no progress):', { traceId, stalledFor });
+            try { xhr.abort(); } catch {}
+            window.clearInterval(watchdog);
+            reject(new Error('Uppladdningen verkar ha fastnat. Försök igen.'));
+          }
+        }, 5000);
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            if (e.loaded > lastLoaded) {
+              lastLoaded = e.loaded;
+              lastProgressAt = Date.now();
+            }
+
+            const percent = Math.min(95, Math.round((e.loaded / e.total) * 95));
+            setUploadProgress((p) => Math.max(p, percent));
+
+            // Log every 10% to avoid spam
+            const bucket = Math.floor(percent / 10) * 10;
+            if (bucket !== lastLoggedPercent) {
+              lastLoggedPercent = bucket;
+              console.log('📶 /asr/transcribe upload progress:', { traceId, percent: bucket, loaded: e.loaded, total: e.total });
+            }
+          } else {
+            // Still update lastProgressAt if bytes are reported
+            if ((e as any).loaded && (e as any).loaded > lastLoaded) {
+              lastLoaded = (e as any).loaded;
+              lastProgressAt = Date.now();
+            }
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          window.clearInterval(watchdog);
+          setUploadProgress(100);
+
+          const preview = (xhr.responseText || '').slice(0, 500);
+          console.log('📦 /asr/transcribe response:', { traceId, status: xhr.status, preview });
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('Ogiltigt svar från servern'));
+            }
+            return;
+          }
+
+          // Non-2xx
+          let msg = `Uppladdningen misslyckades (${xhr.status})`;
+          try {
+            const parsed = JSON.parse(xhr.responseText);
+            msg = parsed?.error || parsed?.message || msg;
+          } catch {
+            // ignore
+          }
+          reject(new Error(msg));
+        });
+
+        xhr.addEventListener('error', () => {
+          window.clearInterval(watchdog);
+          reject(new Error('Nätverksfel vid uppladdning'));
+        });
+
+        xhr.addEventListener('timeout', () => {
+          window.clearInterval(watchdog);
+          reject(new Error('Uppladdningen tog för lång tid (timeout)'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          window.clearInterval(watchdog);
+        });
+
+        xhr.open('POST', 'https://api.tivly.se/asr/transcribe');
+        xhr.timeout = MAX_TOTAL_MS;
+
+        // Bearer auth (same token as rest of app)
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        // Do NOT set Content-Type manually for FormData
+        xhr.send(formData);
+
+        // If nothing happens at all (no progress events), still abort after MAX_TOTAL_MS via xhr.timeout
+        console.log('🛰️ /asr/transcribe XHR started:', { traceId, fileName: file.name, size: file.size, type: file.type, language: languageCode });
       });
 
-      if (!transcribeResponse.ok) {
-        const errorText = await transcribeResponse.text();
-        console.error('Transcribe error:', errorText);
-        throw new Error('Failed to start transcription');
-      }
-
       // Get the server-generated meetingId from response
-      const transcribeResult = await transcribeResponse.json();
       const meetingId = transcribeResult.meetingId || transcribeResult.meeting_id || transcribeResult.id;
-      
+
       if (!meetingId) {
         console.error('No meetingId in response:', transcribeResult);
-        throw new Error('No meeting ID returned from transcription service');
+        throw new Error('Inget meetingId returnerades från transkriberingstjänsten');
       }
-      
-      console.log('✅ Upload complete - meetingId:', meetingId);
+
+      console.log('✅ Upload complete - meetingId:', meetingId, '| traceId:', traceId);
 
       // Save pending meeting to sessionStorage for instant display on meeting page
       const pendingMeeting = {
@@ -213,6 +306,7 @@ export const DigitalMeetingDialog = ({
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
+      setUploadProgress(0);
 
       toast({
         title: 'Uppladdning klar! 🎉',
@@ -220,21 +314,20 @@ export const DigitalMeetingDialog = ({
       });
 
       navigate(`/meetings/${meetingId}`);
-
-
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('Upload error:', { traceId, error });
       setIsSubmitting(false);
       toast({
-        title: "Något gick fel",
-        description: error.message || "Försök igen.",
-        variant: "destructive",
+        title: 'Något gick fel',
+        description: error?.message || 'Försök igen.',
+        variant: 'destructive',
       });
     }
   };
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
+    setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -407,22 +500,19 @@ export const DigitalMeetingDialog = ({
                           </div>
                         </motion.div>
 
-                        {/* Animated progress bar */}
+                        {/* Upload progress */}
                         <div className="space-y-2">
                           <div className="h-2 rounded-full bg-muted overflow-hidden">
                             <motion.div 
                               className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
                               initial={{ width: "0%" }}
-                              animate={{ width: "100%" }}
-                              transition={{ 
-                                duration: 30,
-                                ease: "linear"
-                              }}
+                              animate={{ width: `${Math.min(100, Math.max(uploadProgress, 2))}%` }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
                             />
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>Laddar upp {fileSizeMB.toFixed(0)}MB...</span>
-                            <span>Detta kan ta några minuter</span>
+                            <span>{uploadProgress}%</span>
                           </div>
                         </div>
 
@@ -440,14 +530,14 @@ export const DigitalMeetingDialog = ({
                     ) : (
                       <div className="text-center space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          Laddar upp din inspelning...
+                          Laddar upp din inspelning... {uploadProgress}%
                         </p>
                         <div className="h-1.5 rounded-full bg-muted overflow-hidden max-w-xs mx-auto">
                           <motion.div 
                             className="h-full bg-primary rounded-full"
                             initial={{ width: "0%" }}
-                            animate={{ width: "100%" }}
-                            transition={{ duration: 8, ease: "linear" }}
+                            animate={{ width: `${Math.min(100, Math.max(uploadProgress, 2))}%` }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
                           />
                         </div>
                       </div>
