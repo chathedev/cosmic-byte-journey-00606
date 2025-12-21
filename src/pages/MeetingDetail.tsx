@@ -1062,18 +1062,9 @@ const MeetingDetail = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-muted/30 rounded-xl p-6 max-h-[500px] overflow-y-auto space-y-4">
-                          <motion.p 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.5 }}
-                            className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm"
-                          >
-                            {transcript}
-                          </motion.p>
-
-                          {groupedSegments.length > 0 && (
-                            <div className="mt-6 space-y-3">
+                        <div className="rounded-xl max-h-[600px] overflow-y-auto">
+                          {groupedSegments.length > 0 ? (
+                            <div className="space-y-1">
                               {groupedSegments.map((segment, idx) => {
                                 const manualName = speakerNames[segment.speakerId];
                                 const isIdentified = isSpeakerIdentified(segment.speakerId);
@@ -1083,12 +1074,21 @@ const MeetingDetail = () => {
                                 const isEditing = editingSpeaker === segment.speakerId;
                                 const canEdit = !!segment.speakerId && String(segment.speakerId).toLowerCase() !== 'unknown';
 
-                                const lineClass =
-                                  isIdentified && confidence != null && confidence >= 85
-                                    ? 'bg-primary'
-                                    : isIdentified
-                                      ? 'bg-accent'
-                                      : 'bg-muted';
+                                // Speaker colors for horizontal accent line
+                                const speakerColors = [
+                                  'from-blue-500 to-blue-400',
+                                  'from-emerald-500 to-emerald-400',
+                                  'from-amber-500 to-amber-400',
+                                  'from-purple-500 to-purple-400',
+                                  'from-rose-500 to-rose-400',
+                                  'from-cyan-500 to-cyan-400',
+                                ];
+                                const colorIndex = segment.speakerId ? Math.abs(segment.speakerId.charCodeAt(segment.speakerId.length - 1)) % speakerColors.length : 0;
+                                const lineGradient = isIdentified && confidence != null && confidence >= 85
+                                  ? 'from-primary to-primary/70'
+                                  : isIdentified
+                                    ? 'from-accent to-accent/70'
+                                    : speakerColors[colorIndex];
 
                                 const badgeClass = confidence != null && confidence >= 85
                                   ? 'border-primary/30 text-primary bg-primary/10'
@@ -1097,99 +1097,107 @@ const MeetingDetail = () => {
                                 return (
                                   <motion.div
                                     key={`${segment.speakerId}-${segment.start}-${idx}`}
-                                    initial={{ opacity: 0, y: 8 }}
+                                    initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: Math.min(idx * 0.02, 0.25) }}
-                                    className="grid grid-cols-[140px_1fr] gap-4 rounded-xl border border-border/40 bg-background/40 p-4"
+                                    transition={{ delay: Math.min(idx * 0.015, 0.2) }}
+                                    className="group"
                                   >
-                                    <div className="relative pl-4">
-                                      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-full ${lineClass}`} aria-hidden="true" />
-
-                                      <div className="flex items-center gap-2">
-                                        {isEditing ? (
-                                          <div className="flex items-center gap-2 min-w-0">
-                                            <Input
-                                              value={editingSpeakerValue}
-                                              onChange={(e) => setEditingSpeakerValue(e.target.value)}
-                                              className="h-7 text-sm w-[110px]"
-                                              placeholder="Namn..."
-                                              autoFocus
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleSaveSpeakerName();
-                                                if (e.key === 'Escape') {
-                                                  setEditingSpeaker(null);
-                                                  setEditingSpeakerValue('');
-                                                }
-                                              }}
-                                            />
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-7 w-7 p-0"
-                                              onClick={handleSaveSpeakerName}
-                                              disabled={isSavingSpeaker}
-                                            >
-                                              {isSavingSpeaker ? (
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                              ) : (
-                                                <Save className="w-3 h-3" />
-                                              )}
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-7 w-7 p-0"
-                                              onClick={() => {
+                                    {/* Horizontal colored accent line */}
+                                    <div className={`h-[2px] bg-gradient-to-r ${lineGradient} rounded-full mb-2`} />
+                                    
+                                    {/* Speaker name row */}
+                                    <div className="flex items-center gap-2 mb-1.5 px-1">
+                                      {isEditing ? (
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <Input
+                                            value={editingSpeakerValue}
+                                            onChange={(e) => setEditingSpeakerValue(e.target.value)}
+                                            className="h-7 text-sm w-[140px]"
+                                            placeholder="Namn..."
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') handleSaveSpeakerName();
+                                              if (e.key === 'Escape') {
                                                 setEditingSpeaker(null);
                                                 setEditingSpeakerValue('');
+                                              }
+                                            }}
+                                          />
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            onClick={handleSaveSpeakerName}
+                                            disabled={isSavingSpeaker}
+                                          >
+                                            {isSavingSpeaker ? (
+                                              <Loader2 className="w-3 h-3 animate-spin" />
+                                            ) : (
+                                              <Save className="w-3 h-3" />
+                                            )}
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0"
+                                            onClick={() => {
+                                              setEditingSpeaker(null);
+                                              setEditingSpeakerValue('');
+                                            }}
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <span className="text-xs font-semibold text-foreground/80">
+                                            {displayName}
+                                          </span>
+                                          {isIdentified && confidence != null && (
+                                            <Badge
+                                              variant="outline"
+                                              className={`text-[9px] px-1.5 py-0 h-4 ${badgeClass}`}
+                                            >
+                                              {getSISVerificationLabel(confidence)}
+                                            </Badge>
+                                          )}
+                                          <span className="text-[10px] text-muted-foreground ml-auto">
+                                            {formatTime(segment.start)}
+                                          </span>
+                                          {canEdit && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
+                                              onClick={() => {
+                                                setEditingSpeaker(segment.speakerId);
+                                                setEditingSpeakerValue(manualName || resolvedName || '');
                                               }}
                                             >
-                                              <X className="w-3 h-3" />
+                                              <Pencil className="w-2.5 h-2.5" />
                                             </Button>
-                                          </div>
-                                        ) : (
-                                          <>
-                                            <span className="text-xs font-semibold text-foreground/90 truncate max-w-[110px]">
-                                              {displayName}
-                                            </span>
-                                            {isIdentified && confidence != null && (
-                                              <Badge
-                                                variant="outline"
-                                                className={`text-[10px] px-1.5 py-0 h-4 ${badgeClass}`}
-                                              >
-                                                {getSISVerificationLabel(confidence)}
-                                              </Badge>
-                                            )}
-                                            {canEdit && (
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
-                                                onClick={() => {
-                                                  setEditingSpeaker(segment.speakerId);
-                                                  setEditingSpeakerValue(manualName || (resolvedName || ''));
-                                                }}
-                                              >
-                                                <Pencil className="w-3 h-3" />
-                                              </Button>
-                                            )}
-                                          </>
-                                        )}
-                                      </div>
+                                          )}
+                                        </>
+                                      )}
                                     </div>
 
-                                    <div className="min-w-0">
-                                      <div className="text-xs text-muted-foreground">
-                                        {formatTime(segment.start)}
-                                      </div>
-                                      <p className="mt-2 text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">
-                                        {segment.text}
-                                      </p>
-                                    </div>
+                                    {/* Transcript text */}
+                                    <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed px-1 pb-4">
+                                      {segment.text}
+                                    </p>
                                   </motion.div>
                                 );
                               })}
                             </div>
+                          ) : (
+                            <motion.p 
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.5 }}
+                              className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-sm p-4 bg-muted/30 rounded-xl"
+                            >
+                              {transcript}
+                            </motion.p>
                           )}
                         </div>
                       )}
