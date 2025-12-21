@@ -20,7 +20,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3 } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -201,6 +201,7 @@ export function AppSidebar() {
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
     { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
     { Icon: DollarSign, title: "AI Kostnader", path: "/admin/ai-costs" },
+    { Icon: Mic, title: "Röstprofiler", path: "/admin/speaker-profiles" },
     { Icon: Eye, title: "Support Panel", action: () => setShowAdminSupport(true) },
   ];
 

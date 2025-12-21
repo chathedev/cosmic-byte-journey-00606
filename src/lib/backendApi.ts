@@ -5,6 +5,16 @@ const BACKEND_URL = 'https://api.tivly.se';
 // Re-export for convenience
 export type { LyraLearningEntry, SISLearningEntry };
 
+export interface SpeakerProfile {
+  name: string;
+  companyId?: string;
+  linkedEmail?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  embeddingCount?: number;
+  meetingsCount?: number;
+}
+
 export interface SpeakerNamesResponse {
   speakerNames: Record<string, string>;
   sisLearning?: LyraLearningEntry[];
@@ -467,6 +477,70 @@ export const backendApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Det gick inte att återställa auth-data' }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  // Admin Speaker Profiles Management
+  async getSpeakerProfiles(companyId?: string): Promise<SpeakerProfile[]> {
+    const params = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+    const response = await fetch(`${BACKEND_URL}/admin/speaker-profiles${params}`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Kunde inte hämta röstsökprofiler' }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.profiles || [];
+  },
+
+  async linkSpeakerProfile(companyId: string, name: string, email: string): Promise<{ ok: boolean; profile: SpeakerProfile }> {
+    const response = await fetch(`${BACKEND_URL}/admin/speaker-profiles/link`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ companyId, name, email }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Kunde inte länka profilen' }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async unlinkSpeakerProfile(companyId: string, name: string): Promise<{ ok: boolean }> {
+    const response = await fetch(`${BACKEND_URL}/admin/speaker-profiles/unlink`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ companyId, name }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Kunde inte ta bort länk' }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async deleteSpeakerProfile(companyId: string, name: string): Promise<{ ok: boolean }> {
+    const response = await fetch(`${BACKEND_URL}/admin/speaker-profiles/${encodeURIComponent(companyId)}/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Kunde inte ta bort profilen' }));
       throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
 
