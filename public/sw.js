@@ -33,18 +33,20 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Always use network-first for everything to avoid stale content
+// Always use network-first for same-origin GET requests to avoid stale content
 async function networkFirst(request) {
   try {
     const fresh = await fetch(request);
-    // Only cache successful responses
+
+    // Only cache successful SAME-ORIGIN responses
     if (fresh.ok) {
-      const cache = await caches.open(CACHE_VERSION);
       const url = new URL(request.url);
-      if (url.protocol === 'http:' || url.protocol === 'https:') {
+      if (url.origin === self.location.origin) {
+        const cache = await caches.open(CACHE_VERSION);
         cache.put(request, fresh.clone());
       }
     }
+
     return fresh;
   } catch (_) {
     const cached = await caches.match(request);
@@ -56,6 +58,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Never intercept cross-origin (prevents SW from affecting api.tivly.se requests)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Never cache dev server or module transforms
   if (url.pathname.startsWith('/@vite') || url.pathname.startsWith('/src/')) {
     return; // Let browser handle normally
@@ -66,6 +73,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Use network-first for EVERYTHING to prevent stale CSS/JS
+  // Use network-first for same-origin GET assets
   event.respondWith(networkFirst(request));
 });
