@@ -113,9 +113,7 @@ async function executeUpload(meetingId: string): Promise<void> {
   formData.append('audio', upload.file, upload.file.name);
   formData.append('meetingId', meetingId);
   formData.append('language', upload.language);
-  if (transcribeTarget.useProxy && token) {
-    formData.append('backendAuthToken', token);
-  }
+  // No proxy token needed - always direct upload now
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -207,9 +205,8 @@ async function executeUpload(meetingId: string): Promise<void> {
       xhr.open('POST', transcribeTarget.url);
       xhr.timeout = MAX_TOTAL_MS;
 
-      if (transcribeTarget.useProxy) {
-        applyProxyHeadersToXhr(xhr);
-      } else if (token) {
+      // Always use Bearer auth (direct upload only now)
+      if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
 

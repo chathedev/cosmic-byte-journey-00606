@@ -177,14 +177,12 @@ export const DigitalMeetingDialog = ({
       formData.append('title', meetingTitle);
       formData.append('traceId', traceId);
 
-      // For proxy uploads we pass the external auth token in the body (never log it)
-      if (transcribeTarget.useProxy) {
-        formData.append('backendAuthToken', token);
-      }
+      // No longer using proxy - direct upload only
+      // (proxy caused HTTP/2 stalls)
 
       console.log('📤 Step 1: Uploading to /asr/transcribe (XHR)...', {
         traceId,
-        via: transcribeTarget.useProxy ? 'proxy' : 'direct',
+        url: transcribeTarget.url,
       });
 
       const transcribeResult = await new Promise<any>((resolve, reject) => {
@@ -279,12 +277,8 @@ export const DigitalMeetingDialog = ({
         xhr.open('POST', transcribeTarget.url);
         xhr.timeout = MAX_TOTAL_MS;
 
-        if (transcribeTarget.useProxy) {
-          applyProxyHeadersToXhr(xhr);
-        } else {
-          // Bearer auth (same token as rest of app)
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        }
+        // Always use Bearer auth (direct upload only now)
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
         // Do NOT set Content-Type manually for FormData
         xhr.send(formData);
