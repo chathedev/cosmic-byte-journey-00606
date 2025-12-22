@@ -13,7 +13,7 @@ import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
 import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry } from "@/lib/asrService";
 import { apiClient } from "@/lib/api";
 import { backendApi } from "@/lib/backendApi";
-import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
+import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackendAlias } from "@/lib/backgroundUploader";
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
@@ -124,6 +124,13 @@ const MeetingDetail = () => {
 
     const loadMeeting = async () => {
       setIsLoading(true);
+      
+      // Resolve backend alias if upload returned a different ID
+      const resolvedId = resolveBackendMeetingId(id);
+      if (resolvedId !== id) {
+        console.log('📋 Meeting detail: using resolved backend ID:', { original: id, resolved: resolvedId });
+      }
+      
       try {
         // First check sessionStorage for pending meeting
         const pendingMeetingJson = sessionStorage.getItem('pendingMeeting');
@@ -148,8 +155,15 @@ const MeetingDetail = () => {
           }
         }
 
-        // Otherwise fetch from backend
-        const fetchedMeeting = await meetingStorage.getMeeting(id);
+        // Try fetching with original ID first, then resolved ID if different
+        let fetchedMeeting = await meetingStorage.getMeeting(id);
+        
+        // If not found and we have a resolved ID, try that
+        if (!fetchedMeeting && resolvedId !== id) {
+          console.log('📋 Meeting not found with original ID, trying resolved ID...');
+          fetchedMeeting = await meetingStorage.getMeeting(resolvedId);
+        }
+        
         if (fetchedMeeting) {
           setMeeting(fetchedMeeting);
           

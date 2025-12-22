@@ -13,6 +13,7 @@
 
 import { debugLog, debugError } from './debugLogger';
 import { uploadToAsr } from './asrUpload';
+import { resolveBackendMeetingId } from './backgroundUploader';
 
 const BACKEND_API_URL = 'https://api.tivly.se';
 const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
@@ -255,6 +256,7 @@ export async function uploadAudioForTranscription(
 /**
  * Poll ASR status by meetingId
  * Handles 404 gracefully (job not registered yet)
+ * Automatically resolves backend aliases if the ID was remapped
  */
 export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
   const token = localStorage.getItem('authToken');
@@ -265,8 +267,14 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     headers['Authorization'] = `Bearer ${token}`;
   }
   
+  // Resolve alias: if backend returned a different ID during upload, use that
+  const resolvedId = resolveBackendMeetingId(meetingId);
+  if (resolvedId !== meetingId) {
+    debugLog('📊 ASR poll: using resolved backend ID:', { original: meetingId, resolved: resolvedId });
+  }
+  
   try {
-    const response = await fetch(`${BACKEND_API_URL}/asr/status?meetingId=${encodeURIComponent(meetingId)}`, {
+    const response = await fetch(`${BACKEND_API_URL}/asr/status?meetingId=${encodeURIComponent(resolvedId)}`, {
       method: 'GET',
       headers,
     });
