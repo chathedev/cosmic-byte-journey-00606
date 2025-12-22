@@ -642,7 +642,7 @@ export const AutoProtocolGenerator = ({
     }
     
     if (!meetingId || !isValidUUID(meetingId)) {
-      console.warn('⚠️ No valid meeting ID - protocol already generated, navigating to library');
+      console.warn('⚠️ No valid meeting ID - navigating to library');
       toast({
         title: "Protokoll klart",
         description: "Protokollet har genererats och är tillgängligt i biblioteket.",
@@ -653,14 +653,14 @@ export const AutoProtocolGenerator = ({
     }
 
     // Protocol is already saved via backend during generation
-    // Just provide user feedback and navigate
+    // Navigate directly to the meeting page
     toast({
       title: "Protokoll sparat",
-      description: "Protokollet har sparats på mötet och finns i ditt bibliotek.",
+      description: "Protokollet har sparats på mötet.",
       duration: 2000,
     });
     
-    navigate("/library");
+    navigate(`/meeting/${meetingId}`);
   };
 
   const getPriorityColor = (priority: string) => {
