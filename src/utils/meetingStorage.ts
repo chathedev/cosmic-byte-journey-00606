@@ -108,6 +108,9 @@ export const meetingStorage = {
 
   async saveMeeting(meeting: MeetingSession): Promise<string> {
     try {
+      // NOTE: protocolCount is NOT stored in meeting records anymore.
+      // It's stored in a separate file (data/protocol-counts.json).
+      // We should NOT include protocolCount in the payload.
       const payload: any = {
         title: meeting.title,
         transcript: meeting.transcript,
@@ -115,18 +118,12 @@ export const meetingStorage = {
         folder: meeting.folder,
         folderId: (meeting as any).folderId,
         isCompleted: meeting.isCompleted ?? false,
-        // IMPORTANT: Only send protocolCount when explicitly provided.
-        // Otherwise we risk overwriting the backend counter with 0.
         hasCounted: (meeting as any).hasCounted ?? false,
         agendaId: meeting.agendaId,
         createdAt: meeting.createdAt,
         startedAt: meeting.createdAt,
         meetingStartedAt: meeting.createdAt,
       };
-
-      if (typeof meeting.protocolCount === 'number' && Number.isFinite(meeting.protocolCount)) {
-        payload.protocolCount = meeting.protocolCount;
-      }
 
       // Resolve folderId if only a folder name was provided
       try {
@@ -196,7 +193,12 @@ export const meetingStorage = {
   },
 
   // Increment protocol count using dedicated backend endpoint
+  // NOTE: Protocol counts are stored in a SEPARATE file (data/protocol-counts.json)
+  // They are NOT stored in meeting records, so we only use the dedicated endpoint.
   async incrementProtocolCount(meetingId: string): Promise<number> {
+    const cacheKey = `protocol_count_${meetingId}`;
+    const timestampKey = `protocol_count_ts_${meetingId}`;
+    
     try {
       // Skip for temp meetings - they don't exist in backend yet
       if (!isValidUUID(meetingId)) {
@@ -204,56 +206,83 @@ export const meetingStorage = {
         return 0;
       }
 
-      const cacheKey = `protocol_count_${meetingId}`;
-
       // Use the dedicated endpoint: POST /meetings/:id/protocol-count/increment
+      // This is the ONLY way to increment - counts are stored in protocol-counts.json, not meeting records
       const result = await apiClient.incrementProtocolCount(meetingId);
       const nextCount = Number(result.protocolCount ?? 0) || 0;
 
-      // Cache locally to prevent UI flicker if a later read briefly returns 0
+      // Cache locally with timestamp - this helps when GET returns stale data
       try {
         localStorage.setItem(cacheKey, String(nextCount));
+        localStorage.setItem(timestampKey, String(Date.now()));
       } catch {}
-
-      // Best-effort: also persist onto meeting payload (some endpoints/UI read protocolCount from meeting)
-      try {
-        await apiClient.updateMeeting(meetingId, { protocolCount: nextCount } as any);
-      } catch (e) {
-        console.warn('⚠️ Could not persist protocolCount onto meeting record (non-blocking):', e);
-      }
 
       console.log(`✅ Protocol count incremented to ${nextCount} for meeting:`, meetingId);
       return nextCount;
     } catch (error) {
       console.error('Error incrementing protocol count (API):', error);
+      // Return cached value if available
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return Math.max(0, parseInt(cached, 10) || 0);
+      } catch {}
       return 0;
     }
   },
 
-  // Get protocol count from backend
+  // Get protocol count from backend (stored in protocol-counts.json, NOT in meeting records)
   async getProtocolCount(meetingId: string): Promise<number> {
     const cacheKey = `protocol_count_${meetingId}`;
+    const timestampKey = `protocol_count_ts_${meetingId}`;
+    
+    // Read cache first for fallback
     let cached = 0;
+    let cacheTimestamp = 0;
     try {
       const raw = localStorage.getItem(cacheKey);
       cached = raw ? Math.max(0, parseInt(raw, 10) || 0) : 0;
+      const ts = localStorage.getItem(timestampKey);
+      cacheTimestamp = ts ? parseInt(ts, 10) : 0;
     } catch {}
+
+    // If we recently incremented (within 30 seconds), trust the cache over a potentially stale backend
+    // This handles race conditions where the backend hasn't persisted yet
+    const recentlyIncremented = cacheTimestamp > 0 && (Date.now() - cacheTimestamp) < 30000;
+    if (recentlyIncremented && cached > 0) {
+      console.log('📊 Using recent cache for protocol count:', { meetingId, cached, ageMs: Date.now() - cacheTimestamp });
+      return cached;
+    }
 
     try {
       if (!isValidUUID(meetingId)) {
-        return 0;
+        console.log('⏭️ Invalid meeting ID for protocol count:', meetingId);
+        return cached;
       }
+      
+      // Fetch from the dedicated endpoint (NOT from meeting record)
       const result = await apiClient.getProtocolCount(meetingId);
       const count = Math.max(0, Number(result.protocolCount ?? 0) || 0);
+      
+      console.log('📊 Protocol count from backend:', { meetingId, backendCount: count, cachedCount: cached });
 
-      // Trust backend when it responds; update cache
+      // If backend returns less than cache, and we recently incremented, trust cache
+      if (count < cached && recentlyIncremented) {
+        console.log('⚠️ Backend returned stale count, using cache:', { backend: count, cache: cached });
+        return cached;
+      }
+
+      // Update cache with backend value
       try {
         localStorage.setItem(cacheKey, String(count));
+        // Clear timestamp since we have fresh data
+        if (count >= cached) {
+          localStorage.removeItem(timestampKey);
+        }
       } catch {}
 
       return count;
     } catch (error) {
-      console.error('Error getting protocol count:', error);
+      console.error('Error getting protocol count from backend, using cache:', error);
       return cached;
     }
   },
