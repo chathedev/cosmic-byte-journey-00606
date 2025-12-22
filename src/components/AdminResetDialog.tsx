@@ -3,7 +3,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, RotateCcw, MessageCircle, FileText } from 'lucide-react';
+import { Loader2, RotateCcw, MessageCircle, FileText, ScrollText } from 'lucide-react';
 
 interface UserData {
   email: string;
@@ -22,6 +22,7 @@ interface AdminResetDialogProps {
   onReset: (options: {
     resetMeetings: boolean;
     resetChat: boolean;
+    resetProtocolCounts: boolean;
     note?: string;
   }) => Promise<void>;
   isResetting: boolean;
@@ -40,20 +41,23 @@ export function AdminResetDialog({
 }: AdminResetDialogProps) {
   const [resetMeetings, setResetMeetings] = useState(true);
   const [resetChat, setResetChat] = useState(false);
+  const [resetProtocolCounts, setResetProtocolCounts] = useState(false);
   const [resetNote, setResetNote] = useState('');
 
   const handleReset = async () => {
-    if (!resetMeetings && !resetChat) return;
+    if (!resetMeetings && !resetChat && !resetProtocolCounts) return;
     
     await onReset({
       resetMeetings,
       resetChat,
+      resetProtocolCounts,
       note: resetNote || undefined,
     });
     
     // Reset state after successful reset
     setResetMeetings(true);
     setResetChat(false);
+    setResetProtocolCounts(false);
     setResetNote('');
   };
 
@@ -61,6 +65,7 @@ export function AdminResetDialog({
     if (!isOpen) {
       setResetMeetings(true);
       setResetChat(false);
+      setResetProtocolCounts(false);
       setResetNote('');
     }
     onOpenChange(isOpen);
@@ -130,6 +135,28 @@ export function AdminResetDialog({
                 </p>
               </div>
             </div>
+
+            {/* Protocol Counts Reset */}
+            <div className="flex items-start space-x-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+              <Checkbox
+                id="reset-protocols"
+                checked={resetProtocolCounts}
+                onCheckedChange={(checked) => setResetProtocolCounts(checked === true)}
+                className="mt-0.5"
+              />
+              <div className="flex-1 space-y-1">
+                <label
+                  htmlFor="reset-protocols"
+                  className="flex items-center gap-2 text-sm font-medium cursor-pointer"
+                >
+                  <ScrollText className="w-4 h-4 text-green-600" />
+                  Protocol Generation Counts
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Resets protocolCount to 0 on all active meetings (not in Trash)
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Note */}
@@ -153,7 +180,7 @@ export function AdminResetDialog({
           <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleReset}
-            disabled={isResetting || (!resetMeetings && !resetChat)}
+            disabled={isResetting || (!resetMeetings && !resetChat && !resetProtocolCounts)}
             className="bg-orange-600 text-white hover:bg-orange-700"
           >
             {isResetting ? (

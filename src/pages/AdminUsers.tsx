@@ -336,7 +336,7 @@ export default function AdminUsers() {
     }
   };
 
-  const handleResetUsage = async (options: { resetMeetings: boolean; resetChat: boolean; note?: string }) => {
+  const handleResetUsage = async (options: { resetMeetings: boolean; resetChat: boolean; resetProtocolCounts: boolean; note?: string }) => {
     if (!resetUsageUser) return;
     
     setIsResettingUsage(true);
@@ -351,6 +351,11 @@ export default function AdminUsers() {
       if (options.resetChat) {
         await apiClient.resetChatCounter(resetUsageUser.email);
         results.push('chatt');
+      }
+      
+      if (options.resetProtocolCounts) {
+        await apiClient.resetUserProtocolCounts(resetUsageUser.email);
+        results.push('protokollräknare');
       }
       
       toast({

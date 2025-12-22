@@ -1318,6 +1318,42 @@ class ApiClient {
     return response.json();
   }
 
+  // Protocol count management
+  async incrementProtocolCount(meetingId: string, count: number = 1): Promise<{ meetingId: string; protocolCount: number }> {
+    const response = await this.fetchWithAuth(`/meetings/${encodeURIComponent(meetingId)}/protocol-count/increment`, {
+      method: 'POST',
+      body: JSON.stringify({ count }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to increment protocol count' }));
+      throw new Error(error.error || 'Failed to increment protocol count');
+    }
+    return response.json();
+  }
+
+  async getProtocolCount(meetingId: string): Promise<{ meetingId: string; protocolCount: number }> {
+    const response = await this.fetchWithAuth(`/meetings/${encodeURIComponent(meetingId)}/protocol-count`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { meetingId, protocolCount: 0 };
+      }
+      const error = await response.json().catch(() => ({ error: 'Failed to get protocol count' }));
+      throw new Error(error.error || 'Failed to get protocol count');
+    }
+    return response.json();
+  }
+
+  async resetUserProtocolCounts(email: string): Promise<{ ok: boolean; reset: number; email: string }> {
+    const response = await this.fetchWithAuth(`/admin/users/${encodeURIComponent(email)}/protocol-count/reset`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to reset protocol counts' }));
+      throw new Error(error.error || 'Failed to reset protocol counts');
+    }
+    return response.json();
+  }
+
   async deleteAdminUser(email: string): Promise<any> {
     const response = await this.fetchWithAuth(`/admin/users/${encodeURIComponent(email)}`, {
       method: 'DELETE',
