@@ -22,7 +22,7 @@ import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiClient } from "@/lib/api";
-import { subscribeToUpload, getUploadStatus } from "@/lib/backgroundUploader";
+import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackendAlias } from "@/lib/backgroundUploader";
 import { isTestAccount, generateDemoMeetings, generateDemoFolders, generateDemoProtocolStatus, getDemoProtocol } from "@/utils/demoData";
 import { TranscriptionStatusWidget } from "@/components/TranscriptionStatusWidget";
 import { pollASRStatus, SISSpeaker, SISMatch } from "@/lib/asrService";

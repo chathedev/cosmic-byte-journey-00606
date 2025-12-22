@@ -19,6 +19,10 @@ interface PendingUpload {
 // In-memory store for pending uploads
 const pendingUploads = new Map<string, PendingUpload>();
 
+// Alias map: frontend-created ID → backend-returned ID (if different)
+// This allows polling to find the correct meeting when IDs differ
+const meetingIdAliases = new Map<string, string>();
+
 // Listeners for upload status changes
 const listeners = new Set<(meetingId: string, status: PendingUpload) => void>();
 
@@ -57,6 +61,32 @@ export function isUploadStale(meetingId: string): boolean {
 
 export function getAllPendingUploads(): PendingUpload[] {
   return Array.from(pendingUploads.values());
+}
+
+/**
+ * Get backend meeting ID for a frontend-created meeting ID.
+ * If backend returned a different ID, this returns that ID.
+ * Otherwise returns the original ID.
+ */
+export function resolveBackendMeetingId(frontendMeetingId: string): string {
+  return meetingIdAliases.get(frontendMeetingId) || frontendMeetingId;
+}
+
+/**
+ * Check if a meeting ID has an alias (backend created a different ID)
+ */
+export function hasBackendAlias(frontendMeetingId: string): boolean {
+  return meetingIdAliases.has(frontendMeetingId);
+}
+
+/**
+ * Get the frontend meeting ID from a backend ID (reverse lookup)
+ */
+export function getFrontendMeetingId(backendMeetingId: string): string | undefined {
+  for (const [frontendId, backendId] of meetingIdAliases.entries()) {
+    if (backendId === backendMeetingId) return frontendId;
+  }
+  return undefined;
 }
 
 /**
@@ -117,11 +147,30 @@ async function executeUpload(meetingId: string): Promise<void> {
       throw new Error(result.error || 'Upload failed');
     }
 
+    // CRITICAL: Check if backend returned a different meeting ID
+    const returnedMeetingId = result.meetingId;
+    if (returnedMeetingId && returnedMeetingId !== meetingId) {
+      debugLog('⚠️ Backend returned different meetingId - storing alias:', {
+        frontendId: meetingId,
+        backendId: returnedMeetingId,
+      });
+      meetingIdAliases.set(meetingId, returnedMeetingId);
+      
+      // Persist alias to sessionStorage for page reloads
+      try {
+        const aliases = JSON.parse(sessionStorage.getItem('meeting_id_aliases') || '{}');
+        aliases[meetingId] = returnedMeetingId;
+        sessionStorage.setItem('meeting_id_aliases', JSON.stringify(aliases));
+      } catch (e) {
+        console.warn('Could not persist meeting alias:', e);
+      }
+    }
+
     upload.status = 'complete';
     upload.progress = 100;
     upload.lastProgressAt = Date.now();
     notifyListeners(meetingId, upload);
-    debugLog('✅ Background upload complete:', { meetingId, traceId });
+    debugLog('✅ Background upload complete:', { meetingId, traceId, backendMeetingId: returnedMeetingId });
 
   } catch (error: any) {
     debugError('❌ Background upload failed:', { meetingId, traceId, error: error?.message || String(error) });
@@ -168,3 +217,25 @@ export function retryUpload(meetingId: string): void {
 export function cancelUpload(meetingId: string): void {
   pendingUploads.delete(meetingId);
 }
+
+/**
+ * Load persisted aliases from sessionStorage (call on app init)
+ */
+export function loadPersistedAliases(): void {
+  try {
+    const aliases = JSON.parse(sessionStorage.getItem('meeting_id_aliases') || '{}');
+    for (const [frontendId, backendId] of Object.entries(aliases)) {
+      if (typeof backendId === 'string') {
+        meetingIdAliases.set(frontendId, backendId);
+      }
+    }
+    if (Object.keys(aliases).length > 0) {
+      debugLog('📋 Loaded meeting ID aliases from session:', aliases);
+    }
+  } catch (e) {
+    console.warn('Could not load meeting aliases:', e);
+  }
+}
+
+// Load aliases on module init
+loadPersistedAliases();
