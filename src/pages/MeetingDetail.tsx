@@ -102,12 +102,14 @@ const MeetingDetail = () => {
     return 'Okänd';
   };
 
-  // Protocol limits: Pro = 1 replacement, Enterprise = 3 replacements
+  // Protocol limits: Pro = 1 generation, Enterprise = 3 generations
   const { enterpriseMembership } = useSubscription();
   const isEnterprise = enterpriseMembership?.isMember === true;
-  const maxProtocolReplaces = isEnterprise ? 3 : 1;
-  const currentProtocolCount = meeting?.protocolCount || 0;
-  const canReplaceProtocol = currentProtocolCount < maxProtocolReplaces;
+  const maxProtocolGenerations = isEnterprise ? 3 : 1;
+  const [backendProtocolCount, setBackendProtocolCount] = useState<number>(0);
+  const protocolCountUsed = backendProtocolCount;
+  const protocolCountRemaining = Math.max(0, maxProtocolGenerations - protocolCountUsed);
+  const canGenerateMoreProtocols = protocolCountUsed < maxProtocolGenerations;
 
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
@@ -263,14 +265,14 @@ const MeetingDetail = () => {
     const loadProtocolData = async () => {
       if (!id) return;
       
-      // Always fetch the latest protocol count from backend
+      // CRITICAL: Always fetch the latest protocol count from backend endpoint
       try {
         const countData = await meetingStorage.getProtocolCount(id);
-        if (countData > 0) {
-          setMeeting(prev => prev ? { ...prev, protocolCount: countData } : null);
-        }
+        console.log('📊 Fresh protocol count from backend:', countData);
+        setBackendProtocolCount(countData);
       } catch (error) {
         console.log('Could not load protocol count:', error);
+        setBackendProtocolCount(0);
       }
       
       // Load protocol document if meeting has protocol
@@ -559,10 +561,10 @@ const MeetingDetail = () => {
 
     // If protocol exists, show replace confirmation
     if (protocolData) {
-      if (!canReplaceProtocol) {
+      if (!canGenerateMoreProtocols) {
         toast({
           title: 'Gräns nådd',
-          description: `Du har nått gränsen för protokollersättningar (${maxProtocolReplaces}). Uppgradera för fler.`,
+          description: `Du har använt alla ${maxProtocolGenerations} protokoll. ${isEnterprise ? '' : 'Uppgradera till Enterprise för fler.'}`,
           variant: 'destructive',
         });
         return;
@@ -1457,7 +1459,7 @@ const MeetingDetail = () => {
                           <span className="font-medium text-sm">Protokoll</span>
                           <p className="text-xs text-muted-foreground">
                             Sparat {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')}
-                            {currentProtocolCount > 0 && ` • ${currentProtocolCount}/${maxProtocolReplaces} ersättningar`}
+                            {protocolCountUsed > 0 && ` • ${protocolCountUsed}/${maxProtocolGenerations} använda`}
                           </p>
                         </div>
                       </div>
@@ -1502,24 +1504,32 @@ const MeetingDetail = () => {
                     transition={{ delay: 0.2 }}
                     className="flex flex-wrap gap-3"
                   >
-                    <Button
-                      onClick={handleCreateProtocol}
-                      variant={protocolData ? "outline" : "default"}
-                      className="flex-1 sm:flex-none gap-2 rounded-full h-12"
-                      disabled={loadingProtocol}
-                    >
-                      {loadingProtocol ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : protocolData ? (
-                        <RefreshCw className="w-4 h-4" />
-                      ) : (
-                        <FileText className="w-4 h-4" />
-                      )}
-                      {protocolData 
-                        ? (canReplaceProtocol ? 'Ersätt protokoll' : 'Gräns nådd')
-                        : 'Skapa protokoll'
-                      }
-                    </Button>
+                    <div className="flex flex-col items-start gap-1">
+                      <Button
+                        onClick={handleCreateProtocol}
+                        variant={protocolData ? "outline" : "default"}
+                        className="flex-1 sm:flex-none gap-2 rounded-full h-12"
+                        disabled={loadingProtocol || (!canGenerateMoreProtocols && !!protocolData)}
+                      >
+                        {loadingProtocol ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : protocolData ? (
+                          <RefreshCw className="w-4 h-4" />
+                        ) : (
+                          <FileText className="w-4 h-4" />
+                        )}
+                        {protocolData 
+                          ? (canGenerateMoreProtocols ? 'Ersätt protokoll' : 'Gräns nådd')
+                          : 'Skapa protokoll'
+                        }
+                      </Button>
+                      <span className="text-xs text-muted-foreground pl-1">
+                        {protocolCountRemaining > 0 
+                          ? `Kvar: ${protocolCountRemaining} av ${maxProtocolGenerations}`
+                          : `Inga kvar (${protocolCountUsed}/${maxProtocolGenerations} använda)`
+                        }
+                      </span>
+                    </div>
 
                     {hasPlusAccess(user, userPlan) && (
                       <Button
@@ -1583,7 +1593,7 @@ const MeetingDetail = () => {
         open={showReplaceProtocolConfirm}
         onOpenChange={setShowReplaceProtocolConfirm}
         title="Ersätt protokoll"
-        description={`Vill du ersätta det befintliga protokollet? Efter detta har du ${Math.max(0, maxProtocolReplaces - currentProtocolCount - 1)} ersättningar kvar av ${maxProtocolReplaces}.`}
+        description={`Vill du ersätta det befintliga protokollet? Du har använt ${protocolCountUsed} av ${maxProtocolGenerations}. Efter detta har du ${Math.max(0, protocolCountRemaining - 1)} kvar.`}
         confirmText="Ersätt"
         onConfirm={handleReplaceProtocol}
         variant="destructive"

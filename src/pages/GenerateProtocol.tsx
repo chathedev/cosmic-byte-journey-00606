@@ -134,17 +134,23 @@ export default function GenerateProtocol() {
       // Pro = 1 protocol generation, Enterprise = 3 protocol generations
       if (payload.meetingId) {
         try {
-          const meeting = await meetingStorage.getMeeting(payload.meetingId);
-          const currentProtocolCount = meeting?.protocolCount || 0;
+          // CRITICAL: Always fetch fresh count from backend endpoint, not stale meeting data
+          const currentProtocolCount = await meetingStorage.getProtocolCount(payload.meetingId);
           const isEnterprise = enterpriseMembership?.isMember === true;
           const maxProtocolCount = isEnterprise ? 3 : 1;
           
-          console.log('🔐 Protocol limit check', { meetingId: payload.meetingId, currentProtocolCount, maxProtocolCount, isEnterprise });
+          console.log('🔐 Protocol limit check (fresh from backend)', { 
+            meetingId: payload.meetingId, 
+            currentProtocolCount, 
+            maxProtocolCount, 
+            isEnterprise,
+            remaining: maxProtocolCount - currentProtocolCount
+          });
           
           if (currentProtocolCount >= maxProtocolCount) {
             toast({
               title: "Protokollgräns nådd",
-              description: `Du har nått gränsen för protokoll (${maxProtocolCount}).`,
+              description: `Du har använt alla ${maxProtocolCount} protokoll för detta möte.`,
               variant: "destructive",
             });
             navigate("/");
