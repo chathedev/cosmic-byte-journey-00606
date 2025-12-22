@@ -103,6 +103,7 @@ async function executeUpload(meetingId: string): Promise<void> {
   try {
     const result = await uploadToAsr({
       file: upload.file,
+      meetingId,
       language: upload.language,
       traceId,
       onProgress: (percent) => {

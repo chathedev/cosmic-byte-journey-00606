@@ -227,6 +227,7 @@ export async function uploadAudioForTranscription(
   try {
     const result = await uploadToAsr({
       file,
+      meetingId,
       language,
       traceId,
       onProgress: (percent) => onUploadProgress?.(percent),

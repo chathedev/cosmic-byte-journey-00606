@@ -6,6 +6,8 @@ const ASR_ENDPOINT = 'https://api.tivly.se/asr/transcribe';
 
 export interface AsrUploadOptions {
   file: File;
+  /** Optional: attach the upload to an existing meeting (pre-created by the frontend). */
+  meetingId?: string;
   language?: string;
   title?: string;
   traceId?: string;
@@ -26,7 +28,7 @@ export interface AsrUploadResult {
  * Tries multipart/form-data first; falls back to raw body on HTTP/2 errors.
  */
 export async function uploadToAsr(options: AsrUploadOptions): Promise<AsrUploadResult> {
-  const { file, language = 'sv', title, traceId, authMode = 'required' } = options;
+  const { file, meetingId, language = 'sv', title, traceId, authMode = 'required' } = options;
 
   const token = localStorage.getItem('authToken')?.trim();
 
@@ -38,24 +40,45 @@ export async function uploadToAsr(options: AsrUploadOptions): Promise<AsrUploadR
     return { success: false, error: 'Filen verkar vara tom' };
   }
 
-  console.log(`[ASR] Uploading ${file.name} (${file.size} bytes)`);
+  console.log(`[ASR] Uploading ${file.name} (${file.size} bytes)`, {
+    meetingId: meetingId || undefined,
+  });
 
   // Try multipart first
-  const multipartResult = await attemptMultipartUpload(file, token, language, title, traceId, authMode, options.onProgress);
-  
+  const multipartResult = await attemptMultipartUpload(
+    file,
+    token,
+    language,
+    title,
+    traceId,
+    meetingId,
+    authMode,
+    options.onProgress
+  );
+
   if (multipartResult.success) {
     return multipartResult;
   }
 
   // If it looks like a network/protocol error, try raw body fallback
   const errorLower = (multipartResult.error || '').toLowerCase();
-  const isProtocolError = errorLower.includes('failed to fetch') || 
-                          errorLower.includes('network') ||
-                          errorLower.includes('protocol');
+  const isProtocolError =
+    errorLower.includes('failed to fetch') ||
+    errorLower.includes('network') ||
+    errorLower.includes('protocol');
 
   if (isProtocolError) {
     console.log('[ASR] Multipart failed with protocol error, trying raw body fallback...');
-    return attemptRawBodyUpload(file, token, language, title, traceId, authMode, options.onProgress);
+    return attemptRawBodyUpload(
+      file,
+      token,
+      language,
+      title,
+      traceId,
+      meetingId,
+      authMode,
+      options.onProgress
+    );
   }
 
   return multipartResult;
@@ -70,11 +93,13 @@ async function attemptMultipartUpload(
   language: string,
   title: string | undefined,
   traceId: string | undefined,
+  meetingId: string | undefined,
   authMode: 'required' | 'auto' | 'omit',
   onProgress?: (percent: number) => void
 ): Promise<AsrUploadResult> {
   const formData = new FormData();
   formData.append('audio', file, file.name);
+  if (meetingId) formData.append('meetingId', meetingId);
   if (language) formData.append('language', language);
   if (title) formData.append('title', title);
   if (traceId) formData.append('traceId', traceId);
@@ -87,7 +112,7 @@ async function attemptMultipartUpload(
 
     const response = await fetch(ASR_ENDPOINT, {
       method: 'POST',
-      headers: token && authMode !== 'omit' ? { 'Authorization': `Bearer ${token}` } : {},
+      headers: token && authMode !== 'omit' ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
       signal: controller.signal,
     });
@@ -115,6 +140,7 @@ async function attemptRawBodyUpload(
   language: string,
   title: string | undefined,
   traceId: string | undefined,
+  meetingId: string | undefined,
   authMode: 'required' | 'auto' | 'omit',
   onProgress?: (percent: number) => void
 ): Promise<AsrUploadResult> {
@@ -128,13 +154,19 @@ async function attemptRawBodyUpload(
       'Content-Type': file.type || 'application/octet-stream',
       'X-File-Name': encodeURIComponent(file.name),
     };
-    
+
+    if (meetingId) {
+      // Keep both variants for maximum compatibility with backend parsers
+      headers['X-Meeting-Id'] = meetingId;
+      headers['X-MeetingId'] = meetingId;
+    }
+
     if (language) headers['X-Language'] = language;
     if (title) headers['X-Title'] = encodeURIComponent(title);
     if (traceId) headers['X-Trace-Id'] = traceId;
     if (token && authMode !== 'omit') headers['Authorization'] = `Bearer ${token}`;
 
-    console.log('[ASR] Raw body upload starting...');
+    console.log('[ASR] Raw body upload starting...', { meetingId: meetingId || undefined });
 
     const response = await fetch(ASR_ENDPOINT, {
       method: 'POST',
