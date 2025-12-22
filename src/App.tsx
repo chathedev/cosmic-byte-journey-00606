@@ -175,13 +175,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
-  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/generate-protocol';
+  const isPublicPage = location.pathname === '/free-trial';
   const isRecordingPage = location.pathname === '/recording';
-  const isProtocolPage = location.pathname === '/protocol';
   const isSISRequiredPage = location.pathname === '/sis-required';
   const isNative = isNativeApp();
 
-  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage || isProtocolPage || isSISRequiredPage) {
+  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage || isSISRequiredPage) {
     return <>{children}</>;
   }
 
