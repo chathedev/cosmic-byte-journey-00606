@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,9 +173,50 @@ const Library = () => {
     };
   }, []);
 
+  // Track last reload time to debounce
+  const lastReloadRef = useRef<number>(0);
+  const RELOAD_DEBOUNCE_MS = 2000; // Don't reload more than once every 2 seconds
+
+  const reloadDataIfNeeded = useCallback(() => {
+    const now = Date.now();
+    if (now - lastReloadRef.current > RELOAD_DEBOUNCE_MS) {
+      lastReloadRef.current = now;
+      console.log('📚 Library: reloading data...');
+      loadData();
+    }
+  }, []);
+
+  // Reload data when user changes or when navigating to library
   useEffect(() => {
-    loadData();
-  }, [user]);
+    if (user) {
+      console.log('📚 Library: loading data for user');
+      loadData();
+      lastReloadRef.current = Date.now();
+    }
+  }, [user, location.pathname]);
+
+  // Reload data when library becomes visible (navigating back from meeting detail)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user && location.pathname === '/library') {
+        reloadDataIfNeeded();
+      }
+    };
+
+    const handleFocus = () => {
+      if (user && location.pathname === '/library') {
+        reloadDataIfNeeded();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user, location.pathname, reloadDataIfNeeded]);
 
   // Poll for processing meetings via GET /meetings/:id/transcription per spec
   const meetingsRef = useRef(meetings);
