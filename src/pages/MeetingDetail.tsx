@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown, Eye, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,7 @@ import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
 import { MeetingChat } from "@/components/MeetingChat";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
 interface AgendaLyraSpeaker {
@@ -79,6 +80,19 @@ const MeetingDetail = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSpeakers, setShowSpeakers] = useState(true);
 
+  // Protocol management state
+  const [protocolData, setProtocolData] = useState<{
+    fileName: string;
+    mimeType: string;
+    blob: string;
+    storedAt: string;
+    size: number;
+  } | null>(null);
+  const [loadingProtocol, setLoadingProtocol] = useState(false);
+  const [viewingProtocol, setViewingProtocol] = useState(false);
+  const [showDeleteProtocolConfirm, setShowDeleteProtocolConfirm] = useState(false);
+  const [showReplaceProtocolConfirm, setShowReplaceProtocolConfirm] = useState(false);
+
   // Speaker identification UX thresholds (per docs)
   const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
   const getSISVerificationLabel = (percent: number) => {
@@ -87,6 +101,11 @@ const MeetingDetail = () => {
     if (percent >= 75) return 'Trolig';
     return 'Okänd';
   };
+
+  // Protocol limits: Pro can replace 1 time, Plus can replace 5 times
+  const maxProtocolReplaces = userPlan?.plan === 'plus' ? 5 : 1;
+  const currentProtocolCount = meeting?.protocolCount || 0;
+  const canReplaceProtocol = currentProtocolCount < maxProtocolReplaces;
 
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
@@ -236,6 +255,30 @@ const MeetingDetail = () => {
 
     loadMeeting();
   }, [id, user, navigate, toast]);
+
+  // Load protocol data when meeting has a protocol
+  useEffect(() => {
+    const loadProtocol = async () => {
+      if (!id || !meeting?.protocol) {
+        setProtocolData(null);
+        return;
+      }
+      
+      try {
+        setLoadingProtocol(true);
+        const data = await backendApi.getProtocol(id);
+        if (data?.protocol) {
+          setProtocolData(data.protocol);
+        }
+      } catch (error) {
+        console.log('Could not load protocol:', error);
+      } finally {
+        setLoadingProtocol(false);
+      }
+    };
+    
+    loadProtocol();
+  }, [id, meeting?.protocol]);
 
   // Subscribe to background upload status
   useEffect(() => {
@@ -495,8 +538,29 @@ const MeetingDetail = () => {
     }
   };
 
-  // Handle create protocol
+  // Handle create protocol - check if one exists first
   const handleCreateProtocol = async () => {
+    if (!meeting || !transcript) return;
+
+    // If protocol exists, show replace confirmation
+    if (protocolData) {
+      if (!canReplaceProtocol) {
+        toast({
+          title: 'Gräns nådd',
+          description: `Du har nått gränsen för protokollersättningar (${maxProtocolReplaces}). Uppgradera för fler.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setShowReplaceProtocolConfirm(true);
+      return;
+    }
+
+    await proceedWithProtocolGeneration();
+  };
+
+  // Proceed with protocol generation
+  const proceedWithProtocolGeneration = async () => {
     if (!meeting || !transcript) return;
 
     let fetchedSegments: { speakerId: string; text: string; start: number; end: number }[] | undefined;
@@ -544,6 +608,109 @@ const MeetingDetail = () => {
       sisMatches: fetchedLyraMatches.length > 0 ? fetchedLyraMatches : undefined,
     });
     setShowAgendaDialog(true);
+  };
+
+  // Handle view protocol
+  const handleViewProtocol = () => {
+    if (protocolData) {
+      setViewingProtocol(true);
+    }
+  };
+
+  // Handle download protocol
+  const handleDownloadProtocol = () => {
+    if (!protocolData?.blob) return;
+
+    try {
+      const base64Data = protocolData.blob.replace(/^data:.*?;base64,/, '');
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const file = new Blob([bytes], { type: protocolData.mimeType });
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = protocolData.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Protokoll nedladdat",
+        description: protocolData.fileName,
+        duration: 2000,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Fel",
+        description: error.message || "Kunde inte ladda ner protokoll",
+        variant: "destructive",
+        duration: 2500,
+      });
+    }
+  };
+
+  // Handle delete protocol
+  const handleDeleteProtocol = async () => {
+    if (!id) return;
+    
+    try {
+      await backendApi.deleteProtocol(id);
+      setProtocolData(null);
+      
+      // Update meeting state to reflect no protocol
+      setMeeting(prev => prev ? { ...prev, protocol: null } : null);
+      
+      toast({
+        title: "Protokoll borttaget",
+        description: "Du kan nu generera ett nytt protokoll",
+        duration: 2000,
+      });
+      setShowDeleteProtocolConfirm(false);
+    } catch (error: any) {
+      toast({
+        title: "Fel",
+        description: error.message || "Kunde inte ta bort protokoll",
+        variant: "destructive",
+        duration: 2500,
+      });
+    }
+  };
+
+  // Handle replace protocol
+  const handleReplaceProtocol = async () => {
+    if (!id) return;
+    
+    try {
+      await backendApi.deleteProtocol(id);
+      setProtocolData(null);
+      
+      // Increment protocol count for this meeting
+      setMeeting(prev => prev ? { 
+        ...prev, 
+        protocol: null,
+        protocolCount: (prev.protocolCount || 0) + 1 
+      } : null);
+      
+      setShowReplaceProtocolConfirm(false);
+      
+      // Proceed with new generation
+      await proceedWithProtocolGeneration();
+      
+      toast({
+        title: "Protokoll ersätts",
+        description: "Nytt protokoll kommer att genereras",
+        duration: 2000,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Fel",
+        description: error.message || "Kunde inte ersätta protokoll",
+        variant: "destructive",
+        duration: 2500,
+      });
+    }
   };
 
   // Get speaker display name - always returns a name (never null or "Okänd talare")
@@ -1259,6 +1426,60 @@ const MeetingDetail = () => {
                   </div>
                 </motion.div>
 
+                {/* Protocol Section - Show if protocol exists */}
+                {protocolData && !isEditing && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.18 }}
+                    className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
+                  >
+                    <div className="px-5 py-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-sm">Protokoll</span>
+                          <p className="text-xs text-muted-foreground">
+                            Sparat {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')}
+                            {currentProtocolCount > 0 && ` • ${currentProtocolCount}/${maxProtocolReplaces} ersättningar`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          onClick={handleViewProtocol}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          title="Visa protokoll"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={handleDownloadProtocol}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          title="Ladda ner protokoll"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={() => setShowDeleteProtocolConfirm(true)}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          title="Ta bort protokoll"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Action Buttons */}
                 {!isEditing && (
                   <motion.div
@@ -1269,10 +1490,21 @@ const MeetingDetail = () => {
                   >
                     <Button
                       onClick={handleCreateProtocol}
+                      variant={protocolData ? "outline" : "default"}
                       className="flex-1 sm:flex-none gap-2 rounded-full h-12"
+                      disabled={loadingProtocol}
                     >
-                      <FileText className="w-4 h-4" />
-                      Skapa protokoll
+                      {loadingProtocol ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : protocolData ? (
+                        <RefreshCw className="w-4 h-4" />
+                      ) : (
+                        <FileText className="w-4 h-4" />
+                      )}
+                      {protocolData 
+                        ? (canReplaceProtocol ? 'Ersätt protokoll' : 'Gräns nådd')
+                        : 'Skapa protokoll'
+                      }
                     </Button>
 
                     {hasPlusAccess(user, userPlan) && (
@@ -1319,6 +1551,35 @@ const MeetingDetail = () => {
         confirmText="Ta bort"
         onConfirm={handleDelete}
         variant="destructive"
+      />
+
+      {/* Delete Protocol Confirm Dialog */}
+      <ConfirmDialog
+        open={showDeleteProtocolConfirm}
+        onOpenChange={setShowDeleteProtocolConfirm}
+        title="Ta bort protokoll"
+        description="Är du säker på att du vill ta bort detta protokoll? Du kan generera ett nytt efteråt."
+        confirmText="Ta bort"
+        onConfirm={handleDeleteProtocol}
+        variant="destructive"
+      />
+
+      {/* Replace Protocol Confirm Dialog */}
+      <ConfirmDialog
+        open={showReplaceProtocolConfirm}
+        onOpenChange={setShowReplaceProtocolConfirm}
+        title="Ersätt protokoll"
+        description={`Det finns redan ett protokoll för detta möte. Vill du ersätta det? Du har ${maxProtocolReplaces - currentProtocolCount} ersättningar kvar.`}
+        confirmText="Ersätt"
+        onConfirm={handleReplaceProtocol}
+        variant="destructive"
+      />
+
+      {/* Protocol Viewer Dialog */}
+      <ProtocolViewerDialog
+        open={viewingProtocol}
+        onOpenChange={setViewingProtocol}
+        protocol={protocolData}
       />
     </div>
   );
