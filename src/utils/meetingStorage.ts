@@ -115,13 +115,18 @@ export const meetingStorage = {
         folder: meeting.folder,
         folderId: (meeting as any).folderId,
         isCompleted: meeting.isCompleted ?? false,
-        protocolCount: meeting.protocolCount ?? 0,
+        // IMPORTANT: Only send protocolCount when explicitly provided.
+        // Otherwise we risk overwriting the backend counter with 0.
         hasCounted: (meeting as any).hasCounted ?? false,
         agendaId: meeting.agendaId,
         createdAt: meeting.createdAt,
         startedAt: meeting.createdAt,
         meetingStartedAt: meeting.createdAt,
       };
+
+      if (typeof meeting.protocolCount === 'number' && Number.isFinite(meeting.protocolCount)) {
+        payload.protocolCount = meeting.protocolCount;
+      }
 
       // Resolve folderId if only a folder name was provided
       try {
@@ -198,11 +203,27 @@ export const meetingStorage = {
         console.log('⏭️ Temp meeting - protocol count will be set on save:', meetingId);
         return 0;
       }
-      
+
+      const cacheKey = `protocol_count_${meetingId}`;
+
       // Use the dedicated endpoint: POST /meetings/:id/protocol-count/increment
       const result = await apiClient.incrementProtocolCount(meetingId);
-      console.log(`✅ Protocol count incremented to ${result.protocolCount} for meeting:`, meetingId);
-      return result.protocolCount;
+      const nextCount = Number(result.protocolCount ?? 0) || 0;
+
+      // Cache locally to prevent UI flicker if a later read briefly returns 0
+      try {
+        localStorage.setItem(cacheKey, String(nextCount));
+      } catch {}
+
+      // Best-effort: also persist onto meeting payload (some endpoints/UI read protocolCount from meeting)
+      try {
+        await apiClient.updateMeeting(meetingId, { protocolCount: nextCount } as any);
+      } catch (e) {
+        console.warn('⚠️ Could not persist protocolCount onto meeting record (non-blocking):', e);
+      }
+
+      console.log(`✅ Protocol count incremented to ${nextCount} for meeting:`, meetingId);
+      return nextCount;
     } catch (error) {
       console.error('Error incrementing protocol count (API):', error);
       return 0;
@@ -211,15 +232,29 @@ export const meetingStorage = {
 
   // Get protocol count from backend
   async getProtocolCount(meetingId: string): Promise<number> {
+    const cacheKey = `protocol_count_${meetingId}`;
+    let cached = 0;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      cached = raw ? Math.max(0, parseInt(raw, 10) || 0) : 0;
+    } catch {}
+
     try {
       if (!isValidUUID(meetingId)) {
         return 0;
       }
       const result = await apiClient.getProtocolCount(meetingId);
-      return result.protocolCount || 0;
+      const count = Math.max(0, Number(result.protocolCount ?? 0) || 0);
+
+      // Trust backend when it responds; update cache
+      try {
+        localStorage.setItem(cacheKey, String(count));
+      } catch {}
+
+      return count;
     } catch (error) {
       console.error('Error getting protocol count:', error);
-      return 0;
+      return cached;
     }
   },
   async markCompleted(meetingId: string): Promise<void> {
