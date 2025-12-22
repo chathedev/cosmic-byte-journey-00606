@@ -130,21 +130,29 @@ export default function GenerateProtocol() {
         return;
       }
 
-      // 3) Prevent duplicates only when we have a real meetingId
+      // 3) Check protocol count against limit when we have a real meetingId
+      // Pro users can generate 1 protocol, Plus users can generate up to 5
       if (payload.meetingId) {
-        const protocolKey = `protocol_generated_${payload.meetingId}`;
-        const alreadyGenerated = sessionStorage.getItem(protocolKey);
-        console.log('🔐 Duplicate check', { protocolKey, alreadyGenerated });
-        if (alreadyGenerated) {
-          toast({
-            title: "Protokoll redan genererat",
-            description: "Detta möte har redan ett genererat protokoll.",
-            variant: "destructive",
-          });
-          navigate("/");
-          return;
+        try {
+          const meeting = await meetingStorage.getMeeting(payload.meetingId);
+          const currentProtocolCount = meeting?.protocolCount || 0;
+          const maxProtocolCount = userPlan?.plan === 'plus' ? 5 : 1;
+          
+          console.log('🔐 Protocol limit check', { meetingId: payload.meetingId, currentProtocolCount, maxProtocolCount });
+          
+          if (currentProtocolCount >= maxProtocolCount) {
+            toast({
+              title: "Protokollgräns nådd",
+              description: `Du har nått gränsen för protokoll (${maxProtocolCount}). ${userPlan?.plan === 'plus' ? '' : 'Uppgradera för fler.'}`,
+              variant: "destructive",
+            });
+            navigate("/");
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking protocol count:', error);
+          // Continue anyway if check fails
         }
-        sessionStorage.setItem(protocolKey, 'true');
       }
 
       // Clear token from old flows; keep pending payload until generation begins
