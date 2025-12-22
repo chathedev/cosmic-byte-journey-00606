@@ -90,8 +90,9 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
       }
 
       // Check protocol generation limits using the FINAL id
-      const latest = await meetingStorage.getMeeting(finalId);
-      const currentProtocolCount = latest?.protocolCount || 0;
+      // CRITICAL: Always fetch fresh count from backend endpoint
+      const currentProtocolCount = await meetingStorage.getProtocolCount(finalId);
+      console.log('📊 AgendaDialog: Fresh protocol count from backend:', currentProtocolCount);
       const { allowed, reason } = await canGenerateProtocol(finalId, currentProtocolCount);
       
       if (!allowed && reason !== 'Du har nått din gräns för AI-protokoll') {
