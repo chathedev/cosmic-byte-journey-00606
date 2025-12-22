@@ -102,8 +102,10 @@ const MeetingDetail = () => {
     return 'Okänd';
   };
 
-  // Protocol limits: Pro can replace 1 time, Plus can replace 5 times
-  const maxProtocolReplaces = userPlan?.plan === 'plus' ? 5 : 1;
+  // Protocol limits: Pro = 1 replacement, Enterprise = 3 replacements
+  const { enterpriseMembership } = useSubscription();
+  const isEnterprise = enterpriseMembership?.isMember === true;
+  const maxProtocolReplaces = isEnterprise ? 3 : 1;
   const currentProtocolCount = meeting?.protocolCount || 0;
   const canReplaceProtocol = currentProtocolCount < maxProtocolReplaces;
 

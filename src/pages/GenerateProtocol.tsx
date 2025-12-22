@@ -48,7 +48,7 @@ export default function GenerateProtocol() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { incrementMeetingCount, refreshPlan, userPlan } = useSubscription();
+  const { incrementMeetingCount, refreshPlan, userPlan, enterpriseMembership } = useSubscription();
   const { toast } = useToast();
   const [isValidated, setIsValidated] = useState(false);
   const hasCountedRef = useRef(false);
@@ -131,19 +131,20 @@ export default function GenerateProtocol() {
       }
 
       // 3) Check protocol count against limit when we have a real meetingId
-      // Pro users can generate 1 protocol, Plus users can generate up to 5
+      // Pro = 1 protocol generation, Enterprise = 3 protocol generations
       if (payload.meetingId) {
         try {
           const meeting = await meetingStorage.getMeeting(payload.meetingId);
           const currentProtocolCount = meeting?.protocolCount || 0;
-          const maxProtocolCount = userPlan?.plan === 'plus' ? 5 : 1;
+          const isEnterprise = enterpriseMembership?.isMember === true;
+          const maxProtocolCount = isEnterprise ? 3 : 1;
           
-          console.log('🔐 Protocol limit check', { meetingId: payload.meetingId, currentProtocolCount, maxProtocolCount });
+          console.log('🔐 Protocol limit check', { meetingId: payload.meetingId, currentProtocolCount, maxProtocolCount, isEnterprise });
           
           if (currentProtocolCount >= maxProtocolCount) {
             toast({
               title: "Protokollgräns nådd",
-              description: `Du har nått gränsen för protokoll (${maxProtocolCount}). ${userPlan?.plan === 'plus' ? '' : 'Uppgradera för fler.'}`,
+              description: `Du har nått gränsen för protokoll (${maxProtocolCount}).`,
               variant: "destructive",
             });
             navigate("/");
