@@ -256,10 +256,23 @@ const MeetingDetail = () => {
     loadMeeting();
   }, [id, user, navigate, toast]);
 
-  // Load protocol data when meeting has a protocol
+  // Load protocol data and count when meeting has a protocol
   useEffect(() => {
-    const loadProtocol = async () => {
-      if (!id || !meeting?.protocol) {
+    const loadProtocolData = async () => {
+      if (!id) return;
+      
+      // Always fetch the latest protocol count from backend
+      try {
+        const countData = await meetingStorage.getProtocolCount(id);
+        if (countData > 0) {
+          setMeeting(prev => prev ? { ...prev, protocolCount: countData } : null);
+        }
+      } catch (error) {
+        console.log('Could not load protocol count:', error);
+      }
+      
+      // Load protocol document if meeting has protocol
+      if (!meeting?.protocol) {
         setProtocolData(null);
         return;
       }
@@ -277,7 +290,7 @@ const MeetingDetail = () => {
       }
     };
     
-    loadProtocol();
+    loadProtocolData();
   }, [id, meeting?.protocol]);
 
   // Subscribe to background upload status
@@ -686,11 +699,10 @@ const MeetingDetail = () => {
       await backendApi.deleteProtocol(id);
       setProtocolData(null);
       
-      // Increment protocol count for this meeting
+      // Update local state - protocol count will be incremented during new generation
       setMeeting(prev => prev ? { 
         ...prev, 
         protocol: null,
-        protocolCount: (prev.protocolCount || 0) + 1 
       } : null);
       
       setShowReplaceProtocolConfirm(false);
@@ -1569,7 +1581,7 @@ const MeetingDetail = () => {
         open={showReplaceProtocolConfirm}
         onOpenChange={setShowReplaceProtocolConfirm}
         title="Ersätt protokoll"
-        description={`Det finns redan ett protokoll för detta möte. Vill du ersätta det? Du har ${maxProtocolReplaces - currentProtocolCount} ersättningar kvar.`}
+        description={`Vill du ersätta det befintliga protokollet? Efter detta har du ${Math.max(0, maxProtocolReplaces - currentProtocolCount - 1)} ersättningar kvar av ${maxProtocolReplaces}.`}
         confirmText="Ersätt"
         onConfirm={handleReplaceProtocol}
         variant="destructive"

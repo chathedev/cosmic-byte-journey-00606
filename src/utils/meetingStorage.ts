@@ -190,26 +190,36 @@ export const meetingStorage = {
     }
   },
 
-  // Increment protocol count - count meeting ONLY if not already counted
-  async incrementProtocolCount(meetingId: string): Promise<void> {
+  // Increment protocol count using dedicated backend endpoint
+  async incrementProtocolCount(meetingId: string): Promise<number> {
     try {
-      // NEVER increment meeting count here - that's handled by incrementMeetingCount flow
-      // This function ONLY increments the protocolCount field
-      
       // Skip for temp meetings - they don't exist in backend yet
       if (!isValidUUID(meetingId)) {
         console.log('⏭️ Temp meeting - protocol count will be set on save:', meetingId);
-        return;
+        return 0;
       }
       
-      // Fetch current to compute next count
-      const { meetings } = await apiClient.getMeetings();
-      const current = (meetings || []).find((m: any) => String(m.id) === String(meetingId));
-      const next = Number(current?.protocolCount ?? 0) + 1;
-      await apiClient.updateMeeting(meetingId, { protocolCount: next });
-      console.log(`✅ Protocol count updated to ${next} for meeting:`, meetingId);
+      // Use the dedicated endpoint: POST /meetings/:id/protocol-count/increment
+      const result = await apiClient.incrementProtocolCount(meetingId);
+      console.log(`✅ Protocol count incremented to ${result.protocolCount} for meeting:`, meetingId);
+      return result.protocolCount;
     } catch (error) {
       console.error('Error incrementing protocol count (API):', error);
+      return 0;
+    }
+  },
+
+  // Get protocol count from backend
+  async getProtocolCount(meetingId: string): Promise<number> {
+    try {
+      if (!isValidUUID(meetingId)) {
+        return 0;
+      }
+      const result = await apiClient.getProtocolCount(meetingId);
+      return result.protocolCount || 0;
+    } catch (error) {
+      console.error('Error getting protocol count:', error);
+      return 0;
     }
   },
   async markCompleted(meetingId: string): Promise<void> {
