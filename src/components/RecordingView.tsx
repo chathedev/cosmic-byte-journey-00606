@@ -1191,14 +1191,16 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     }
     
     // Check protocol count BEFORE navigating
+    // Pro users can generate 1 protocol, Plus users can generate up to 5
     try {
       const meeting = await meetingStorage.getMeeting(savedId || sessionId);
       const currentProtocolCount = meeting?.protocolCount || 0;
+      const maxProtocolCount = userPlan?.plan === 'plus' ? 5 : 1;
       
-      if (currentProtocolCount >= 1) {
+      if (currentProtocolCount >= maxProtocolCount) {
         toast({
-          title: "Protokoll redan genererat",
-          description: "Du har redan genererat ett protokoll för detta möte.",
+          title: "Protokollgräns nådd",
+          description: `Du har nått gränsen för protokoll (${maxProtocolCount}). ${userPlan?.plan === 'plus' ? '' : 'Uppgradera för fler.'}`,
           variant: "destructive",
           duration: 2500,
         });
