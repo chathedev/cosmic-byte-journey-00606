@@ -99,7 +99,11 @@ async function attemptMultipartUpload(
 ): Promise<AsrUploadResult> {
   const formData = new FormData();
   formData.append('audio', file, file.name);
-  if (meetingId) formData.append('meetingId', meetingId);
+  if (meetingId) {
+    // Send both keys for backend compatibility (avoid duplicate meeting creation)
+    formData.append('meetingId', meetingId);
+    formData.append('meeting_id', meetingId);
+  }
   if (language) formData.append('language', language);
   if (title) formData.append('title', title);
   if (traceId) formData.append('traceId', traceId);
