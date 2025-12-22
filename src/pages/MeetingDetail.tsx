@@ -17,7 +17,7 @@ import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackend
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
-import { MeetingChat } from "@/components/MeetingChat";
+
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
@@ -70,7 +70,6 @@ const MeetingDetail = () => {
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
   const [pendingMeetingData, setPendingMeetingData] = useState<MeetingDataForDialog | null>(null);
   const [selectedProtocol, setSelectedProtocol] = useState<{ transcript: string; aiProtocol: any } | null>(null);
-  const [chatMeeting, setChatMeeting] = useState<MeetingSession | null>(null);
   
   // Unified editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -102,10 +101,8 @@ const MeetingDetail = () => {
     return 'Okänd';
   };
 
-  // Protocol limits: Pro = 1 generation, Enterprise = 3 generations
-  const { enterpriseMembership } = useSubscription();
-  const isEnterprise = enterpriseMembership?.isMember === true;
-  const maxProtocolGenerations = isEnterprise ? 3 : 1;
+  // Protocol limits: 1 generation per meeting for ALL plans
+  const maxProtocolGenerations = 1;
   const [backendProtocolCount, setBackendProtocolCount] = useState<number>(0);
   const protocolCountUsed = backendProtocolCount;
   const protocolCountRemaining = Math.max(0, maxProtocolGenerations - protocolCountUsed);
@@ -564,7 +561,7 @@ const MeetingDetail = () => {
       if (!canGenerateMoreProtocols) {
         toast({
           title: 'Gräns nådd',
-          description: `Du har använt alla ${maxProtocolGenerations} protokoll. ${isEnterprise ? '' : 'Uppgradera till Enterprise för fler.'}`,
+          description: `Du har använt din protokollgenerering för detta möte.`,
           variant: 'destructive',
         });
         return;
@@ -825,18 +822,6 @@ const MeetingDetail = () => {
     );
   }
 
-  // If showing chat
-  if (chatMeeting) {
-    return (
-      <div className="min-h-screen bg-background">
-        <MeetingChat
-          transcript={transcript || ''}
-          meetingTitle={chatMeeting.title}
-          onClose={() => setChatMeeting(null)}
-        />
-      </div>
-    );
-  }
 
   const isProcessing = status === 'uploading' || status === 'processing';
   const hasTranscript = !!transcript && transcript.trim().length > 0;
@@ -1534,7 +1519,7 @@ const MeetingDetail = () => {
                     {hasPlusAccess(user, userPlan) && (
                       <Button
                         variant="outline"
-                        onClick={() => setChatMeeting(meeting)}
+                        onClick={() => navigate(`/chat?meeting=${meeting.id}`)}
                         className="flex-1 sm:flex-none gap-2 rounded-full h-12"
                       >
                         <MessageCircle className="w-4 h-4" />

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -108,6 +108,8 @@ export const Chat = () => {
     }
   }, [messages, isThinking]);
 
+  const [searchParams] = useSearchParams();
+
   useEffect(() => {
     loadMeetings();
     // Fetch chat count on mount
@@ -115,6 +117,17 @@ export const Chat = () => {
       fetchChatCount();
     }
   }, [user, isPlusUser]);
+
+  // Pre-select meeting from URL query param
+  useEffect(() => {
+    const meetingIdFromUrl = searchParams.get('meeting');
+    if (meetingIdFromUrl && meetings.length > 0) {
+      const meetingExists = meetings.some(m => m.id === meetingIdFromUrl);
+      if (meetingExists) {
+        setSelectedMeetingId(meetingIdFromUrl);
+      }
+    }
+  }, [searchParams, meetings]);
 
   const loadMeetings = async () => {
     if (!user) return;
