@@ -325,53 +325,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     
     console.log('[SubscriptionContext] 🏢 Loading enterprise membership for:', user.email);
     
-    // Check if user is admin - auto-enable enterprise + SIS for admins
-    let userIsAdmin = false;
-    try {
-      const roleData = await apiClient.getUserRole((user.email || '').toLowerCase());
-      userIsAdmin = !!roleData && (roleData.role === 'admin' || roleData.role === 'owner');
-    } catch {
-      userIsAdmin = false;
-    }
-    
-    // Auto-enable enterprise + SIS for admins
-    if (userIsAdmin) {
-      console.log('[SubscriptionContext] 👑 Admin detected - auto-enabling enterprise + SIS for:', user.email);
-      
-      // Fetch SIS sample status for admin
-      let sisSample: EnterpriseMembership['sisSample'] = undefined;
-      try {
-        const sisStatus = await apiClient.getSISSampleStatus();
-        console.log('[SubscriptionContext] 🎤 Admin SIS sample status:', sisStatus);
-        if (sisStatus?.disabled || sisStatus?.sisSample?.status === 'disabled') {
-          sisSample = { status: 'disabled' };
-        } else {
-          sisSample = sisStatus?.sisSample || { status: 'missing' };
-        }
-      } catch (sisError) {
-        console.log('[SubscriptionContext] 🎤 Admin SIS sample check failed, defaulting to missing:', sisError);
-        sisSample = { status: 'missing' };
-      }
-      
-      setEnterpriseMembership({
-        isMember: true,
-        company: {
-          id: 'admin-virtual-company',
-          name: 'Tivly Admin',
-          slug: 'tivly-admin',
-          status: 'active',
-          planTier: 'enterprise',
-          speakerIdentificationEnabled: true, // Always enabled for admins
-        },
-        membership: {
-          role: 'admin',
-          status: 'active',
-          joinedAt: new Date().toISOString(),
-        },
-        sisSample,
-      });
-      return;
-    }
+    // Admins keep their admin powers but get enterprise features from real companies
+    // No virtual company - admins should be added to real enterprise companies
     
     try {
       const membership = await apiClient.getMyEnterpriseMembership();
