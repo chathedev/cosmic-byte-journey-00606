@@ -1530,10 +1530,10 @@ const MeetingDetail = () => {
                     <Button
                       variant="ghost"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="gap-2 rounded-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="gap-2 rounded-full h-12 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Ta bort</span>
+                      <span>Ta bort möte</span>
                     </Button>
                   </motion.div>
                 )}
