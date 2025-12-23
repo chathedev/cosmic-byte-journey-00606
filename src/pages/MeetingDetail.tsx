@@ -491,10 +491,16 @@ const MeetingDetail = () => {
 
     try {
       // Save transcript if changed
-      if (editedTranscript.trim() !== (transcript || '').trim()) {
+      const transcriptChanged = editedTranscript.trim() !== (transcript || '').trim();
+      if (transcriptChanged) {
         await apiClient.updateMeeting(id, { transcript: editedTranscript.trim() });
         setTranscript(editedTranscript.trim());
         setMeeting(prev => prev ? { ...prev, transcript: editedTranscript.trim(), updatedAt: new Date().toISOString() } : prev);
+        
+        // CRITICAL: Clear transcriptSegments when transcript text is manually edited
+        // This forces the UI to show plain text instead of stale segment data
+        // The segments are from ASR and no longer match the edited text
+        setTranscriptSegments(null);
       }
 
       // Save speaker names if changed
