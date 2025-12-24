@@ -137,7 +137,7 @@ export default function GenerateProtocol() {
           // CRITICAL: Always fetch fresh count from backend endpoint, not stale meeting data
           const currentProtocolCount = await meetingStorage.getProtocolCount(payload.meetingId);
           const isEnterprise = enterpriseMembership?.isMember === true;
-          const maxProtocolCount = isEnterprise ? 3 : 1;
+          const maxProtocolCount = isEnterprise ? 3 : 2; // 2 generations (1 initial + 1 replacement)
           
           console.log('🔐 Protocol limit check (fresh from backend)', { 
             meetingId: payload.meetingId, 
