@@ -5,6 +5,7 @@
 // API Response Format (when status: "done"):
 // - transcript: string - Full transcript text
 // - transcriptSegments: Array<{ speakerId, text, start, end }> - Speaker diarization segments
+// - reconstructedSegments: Array<ReconstructedSegment> - Properly attributed segments from diarization
 // - sisStatus: 'queued' | 'processing' | 'done' | 'no_samples' | 'error' | 'disabled' | 'missing_owner'
 // - sisMatches: Array<SISMatch> - Speaker identification matches
 // - sisMatch: SISMatch - Best match (shortcut to sisMatches[0])
@@ -14,6 +15,10 @@
 import { debugLog, debugError } from './debugLogger';
 import { uploadToAsr } from './asrUpload';
 import { resolveBackendMeetingId } from './backgroundUploader';
+import { processASRResponseWithReconstruction, type ReconstructedSegment } from './transcriptReconstruction';
+
+// Re-export ReconstructedSegment for consumers
+export type { ReconstructedSegment };
 
 const BACKEND_API_URL = 'https://api.tivly.se';
 const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
@@ -153,6 +158,9 @@ export interface ASRStatus {
   progress?: number;
   transcript?: string;
   transcriptSegments?: TranscriptSegment[];
+  // Reconstructed segments with proper speaker attribution from diarization
+  // This is the source of truth for speaker turns - use this instead of transcriptSegments
+  reconstructedSegments?: ReconstructedSegment[];
   // Word-level timing from backend
   words?: TranscriptWord[];
   error?: string;
@@ -330,6 +338,21 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       });
     }
     
+    // Reconstruct segments from diarization data for proper speaker attribution
+    const reconstructedSegments = processASRResponseWithReconstruction({
+      transcript: data.transcript,
+      transcriptSegments: data.transcriptSegments,
+      words: data.words,
+      sisSpeakers: data.sisSpeakers,
+      lyraSpeakers: data.lyraSpeakers,
+      speakerNames: data.speakerNames,
+      lyraSpeakerNames: data.lyraSpeakerNames,
+    });
+    
+    if (reconstructedSegments.length > 0) {
+      debugLog('🎤 Reconstructed segments:', reconstructedSegments.length, 'speaker turns');
+    }
+    
     // Return both SIS and Lyra mirror fields for compatibility
     return {
       meetingId: data.meetingId,
@@ -338,6 +361,7 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       progress: data.progress,
       transcript: data.transcript,
       transcriptSegments: data.transcriptSegments,
+      reconstructedSegments: reconstructedSegments.length > 0 ? reconstructedSegments : undefined,
       words: data.words,
       error: data.error || data.sisError || data.lyraError,
       duration: data.duration,
