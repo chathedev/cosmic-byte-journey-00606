@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
-import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry } from "@/lib/asrService";
+import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment } from "@/lib/asrService";
 import { apiClient } from "@/lib/api";
 import { backendApi } from "@/lib/backendApi";
 import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackendAlias } from "@/lib/backgroundUploader";
@@ -60,6 +60,7 @@ const MeetingDetail = () => {
   const [stage, setStage] = useState<'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
+  const [reconstructedSegments, setReconstructedSegments] = useState<ReconstructedSegment[] | null>(null);
   const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
   const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
@@ -209,6 +210,10 @@ const MeetingDetail = () => {
                 if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
                   setTranscriptSegments(asrStatus.transcriptSegments);
                 }
+                // Use reconstructed segments as source of truth when available
+                if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
+                  setReconstructedSegments(asrStatus.reconstructedSegments);
+                }
                 setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
                 setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
                 setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
@@ -356,6 +361,8 @@ const MeetingDetail = () => {
           const newTranscript = asrStatus.transcript || '';
           setTranscript(newTranscript);
           setTranscriptSegments(asrStatus.transcriptSegments || null);
+          // Use reconstructed segments as the source of truth for speaker turns
+          setReconstructedSegments(asrStatus.reconstructedSegments || null);
           setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
           setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
           setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
@@ -949,7 +956,7 @@ const MeetingDetail = () => {
     return speakers;
   })();
 
-  // Find speaker at a given time using lyraSpeakers time segments
+  // Find speaker at a given time using lyraSpeakers time segments (fallback only)
   const findSpeakerAtTime = (time: number): string => {
     for (const speaker of lyraSpeakers) {
       for (const seg of speaker.segments) {
@@ -961,38 +968,51 @@ const MeetingDetail = () => {
     return 'unknown';
   };
 
-  // Group consecutive segments with proper time-based speaker matching
-  const groupedSegments = transcriptSegments ? (() => {
-    const grouped: { speakerId: string; text: string; start: number; end: number }[] = [];
+  // Use reconstructedSegments as source of truth when available
+  // This eliminates frontend speaker inference - backend provides properly attributed segments
+  const groupedSegments = (() => {
+    // Prefer reconstructedSegments (source of truth from backend with proper speaker attribution)
+    if (reconstructedSegments && reconstructedSegments.length > 0) {
+      return reconstructedSegments.map(seg => ({
+        speakerId: seg.speaker,
+        speakerName: seg.speakerName,
+        text: seg.text,
+        start: seg.start,
+        end: seg.end,
+      }));
+    }
     
-    for (const seg of transcriptSegments) {
-      // First try to get speaker from segment data
-      let rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || '';
+    // Fallback: use transcriptSegments with time-based speaker matching
+    if (transcriptSegments && transcriptSegments.length > 0) {
+      const grouped: { speakerId: string; speakerName?: string; text: string; start: number; end: number }[] = [];
       
-      // If no speaker in segment data OR speaker is unknown, use time-based matching from lyraSpeakers
-      if (!rawSpeakerId || rawSpeakerId.toLowerCase() === 'unknown') {
-        // Use midpoint of segment for speaker matching
-        const midpoint = (seg.start + seg.end) / 2;
-        rawSpeakerId = findSpeakerAtTime(midpoint);
+      for (const seg of transcriptSegments) {
+        let rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || '';
         
-        // If still no match, try start time
-        if (rawSpeakerId === 'unknown') {
-          rawSpeakerId = findSpeakerAtTime(seg.start);
+        // If no speaker, use time-based matching from lyraSpeakers
+        if (!rawSpeakerId || rawSpeakerId.toLowerCase() === 'unknown') {
+          const midpoint = (seg.start + seg.end) / 2;
+          rawSpeakerId = findSpeakerAtTime(midpoint);
+          if (rawSpeakerId === 'unknown') {
+            rawSpeakerId = findSpeakerAtTime(seg.start);
+          }
+        }
+        
+        const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
+        const prev = grouped[grouped.length - 1];
+
+        if (prev && prev.speakerId === speakerId) {
+          prev.text = `${prev.text}\n${seg.text}`;
+          prev.end = seg.end;
+        } else {
+          grouped.push({ speakerId, text: seg.text, start: seg.start, end: seg.end });
         }
       }
-      
-      const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
-      const prev = grouped[grouped.length - 1];
-
-      if (prev && prev.speakerId === speakerId) {
-        prev.text = `${prev.text}\n${seg.text}`;
-        prev.end = seg.end;
-      } else {
-        grouped.push({ speakerId, text: seg.text, start: seg.start, end: seg.end });
-      }
+      return grouped;
     }
-    return grouped;
-  })() : [];
+    
+    return [];
+  })();
 
   // Infer primary speaker
   const inferredPrimarySpeakerId = (() => {
@@ -1468,7 +1488,8 @@ const MeetingDetail = () => {
                       // Clean linear transcript with speaker attribution
                       <div className="space-y-0">
                         {groupedSegments.map((segment, idx) => {
-                          const speakerName = getSegmentSpeakerName(segment.speakerId);
+                          // Use speakerName from reconstructed segments (source of truth) or fallback to lookup
+                          const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
                           const colorClass = getSpeakerColorClass(segment.speakerId);
                           const dotClass = getSpeakerDotClass(segment.speakerId);
                           const textClass = getSpeakerTextClass(segment.speakerId);
