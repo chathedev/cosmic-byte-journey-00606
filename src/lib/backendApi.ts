@@ -466,6 +466,71 @@ export const backendApi = {
     }
   },
 
+  // SIS Speaker Learning - Teach backend a speaker identity
+  // POST /sis/rename-speaker with { meetingId, speakerId, displayName }
+  // Returns { ok, rejected, similarity, profile }
+  async renameSpeaker(meetingId: string, speakerId: string, displayName: string): Promise<{
+    ok: boolean;
+    rejected: boolean;
+    similarity: number | null;
+    profile?: {
+      profileId: string;
+      displayName: string;
+      usageCount: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }> {
+    console.log(`[SIS] POST /sis/rename-speaker:`, { meetingId, speakerId, displayName });
+
+    const response = await fetch(`${BACKEND_URL}/sis/rename-speaker`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ meetingId, speakerId, displayName }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to rename speaker' }));
+      console.warn('[SIS] Rename speaker error:', error);
+      return { ok: false, rejected: false, similarity: null };
+    }
+
+    const data = await response.json();
+    console.log('[SIS] Rename speaker result:', data);
+    return data;
+  },
+
+  // Get all learned speaker profiles for the company
+  // GET /sis/speaker-profiles
+  async getSisSpeakerProfiles(): Promise<{
+    profiles: Array<{
+      profileId: string;
+      displayName: string;
+      usageCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }> {
+    try {
+      const response = await fetch(`${BACKEND_URL}/sis/speaker-profiles`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        console.warn('[SIS] Get speaker profiles error:', response.status);
+        return { profiles: [] };
+      }
+
+      return response.json();
+    } catch (error) {
+      console.warn('[SIS] Get speaker profiles error:', error);
+      return { profiles: [] };
+    }
+  },
+
   // Admin Auth Management
   async resetUserAuth(email: string): Promise<{ ok: boolean; user: any }> {
     const response = await fetch(`${BACKEND_URL}/admin/users/auth/reset`, {

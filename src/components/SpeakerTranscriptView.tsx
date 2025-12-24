@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Check, Edit2, Copy, X } from 'lucide-react';
+import { Check, Edit2, Copy, X, Sparkles, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import { backendApi } from '@/lib/backendApi';
 
 interface TranscriptSegment {
   id: number;
@@ -24,13 +25,14 @@ interface Speaker {
 }
 
 interface SpeakerTranscriptViewProps {
+  meetingId: string;
   transcriptSegments: TranscriptSegment[] | null;
   transcript: string;
   sisSpeakers: Speaker[] | null;
   lyraSpeakers: Speaker[] | null;
   speakerNames: Record<string, string> | null;
   lyraSpeakerNames: Record<string, string> | null;
-  onSaveSpeakerName?: (speakerLabel: string, newName: string) => Promise<void>;
+  onSpeakerNamesUpdated?: (names: Record<string, string>) => void;
   sisEnabled?: boolean;
   className?: string;
 }
@@ -64,23 +66,26 @@ const findSpeakerAtTime = (time: number, speakers: Speaker[]): string | null => 
 };
 
 export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
+  meetingId,
   transcriptSegments,
   transcript,
   sisSpeakers,
   lyraSpeakers,
-  speakerNames,
-  lyraSpeakerNames,
-  onSaveSpeakerName,
+  speakerNames: initialSpeakerNames,
+  lyraSpeakerNames: initialLyraSpeakerNames,
+  onSpeakerNamesUpdated,
   sisEnabled = false,
   className,
 }) => {
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [localSpeakerNames, setLocalSpeakerNames] = useState<Record<string, string>>({});
+  const [learningStatus, setLearningStatus] = useState<Record<string, 'learned' | 'rejected' | null>>({});
 
   // Use lyra speakers if available, otherwise sis speakers
   const speakers = lyraSpeakers || sisSpeakers;
-  const names = lyraSpeakerNames || speakerNames || {};
+  const names = { ...(initialLyraSpeakerNames || initialSpeakerNames || {}), ...localSpeakerNames };
 
   // Check if we have speaker diarization data
   const hasSpeakerData = sisEnabled && speakers && speakers.length > 0;
@@ -155,12 +160,12 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
     return groups;
   }, [segmentsWithSpeakers]);
 
-  const getSpeakerDisplayName = (speakerLabel: string | null) => {
+  const getSpeakerDisplayName = useCallback((speakerLabel: string | null) => {
     if (!speakerLabel) return 'Okänd';
     return names[speakerLabel] || 
            speakers?.find(s => s.label === speakerLabel)?.speakerName || 
            speakerLabel;
-  };
+  }, [names, speakers]);
 
   const handleEditSpeaker = (speakerLabel: string) => {
     setEditingSpeaker(speakerLabel);
@@ -168,12 +173,56 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
   };
 
   const handleSaveSpeakerName = async () => {
-    if (!editingSpeaker || !onSaveSpeakerName) return;
+    if (!editingSpeaker || !meetingId) return;
+
+    const speakerLabel = editingSpeaker;
+    const newName = editedName.trim();
+    
+    if (!newName) {
+      setEditingSpeaker(null);
+      return;
+    }
 
     setSavingName(true);
+    
     try {
-      await onSaveSpeakerName(editingSpeaker, editedName);
-      toast.success('Talarnamn sparat');
+      // 1. Update local state immediately for responsive UI
+      const updatedNames = { ...names, [speakerLabel]: newName };
+      setLocalSpeakerNames(prev => ({ ...prev, [speakerLabel]: newName }));
+      
+      // 2. Save to meeting (PUT /meetings/:id/speaker-names)
+      const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
+      console.log('[SIS] Speaker names saved:', saveResult);
+      
+      // Notify parent of updated names
+      onSpeakerNamesUpdated?.(saveResult.speakerNames);
+      
+      // 3. Teach backend the speaker identity (POST /sis/rename-speaker)
+      const learnResult = await backendApi.renameSpeaker(meetingId, speakerLabel, newName);
+      
+      if (learnResult.ok && !learnResult.rejected) {
+        // Successfully learned
+        setLearningStatus(prev => ({ ...prev, [speakerLabel]: 'learned' }));
+        toast.success(
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span>Talare inlärd: {newName}</span>
+          </div>
+        );
+      } else if (learnResult.rejected) {
+        // Learning was rejected (embedding too different)
+        setLearningStatus(prev => ({ ...prev, [speakerLabel]: 'rejected' }));
+        toast.info(
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <span>Namn sparat, men kunde inte lära talaren ännu</span>
+          </div>
+        );
+      } else {
+        // Just saved without learning
+        toast.success('Talarnamn sparat');
+      }
+      
     } catch (error) {
       console.error('Error saving speaker name:', error);
       toast.error('Kunde inte spara namn');
@@ -196,7 +245,7 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
       navigator.clipboard.writeText(transcript || '');
     }
     toast.success('Transkription kopierad');
-  }, [hasSpeakerData, groupedSegments, transcript, names]);
+  }, [hasSpeakerData, groupedSegments, transcript, getSpeakerDisplayName]);
 
   // If no speaker data or SIS not enabled, show simple transcript
   if (!hasSpeakerData || !transcriptSegments || groupedSegments.length === 0) {
@@ -226,15 +275,16 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
   return (
     <div className={cn("space-y-5", className)}>
       {/* Minimal header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-4 flex-wrap">
           <span className="text-sm font-medium text-muted-foreground">Transkription</span>
           
           {/* Inline speaker chips */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {speakers?.map(speaker => {
               const style = speakerStyleMap[speaker.label];
               const isEditing = editingSpeaker === speaker.label;
+              const learnStatus = learningStatus[speaker.label];
 
               return (
                 <div key={speaker.label} className="flex items-center">
@@ -247,7 +297,7 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
                       <Input
                         value={editedName}
                         onChange={(e) => setEditedName(e.target.value)}
-                        className="h-5 w-20 text-xs px-1.5 py-0 border-0 bg-transparent focus-visible:ring-0"
+                        className="h-5 w-24 text-xs px-1.5 py-0 border-0 bg-transparent focus-visible:ring-0"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveSpeakerName();
@@ -274,11 +324,11 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
                     </div>
                   ) : (
                     <button
-                      onClick={() => onSaveSpeakerName && handleEditSpeaker(speaker.label)}
+                      onClick={() => handleEditSpeaker(speaker.label)}
                       className={cn(
-                        "flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full",
-                        "bg-muted/50 hover:bg-muted transition-colors",
-                        onSaveSpeakerName && "cursor-pointer"
+                        "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full",
+                        "bg-muted/50 hover:bg-muted transition-colors cursor-pointer",
+                        "border border-transparent hover:border-border/50"
                       )}
                     >
                       <div 
@@ -288,9 +338,10 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
                       <span className={style?.label}>
                         {getSpeakerDisplayName(speaker.label)}
                       </span>
-                      {onSaveSpeakerName && (
-                        <Edit2 className="h-2.5 w-2.5 opacity-40" />
+                      {learnStatus === 'learned' && (
+                        <Sparkles className="h-2.5 w-2.5 text-amber-500" />
                       )}
+                      <Edit2 className="h-2.5 w-2.5 opacity-40" />
                     </button>
                   )}
                 </div>
@@ -329,7 +380,7 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
                 {/* Speaker indicator line */}
                 <div className="flex flex-col items-center gap-1 pt-1">
                   <div 
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
                     style={{ backgroundColor: style?.accent || 'hsl(var(--muted-foreground))' }}
                   />
                   <div 
@@ -340,7 +391,7 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
 
                 {/* Content */}
                 <div className={cn(
-                  "flex-1 space-y-1",
+                  "flex-1 space-y-1 min-w-0",
                   !isEven && "text-right"
                 )}>
                   {/* Speaker name & time */}
@@ -351,7 +402,7 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
                     <span className={cn("text-sm font-medium", style?.label || "text-muted-foreground")}>
                       {speakerName}
                     </span>
-                    <span className="text-[10px] text-muted-foreground/60">
+                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
                       {formatTime(group.startTime)}
                     </span>
                   </div>
@@ -359,9 +410,9 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
                   {/* Message bubble */}
                   <div
                     className={cn(
-                      "inline-block max-w-[90%] rounded-2xl px-4 py-2.5",
+                      "inline-block max-w-[90%] rounded-2xl px-4 py-2.5 shadow-sm",
                       isEven 
-                        ? "rounded-tl-sm bg-muted/60" 
+                        ? "rounded-tl-sm bg-muted/60 dark:bg-muted/40" 
                         : "rounded-tr-sm bg-primary/5 dark:bg-primary/10"
                     )}
                   >
