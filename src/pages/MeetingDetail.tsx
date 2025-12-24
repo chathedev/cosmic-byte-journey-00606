@@ -102,8 +102,8 @@ const MeetingDetail = () => {
     return 'Okänd';
   };
 
-  // Protocol limits: 1 generation per meeting for ALL plans
-  const maxProtocolGenerations = 1;
+  // Protocol limits: 2 generations per meeting (1 initial + 1 replacement)
+  const maxProtocolGenerations = 2;
   const [backendProtocolCount, setBackendProtocolCount] = useState<number>(0);
   const protocolCountUsed = backendProtocolCount;
   const protocolCountRemaining = Math.max(0, maxProtocolGenerations - protocolCountUsed);

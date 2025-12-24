@@ -104,7 +104,7 @@ const Library = () => {
   const location = useLocation();
   const { toast } = useToast();
   const isEnterprise = enterpriseMembership?.isMember === true;
-  const maxProtocolsPerMeeting = isEnterprise ? 3 : 1;
+  const maxProtocolsPerMeeting = isEnterprise ? 3 : 2; // 2 generations (1 initial + 1 replacement)
   const pendingMeetingIdRef = useRef<string | null>(null);
   
   // Check if this is a demo/test account
