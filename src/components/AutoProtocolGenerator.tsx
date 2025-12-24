@@ -660,7 +660,7 @@ export const AutoProtocolGenerator = ({
       duration: 2000,
     });
     
-    navigate(`/meeting/${meetingId}`);
+    navigate(`/meetings/${meetingId}`);
   };
 
   const getPriorityColor = (priority: string) => {
