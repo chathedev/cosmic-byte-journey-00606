@@ -196,24 +196,41 @@ function reconstructFromSpeakerTimes(
     }
   }
 
+  // If no speaker segments, return empty
+  if (allSegments.length === 0) {
+    console.log('[Reconstruct] No speaker segments found');
+    return [];
+  }
+
   // Sort by start time
   allSegments.sort((a, b) => a.start - b.start);
 
-  // Merge consecutive segments from same speaker
+  console.log('[Reconstruct] All segments sorted:', allSegments.length);
+
+  // DON'T merge consecutive segments from same speaker - keep them separate for proper turn display
+  // Only merge if they're overlapping or very close (< 0.5s gap)
   const merged: { speaker: string; start: number; end: number }[] = [];
   for (const seg of allSegments) {
     const last = merged[merged.length - 1];
-    if (last && last.speaker === seg.speaker && seg.start - last.end < 1.0) {
+    // Only merge if same speaker AND segments are overlapping/touching
+    if (last && last.speaker === seg.speaker && seg.start <= last.end + 0.1) {
       last.end = Math.max(last.end, seg.end);
     } else {
       merged.push({ ...seg });
     }
   }
 
+  console.log('[Reconstruct] Merged segments:', merged.length);
+
   // Calculate total duration for proportional text splitting
   const totalDuration = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
-  const words = transcript.split(/\s+/);
+  const words = transcript.split(/\s+/).filter(w => w.trim());
   const totalWords = words.length;
+
+  if (totalDuration === 0 || totalWords === 0) {
+    console.log('[Reconstruct] No duration or words');
+    return [];
+  }
 
   // Build speaker labels list for indexing
   const speakerLabels = [...new Set(speakers.map(s => s.label))];
@@ -233,9 +250,11 @@ function reconstructFromSpeakerTimes(
     wordIndex += segmentWordCount;
 
     const speakerIndex = getSpeakerIndex(seg.speaker);
+    const speakerName = getSpeakerDisplayName(seg.speaker, speakerNames, speakerIndex);
+    
     result.push({
       speaker: seg.speaker,
-      speakerName: getSpeakerDisplayName(seg.speaker, speakerNames, speakerIndex),
+      speakerName,
       start: seg.start,
       end: seg.end,
       text: segmentWords.join(' '),
@@ -247,6 +266,8 @@ function reconstructFromSpeakerTimes(
     const lastSeg = result[result.length - 1];
     lastSeg.text = `${lastSeg.text} ${words.slice(wordIndex).join(' ')}`.trim();
   }
+
+  console.log('[Reconstruct] Result segments:', result.length, result.map(r => `${r.speaker}:${r.speakerName}`));
 
   return result;
 }
