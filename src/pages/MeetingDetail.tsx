@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown, Eye, Download, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown, Eye, Download, RefreshCw, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -1693,18 +1693,22 @@ const MeetingDetail = () => {
                         onClick={handleCreateProtocol}
                         variant={protocolData ? "outline" : "default"}
                         className="flex-1 sm:flex-none gap-2 rounded-full h-12"
-                        disabled={loadingProtocol || (!canGenerateMoreProtocols && !!protocolData)}
+                        disabled={loadingProtocol || !canGenerateMoreProtocols}
                       >
                         {loadingProtocol ? (
                           <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : !canGenerateMoreProtocols ? (
+                          <Lock className="w-4 h-4" />
                         ) : protocolData ? (
                           <RefreshCw className="w-4 h-4" />
                         ) : (
                           <FileText className="w-4 h-4" />
                         )}
-                        {protocolData 
-                          ? (canGenerateMoreProtocols ? 'Ersätt protokoll' : 'Gräns nådd')
-                          : 'Skapa protokoll'
+                        {!canGenerateMoreProtocols 
+                          ? 'Gräns nådd'
+                          : protocolData 
+                            ? 'Ersätt protokoll'
+                            : 'Skapa protokoll'
                         }
                       </Button>
                       <span className="text-xs text-muted-foreground pl-1">
