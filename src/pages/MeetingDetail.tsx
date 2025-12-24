@@ -709,6 +709,17 @@ const MeetingDetail = () => {
   const handleReplaceProtocol = async () => {
     if (!id) return;
     
+    // Double-check protocol count limit before proceeding
+    if (!canGenerateMoreProtocols) {
+      toast({
+        title: 'Protokollgräns nådd',
+        description: `Du har redan använt ${protocolCountUsed} av ${maxProtocolGenerations} protokollgenereringar för detta möte.`,
+        variant: 'destructive',
+      });
+      setShowReplaceProtocolConfirm(false);
+      return;
+    }
+    
     try {
       await backendApi.deleteProtocol(id);
       setProtocolData(null);
@@ -1755,7 +1766,10 @@ const MeetingDetail = () => {
         open={showDeleteProtocolConfirm}
         onOpenChange={setShowDeleteProtocolConfirm}
         title="Ta bort protokoll"
-        description="Är du säker på att du vill ta bort detta protokoll? Du kan generera ett nytt efteråt."
+        description={canGenerateMoreProtocols 
+          ? "Är du säker på att du vill ta bort detta protokoll? Du kan generera ett nytt efteråt."
+          : `Är du säker på att du vill ta bort detta protokoll? OBS: Du har använt alla ${maxProtocolGenerations} protokollgenereringar för detta möte och kan inte skapa ett nytt.`
+        }
         confirmText="Ta bort"
         onConfirm={handleDeleteProtocol}
         variant="destructive"
@@ -1765,11 +1779,14 @@ const MeetingDetail = () => {
       <ConfirmDialog
         open={showReplaceProtocolConfirm}
         onOpenChange={setShowReplaceProtocolConfirm}
-        title="Ersätt protokoll"
-        description={`Vill du ersätta det befintliga protokollet? Du har använt ${protocolCountUsed} av ${maxProtocolGenerations}. Efter detta har du ${Math.max(0, protocolCountRemaining - 1)} kvar.`}
-        confirmText="Ersätt"
-        onConfirm={handleReplaceProtocol}
-        variant="destructive"
+        title={canGenerateMoreProtocols ? "Ersätt protokoll" : "Protokollgräns nådd"}
+        description={canGenerateMoreProtocols
+          ? `Vill du ersätta det befintliga protokollet? Du har använt ${protocolCountUsed} av ${maxProtocolGenerations}. Efter detta har du ${Math.max(0, protocolCountRemaining - 1)} kvar.`
+          : `Du har redan använt alla ${maxProtocolGenerations} protokollgenereringar för detta möte. Du kan inte ersätta protokollet.`
+        }
+        confirmText={canGenerateMoreProtocols ? "Ersätt" : "OK"}
+        onConfirm={canGenerateMoreProtocols ? handleReplaceProtocol : () => setShowReplaceProtocolConfirm(false)}
+        variant={canGenerateMoreProtocols ? "destructive" : "default"}
       />
 
       {/* Protocol Viewer Dialog */}

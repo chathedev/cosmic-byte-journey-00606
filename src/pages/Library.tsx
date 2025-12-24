@@ -99,10 +99,12 @@ const Library = () => {
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
+  const [protocolCounts, setProtocolCounts] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const maxProtocolsPerMeeting = userPlan?.plan === 'plus' ? 5 : 1;
+  const isEnterprise = enterpriseMembership?.isMember === true;
+  const maxProtocolsPerMeeting = isEnterprise ? 3 : 1;
   const pendingMeetingIdRef = useRef<string | null>(null);
   
   // Check if this is a demo/test account
@@ -730,6 +732,23 @@ const Library = () => {
   };
 
   const handleCreateProtocol = async (meeting: MeetingSession) => {
+    // Check protocol count limit first
+    try {
+      const currentCount = await meetingStorage.getProtocolCount(meeting.id);
+      setProtocolCounts(prev => ({ ...prev, [meeting.id]: currentCount }));
+      
+      if (currentCount >= maxProtocolsPerMeeting) {
+        toast({
+          title: "Protokollgräns nådd",
+          description: `Du har redan använt ${currentCount} av ${maxProtocolsPerMeeting} protokollgenereringar för detta möte.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not check protocol count:', e);
+    }
+
     // If a protocol exists, offer replace flow
     if (protocolStatus[meeting.id]) {
       setMeetingToReplaceProtocol(meeting);
@@ -1400,12 +1419,25 @@ const Library = () => {
           if (!open) setMeetingToReplaceProtocol(null);
         }}
         title="Ersätt protokoll"
-        description="Det finns redan ett protokoll för detta möte. Vill du ersätta det genom att skapa ett nytt?"
-        confirmText="Ersätt"
+        description={`Det finns redan ett protokoll för detta möte. Du har använt ${protocolCounts[meetingToReplaceProtocol?.id || ''] || 0} av ${maxProtocolsPerMeeting} protokollgenereringar.${(protocolCounts[meetingToReplaceProtocol?.id || ''] || 0) >= maxProtocolsPerMeeting ? ' Du har nått din gräns.' : ' Vill du ersätta det genom att skapa ett nytt?'}`}
+        confirmText={(protocolCounts[meetingToReplaceProtocol?.id || ''] || 0) >= maxProtocolsPerMeeting ? "Gräns nådd" : "Ersätt"}
         cancelText="Avbryt"
         variant="destructive"
         onConfirm={async () => {
           if (!meetingToReplaceProtocol) return;
+          
+          // Double-check protocol count limit
+          const currentCount = protocolCounts[meetingToReplaceProtocol.id] || 0;
+          if (currentCount >= maxProtocolsPerMeeting) {
+            toast({
+              title: "Protokollgräns nådd",
+              description: `Du har redan använt ${currentCount} av ${maxProtocolsPerMeeting} protokollgenereringar för detta möte.`,
+              variant: "destructive",
+            });
+            setMeetingToReplaceProtocol(null);
+            return;
+          }
+          
           try {
             // Remove old
             await backendApi.deleteProtocol(meetingToReplaceProtocol.id);
