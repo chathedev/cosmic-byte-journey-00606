@@ -37,14 +37,14 @@ interface SpeakerTranscriptViewProps {
   className?: string;
 }
 
-// Minimalistic speaker color palette
-const SPEAKER_STYLES = [
-  { accent: 'hsl(217, 91%, 60%)', label: 'text-blue-600 dark:text-blue-400' },
-  { accent: 'hsl(160, 84%, 39%)', label: 'text-emerald-600 dark:text-emerald-400' },
-  { accent: 'hsl(38, 92%, 50%)', label: 'text-amber-600 dark:text-amber-400' },
-  { accent: 'hsl(271, 91%, 65%)', label: 'text-purple-500 dark:text-purple-400' },
-  { accent: 'hsl(350, 89%, 60%)', label: 'text-rose-500 dark:text-rose-400' },
-  { accent: 'hsl(187, 85%, 43%)', label: 'text-cyan-600 dark:text-cyan-400' },
+// Clean, professional speaker colors
+const SPEAKER_COLORS = [
+  { border: 'border-l-blue-500', dot: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/5' },
+  { border: 'border-l-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/5' },
+  { border: 'border-l-amber-500', dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/5' },
+  { border: 'border-l-purple-500', dot: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/5' },
+  { border: 'border-l-rose-500', dot: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/5' },
+  { border: 'border-l-cyan-500', dot: 'bg-cyan-500', text: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/5' },
 ];
 
 const formatTime = (seconds: number): string => {
@@ -88,14 +88,14 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
   const names = { ...(initialLyraSpeakerNames || initialSpeakerNames || {}), ...localSpeakerNames };
 
   // Check if we have speaker diarization data
-  const hasSpeakerData = sisEnabled && speakers && speakers.length > 0;
+  const hasSpeakerData = sisEnabled && speakers && speakers.length > 1;
 
-  // Create speaker style map
-  const speakerStyleMap = useMemo(() => {
+  // Create speaker color map
+  const speakerColorMap = useMemo(() => {
     if (!speakers) return {};
-    const map: Record<string, typeof SPEAKER_STYLES[0] & { index: number }> = {};
+    const map: Record<string, typeof SPEAKER_COLORS[0]> = {};
     speakers.forEach((speaker, index) => {
-      map[speaker.label] = { ...SPEAKER_STYLES[index % SPEAKER_STYLES.length], index };
+      map[speaker.label] = SPEAKER_COLORS[index % SPEAKER_COLORS.length];
     });
     return map;
   }, [speakers]);
@@ -105,17 +105,10 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
     if (!transcriptSegments || !speakers || speakers.length === 0) return [];
 
     return transcriptSegments.map(segment => {
-      // Use midpoint of segment to determine speaker
       const midpoint = (segment.start + segment.end) / 2;
       const matchedSpeaker = findSpeakerAtTime(midpoint, speakers);
-      
-      // If no match at midpoint, try start time
       const finalSpeaker = matchedSpeaker || findSpeakerAtTime(segment.start, speakers);
-
-      return {
-        ...segment,
-        speaker: finalSpeaker,
-      };
+      return { ...segment, speaker: finalSpeaker };
     });
   }, [transcriptSegments, speakers]);
 
@@ -186,22 +179,15 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
     setSavingName(true);
     
     try {
-      // 1. Update local state immediately for responsive UI
       const updatedNames = { ...names, [speakerLabel]: newName };
       setLocalSpeakerNames(prev => ({ ...prev, [speakerLabel]: newName }));
       
-      // 2. Save to meeting (PUT /meetings/:id/speaker-names)
       const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
-      console.log('[SIS] Speaker names saved:', saveResult);
-      
-      // Notify parent of updated names
       onSpeakerNamesUpdated?.(saveResult.speakerNames);
       
-      // 3. Teach backend the speaker identity (POST /sis/rename-speaker)
       const learnResult = await backendApi.renameSpeaker(meetingId, speakerLabel, newName);
       
       if (learnResult.ok && !learnResult.rejected) {
-        // Successfully learned
         setLearningStatus(prev => ({ ...prev, [speakerLabel]: 'learned' }));
         toast.success(
           <div className="flex items-center gap-2">
@@ -210,7 +196,6 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
           </div>
         );
       } else if (learnResult.rejected) {
-        // Learning was rejected (embedding too different)
         setLearningStatus(prev => ({ ...prev, [speakerLabel]: 'rejected' }));
         toast.info(
           <div className="flex items-center gap-2">
@@ -219,7 +204,6 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
           </div>
         );
       } else {
-        // Just saved without learning
         toast.success('Talarnamn sparat');
       }
       
@@ -237,7 +221,7 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
       const text = groupedSegments
         .map(group => {
           const speakerName = getSpeakerDisplayName(group.speaker);
-          return `${speakerName}: ${group.text}`;
+          return `[${formatTime(group.startTime)}] ${speakerName}:\n${group.text}`;
         })
         .join('\n\n');
       navigator.clipboard.writeText(text);
@@ -250,101 +234,97 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
   // If no speaker data or SIS not enabled, show simple transcript
   if (!hasSpeakerData || !transcriptSegments || groupedSegments.length === 0) {
     return (
-      <div className={cn("space-y-4", className)}>
+      <div className={cn("space-y-3", className)}>
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">Transkription</span>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleCopyTranscript}
-            className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+            className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
-            <Copy className="h-3.5 w-3.5" />
-            <span className="text-xs">Kopiera</span>
+            <Copy className="h-3 w-3" />
+            Kopiera
           </Button>
         </div>
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-            {transcript || 'Ingen transkription tillgänglig.'}
-          </p>
-        </div>
+        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          {transcript || 'Ingen transkription tillgänglig.'}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className={cn("space-y-5", className)}>
-      {/* Minimal header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-sm font-medium text-muted-foreground">Transkription</span>
+    <div className={cn("space-y-4", className)}>
+      {/* Header with speaker chips */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Transkription</span>
+            <span className="text-xs text-muted-foreground/60">• {speakers?.length} talare</span>
+          </div>
           
-          {/* Inline speaker chips */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Speaker chips for quick edit */}
+          <div className="flex flex-wrap gap-1.5">
             {speakers?.map(speaker => {
-              const style = speakerStyleMap[speaker.label];
+              const colors = speakerColorMap[speaker.label];
               const isEditing = editingSpeaker === speaker.label;
               const learnStatus = learningStatus[speaker.label];
 
-              return (
-                <div key={speaker.label} className="flex items-center">
-                  {isEditing ? (
-                    <div className="flex items-center gap-1 bg-muted rounded-full pl-2 pr-1 py-0.5">
-                      <div 
-                        className="w-2 h-2 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: style?.accent }}
-                      />
-                      <Input
-                        value={editedName}
-                        onChange={(e) => setEditedName(e.target.value)}
-                        className="h-5 w-24 text-xs px-1.5 py-0 border-0 bg-transparent focus-visible:ring-0"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveSpeakerName();
-                          if (e.key === 'Escape') setEditingSpeaker(null);
-                        }}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleSaveSpeakerName}
-                        disabled={savingName}
-                        className="h-5 w-5 p-0 hover:bg-transparent"
-                      >
-                        <Check className="h-3 w-3 text-emerald-500" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingSpeaker(null)}
-                        className="h-5 w-5 p-0 hover:bg-transparent"
-                      >
-                        <X className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleEditSpeaker(speaker.label)}
-                      className={cn(
-                        "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full",
-                        "bg-muted/50 hover:bg-muted transition-colors cursor-pointer",
-                        "border border-transparent hover:border-border/50"
-                      )}
+              if (isEditing) {
+                return (
+                  <div key={speaker.label} className="flex items-center gap-1 bg-muted rounded-md px-2 py-1">
+                    <div className={cn("w-2 h-2 rounded-full flex-shrink-0", colors?.dot)} />
+                    <Input
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="h-5 w-28 text-xs px-1 py-0 border-0 bg-transparent focus-visible:ring-0"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveSpeakerName();
+                        if (e.key === 'Escape') setEditingSpeaker(null);
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSaveSpeakerName}
+                      disabled={savingName}
+                      className="h-5 w-5 p-0"
                     >
-                      <div 
-                        className="w-2 h-2 rounded-full" 
-                        style={{ backgroundColor: style?.accent }}
-                      />
-                      <span className={style?.label}>
-                        {getSpeakerDisplayName(speaker.label)}
-                      </span>
-                      {learnStatus === 'learned' && (
-                        <Sparkles className="h-2.5 w-2.5 text-amber-500" />
-                      )}
-                      <Edit2 className="h-2.5 w-2.5 opacity-40" />
-                    </button>
+                      <Check className="h-3 w-3 text-emerald-500" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingSpeaker(null)}
+                      className="h-5 w-5 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={speaker.label}
+                  onClick={() => handleEditSpeaker(speaker.label)}
+                  className={cn(
+                    "flex items-center gap-1.5 text-xs px-2 py-1 rounded-md",
+                    "bg-muted/50 hover:bg-muted border border-transparent hover:border-border/50",
+                    "transition-all duration-150"
                   )}
-                </div>
+                >
+                  <div className={cn("w-2 h-2 rounded-full", colors?.dot)} />
+                  <span className={cn("font-medium", colors?.text)}>
+                    {getSpeakerDisplayName(speaker.label)}
+                  </span>
+                  {learnStatus === 'learned' && (
+                    <Sparkles className="h-2.5 w-2.5 text-amber-500" />
+                  )}
+                  <Edit2 className="h-2.5 w-2.5 opacity-30" />
+                </button>
               );
             })}
           </div>
@@ -354,75 +334,54 @@ export const SpeakerTranscriptView: React.FC<SpeakerTranscriptViewProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleCopyTranscript}
-          className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+          className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground flex-shrink-0"
         >
-          <Copy className="h-3.5 w-3.5" />
-          <span className="text-xs">Kopiera</span>
+          <Copy className="h-3 w-3" />
+          Kopiera
         </Button>
       </div>
 
-      {/* Conversation-style transcript */}
-      <ScrollArea className="max-h-[65vh]">
-        <div className="space-y-4 pr-4">
+      {/* Clean linear transcript with speaker blocks */}
+      <ScrollArea className="max-h-[60vh]">
+        <div className="space-y-0 pr-2">
           {groupedSegments.map((group, index) => {
-            const style = group.speaker ? speakerStyleMap[group.speaker] : null;
+            const colors = group.speaker ? speakerColorMap[group.speaker] : null;
             const speakerName = getSpeakerDisplayName(group.speaker);
-            const isEven = (style?.index ?? 0) % 2 === 0;
+            const prevGroup = index > 0 ? groupedSegments[index - 1] : null;
+            const showDivider = prevGroup && prevGroup.speaker !== group.speaker;
 
             return (
-              <div
-                key={index}
-                className={cn(
-                  "flex gap-3",
-                  !isEven && "flex-row-reverse"
+              <div key={index}>
+                {/* Divider line between different speakers */}
+                {showDivider && (
+                  <div className="flex items-center gap-3 py-3">
+                    <div className="flex-1 h-px bg-border/50" />
+                  </div>
                 )}
-              >
-                {/* Speaker indicator line */}
-                <div className="flex flex-col items-center gap-1 pt-1">
-                  <div 
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
-                    style={{ backgroundColor: style?.accent || 'hsl(var(--muted-foreground))' }}
-                  />
-                  <div 
-                    className="w-0.5 flex-1 rounded-full opacity-20"
-                    style={{ backgroundColor: style?.accent || 'hsl(var(--muted-foreground))' }}
-                  />
-                </div>
 
-                {/* Content */}
-                <div className={cn(
-                  "flex-1 space-y-1 min-w-0",
-                  !isEven && "text-right"
-                )}>
-                  {/* Speaker name & time */}
-                  <div className={cn(
-                    "flex items-center gap-2",
-                    !isEven && "flex-row-reverse"
-                  )}>
-                    <span className={cn("text-sm font-medium", style?.label || "text-muted-foreground")}>
+                {/* Speaker segment */}
+                <div
+                  className={cn(
+                    "relative pl-4 py-2 border-l-2 transition-colors",
+                    colors?.border || "border-l-muted-foreground/30",
+                    "hover:bg-muted/30"
+                  )}
+                >
+                  {/* Speaker name and time */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={cn("w-1.5 h-1.5 rounded-full", colors?.dot || "bg-muted-foreground/50")} />
+                    <span className={cn("text-xs font-semibold", colors?.text || "text-muted-foreground")}>
                       {speakerName}
                     </span>
-                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                    <span className="text-[10px] text-muted-foreground/50 tabular-nums">
                       {formatTime(group.startTime)}
                     </span>
                   </div>
 
-                  {/* Message bubble */}
-                  <div
-                    className={cn(
-                      "inline-block max-w-[90%] rounded-2xl px-4 py-2.5 shadow-sm",
-                      isEven 
-                        ? "rounded-tl-sm bg-muted/60 dark:bg-muted/40" 
-                        : "rounded-tr-sm bg-primary/5 dark:bg-primary/10"
-                    )}
-                  >
-                    <p className={cn(
-                      "text-sm leading-relaxed text-foreground",
-                      !isEven && "text-left"
-                    )}>
-                      {group.text}
-                    </p>
-                  </div>
+                  {/* Text content */}
+                  <p className="text-sm text-foreground leading-relaxed pl-3.5">
+                    {group.text}
+                  </p>
                 </div>
               </div>
             );
