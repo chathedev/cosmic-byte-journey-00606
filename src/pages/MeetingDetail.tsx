@@ -949,13 +949,40 @@ const MeetingDetail = () => {
     return speakers;
   })();
 
-  // Group consecutive segments
+  // Find speaker at a given time using lyraSpeakers time segments
+  const findSpeakerAtTime = (time: number): string => {
+    for (const speaker of lyraSpeakers) {
+      for (const seg of speaker.segments) {
+        if (time >= seg.start && time <= seg.end) {
+          return speaker.label;
+        }
+      }
+    }
+    return 'unknown';
+  };
+
+  // Group consecutive segments with proper time-based speaker matching
   const groupedSegments = transcriptSegments ? (() => {
     const grouped: { speakerId: string; text: string; start: number; end: number }[] = [];
+    
     for (const seg of transcriptSegments) {
-      const prev = grouped[grouped.length - 1];
-      const rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || 'unknown';
+      // First try to get speaker from segment data
+      let rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || '';
+      
+      // If no speaker in segment data OR speaker is unknown, use time-based matching from lyraSpeakers
+      if (!rawSpeakerId || rawSpeakerId.toLowerCase() === 'unknown') {
+        // Use midpoint of segment for speaker matching
+        const midpoint = (seg.start + seg.end) / 2;
+        rawSpeakerId = findSpeakerAtTime(midpoint);
+        
+        // If still no match, try start time
+        if (rawSpeakerId === 'unknown') {
+          rawSpeakerId = findSpeakerAtTime(seg.start);
+        }
+      }
+      
       const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
+      const prev = grouped[grouped.length - 1];
 
       if (prev && prev.speakerId === speakerId) {
         prev.text = `${prev.text}\n${seg.text}`;
@@ -1080,25 +1107,67 @@ const MeetingDetail = () => {
     return `Talare ${idx >= 0 ? idx + 1 : 1}`;
   };
 
-  // Get speaker color class based on speaker index
+  // Get speaker color class based on speaker index - includes border-left for clean linear design
   const getSpeakerColorClass = (speakerId: string): string => {
     const colors = [
-      'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-      'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-      'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-      'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-      'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-      'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
+      'border-l-blue-500 text-blue-600 dark:text-blue-400',
+      'border-l-emerald-500 text-emerald-600 dark:text-emerald-400',
+      'border-l-purple-500 text-purple-600 dark:text-purple-400',
+      'border-l-amber-500 text-amber-600 dark:text-amber-400',
+      'border-l-rose-500 text-rose-600 dark:text-rose-400',
+      'border-l-cyan-500 text-cyan-600 dark:text-cyan-400',
     ];
     
     const normalizedId = (speakerId || '').toLowerCase().trim();
     
     if (!speakerId || normalizedId === 'unknown') {
-      return 'bg-muted text-muted-foreground border-border';
+      return 'border-l-muted-foreground/30 text-muted-foreground';
     }
     
     const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
     return colors[idx >= 0 ? idx % colors.length : 0];
+  };
+
+  // Get dot color for speaker
+  const getSpeakerDotClass = (speakerId: string): string => {
+    const dots = [
+      'bg-blue-500',
+      'bg-emerald-500',
+      'bg-purple-500',
+      'bg-amber-500',
+      'bg-rose-500',
+      'bg-cyan-500',
+    ];
+    
+    const normalizedId = (speakerId || '').toLowerCase().trim();
+    
+    if (!speakerId || normalizedId === 'unknown') {
+      return 'bg-muted-foreground/50';
+    }
+    
+    const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
+    return dots[idx >= 0 ? idx % dots.length : 0];
+  };
+
+  // Get text color class for speaker name
+  const getSpeakerTextClass = (speakerId: string): string => {
+    const textColors = [
+      'text-blue-600 dark:text-blue-400',
+      'text-emerald-600 dark:text-emerald-400',
+      'text-purple-600 dark:text-purple-400',
+      'text-amber-600 dark:text-amber-400',
+      'text-rose-600 dark:text-rose-400',
+      'text-cyan-600 dark:text-cyan-400',
+    ];
+    
+    const normalizedId = (speakerId || '').toLowerCase().trim();
+    
+    if (!speakerId || normalizedId === 'unknown') {
+      return 'text-muted-foreground';
+    }
+    
+    const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
+    return textColors[idx >= 0 ? idx % textColors.length : 0];
   };
 
   const displayTranscript = isEditing ? editedTranscript : (transcript || '');
@@ -1396,28 +1465,44 @@ const MeetingDetail = () => {
                         placeholder="Redigera transkriptionen..."
                       />
                     ) : hasSegments ? (
-                      // Show segments with speaker attribution
-                      <div className="space-y-4">
+                      // Clean linear transcript with speaker attribution
+                      <div className="space-y-0">
                         {groupedSegments.map((segment, idx) => {
                           const speakerName = getSegmentSpeakerName(segment.speakerId);
                           const colorClass = getSpeakerColorClass(segment.speakerId);
+                          const dotClass = getSpeakerDotClass(segment.speakerId);
+                          const textClass = getSpeakerTextClass(segment.speakerId);
                           const timestamp = formatTimestamp(segment.start);
+                          const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
+                          const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
                           
                           return (
-                            <div key={idx} className="group">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${colorClass}`}>
-                                  {speakerName}
-                                </span>
-                                {timestamp && (
-                                  <span className="text-[10px] text-muted-foreground/60 font-mono tabular-nums">
-                                    {timestamp}
+                            <div key={idx}>
+                              {/* Subtle divider between different speakers */}
+                              {showDivider && (
+                                <div className="h-px bg-border/40 my-3" />
+                              )}
+                              
+                              {/* Speaker segment with colored left border */}
+                              <div className={`pl-4 py-2 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
+                                {/* Speaker name and time */}
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                                  <span className={`text-xs font-semibold ${textClass}`}>
+                                    {speakerName}
                                   </span>
-                                )}
+                                  {timestamp && (
+                                    <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+                                      {timestamp}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Text content */}
+                                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-3.5">
+                                  {segment.text}
+                                </p>
                               </div>
-                              <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-0.5">
-                                {segment.text}
-                              </p>
                             </div>
                           );
                         })}
