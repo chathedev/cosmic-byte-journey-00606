@@ -21,17 +21,17 @@ type AccessState =
 function determineAccessState(membership: EnterpriseMembership): AccessState {
   const company = membership.company;
   if (!company) return { type: 'allowed' };
-  
+
   const companyName = company.name;
   const trial = company.trial;
   const billing = company.billing;
   const preferences = company.preferences;
-  
+
   // Special perk enabled = bypass all checks
   if (preferences?.specialPerkEnabled) {
     return { type: 'allowed' };
   }
-  
+
   // Check trial status first (if trial is enabled)
   if (trial?.enabled) {
     // If manually disabled, trial locks are removed
@@ -45,62 +45,67 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
     // Trial active and not expired = allowed
     return { type: 'allowed' };
   }
-  
-  // Check billing status - PAID INVOICE = ALLOWED
-  // If billing status is 'active' or 'paid', or latest invoice is paid = access granted
-  if (billing?.status === 'active' || billing?.status === 'paid') {
-    return { type: 'allowed' };
-  }
-  
-  // Check if latest invoice is paid - this means they have valid billing
-  if (billing?.latestInvoice?.status === 'paid') {
-    return { type: 'allowed' };
-  }
-  
-  // Check for active subscription
-  if (billing?.activeSubscription) {
-    const subStatus = billing.activeSubscription.status?.toLowerCase();
-    
-    // Subscription is fully canceled/ended - block immediately
+
+  // Subscription status has priority over invoice state.
+  // If the subscription is canceled/ended, access should be blocked (unless special perk).
+  const activeSub = billing?.activeSubscription;
+  if (activeSub) {
+    const now = new Date();
+    const subStatus = (activeSub.status || '').toLowerCase();
+    const periodEnd = activeSub.currentPeriodEnd ? new Date(activeSub.currentPeriodEnd) : null;
+    const scheduledCancel = !!activeSub.cancelAtPeriodEnd && !!periodEnd && now < periodEnd;
+
+    // If backend reports the subscription has ended, always block immediately.
+    if (activeSub.endedAt) {
+      const endedAt = new Date(activeSub.endedAt);
+      if (Number.isNaN(endedAt.getTime()) || endedAt <= now) {
+        return { type: 'canceled_expired', companyName };
+      }
+    }
+
+    // Fully canceled/ended subscription
     if (subStatus === 'canceled' || subStatus === 'ended') {
+      // Exception: cancel at period end and still within the paid period => allow with banner
+      if (scheduledCancel) {
+        return { type: 'canceled_active', companyName, cancelAt: periodEnd! };
+      }
       return { type: 'canceled_expired', companyName };
     }
-    
-    // Subscription is active
+
+    // Active subscription
     if (subStatus === 'active' || subStatus === 'trialing') {
-      // Check if it's scheduled to cancel but still in grace period
-      if (billing.activeSubscription.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
-        const periodEnd = new Date(billing.activeSubscription.currentPeriodEnd);
-        const now = new Date();
-        
-        if (now < periodEnd) {
-          // Still within the paid period - allow access but show info banner
-          return { type: 'canceled_active', companyName, cancelAt: periodEnd };
-        } else {
-          // Past the period end - block access
-          return { type: 'canceled_expired', companyName };
-        }
+      if (scheduledCancel) {
+        return { type: 'canceled_active', companyName, cancelAt: periodEnd! };
       }
-      // Active subscription without scheduled cancel = allowed
       return { type: 'allowed' };
     }
   }
-  
-  // Check billing status for canceled without active subscription
+
+  // Canceled billing without an active subscription object
   if (billing?.status === 'canceled') {
     return { type: 'canceled_expired', companyName };
   }
-  
-  // Check for unpaid invoice
+
+  // Unpaid invoice blocks access
   if (billing?.status === 'unpaid' || billing?.latestInvoice?.status === 'open') {
-    return { 
-      type: 'unpaid_invoice', 
+    return {
+      type: 'unpaid_invoice',
       companyName,
       invoiceUrl: billing.latestInvoice?.invoiceUrl,
-      amountDue: billing.latestInvoice?.amountDue
+      amountDue: billing.latestInvoice?.amountDue,
     };
   }
-  
+
+  // Active/paid billing grants access
+  if (billing?.status === 'active' || billing?.status === 'paid') {
+    return { type: 'allowed' };
+  }
+
+  // Fallback: paid latest invoice grants access (only reached if not canceled/unpaid)
+  if (billing?.latestInvoice?.status === 'paid') {
+    return { type: 'allowed' };
+  }
+
   // No billing at all and no trial = show contact overlay
   // But only if trial was set up before (endsAt exists) OR status is inactive
   if (!billing || billing.status === 'none') {
@@ -110,7 +115,7 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
     // New company with no trial setup yet - allow access
     return { type: 'allowed' };
   }
-  
+
   // All good - default to allowed
   return { type: 'allowed' };
 }
@@ -169,8 +174,13 @@ function mapLiveToCompanyBilling(live: LiveBillingStatusResponse | null): Compan
   const invoiceStatus = (inv?.status || '').toLowerCase();
   const subscriptionStatus = (sub?.status || '').toLowerCase();
 
-  const hasPaidInvoice = invoiceStatus === 'paid' || (typeof inv?.amountRemaining === 'number' && inv.amountRemaining === 0 && (inv.amountPaid || 0) > 0);
-  const hasOpenInvoice = invoiceStatus === 'open' || invoiceStatus === 'unpaid' || (typeof inv?.amountRemaining === 'number' && inv.amountRemaining > 0);
+  const hasPaidInvoice =
+    invoiceStatus === 'paid' ||
+    (typeof inv?.amountRemaining === 'number' && inv.amountRemaining === 0 && (inv.amountPaid || 0) > 0);
+  const hasOpenInvoice =
+    invoiceStatus === 'open' ||
+    invoiceStatus === 'unpaid' ||
+    (typeof inv?.amountRemaining === 'number' && inv.amountRemaining > 0);
 
   let status: CompanyBilling['status'] = 'none';
 
@@ -207,6 +217,8 @@ function mapLiveToCompanyBilling(live: LiveBillingStatusResponse | null): Compan
           cancelAtPeriodEnd: !!sub.cancelAtPeriodEnd,
           cancelAt: sub.cancelAt ?? null,
           currentPeriodEnd: sub.currentPeriodEnd ?? null,
+          canceledAt: sub.canceledAt ?? null,
+          endedAt: sub.endedAt ?? null,
         }
       : undefined,
   } as CompanyBilling;
