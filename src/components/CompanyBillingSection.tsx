@@ -78,6 +78,44 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
 
+  // Track whether invoice email has been sent (separate from Stripe invoice status)
+  const sentStorageKey = `enterpriseBillingSent:${companyId}`;
+  const [sentInvoiceIds, setSentInvoiceIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!companyId) return;
+    try {
+      const raw = localStorage.getItem(sentStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+      setSentInvoiceIds(new Set(parsed.filter(Boolean)));
+    } catch {
+      setSentInvoiceIds(new Set());
+    }
+  }, [companyId, sentStorageKey]);
+
+  const markInvoiceSent = useCallback(
+    (invoiceId?: string) => {
+      if (!invoiceId) return;
+      setSentInvoiceIds((prev) => {
+        const next = new Set(prev);
+        next.add(invoiceId);
+        localStorage.setItem(sentStorageKey, JSON.stringify(Array.from(next)));
+        return next;
+      });
+    },
+    [sentStorageKey]
+  );
+
+  const getDisplayStatus = useCallback(
+    (record: BillingRecord) => {
+      if (record.status === 'open' && record.invoiceId && sentInvoiceIds.has(record.invoiceId)) {
+        return 'sent';
+      }
+      return record.status;
+    },
+    [sentInvoiceIds]
+  );
+
   // Real-time polling ref
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
@@ -316,6 +354,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
 
     try {
       await apiClient.sendInvoiceEmail(companyId, record.invoiceId);
+      markInvoiceSent(record.invoiceId);
       toast.success('Faktura skickad');
       await loadBillingHistory(false);
     } catch (error: any) {
@@ -427,8 +466,8 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(record.status)} className="text-[10px]">
-                            {getStatusLabel(record.status)}
+                          <Badge variant={getStatusVariant(getDisplayStatus(record))} className="text-[10px]">
+                            {getStatusLabel(getDisplayStatus(record))}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

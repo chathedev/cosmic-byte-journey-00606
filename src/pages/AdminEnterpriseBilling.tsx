@@ -94,6 +94,25 @@ export default function AdminEnterpriseBilling() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
 
+  // Track whether invoice email has been sent (separate from Stripe invoice status)
+  const [sentInvoiceIds, setSentInvoiceIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setSentInvoiceIds(new Set());
+      return;
+    }
+
+    const sentStorageKey = `enterpriseBillingSent:${selectedCompanyId}`;
+    try {
+      const raw = localStorage.getItem(sentStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+      setSentInvoiceIds(new Set(parsed.filter(Boolean)));
+    } catch {
+      setSentInvoiceIds(new Set());
+    }
+  }, [selectedCompanyId]);
+
   useEffect(() => {
     loadCompanies();
   }, []);
@@ -319,6 +338,25 @@ export default function AdminEnterpriseBilling() {
     }
   };
 
+  const markInvoiceSent = (invoiceId?: string) => {
+    if (!selectedCompanyId || !invoiceId) return;
+
+    const sentStorageKey = `enterpriseBillingSent:${selectedCompanyId}`;
+    setSentInvoiceIds((prev) => {
+      const next = new Set(prev);
+      next.add(invoiceId);
+      localStorage.setItem(sentStorageKey, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
+  const getDisplayStatus = (record: BillingRecord) => {
+    if (record.status === 'open' && record.invoiceId && sentInvoiceIds.has(record.invoiceId)) {
+      return 'sent';
+    }
+    return record.status;
+  };
+
   const handleSendInvoice = async (record: BillingRecord) => {
     if (!record.invoiceId || !selectedCompanyId) {
       toast.error('Inget faktura-ID eller företag valt');
@@ -330,6 +368,7 @@ export default function AdminEnterpriseBilling() {
 
     try {
       await apiClient.sendInvoiceEmail(selectedCompanyId, record.invoiceId);
+      markInvoiceSent(record.invoiceId);
       toast.success('Faktura skickad');
       await loadBillingHistory(selectedCompanyId);
     } catch (error: any) {
@@ -669,8 +708,8 @@ export default function AdminEnterpriseBilling() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <Badge variant={getStatusVariant(record.status)}>
-                                  {getStatusLabel(record.status)}
+                                <Badge variant={getStatusVariant(getDisplayStatus(record))}>
+                                  {getStatusLabel(getDisplayStatus(record))}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
