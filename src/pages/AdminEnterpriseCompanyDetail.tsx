@@ -588,6 +588,50 @@ export default function AdminEnterpriseCompanyDetail() {
     }
   };
 
+  const handleToggleSpecialPerk = async (checked: boolean) => {
+    if (!company) return;
+
+    const previousValue = company.preferences?.specialPerkEnabled ?? false;
+
+    // Optimistic update
+    setCompany(prev => prev ? {
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        specialPerkEnabled: checked,
+      },
+    } : null);
+
+    try {
+      setIsSubmitting(true);
+      await apiClient.toggleEnterpriseCompanySpecialPerk(company.id, checked);
+
+      toast({
+        title: checked ? 'Special Perk aktiverad' : 'Special Perk inaktiverad',
+        description: checked
+          ? 'Företaget har nu obegränsad åtkomst oavsett fakturor/trial'
+          : 'Företaget följer nu normala faktura/trial-regler',
+      });
+    } catch (error: any) {
+      console.error('Failed to toggle special perk:', error);
+      // Revert on error
+      setCompany(prev => prev ? {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          specialPerkEnabled: previousValue,
+        },
+      } : null);
+      toast({
+        title: 'Fel',
+        description: error?.message || 'Kunde inte uppdatera special perk',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -612,6 +656,7 @@ export default function AdminEnterpriseCompanyDetail() {
 
   const activeMembers = company.members.filter(m => m.status === 'active').length;
   const sisEnabled = company.preferences?.speakerIdentificationEnabled ?? false;
+  const specialPerkEnabled = company.preferences?.specialPerkEnabled ?? false;
   const sisReadyCount = company.members.filter(m => m.sisSample?.status === 'ready').length;
 
   // Billing status helpers
@@ -760,7 +805,7 @@ export default function AdminEnterpriseCompanyDetail() {
         </div>
 
         {/* Stats Grid - Minimalistic */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
@@ -824,6 +869,27 @@ export default function AdminEnterpriseCompanyDetail() {
                   </div>
                 </div>
                 <Volume2 className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className={specialPerkEnabled ? 'border-green-500/50 bg-green-500/5' : ''}>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Special Perk</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-2xl font-bold">
+                      {specialPerkEnabled ? 'På' : 'Av'}
+                    </p>
+                    <Switch
+                      checked={specialPerkEnabled}
+                      onCheckedChange={handleToggleSpecialPerk}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                <Sparkles className="h-8 w-8 text-muted-foreground/30" />
               </div>
             </CardContent>
           </Card>
