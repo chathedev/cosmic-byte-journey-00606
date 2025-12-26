@@ -377,24 +377,6 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
           </a>
         )}
 
-        {companyId && (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={checkBillingNow}
-              disabled={isCheckingBilling}
-              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-muted text-foreground text-sm font-medium hover:bg-muted/80 transition-colors disabled:opacity-60"
-            >
-              {isCheckingBilling ? 'Uppdaterar…' : 'Uppdatera status'}
-            </button>
-            <p className="text-xs text-muted-foreground">Auto-uppdateras var 3:e sekund.</p>
-            {billingCheckError && (
-              <p className="text-xs text-muted-foreground">
-                Kunde inte hämta faktureringsstatus just nu. Försöker igen automatiskt.
-              </p>
-            )}
-          </div>
-        )}
 
         <div className="pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground">
