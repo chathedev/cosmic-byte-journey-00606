@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield, User, Loader2, Headphones } from "lucide-react";
+import { Trash2, CreditCard, CheckCircle, XCircle, LogOut, Building2, Users, Shield, User, Loader2, Headphones, Calendar, Receipt, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "./SubscribeDialog";
@@ -63,6 +63,29 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
   const [preferredName, setPreferredName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   
+  // Enterprise billing info for admin/owner
+  const [enterpriseBilling, setEnterpriseBilling] = useState<{
+    subscription: {
+      id: string;
+      status: string;
+      currentPeriodStart?: string | null;
+      currentPeriodEnd?: string | null;
+      startedAt?: string | null;
+      cancelAtPeriodEnd?: boolean;
+      cancelAt?: string | null;
+      autoChargeEnabled?: boolean;
+    } | null;
+    latestInvoice: {
+      id: string;
+      status: string;
+      hostedInvoiceUrl?: string;
+      amountPaid?: number;
+      currency?: string;
+      paidAt?: string | null;
+    } | null;
+  } | null>(null);
+  const [isLoadingBilling, setIsLoadingBilling] = useState(false);
+  
   // Check if running on iOS app domain
   const isIosApp = typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se';
 
@@ -78,6 +101,35 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
     if (!open) return;
     refreshPlan();
   }, [open, refreshPlan]);
+
+  // Check if user is enterprise admin/owner
+  const isEnterpriseAdminOrOwner = enterpriseMembership?.isMember && 
+    (enterpriseMembership.membership?.role === 'admin' || enterpriseMembership.membership?.role === 'owner');
+  
+  // Load enterprise billing when dialog opens and user is admin/owner
+  const loadEnterpriseBilling = useCallback(async () => {
+    if (!enterpriseMembership?.company?.id || !isEnterpriseAdminOrOwner) return;
+    
+    setIsLoadingBilling(true);
+    try {
+      const data = await apiClient.getEnterpriseCompanyBillingSubscription(enterpriseMembership.company.id);
+      setEnterpriseBilling({
+        subscription: data.subscription,
+        latestInvoice: data.latestInvoice,
+      });
+    } catch (error) {
+      console.log('[SettingsDialog] Could not load enterprise billing:', error);
+      setEnterpriseBilling(null);
+    } finally {
+      setIsLoadingBilling(false);
+    }
+  }, [enterpriseMembership?.company?.id, isEnterpriseAdminOrOwner]);
+  
+  useEffect(() => {
+    if (open && isEnterpriseAdminOrOwner) {
+      loadEnterpriseBilling();
+    }
+  }, [open, isEnterpriseAdminOrOwner, loadEnterpriseBilling]);
 
   const handleSavePreferredName = async () => {
     setIsSavingName(true);
@@ -442,6 +494,185 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
                     >
                       Kontakta support
                     </Button>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Enterprise Billing Card - Only for admin/owner */}
+              {userPlan?.plan === 'enterprise' && isEnterpriseAdminOrOwner && (
+                <Card className="border-border">
+                  <CardHeader className="p-3 sm:p-4 pb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                          Företagsfakturering
+                          {enterpriseBilling?.subscription?.status === 'active' && (
+                            <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400 text-[10px]">
+                              Aktiv
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="text-xs mt-0.5">
+                          Prenumerationsstatus och betalningar
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-2 space-y-3">
+                    {isLoadingBilling ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : enterpriseBilling?.subscription ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                              <Receipt className="w-2.5 h-2.5" />
+                              Status
+                            </div>
+                            <div className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                enterpriseBilling.subscription.status === 'active' ? 'bg-green-500' :
+                                enterpriseBilling.subscription.status === 'canceled' ? 'bg-red-500' :
+                                'bg-yellow-500'
+                              }`}></span>
+                              {enterpriseBilling.subscription.status === 'active' ? 'Aktiv' :
+                               enterpriseBilling.subscription.status === 'canceled' ? 'Avslutad' :
+                               enterpriseBilling.subscription.status === 'trialing' ? 'Testperiod' :
+                               enterpriseBilling.subscription.status}
+                            </div>
+                          </div>
+                          <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                              <CreditCard className="w-2.5 h-2.5" />
+                              Betalning
+                            </div>
+                            <div className="text-xs font-medium text-foreground">
+                              {enterpriseBilling.subscription.autoChargeEnabled ? 'Automatisk' : 'Faktura'}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {enterpriseBilling.subscription.startedAt && (
+                          <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                              <Calendar className="w-2.5 h-2.5" />
+                              Prenumeration startad
+                            </div>
+                            <div className="text-xs font-medium text-foreground">
+                              {formatSwedishDate(enterpriseBilling.subscription.startedAt)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {enterpriseBilling.subscription.currentPeriodEnd && (
+                          <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                              <Calendar className="w-2.5 h-2.5" />
+                              {enterpriseBilling.subscription.cancelAtPeriodEnd ? 'Avslutas' : 'Förnyas'}
+                            </div>
+                            <div className="text-xs font-medium text-foreground">
+                              {formatSwedishDate(enterpriseBilling.subscription.currentPeriodEnd)}
+                              {enterpriseBilling.subscription.cancelAtPeriodEnd && (
+                                <span className="text-muted-foreground ml-1">(schemalagd avslutning)</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {enterpriseBilling.latestInvoice && (
+                          <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                                  <Receipt className="w-2.5 h-2.5" />
+                                  Senaste faktura
+                                </div>
+                                <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                                  {enterpriseBilling.latestInvoice.amountPaid !== undefined && (
+                                    <span>
+                                      {(enterpriseBilling.latestInvoice.amountPaid / 100).toLocaleString('sv-SE')} {(enterpriseBilling.latestInvoice.currency || 'sek').toUpperCase()}
+                                    </span>
+                                  )}
+                                  <Badge variant="secondary" className={`text-[9px] ${
+                                    enterpriseBilling.latestInvoice.status === 'paid' ? 'bg-green-500/20 text-green-700 dark:text-green-400' :
+                                    enterpriseBilling.latestInvoice.status === 'open' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' :
+                                    'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {enterpriseBilling.latestInvoice.status === 'paid' ? 'Betald' :
+                                     enterpriseBilling.latestInvoice.status === 'open' ? 'Öppen' :
+                                     enterpriseBilling.latestInvoice.status}
+                                  </Badge>
+                                </div>
+                                {enterpriseBilling.latestInvoice.paidAt && (
+                                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                                    Betalad {formatSwedishDate(enterpriseBilling.latestInvoice.paidAt)}
+                                  </div>
+                                )}
+                              </div>
+                              {enterpriseBilling.latestInvoice.hostedInvoiceUrl && (
+                                <a
+                                  href={enterpriseBilling.latestInvoice.hostedInvoiceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:text-primary/80 transition-colors"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : enterpriseBilling?.latestInvoice ? (
+                      // No subscription but has an invoice (one-time payment)
+                      <div className="p-2 bg-background/50 rounded-md border border-border/50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                              <Receipt className="w-2.5 h-2.5" />
+                              Senaste betalning
+                            </div>
+                            <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                              {enterpriseBilling.latestInvoice.amountPaid !== undefined && (
+                                <span>
+                                  {(enterpriseBilling.latestInvoice.amountPaid / 100).toLocaleString('sv-SE')} {(enterpriseBilling.latestInvoice.currency || 'sek').toUpperCase()}
+                                </span>
+                              )}
+                              <Badge variant="secondary" className={`text-[9px] ${
+                                enterpriseBilling.latestInvoice.status === 'paid' ? 'bg-green-500/20 text-green-700 dark:text-green-400' :
+                                'bg-muted text-muted-foreground'
+                              }`}>
+                                {enterpriseBilling.latestInvoice.status === 'paid' ? 'Betald' : enterpriseBilling.latestInvoice.status}
+                              </Badge>
+                            </div>
+                            {enterpriseBilling.latestInvoice.paidAt && (
+                              <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {formatSwedishDate(enterpriseBilling.latestInvoice.paidAt)}
+                              </div>
+                            )}
+                          </div>
+                          {enterpriseBilling.latestInvoice.hostedInvoiceUrl && (
+                            <a
+                              href={enterpriseBilling.latestInvoice.hostedInvoiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:text-primary/80 transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        Ingen faktureringsinformation tillgänglig
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               )}
