@@ -21,7 +21,7 @@ import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TrialExpiredOverlay } from "@/components/TrialExpiredOverlay";
+import { EnterpriseAccessOverlay } from "@/components/EnterpriseAccessOverlay";
 import { MaintenanceOverlay } from "@/components/MaintenanceOverlay";
 import { SupportBanner } from "@/components/SupportBanner";
 import { IOSAppPromoDialog } from "@/components/IOSAppPromoDialog";
@@ -218,26 +218,18 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
 };
 
 
-
-// Trial Overlay Component - checks enterprise trial status
-const EnterpriseTrialCheck = () => {
-  const { enterpriseMembership } = useSubscription();
+// Enterprise Access Check Component - handles trial, billing, and subscription states
+const EnterpriseAccessCheck = () => {
+  const { enterpriseMembership, isAdmin } = useSubscription();
   
   if (!enterpriseMembership?.isMember || !enterpriseMembership.company) {
     return null;
   }
 
-  const trial = enterpriseMembership.company.trial;
-  if (!trial?.enabled) {
-    return null;
-  }
-
   return (
-    <TrialExpiredOverlay
-      companyName={enterpriseMembership.company.name}
-      daysRemaining={trial.daysRemaining}
-      expired={trial.expired}
-      manuallyDisabled={trial.manuallyDisabled}
+    <EnterpriseAccessOverlay
+      membership={enterpriseMembership}
+      isAdmin={isAdmin}
     />
   );
 };
@@ -296,7 +288,7 @@ const AppContent = () => {
       <AuthRedirectHandler />
       <MaintenanceOverlay />
       <SupportBanner />
-      <EnterpriseTrialCheck />
+      <EnterpriseAccessCheck />
       <IOSAppPromoDialog />
       <OpenInAppBanner />
       <WelcomeGate>

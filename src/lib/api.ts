@@ -925,6 +925,47 @@ class ApiClient {
       billingStatus?: string;
       billingHistory?: any[];
       speakerIdentificationEnabled?: boolean;
+      trial?: {
+        enabled: boolean;
+        startsAt: string;
+        endsAt: string;
+        daysTotal: number;
+        daysRemaining: number | null;
+        expired: boolean;
+        configuredBy: string;
+        manuallyDisabled: boolean;
+        disabledAt: string | null;
+        disabledBy: string | null;
+      };
+      preferences?: {
+        specialPerkEnabled?: boolean;
+        meetingCreatorVisibility?: string;
+        storageRegion?: string;
+        dataRetentionDays?: number;
+        allowAdminFolderLock?: boolean;
+      };
+      billing?: {
+        status: 'active' | 'unpaid' | 'canceled' | 'none';
+        latestInvoice?: {
+          id: string;
+          status: string;
+          billingType: string;
+          subscriptionId?: string;
+          subscriptionStatus?: string;
+          cancelAtPeriodEnd?: boolean;
+          cancelAt?: string | null;
+          currentPeriodEnd?: string;
+          amountDue?: number;
+          invoiceUrl?: string;
+        };
+        activeSubscription?: {
+          id: string;
+          status: string;
+          cancelAtPeriodEnd: boolean;
+          cancelAt: string | null;
+          currentPeriodEnd: string | null;
+        };
+      };
     };
     membership?: {
       role: string;
@@ -998,6 +1039,7 @@ class ApiClient {
       dataRetentionDays?: number;
       allowAdminFolderLock?: boolean;
       speakerIdentificationEnabled?: boolean;
+      specialPerkEnabled?: boolean;
     };
     members?: Array<{
       email: string;
@@ -1038,6 +1080,7 @@ class ApiClient {
       dataRetentionDays?: number;
       allowAdminFolderLock?: boolean;
       speakerIdentificationEnabled?: boolean;
+      specialPerkEnabled?: boolean;
     };
   }): Promise<any> {
     const response = await this.fetchWithAuth(`/admin/enterprise/companies/${companyId}`, {
@@ -1158,6 +1201,27 @@ class ApiClient {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to resume trial' }));
       throw new Error(error.error || 'Failed to resume trial');
+    }
+    return response.json();
+  }
+
+  // Toggle special perk for a company - bypasses billing/trial checks
+  async toggleEnterpriseCompanySpecialPerk(companyId: string, enabled: boolean): Promise<{
+    success: boolean;
+    enabled: boolean;
+    company: any;
+    timestamp: string;
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/perks/special`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to toggle special perk' }));
+      throw new Error(error.error || 'Failed to toggle special perk');
     }
     return response.json();
   }
