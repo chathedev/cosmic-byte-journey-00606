@@ -1,12 +1,11 @@
-import { Mic, Library, LogOut, Settings, User, Lock } from "lucide-react";
+import { Mic, Library, LogOut, Settings, Lock } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { SettingsDialog } from "@/components/SettingsDialog";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { isLibraryLocked as checkLibraryLocked } from "@/lib/accessCheck";
 
@@ -16,7 +15,6 @@ export const BottomNav = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { userPlan, isLoading: planLoading, refreshPlan } = useSubscription();
-  const [showSettings, setShowSettings] = useState(false);
   
   const isLibraryLocked = planLoading ? false : checkLibraryLocked(user, userPlan);
  
@@ -113,7 +111,7 @@ export const BottomNav = () => {
                 <Button
                   variant="ghost"
                   className="justify-start gap-2 w-full"
-                  onClick={() => setShowSettings(true)}
+                  onClick={() => navigate('/settings')}
                 >
                   <Settings className="w-4 h-4" />
                   Inställningar
@@ -132,8 +130,6 @@ export const BottomNav = () => {
           </Popover>
         )}
       </div>
-
-      <SettingsDialog open={showSettings} onOpenChange={setShowSettings} />
     </nav>
   );
 };

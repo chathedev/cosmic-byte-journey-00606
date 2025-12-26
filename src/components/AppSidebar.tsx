@@ -40,8 +40,7 @@ export function AppSidebar() {
   const [open, setOpen] = useState(() => !isMobileDevice());
   const [collapsed, setCollapsed] = useState(false);
   const [selected, setSelected] = useState("Hem");
-  const [showSettings, setShowSettings] = useState(false);
-  const [requireNameInSettings, setRequireNameInSettings] = useState(false);
+  const [showRequireNameDialog, setShowRequireNameDialog] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAdminSupport, setShowAdminSupport] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -119,8 +118,7 @@ export function AppSidebar() {
     if (!preferredName) {
       // Small delay to ensure we're fully rendered
       const timer = setTimeout(() => {
-        setRequireNameInSettings(true);
-        setShowSettings(true);
+        setShowRequireNameDialog(true);
         setHasCheckedName(true);
       }, 800);
       return () => clearTimeout(timer);
@@ -129,12 +127,9 @@ export function AppSidebar() {
     }
   }, [user, planLoading, hasCheckedName]);
 
-  // When name is saved and settings closes, clear the require flag
-  const handleSettingsClose = (isOpen: boolean) => {
-    setShowSettings(isOpen);
-    if (!isOpen && (user as any)?.preferredName) {
-      setRequireNameInSettings(false);
-    }
+  // When name is saved and dialog closes, clear the require flag
+  const handleRequireNameDialogClose = (isOpen: boolean) => {
+    setShowRequireNameDialog(isOpen);
   };
 
   useEffect(() => {
@@ -144,6 +139,7 @@ export function AppSidebar() {
     else if (path === "/agendas") setSelected("Agendor");
     else if (path === "/chat") setSelected("AI Chatt");
     else if (path === "/feedback") setSelected("Feedback");
+    else if (path === "/settings") setSelected("Inställningar");
     else if (path === "/enterprise/stats") setSelected("Översikt");
     else if (path.startsWith("/admin")) {
       if (path === "/admin/users") setSelected("Användare");
@@ -509,7 +505,7 @@ export function AppSidebar() {
                 </AvatarFallback>
               </Avatar>
               <button
-                onClick={() => setShowSettings(true)}
+                onClick={() => navigate('/settings')}
                 className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
                 title="Inställningar"
               >
@@ -543,7 +539,7 @@ export function AppSidebar() {
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setShowSettings(true)}
+                  onClick={() => navigate('/settings')}
                   className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
                 >
                   <FiSettings className="text-base" />
@@ -563,7 +559,7 @@ export function AppSidebar() {
       )}
 
       {/* Dialogs */}
-      <SettingsDialog open={showSettings} onOpenChange={handleSettingsClose} requireName={requireNameInSettings} />
+      <SettingsDialog open={showRequireNameDialog} onOpenChange={handleRequireNameDialogClose} requireName={true} />
       <SubscribeDialog open={showSubscribe} onOpenChange={setShowSubscribe} />
       <AdminSupportPanel open={showAdminSupport} onOpenChange={setShowAdminSupport} />
     </>
