@@ -569,7 +569,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                                 )}
                                 Skicka faktura
                               </DropdownMenuItem>
-                              {record.subscriptionId && ['active', 'past_due', 'trialing'].includes(record.subscriptionStatus || record.status) && (
+                              {record.subscriptionId && (record.billingType === 'monthly' || record.billingType === 'yearly') && (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem 
