@@ -54,6 +54,7 @@ import SISRequired from "./pages/SISRequired";
 import AdminAICosts from "./pages/AdminAICosts";
 import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -326,6 +327,7 @@ const AppContent = () => {
                 <Route path="/admin/speaker-profiles" element={<AdminRoute><AdminSpeakerProfiles /></AdminRoute>} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                 <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
