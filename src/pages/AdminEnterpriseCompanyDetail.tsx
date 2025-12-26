@@ -89,6 +89,7 @@ interface Company {
     dataRetentionDays?: number;
     allowAdminFolderLock?: boolean;
     speakerIdentificationEnabled?: boolean;
+    specialPerkEnabled?: boolean;
   };
   billingCustomerId?: string;
   billingHistory?: BillingRecord[];

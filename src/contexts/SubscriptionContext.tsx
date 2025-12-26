@@ -9,6 +9,19 @@ import { setDebugAdminStatus } from '@/lib/debugLogger';
 // - io.tivly.se = Apple IAP via RevenueCat
 // - app.tivly.se = Stripe checkout
 
+export interface EnterpriseBillingRecord {
+  id: string;
+  status: string; // 'paid' | 'open' | 'draft' | 'void' | 'uncollectible'
+  billingType: string; // 'monthly' | 'yearly' | 'one_time'
+  subscriptionId?: string;
+  subscriptionStatus?: string; // 'active' | 'canceled' | 'past_due' | 'trialing'
+  cancelAtPeriodEnd?: boolean;
+  cancelAt?: string | null;
+  currentPeriodEnd?: string;
+  amountDue?: number;
+  invoiceUrl?: string;
+}
+
 export interface EnterpriseMembership {
   isMember: boolean;
   company?: {
@@ -29,6 +42,24 @@ export interface EnterpriseMembership {
       manuallyDisabled: boolean;
       disabledAt: string | null;
       disabledBy: string | null;
+    };
+    preferences?: {
+      specialPerkEnabled?: boolean;
+      meetingCreatorVisibility?: string;
+      storageRegion?: string;
+      dataRetentionDays?: number;
+      allowAdminFolderLock?: boolean;
+    };
+    billing?: {
+      status: 'active' | 'unpaid' | 'canceled' | 'none';
+      latestInvoice?: EnterpriseBillingRecord;
+      activeSubscription?: {
+        id: string;
+        status: string;
+        cancelAtPeriodEnd: boolean;
+        cancelAt: string | null;
+        currentPeriodEnd: string | null;
+      };
     };
   };
   membership?: {
