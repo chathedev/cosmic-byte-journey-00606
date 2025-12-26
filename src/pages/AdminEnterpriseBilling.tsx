@@ -266,7 +266,8 @@ export default function AdminEnterpriseBilling() {
   const getStatusLabel = (status?: string) => {
     switch (status) {
       case 'draft': return 'Utkast';
-      case 'open': return 'Skickad';
+      case 'open': return 'Väntande';
+      case 'sent': return 'Skickad';
       case 'paid': return 'Betald';
       case 'void': return 'Makulerad';
       case 'uncollectible': return 'Ej inkasserbar';
@@ -285,7 +286,8 @@ export default function AdminEnterpriseBilling() {
     switch (status) {
       case 'paid':
       case 'active': return 'default';
-      case 'open': return 'secondary';
+      case 'sent': return 'secondary';
+      case 'open':
       case 'draft':
       case 'trialing': return 'outline';
       case 'void':
@@ -675,14 +677,13 @@ export default function AdminEnterpriseBilling() {
                                 <div className="flex items-center justify-end gap-1">
                                   {record.invoiceUrl && (
                                     <Button
-                                      variant="outline"
+                                      variant="ghost"
                                       size="sm"
                                       onClick={() => window.open(record.invoiceUrl, '_blank')}
-                                      title="Öppna faktura (invoice.stripe.com)"
-                                      className="gap-1"
+                                      title="Öppna faktura"
+                                      className="h-7 px-2 text-xs"
                                     >
-                                      <Receipt className="h-3.5 w-3.5" />
-                                      Faktura
+                                      <ExternalLink className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
                                   

@@ -252,7 +252,8 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
   const getStatusLabel = (status?: string) => {
     switch (status) {
       case 'draft': return 'Utkast';
-      case 'open': return 'Skickad';
+      case 'open': return 'Väntande';
+      case 'sent': return 'Skickad';
       case 'paid': return 'Betald';
       case 'void': return 'Makulerad';
       case 'uncollectible': return 'Ej inkasserbar';
@@ -271,7 +272,8 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     switch (status) {
       case 'paid':
       case 'active': return 'default';
-      case 'open': return 'secondary';
+      case 'sent': return 'secondary';
+      case 'open':
       case 'draft':
       case 'trialing': return 'outline';
       case 'void':
