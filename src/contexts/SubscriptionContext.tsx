@@ -51,7 +51,7 @@ export interface EnterpriseMembership {
       allowAdminFolderLock?: boolean;
     };
     billing?: {
-      status: 'active' | 'unpaid' | 'canceled' | 'none';
+      status: 'active' | 'paid' | 'unpaid' | 'canceled' | 'none';
       latestInvoice?: EnterpriseBillingRecord;
       activeSubscription?: {
         id: string;
