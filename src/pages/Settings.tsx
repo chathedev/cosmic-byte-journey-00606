@@ -271,9 +271,9 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-8">
           <button
             onClick={() => navigate(-1)}
             className="p-2 rounded-lg hover:bg-muted transition-colors"
@@ -283,7 +283,7 @@ const Settings = () => {
           <h1 className="text-2xl font-semibold">Inställningar</h1>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {/* Profile Card */}
           <Card className="border-border">
             <CardHeader className="p-4 pb-2">
@@ -707,43 +707,46 @@ const Settings = () => {
             </Card>
           )}
 
-          {/* Actions */}
-          <div className="space-y-3 pt-2">
-            <div className="p-4 border border-border rounded-lg bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <LogOut className="w-5 h-5 text-muted-foreground" />
-                  <span className="font-medium">Logga ut</span>
+          {/* Actions Card */}
+          <Card className="border-border lg:col-span-2 xl:col-span-1">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-base">Kontoåtgärder</CardTitle>
+              <CardDescription className="text-sm">Logga ut eller hantera ditt konto</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-2 space-y-3">
+              <div className="p-3 border border-border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <LogOut className="w-5 h-5 text-muted-foreground" />
+                    <span className="font-medium">Logga ut</span>
+                  </div>
+                  <Button onClick={handleLogout} variant="outline" size="sm">
+                    Logga ut
+                  </Button>
                 </div>
-                <Button onClick={handleLogout} variant="outline">
-                  Logga ut
-                </Button>
               </div>
-            </div>
-            
-            <div className="p-4 border border-destructive/50 rounded-lg bg-destructive/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Trash2 className="w-5 h-5 text-destructive" />
-                  <span className="font-medium text-destructive">Radera konto</span>
+              
+              <div className="p-3 border border-destructive/50 rounded-lg bg-destructive/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                    <span className="font-medium text-destructive">Radera konto</span>
+                  </div>
+                  <Button onClick={() => setShowDeleteAccountConfirm(true)} variant="destructive" size="sm">
+                    Radera
+                  </Button>
                 </div>
-                <Button onClick={() => setShowDeleteAccountConfirm(true)} variant="destructive">
-                  Radera
-                </Button>
               </div>
-            </div>
-          </div>
-          
-          {/* Support section */}
-          <div className="pt-4 mt-4 border-t border-border/30">
-            <button
-              onClick={() => setShowSupportCode(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-            >
-              <Headphones className="w-4 h-4" />
-              <span>Behöver du hjälp? Generera supportkod</span>
-            </button>
-          </div>
+              
+              <button
+                onClick={() => setShowSupportCode(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground/60 hover:text-muted-foreground transition-colors mt-2"
+              >
+                <Headphones className="w-4 h-4" />
+                <span>Behöver du hjälp? Generera supportkod</span>
+              </button>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
