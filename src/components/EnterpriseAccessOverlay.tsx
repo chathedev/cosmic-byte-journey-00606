@@ -57,38 +57,36 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
     return { type: 'allowed' };
   }
   
-  // Check for active subscription (even without cancelAtPeriodEnd)
-  if (billing?.activeSubscription?.status === 'active') {
-    // Check if it's canceled but still in grace period
-    if (billing.activeSubscription.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
-      const periodEnd = new Date(billing.activeSubscription.currentPeriodEnd);
-      const now = new Date();
-      
-      if (now < periodEnd) {
-        // Still within the paid period - allow access but show as canceled_active
-        return { type: 'canceled_active', companyName, cancelAt: periodEnd };
-      } else {
-        // Past the period end - block access
-        return { type: 'canceled_expired', companyName };
-      }
-    }
-    // Active subscription without cancel = allowed
-    return { type: 'allowed' };
-  }
-  
-  // Check for canceled subscription that's still in grace period
-  if (billing?.activeSubscription?.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
-    const periodEnd = new Date(billing.activeSubscription.currentPeriodEnd);
-    const now = new Date();
+  // Check for active subscription
+  if (billing?.activeSubscription) {
+    const subStatus = billing.activeSubscription.status?.toLowerCase();
     
-    if (now < periodEnd) {
-      return { type: 'canceled_active', companyName, cancelAt: periodEnd };
-    } else {
+    // Subscription is fully canceled/ended - block immediately
+    if (subStatus === 'canceled' || subStatus === 'ended') {
       return { type: 'canceled_expired', companyName };
     }
+    
+    // Subscription is active
+    if (subStatus === 'active' || subStatus === 'trialing') {
+      // Check if it's scheduled to cancel but still in grace period
+      if (billing.activeSubscription.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
+        const periodEnd = new Date(billing.activeSubscription.currentPeriodEnd);
+        const now = new Date();
+        
+        if (now < periodEnd) {
+          // Still within the paid period - allow access but show info banner
+          return { type: 'canceled_active', companyName, cancelAt: periodEnd };
+        } else {
+          // Past the period end - block access
+          return { type: 'canceled_expired', companyName };
+        }
+      }
+      // Active subscription without scheduled cancel = allowed
+      return { type: 'allowed' };
+    }
   }
   
-  // Check for canceled subscription without active period
+  // Check billing status for canceled without active subscription
   if (billing?.status === 'canceled') {
     return { type: 'canceled_expired', companyName };
   }
