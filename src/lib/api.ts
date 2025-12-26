@@ -945,7 +945,7 @@ class ApiClient {
         allowAdminFolderLock?: boolean;
       };
       billing?: {
-        status: 'active' | 'unpaid' | 'canceled' | 'none';
+        status: 'active' | 'paid' | 'unpaid' | 'canceled' | 'none';
         latestInvoice?: {
           id: string;
           status: string;
@@ -1015,6 +1015,57 @@ class ApiClient {
       }
       return { isMember: false };
     }
+  }
+
+  // Enterprise Billing Subscription Status (Member Endpoint)
+  // GET /enterprise/companies/:companyId/billing/subscription
+  async getEnterpriseCompanyBillingSubscription(companyId: string): Promise<{
+    success: boolean;
+    companyId: string;
+    subscription: null | {
+      id: string;
+      status: string;
+      collectionMethod?: string;
+      autoChargeEnabled?: boolean;
+      currentPeriodStart?: string | null;
+      currentPeriodEnd?: string | null;
+      startedAt?: string | null;
+      cancelAtPeriodEnd?: boolean;
+      cancelAt?: string | null;
+      canceledAt?: string | null;
+      endedAt?: string | null;
+      trialEnd?: string | null;
+      paymentMethodId?: string | null;
+      paymentMethodSource?: string | null;
+    };
+    latestInvoice: null | {
+      id: string;
+      status: string;
+      hostedInvoiceUrl?: string;
+      amountDue?: number;
+      amountPaid?: number;
+      amountRemaining?: number;
+      currency?: string;
+      collectionMethod?: string;
+      dueDate?: string | null;
+      paidAt?: string | null;
+      createdAt?: string | null;
+      periodStart?: string | null;
+      periodEnd?: string | null;
+    };
+    timestamp: string;
+  }> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/companies/${companyId}/billing/subscription`,
+      { suppressAuthRedirect: true }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch subscription status' }));
+      throw new Error((error as any).error || (error as any).message || 'Failed to fetch subscription status');
+    }
+
+    return response.json();
   }
 
   async getEnterpriseCompanies(): Promise<any> {

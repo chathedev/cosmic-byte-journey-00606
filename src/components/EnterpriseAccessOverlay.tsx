@@ -1,4 +1,6 @@
-import { AlertCircle, CreditCard, Clock, Mail, Check } from 'lucide-react';
+import { AlertCircle, CreditCard, Clock, Mail } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiClient } from '@/lib/api';
 import { EnterpriseMembership } from '@/contexts/SubscriptionContext';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
@@ -115,9 +117,155 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
   return { type: 'allowed' };
 }
 
+type LiveBillingStatusResponse = {
+  success: boolean;
+  companyId: string;
+  subscription: null | {
+    id: string;
+    status: string;
+    collectionMethod?: string;
+    autoChargeEnabled?: boolean;
+    currentPeriodStart?: string | null;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd?: boolean;
+    cancelAt?: string | null;
+    canceledAt?: string | null;
+    endedAt?: string | null;
+    trialEnd?: string | null;
+    paymentMethodId?: string | null;
+    paymentMethodSource?: string | null;
+  };
+  latestInvoice: null | {
+    id: string;
+    status: string;
+    hostedInvoiceUrl?: string;
+    amountDue?: number;
+    amountPaid?: number;
+    amountRemaining?: number;
+    currency?: string;
+    collectionMethod?: string;
+    dueDate?: string | null;
+    paidAt?: string | null;
+    createdAt?: string | null;
+    periodStart?: string | null;
+    periodEnd?: string | null;
+  };
+  timestamp: string;
+};
+
+type Company = NonNullable<EnterpriseMembership['company']>;
+
+type CompanyBilling = NonNullable<Company['billing']>;
+
+function mapLiveToCompanyBilling(live: LiveBillingStatusResponse | null): Company['billing'] | undefined {
+  if (!live) return undefined;
+
+  const sub = live.subscription;
+  const inv = live.latestInvoice;
+
+  if (!sub && !inv) {
+    return { status: 'none' } as CompanyBilling;
+  }
+
+  const invoiceUrl = inv?.hostedInvoiceUrl;
+  const invoiceStatus = (inv?.status || '').toLowerCase();
+  const subscriptionStatus = (sub?.status || '').toLowerCase();
+
+  const hasPaidInvoice = invoiceStatus === 'paid' || (typeof inv?.amountRemaining === 'number' && inv.amountRemaining === 0 && (inv.amountPaid || 0) > 0);
+  const hasOpenInvoice = invoiceStatus === 'open' || invoiceStatus === 'unpaid' || (typeof inv?.amountRemaining === 'number' && inv.amountRemaining > 0);
+
+  let status: CompanyBilling['status'] = 'none';
+
+  if (subscriptionStatus === 'active' || subscriptionStatus === 'trialing') {
+    status = 'active';
+  } else if (subscriptionStatus === 'canceled' || subscriptionStatus === 'ended') {
+    status = 'canceled';
+  } else if (hasPaidInvoice) {
+    status = 'paid';
+  } else if (hasOpenInvoice) {
+    status = 'unpaid';
+  }
+
+  return {
+    status,
+    latestInvoice: inv
+      ? {
+          id: inv.id,
+          status: inv.status,
+          billingType: sub ? 'subscription' : 'one_time',
+          subscriptionId: sub?.id,
+          subscriptionStatus: sub?.status,
+          cancelAtPeriodEnd: sub?.cancelAtPeriodEnd,
+          cancelAt: sub?.cancelAt ?? null,
+          currentPeriodEnd: inv.periodEnd ?? sub?.currentPeriodEnd ?? undefined,
+          amountDue: typeof inv.amountRemaining === 'number' ? inv.amountRemaining : inv.amountDue,
+          invoiceUrl,
+        }
+      : undefined,
+    activeSubscription: sub
+      ? {
+          id: sub.id,
+          status: sub.status,
+          cancelAtPeriodEnd: !!sub.cancelAtPeriodEnd,
+          cancelAt: sub.cancelAt ?? null,
+          currentPeriodEnd: sub.currentPeriodEnd ?? null,
+        }
+      : undefined,
+  } as CompanyBilling;
+}
+
 export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAccessOverlayProps) => {
-  const accessState = determineAccessState(membership);
-  
+  const companyId = membership.company?.id;
+  const [liveBilling, setLiveBilling] = useState<LiveBillingStatusResponse | null>(null);
+  const [isCheckingBilling, setIsCheckingBilling] = useState(false);
+  const [billingCheckError, setBillingCheckError] = useState<string | null>(null);
+
+  const companyBillingFromLive = useMemo(() => mapLiveToCompanyBilling(liveBilling), [liveBilling]);
+
+  const effectiveMembership = useMemo<EnterpriseMembership>(() => {
+    if (!membership.company || !companyBillingFromLive) return membership;
+    return {
+      ...membership,
+      company: {
+        ...membership.company,
+        billing: companyBillingFromLive,
+      },
+    };
+  }, [membership, companyBillingFromLive]);
+
+  const accessState = determineAccessState(effectiveMembership);
+
+  const checkBillingNow = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      setIsCheckingBilling(true);
+      const data = (await apiClient.getEnterpriseCompanyBillingSubscription(companyId)) as LiveBillingStatusResponse;
+      setLiveBilling(data);
+      setBillingCheckError(null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Okänt fel';
+      setBillingCheckError(message);
+    } finally {
+      setIsCheckingBilling(false);
+    }
+  }, [companyId]);
+
+  // Auto-refresh billing status for members (e.g. right after an invoice is paid)
+  useEffect(() => {
+    if (!companyId || isAdmin) return;
+
+    // Always do an initial check when mounted
+    checkBillingNow();
+
+    // Only poll while access is blocked
+    if (accessState.type === 'allowed' || accessState.type === 'canceled_active') {
+      return;
+    }
+
+    const id = window.setInterval(checkBillingNow, 3000);
+    return () => window.clearInterval(id);
+  }, [companyId, isAdmin, accessState.type, checkBillingNow]);
+
   // Admins bypass all overlays
   if (isAdmin) {
     if (accessState.type !== 'allowed' && accessState.type !== 'canceled_active') {
@@ -131,12 +279,12 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     }
     return null;
   }
-  
+
   // No overlay needed
   if (accessState.type === 'allowed') {
     return null;
   }
-  
+
   // Canceled but still active - show info banner, don't block
   if (accessState.type === 'canceled_active') {
     const formattedDate = format(accessState.cancelAt, 'd MMMM yyyy', { locale: sv });
@@ -147,7 +295,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
       </div>
     );
   }
-  
+
   // Blocking overlays - minimalistic design matching MaintenanceOverlay
   const overlayContent = () => {
     switch (accessState.type) {
@@ -158,21 +306,25 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
           message: `Testperioden för ${accessState.companyName} har löpt ut.`,
           action: 'Kontakta din företagsadministratör för att förnya tillgången.',
         };
-        
+
       case 'unpaid_invoice':
         return {
           icon: CreditCard,
-          title: 'Obetald faktura',
-          message: `Det finns en obetald faktura för ${accessState.companyName}.`,
-          action: accessState.invoiceUrl 
+          title: isCheckingBilling ? 'Kontrollerar faktureringsstatus…' : 'Obetald faktura',
+          message: isCheckingBilling
+            ? `Kontrollerar fakturering för ${accessState.companyName}…`
+            : `Det finns en obetald faktura för ${accessState.companyName}.`,
+          action: accessState.invoiceUrl
             ? 'Betala fakturan för att fortsätta använda tjänsten.'
             : 'Kontakta din företagsadministratör för betalning.',
-          actionButton: accessState.invoiceUrl ? {
-            label: 'Betala nu',
-            url: accessState.invoiceUrl,
-          } : undefined,
+          actionButton: accessState.invoiceUrl
+            ? {
+                label: 'Betala nu',
+                url: accessState.invoiceUrl,
+              }
+            : undefined,
         };
-        
+
       case 'canceled_expired':
         return {
           icon: AlertCircle,
@@ -180,39 +332,39 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
           message: `Prenumerationen för ${accessState.companyName} har avslutats.`,
           action: 'Kontakta din företagsadministratör för att återaktivera.',
         };
-        
+
       case 'no_billing':
         return {
-          icon: Mail,
-          title: 'Ingen aktiv prenumeration',
-          message: `Det finns ingen aktiv prenumeration för ${accessState.companyName}.`,
-          action: 'Kontakta din företagsadministratör för att aktivera.',
+          icon: isCheckingBilling ? Clock : Mail,
+          title: isCheckingBilling ? 'Kontrollerar faktureringsstatus…' : 'Ingen aktiv prenumeration',
+          message: isCheckingBilling
+            ? `Kontrollerar fakturering för ${accessState.companyName}…`
+            : `Det finns ingen aktiv prenumeration för ${accessState.companyName}.`,
+          action: isCheckingBilling
+            ? 'Detta uppdateras automatiskt var 3:e sekund.'
+            : 'Kontakta din företagsadministratör för att aktivera.',
         };
     }
   };
-  
+
   const content = overlayContent();
   if (!content) return null;
-  
+
   const IconComponent = content.icon;
-  
+
   return (
     <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6">
       <div className="text-center space-y-6 max-w-sm">
         <div className="w-14 h-14 mx-auto rounded-full bg-muted flex items-center justify-center">
           <IconComponent className="w-7 h-7 text-muted-foreground" />
         </div>
-        
+
         <div className="space-y-2">
           <h1 className="text-xl font-semibold tracking-tight">{content.title}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {content.message}
-          </p>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {content.action}
-          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{content.message}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{content.action}</p>
         </div>
-        
+
         {content.actionButton && (
           <a
             href={content.actionButton.url}
@@ -224,7 +376,26 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
             {content.actionButton.label}
           </a>
         )}
-        
+
+        {companyId && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={checkBillingNow}
+              disabled={isCheckingBilling}
+              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-muted text-foreground text-sm font-medium hover:bg-muted/80 transition-colors disabled:opacity-60"
+            >
+              {isCheckingBilling ? 'Uppdaterar…' : 'Uppdatera status'}
+            </button>
+            <p className="text-xs text-muted-foreground">Auto-uppdateras var 3:e sekund.</p>
+            {billingCheckError && (
+              <p className="text-xs text-muted-foreground">
+                Kunde inte hämta faktureringsstatus just nu. Försöker igen automatiskt.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground">
             Alla möten och data är säkrade och kommer att vara tillgängliga igen när tillgången förnyas.
