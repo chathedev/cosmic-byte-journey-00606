@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt } from "lucide-react";
+import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt, XCircle, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { format } from "date-fns";
@@ -41,6 +41,8 @@ interface BillingRecord {
   invoiceId?: string;
   portalUrl?: string;
   subscriptionId?: string;
+  subscriptionStatus?: string;
+  cancelAt?: string;
   createdAt: string;
   createdBy?: string;
 }
@@ -77,6 +79,9 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
   const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelRecord, setCancelRecord] = useState<BillingRecord | null>(null);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(true);
 
   // Track whether invoice email has been sent (separate from Stripe invoice status)
   const sentStorageKey = `enterpriseBillingSent:${companyId}`;
@@ -287,7 +292,11 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     }
   };
 
-  const getStatusLabel = (status?: string) => {
+  const getStatusLabel = (status?: string, record?: BillingRecord) => {
+    // Show cancel scheduled status
+    if (record?.cancelAt) {
+      return 'Avslutas snart';
+    }
     switch (status) {
       case 'draft': return 'Utkast';
       case 'open': return 'Väntande';
@@ -306,7 +315,11 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     }
   };
 
-  const getStatusVariant = (status?: string): "default" | "secondary" | "outline" | "destructive" => {
+  const getStatusVariant = (status?: string, record?: BillingRecord): "default" | "secondary" | "outline" | "destructive" => {
+    // Cancel scheduled gets warning style
+    if (record?.cancelAt) {
+      return 'secondary';
+    }
     switch (status) {
       case 'paid':
       case 'active': return 'default';
@@ -380,6 +393,35 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
       setDeleteEntryId(null);
     }
   };
+
+  const handleCancelSubscription = async () => {
+    if (!cancelRecord?.subscriptionId || !companyId) return;
+
+    const loadingKey = `cancel-${cancelRecord.id}`;
+    setActionLoading(prev => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      await apiClient.cancelEnterpriseSubscription(companyId, cancelRecord.subscriptionId, cancelAtPeriodEnd);
+      toast.success(cancelAtPeriodEnd ? 'Prenumeration avslutas vid periodens slut' : 'Prenumeration avslutad omedelbart');
+      await loadBillingHistory(false);
+    } catch (error: any) {
+      console.error('Failed to cancel subscription:', error);
+      toast.error(error.message || 'Kunde inte avsluta prenumeration');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [loadingKey]: false }));
+      setCancelDialogOpen(false);
+      setCancelRecord(null);
+      setCancelAtPeriodEnd(true);
+    }
+  };
+
+  // Check if there's an active subscription
+  const activeSubscription = billingHistory.find(
+    r => r.subscriptionId && ['active', 'past_due', 'trialing'].includes(r.subscriptionStatus || r.status)
+  );
+
+  // Get the latest billing record for single-invoice display
+  const latestRecord = billingHistory[0];
 
   return (
     <Card>
@@ -466,8 +508,8 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(getDisplayStatus(record))} className="text-[10px]">
-                            {getStatusLabel(getDisplayStatus(record))}
+                          <Badge variant={getStatusVariant(getDisplayStatus(record), record)} className="text-[10px]">
+                            {getStatusLabel(getDisplayStatus(record), record)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -527,6 +569,26 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                                 )}
                                 Skicka faktura
                               </DropdownMenuItem>
+                              {record.subscriptionId && ['active', 'past_due', 'trialing'].includes(record.subscriptionStatus || record.status) && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      setCancelRecord(record);
+                                      setCancelDialogOpen(true);
+                                    }}
+                                    disabled={actionLoading[`cancel-${record.id}`]}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    {actionLoading[`cancel-${record.id}`] ? (
+                                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3 mr-2" />
+                                    )}
+                                    Avsluta prenumeration
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 onClick={() => {
@@ -683,6 +745,56 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteEntry}>
               Ta bort
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Subscription Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={(open) => {
+        setCancelDialogOpen(open);
+        if (!open) {
+          setCancelRecord(null);
+          setCancelAtPeriodEnd(true);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Avsluta prenumeration?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>Välj hur prenumerationen ska avslutas:</p>
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    checked={cancelAtPeriodEnd}
+                    onChange={() => setCancelAtPeriodEnd(true)}
+                    className="accent-primary"
+                  />
+                  <div>
+                    <div className="font-medium text-sm text-foreground">Vid periodens slut</div>
+                    <div className="text-xs text-muted-foreground">Fortsätter fungera till slutet av faktureringsperioden</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    checked={!cancelAtPeriodEnd}
+                    onChange={() => setCancelAtPeriodEnd(false)}
+                    className="accent-primary"
+                  />
+                  <div>
+                    <div className="font-medium text-sm text-foreground">Omedelbart</div>
+                    <div className="text-xs text-muted-foreground">Avslutas direkt, ingen återbetalning</div>
+                  </div>
+                </label>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelSubscription} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Avsluta
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

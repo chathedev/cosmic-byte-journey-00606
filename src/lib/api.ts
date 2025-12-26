@@ -1663,6 +1663,31 @@ class ApiClient {
     return response.json();
   }
 
+  async cancelEnterpriseSubscription(
+    companyId: string, 
+    subscriptionId: string, 
+    atPeriodEnd: boolean = true
+  ): Promise<{
+    success: boolean;
+    subscriptionId: string;
+    status: string;
+    cancelAt?: string;
+    canceledAt?: string;
+  }> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/billing/subscriptions/${subscriptionId}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ atPeriodEnd }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to cancel subscription' }));
+      throw new Error(error.error || 'Failed to cancel subscription');
+    }
+    return response.json();
+  }
+
   // Get transcription status for a meeting (polling endpoint)
   // Uses meetingId-based polling via /asr/status
   async getTranscriptionStatus(meetingId: string): Promise<{
