@@ -59,6 +59,8 @@ export interface EnterpriseMembership {
         cancelAtPeriodEnd: boolean;
         cancelAt: string | null;
         currentPeriodEnd: string | null;
+        canceledAt?: string | null;
+        endedAt?: string | null;
       };
     };
   };
