@@ -44,38 +44,55 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
     return { type: 'allowed' };
   }
   
-  // No trial or trial disabled - check billing
-  if (!billing || billing.status === 'none') {
-    // No billing at all and no trial = show contact overlay
-    // But only if trial was set up before (endsAt exists) OR status is inactive
-    if (trial?.endsAt || company.status === 'inactive') {
-      return { type: 'no_billing', companyName };
-    }
-    // New company with no trial setup yet - allow access
+  // Check billing status - PAID INVOICE = ALLOWED
+  // If billing status is 'active' or 'paid', or latest invoice is paid = access granted
+  if (billing?.status === 'active' || billing?.status === 'paid') {
     return { type: 'allowed' };
   }
   
-  // Check for active subscription that's canceled but still in grace period
-  if (billing.activeSubscription?.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
+  // Check if latest invoice is paid - this means they have valid billing
+  if (billing?.latestInvoice?.status === 'paid') {
+    return { type: 'allowed' };
+  }
+  
+  // Check for active subscription (even without cancelAtPeriodEnd)
+  if (billing?.activeSubscription?.status === 'active') {
+    // Check if it's canceled but still in grace period
+    if (billing.activeSubscription.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
+      const periodEnd = new Date(billing.activeSubscription.currentPeriodEnd);
+      const now = new Date();
+      
+      if (now < periodEnd) {
+        // Still within the paid period - allow access but show as canceled_active
+        return { type: 'canceled_active', companyName, cancelAt: periodEnd };
+      } else {
+        // Past the period end - block access
+        return { type: 'canceled_expired', companyName };
+      }
+    }
+    // Active subscription without cancel = allowed
+    return { type: 'allowed' };
+  }
+  
+  // Check for canceled subscription that's still in grace period
+  if (billing?.activeSubscription?.cancelAtPeriodEnd && billing.activeSubscription.currentPeriodEnd) {
     const periodEnd = new Date(billing.activeSubscription.currentPeriodEnd);
     const now = new Date();
     
     if (now < periodEnd) {
-      // Still within the paid period - allow access but show as canceled_active
       return { type: 'canceled_active', companyName, cancelAt: periodEnd };
     } else {
-      // Past the period end - block access
       return { type: 'canceled_expired', companyName };
     }
   }
   
   // Check for canceled subscription without active period
-  if (billing.status === 'canceled') {
+  if (billing?.status === 'canceled') {
     return { type: 'canceled_expired', companyName };
   }
   
   // Check for unpaid invoice
-  if (billing.status === 'unpaid' || billing.latestInvoice?.status === 'open') {
+  if (billing?.status === 'unpaid' || billing?.latestInvoice?.status === 'open') {
     return { 
       type: 'unpaid_invoice', 
       companyName,
@@ -84,7 +101,17 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
     };
   }
   
-  // All good
+  // No billing at all and no trial = show contact overlay
+  // But only if trial was set up before (endsAt exists) OR status is inactive
+  if (!billing || billing.status === 'none') {
+    if (trial?.endsAt || company.status === 'inactive') {
+      return { type: 'no_billing', companyName };
+    }
+    // New company with no trial setup yet - allow access
+    return { type: 'allowed' };
+  }
+  
+  // All good - default to allowed
   return { type: 'allowed' };
 }
 
