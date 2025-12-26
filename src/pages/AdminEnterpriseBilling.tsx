@@ -813,7 +813,7 @@ export default function AdminEnterpriseBilling() {
                                           <DropdownMenuSeparator />
                                         </>
                                       )}
-                                      {record.subscriptionId && ['active', 'past_due', 'trialing'].includes(record.subscriptionStatus || record.status) && (
+                                      {record.subscriptionId && (record.billingType === 'monthly' || record.billingType === 'yearly') && (
                                         <>
                                           <DropdownMenuItem
                                             onClick={() => {
