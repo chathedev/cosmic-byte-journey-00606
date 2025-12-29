@@ -1,156 +1,188 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Check, AlertTriangle, Loader2 } from "lucide-react";
+import { Sparkles, Check, X, Loader2, Building2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 interface InvoiceAISuggestionProps {
   companyName: string;
-  monthlyAmount: number;
-  oneTimeAmount?: number;
-  isFirstInvoice: boolean;
-  onAccept: () => void;
-  onAdjust?: (suggestedAmount: number) => void;
+  onAccept: (suggestion: AISuggestion) => void;
+  onDecline: () => void;
 }
 
-interface AIResponse {
-  suggestion: string;
-  isValid: boolean;
-  suggestedAmount?: number;
-  pricingTier?: string;
+export interface AISuggestion {
+  monthlyAmount: number;
+  oneTimeAmount?: number;
+  pricingTier: string;
+  reasoning: string;
+  companyInfo?: string;
 }
+
+type Stage = 'analyzing' | 'suggesting' | 'done' | 'error';
 
 export function InvoiceAISuggestion({
   companyName,
-  monthlyAmount,
-  oneTimeAmount,
-  isFirstInvoice,
   onAccept,
-  onAdjust,
+  onDecline,
 }: InvoiceAISuggestionProps) {
-  const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState<AIResponse | null>(null);
+  const [stage, setStage] = useState<Stage>('analyzing');
+  const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isFirstInvoice && monthlyAmount > 0) {
-      checkPricing();
-    }
-  }, [isFirstInvoice, monthlyAmount]);
+    analyzePricing();
+  }, [companyName]);
 
-  const checkPricing = async () => {
-    setLoading(true);
+  const analyzePricing = async () => {
+    setStage('analyzing');
     setError(null);
     
     try {
       const { data, error: fnError } = await supabase.functions.invoke('validate-enterprise-pricing', {
         body: {
           companyName,
-          monthlyAmount,
-          oneTimeAmount: oneTimeAmount || 0,
+          analyzeCompany: true,
         },
       });
 
       if (fnError) throw fnError;
-      setResponse(data);
+      
+      setSuggestion({
+        monthlyAmount: data.suggestedAmount || 2000,
+        oneTimeAmount: data.oneTimeAmount,
+        pricingTier: data.pricingTier || 'Entry',
+        reasoning: data.suggestion || `${companyName} passar ${data.pricingTier || 'Entry'}-nivå.`,
+        companyInfo: data.companyInfo,
+      });
+      setStage('suggesting');
     } catch (err: any) {
-      console.error('AI pricing check failed:', err);
-      setError('Kunde inte validera prissättning');
-      // Fallback to local validation
-      setResponse(validateLocally(monthlyAmount));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const validateLocally = (amount: number): AIResponse => {
-    const minPrice = 2000;
-    
-    if (amount < minPrice) {
-      return {
-        suggestion: `Priset ${amount.toLocaleString('sv-SE')} kr/mån är under minimum (2 000 kr). Rekommenderar minst 2 000 kr/mån för Enterprise.`,
-        isValid: false,
-        suggestedAmount: minPrice,
+      console.error('AI pricing analysis failed:', err);
+      setError('Kunde inte analysera företaget');
+      // Fallback suggestion
+      setSuggestion({
+        monthlyAmount: 2000,
         pricingTier: 'Entry',
-      };
+        reasoning: `Föreslår Entry-nivå (2 000 kr/mån) för ${companyName}.`,
+      });
+      setStage('suggesting');
     }
-    
-    let tier = 'Entry';
-    if (amount >= 14900) tier = 'Scale';
-    else if (amount >= 6900) tier = 'Core';
-    else if (amount >= 3900) tier = 'Growth';
-    
-    return {
-      suggestion: `${amount.toLocaleString('sv-SE')} kr/mån (${tier}-nivå) ser bra ut för ${companyName}.`,
-      isValid: true,
-      pricingTier: tier,
-    };
   };
 
-  if (!isFirstInvoice || monthlyAmount <= 0) return null;
+  const handleAccept = () => {
+    if (suggestion) {
+      setStage('done');
+      onAccept(suggestion);
+    }
+  };
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        key={stage}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        className="rounded-lg border bg-card p-4 space-y-3"
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.2 }}
+        className="rounded-xl border bg-gradient-to-br from-card to-card/80 overflow-hidden"
       >
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span>AI-validering</span>
+        {/* Header */}
+        <div className="px-4 py-3 border-b bg-muted/30 flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-primary/10">
+            <Sparkles className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">AI-prisförslag</p>
+            <p className="text-[10px] text-muted-foreground">Baserat på företagsanalys</p>
+          </div>
         </div>
 
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Kontrollerar prissättning...</span>
-          </div>
-        ) : error ? (
-          <div className="text-sm text-muted-foreground">{error}</div>
-        ) : response ? (
-          <div className="space-y-3">
-            <div className={`flex items-start gap-2 text-sm ${response.isValid ? 'text-foreground' : 'text-amber-600 dark:text-amber-400'}`}>
-              {response.isValid ? (
-                <Check className="h-4 w-4 mt-0.5 text-green-600 dark:text-green-400 shrink-0" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              )}
-              <span>{response.suggestion}</span>
-            </div>
-
-            {response.pricingTier && (
-              <div className="text-xs text-muted-foreground">
-                Prisnivå: <span className="font-medium">{response.pricingTier}</span>
+        {/* Content */}
+        <div className="p-4">
+          {stage === 'analyzing' && (
+            <div className="flex flex-col items-center py-6 space-y-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+                <div className="relative p-3 rounded-full bg-primary/10">
+                  <Building2 className="h-5 w-5 text-primary" />
+                </div>
               </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-1">
-              {response.isValid ? (
-                <Button size="sm" onClick={onAccept} className="text-xs">
-                  <Check className="h-3 w-3 mr-1" />
-                  Ser bra ut, skapa
-                </Button>
-              ) : (
-                <>
-                  {response.suggestedAmount && onAdjust && (
-                    <Button
-                      size="sm"
-                      onClick={() => onAdjust(response.suggestedAmount!)}
-                      className="text-xs"
-                    >
-                      Justera till {response.suggestedAmount.toLocaleString('sv-SE')} kr
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" onClick={onAccept} className="text-xs">
-                    Skapa ändå
-                  </Button>
-                </>
-              )}
+              <div className="text-center space-y-1">
+                <p className="text-sm font-medium">Analyserar {companyName}...</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Föreslår prissättning</span>
+                </div>
+              </div>
             </div>
-          </div>
-        ) : null}
+          )}
+
+          {stage === 'suggesting' && suggestion && (
+            <div className="space-y-4">
+              {/* Company insight */}
+              {suggestion.companyInfo && (
+                <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
+                  {suggestion.companyInfo}
+                </div>
+              )}
+
+              {/* Price suggestion */}
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">
+                      {suggestion.monthlyAmount.toLocaleString('sv-SE')}
+                    </span>
+                    <span className="text-sm text-muted-foreground">kr/mån</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {suggestion.pricingTier}-nivå
+                    {suggestion.oneTimeAmount && suggestion.oneTimeAmount > 0 && (
+                      <span> + {suggestion.oneTimeAmount.toLocaleString('sv-SE')} kr engång</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Reasoning */}
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {suggestion.reasoning}
+              </p>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={handleAccept}
+                  size="sm"
+                  className="flex-1 gap-1.5"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Acceptera
+                </Button>
+                <Button
+                  onClick={onDecline}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 gap-1.5"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Manuellt
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {stage === 'error' && (
+            <div className="py-4 text-center">
+              <p className="text-sm text-destructive mb-3">{error}</p>
+              <Button onClick={analyzePricing} variant="outline" size="sm">
+                Försök igen
+              </Button>
+            </div>
+          )}
+        </div>
       </motion.div>
     </AnimatePresence>
   );

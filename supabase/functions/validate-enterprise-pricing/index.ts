@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enterprise pricing tiers (internal)
+// Enterprise pricing tiers
 const PRICING_TIERS = {
   entry: { min: 1, max: 5, price: 2000, name: 'Entry' },
   growth: { min: 6, max: 10, price: 3900, name: 'Growth' },
@@ -13,24 +13,116 @@ const PRICING_TIERS = {
   scale: { min: 21, max: Infinity, price: 14900, name: 'Scale' },
 };
 
-const MIN_PRICE = 2000;
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { companyName, monthlyAmount, oneTimeAmount } = await req.json();
+    const { companyName, monthlyAmount, oneTimeAmount, analyzeCompany } = await req.json();
 
-    console.log('[validate-enterprise-pricing] Checking:', { companyName, monthlyAmount, oneTimeAmount });
+    console.log('[validate-enterprise-pricing] Request:', { companyName, monthlyAmount, analyzeCompany });
 
-    // Quick local validation first
+    // If analyzing company, use AI to suggest pricing
+    if (analyzeCompany && companyName) {
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      
+      if (!LOVABLE_API_KEY) {
+        console.warn('[validate-enterprise-pricing] No LOVABLE_API_KEY, using fallback');
+        return new Response(JSON.stringify({
+          suggestedAmount: 2000,
+          pricingTier: 'Entry',
+          suggestion: `Föreslår Entry-nivå (2 000 kr/mån) för ${companyName}.`,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      try {
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash-lite',
+            messages: [
+              {
+                role: 'system',
+                content: `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
+
+PRISSÄTTNING:
+- Entry (1-5 användare): 2 000 kr/mån - För små team, startups
+- Growth (6-10 användare): 3 900 kr/mån - Växande företag
+- Core (11-20 användare): 6 900 kr/mån - Medelstora företag
+- Scale (20+ användare): 14 900 kr/mån - Stora organisationer
+
+Svara ENDAST med JSON (ingen markdown):
+{
+  "suggestedAmount": <nummer>,
+  "pricingTier": "<Entry|Growth|Core|Scale>",
+  "reasoning": "<kort förklaring på svenska, max 2 meningar>",
+  "companyInfo": "<kort info om företaget om känt, annars null>"
+}`
+              },
+              {
+                role: 'user',
+                content: `Analysera och föreslå prissättning för: ${companyName}`
+              }
+            ],
+            max_tokens: 200,
+            temperature: 0.3,
+          }),
+        });
+
+        if (aiResponse.ok) {
+          const data = await aiResponse.json();
+          const content = data.choices?.[0]?.message?.content;
+          
+          if (content) {
+            try {
+              // Clean JSON response
+              const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+              const parsed = JSON.parse(cleanContent);
+              
+              console.log('[validate-enterprise-pricing] AI response:', parsed);
+              
+              return new Response(JSON.stringify({
+                suggestedAmount: parsed.suggestedAmount || 2000,
+                pricingTier: parsed.pricingTier || 'Entry',
+                suggestion: parsed.reasoning || `Föreslår ${parsed.pricingTier}-nivå för ${companyName}.`,
+                companyInfo: parsed.companyInfo || null,
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            } catch (parseErr) {
+              console.error('[validate-enterprise-pricing] JSON parse error:', parseErr, content);
+            }
+          }
+        } else {
+          console.error('[validate-enterprise-pricing] AI request failed:', aiResponse.status);
+        }
+      } catch (aiError) {
+        console.error('[validate-enterprise-pricing] AI error:', aiError);
+      }
+
+      // Fallback
+      return new Response(JSON.stringify({
+        suggestedAmount: 2000,
+        pricingTier: 'Entry',
+        suggestion: `Föreslår Entry-nivå (2 000 kr/mån) för ${companyName}.`,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate existing amount
+    const MIN_PRICE = 2000;
     let isValid = monthlyAmount >= MIN_PRICE;
     let suggestedAmount: number | undefined;
     let pricingTier = 'Entry';
 
-    // Determine tier based on amount
     if (monthlyAmount >= PRICING_TIERS.scale.price) {
       pricingTier = 'Scale';
     } else if (monthlyAmount >= PRICING_TIERS.core.price) {
@@ -43,83 +135,16 @@ serve(async (req) => {
       suggestedAmount = MIN_PRICE;
     }
 
-    let suggestion: string;
+    const suggestion = isValid
+      ? `${monthlyAmount.toLocaleString('sv-SE')} kr/mån (${pricingTier}-nivå) ser bra ut för ${companyName}.`
+      : `Priset ${monthlyAmount.toLocaleString('sv-SE')} kr/mån är under minimum (2 000 kr). Rekommenderar ${MIN_PRICE.toLocaleString('sv-SE')} kr/mån.`;
 
-    if (!isValid) {
-      suggestion = `Priset ${monthlyAmount.toLocaleString('sv-SE')} kr/mån är under minimum (2 000 kr). Enterprise-kunder ska aldrig betala mindre än 2 000 kr/mån. Rekommenderar ${MIN_PRICE.toLocaleString('sv-SE')} kr/mån.`;
-    } else {
-      // Try to get a more detailed suggestion from AI
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      
-      if (LOVABLE_API_KEY) {
-        try {
-          const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
-              messages: [
-                {
-                  role: 'system',
-                  content: `Du är en prisvalideringsassistent för Tivly Enterprise. 
-                  
-Prissättning:
-- Entry (1-5 användare): 2 000 kr/mån
-- Growth (6-10 användare): 3 900 kr/mån  
-- Core (11-20 användare): 6 900 kr/mån
-- Scale (20+ användare): Från 14 900 kr/mån
-
-VIKTIGT: Gå aldrig under 2 000 kr/mån för Enterprise.
-
-Svara kort och koncist på svenska (max 1-2 meningar). Bekräfta att priset ser bra ut och vilken nivå det passar.`
-                },
-                {
-                  role: 'user',
-                  content: `Företag: ${companyName}
-Månadspris: ${monthlyAmount} kr
-${oneTimeAmount ? `Engångsbelopp: ${oneTimeAmount} kr` : ''}
-
-Är detta pris rimligt? Vilken prisnivå passar det?`
-                }
-              ],
-              max_tokens: 150,
-            }),
-          });
-
-          if (aiResponse.ok) {
-            const data = await aiResponse.json();
-            const aiSuggestion = data.choices?.[0]?.message?.content;
-            if (aiSuggestion) {
-              suggestion = aiSuggestion;
-            } else {
-              suggestion = `${monthlyAmount.toLocaleString('sv-SE')} kr/mån (${pricingTier}-nivå) ser bra ut för ${companyName}.`;
-            }
-          } else {
-            console.warn('[validate-enterprise-pricing] AI request failed, using fallback');
-            suggestion = `${monthlyAmount.toLocaleString('sv-SE')} kr/mån (${pricingTier}-nivå) ser bra ut för ${companyName}.`;
-          }
-        } catch (aiError) {
-          console.error('[validate-enterprise-pricing] AI error:', aiError);
-          suggestion = `${monthlyAmount.toLocaleString('sv-SE')} kr/mån (${pricingTier}-nivå) ser bra ut för ${companyName}.`;
-        }
-      } else {
-        suggestion = `${monthlyAmount.toLocaleString('sv-SE')} kr/mån (${pricingTier}-nivå) ser bra ut för ${companyName}.`;
-      }
-    }
-
-    const result = {
+    return new Response(JSON.stringify({
       suggestion,
       isValid,
       suggestedAmount,
       pricingTier,
-    };
-
-    console.log('[validate-enterprise-pricing] Result:', result);
-
-    return new Response(JSON.stringify(result), {
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
