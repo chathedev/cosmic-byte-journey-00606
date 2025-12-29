@@ -1,8 +1,17 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Check, X, Loader2, Building2, TrendingUp } from "lucide-react";
+import { Sparkles, Check, X, Loader2, Building2, TrendingUp, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import {
+  PRICING_TIERS,
+  maxTier,
+  normalizeTier,
+  parseEmployeeCountRange,
+  tierFromEmployees,
+  tierFromMemberLimit,
+  type PricingTier,
+} from "@/lib/enterprisePricing";
 
 const BACKEND_URL = 'https://api.tivly.se';
 
