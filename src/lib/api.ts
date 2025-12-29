@@ -1082,6 +1082,7 @@ class ApiClient {
     status?: string;
     notes?: string;
     metadata?: any;
+    memberLimit?: number | null;
     dataAccessMode?: 'shared' | 'individual';
     adminFullAccessEnabled?: boolean;
     preferences?: {
@@ -1123,6 +1124,7 @@ class ApiClient {
     domains?: string[];
     notes?: string;
     metadata?: any;
+    memberLimit?: number | null;
     dataAccessMode?: 'shared' | 'individual';
     adminFullAccessEnabled?: boolean;
     preferences?: {

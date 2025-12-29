@@ -765,6 +765,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
               {/* AI Suggestion for first invoice - shows as step-by-step flow */}
               {showAISuggestion && isFirstInvoice ? (
                 <InvoiceAISuggestion
+                  companyId={companyId}
                   companyName={companyName}
                   onAccept={handleAISuggestionAccept}
                   onDecline={handleAISuggestionDecline}

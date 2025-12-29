@@ -69,6 +69,7 @@ interface Company {
   domains?: string[];
   notes?: string;
   metadata?: any;
+  memberLimit?: number | null;
   dataAccessMode?: 'shared' | 'individual';
   adminFullAccessEnabled?: boolean;
   trial?: {
@@ -280,6 +281,15 @@ export default function AdminEnterpriseCompanyDetail() {
     const adminFullAccessEnabled = formData.get('adminFullAccessEnabled') === 'true';
     const speakerIdentificationEnabled = formData.get('speakerIdentificationEnabled') === 'true';
 
+    const memberLimitRaw = (formData.get('memberLimit') as string) || '';
+    const memberLimit = memberLimitRaw.trim() === '' ? null : Number(memberLimitRaw);
+
+    const employeeCountHint = ((formData.get('employeeCountHint') as string) || '').trim();
+    const nextMetadata = {
+      ...(company.metadata || {}),
+      ...(employeeCountHint ? { employeeCountHint } : {}),
+    };
+
     try {
       setIsSubmitting(true);
       await apiClient.updateEnterpriseCompany(company.id, {
@@ -290,6 +300,8 @@ export default function AdminEnterpriseCompanyDetail() {
         status,
         dataAccessMode,
         adminFullAccessEnabled,
+        memberLimit: Number.isFinite(memberLimit as number) ? (memberLimit as number) : memberLimit,
+        metadata: Object.keys(nextMetadata).length ? nextMetadata : undefined,
         preferences: {
           meetingCreatorVisibility: 'shared_only',
           storageRegion: 'eu',
@@ -1214,6 +1226,28 @@ export default function AdminEnterpriseCompanyDetail() {
               <div>
                 <Label htmlFor="edit-domains">Domäner (kommaseparerade)</Label>
                 <Input id="edit-domains" name="domains" defaultValue={company.domains?.join(', ')} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="edit-memberLimit">Max teamstorlek (memberLimit)</Label>
+                  <Input
+                    id="edit-memberLimit"
+                    name="memberLimit"
+                    type="number"
+                    min={0}
+                    defaultValue={company.memberLimit ?? ''}
+                    placeholder="Lämna tomt = obegränsat"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-employeeCountHint">Antal anställda (ca)</Label>
+                  <Input
+                    id="edit-employeeCountHint"
+                    name="employeeCountHint"
+                    defaultValue={company.metadata?.employeeCountHint || ''}
+                    placeholder="t.ex. 70 eller 200-500"
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="edit-status">Status</Label>
