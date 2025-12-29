@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Check, X, Loader2, Building2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api";
 
 const BACKEND_URL = 'https://api.tivly.se';
 
@@ -17,6 +18,7 @@ export interface AISuggestion {
   pricingTier: string;
   reasoning: string;
   companyInfo?: string;
+  valuation?: string;
 }
 
 type Stage = 'analyzing' | 'suggesting' | 'done' | 'error';
@@ -39,12 +41,20 @@ export function InvoiceAISuggestion({
     setError(null);
     
     try {
-      // Get user auth token from Supabase session
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Tivly backend expects the app user JWT stored by apiClient
+      const token = apiClient.getAuthToken();
+      const isJwt = !!token && token.split('.').length === 3;
+      console.log('[InvoiceAISuggestion] auth', { hasToken: !!token, isJwt });
+
+      if (!token) {
+        setError('Du behöver vara inloggad för att få AI-förslag');
+        setStage('error');
+        return;
+      }
 
       const prompt = `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
+
+VIKTIGT: Föreslå ALDRIG under 2 000 kr/mån.
 
 PRISSÄTTNING:
 - Entry (1-5 användare): 2 000 kr/mån - För små team, startups
@@ -57,15 +67,18 @@ Svara ENDAST med JSON (ingen markdown):
   "suggestedAmount": <nummer>,
   "pricingTier": "<Entry|Growth|Core|Scale>",
   "reasoning": "<kort förklaring på svenska, max 2 meningar>",
-  "companyInfo": "<kort info om företaget om känt, annars null>"
+  "companyInfo": "<kort info om företaget om känt, annars null>",
+  "approxValuation": "<ca värdering, t.ex. '500 MSEK' eller null>"
 }
 
 Analysera och föreslå prissättning för: ${companyName}`;
 
       const response = await fetch(`${BACKEND_URL}/ai/gemini`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
@@ -76,7 +89,13 @@ Analysera och föreslå prissättning för: ${companyName}`;
       });
 
       if (!response.ok) {
-        throw new Error('AI request failed');
+        console.error('[InvoiceAISuggestion] /ai/gemini failed', { status: response.status });
+        if (response.status === 401) {
+          setError('Inloggningen gick inte att verifiera (401). Logga in igen.');
+          setStage('error');
+          return;
+        }
+        throw new Error(`AI request failed (${response.status})`);
       }
 
       const data = await response.json();
@@ -86,12 +105,15 @@ Analysera och föreslå prissättning för: ${companyName}`;
         const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
         const parsed = JSON.parse(cleanContent);
         
+        const suggestedMonthly = Math.max(2000, Number(parsed.suggestedAmount) || 2000);
+
         setSuggestion({
-          monthlyAmount: parsed.suggestedAmount || 2000,
+          monthlyAmount: suggestedMonthly,
           oneTimeAmount: parsed.oneTimeAmount,
           pricingTier: parsed.pricingTier || 'Entry',
           reasoning: parsed.reasoning || `Föreslår ${parsed.pricingTier}-nivå för ${companyName}.`,
           companyInfo: parsed.companyInfo,
+          valuation: parsed.approxValuation || undefined,
         });
         setStage('suggesting');
       } else {
@@ -161,9 +183,14 @@ Analysera och föreslå prissättning för: ${companyName}`;
           {stage === 'suggesting' && suggestion && (
             <div className="space-y-4">
               {/* Company insight */}
-              {suggestion.companyInfo && (
-                <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
-                  {suggestion.companyInfo}
+              {(suggestion.companyInfo || suggestion.valuation) && (
+                <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-2 space-y-1">
+                  {suggestion.companyInfo && <div>{suggestion.companyInfo}</div>}
+                  {suggestion.valuation && (
+                    <div>
+                      Värdering (ca): <span className="font-medium text-foreground">{suggestion.valuation}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
