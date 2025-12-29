@@ -151,6 +151,14 @@ export type SISLearningEntry = LyraLearningEntry;
 // Backend stage values for detailed progress tracking
 export type ASRStage = 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error';
 
+// Queue metadata for tracking position in ASR queue
+export interface QueueMetadata {
+  queuePosition?: number;  // 1-based position in queue
+  queueDepth?: number;     // Total jobs in queue
+  activeCount?: number;    // Currently processing jobs
+  maxConcurrent?: number;  // Max parallel jobs per instance
+}
+
 export interface ASRStatus {
   meetingId?: string;
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
@@ -170,7 +178,7 @@ export interface ASRStatus {
   language?: string;
   durationMs?: number;
   wavDurationSec?: number;
-  metadata?: Record<string, any>;
+  metadata?: QueueMetadata;
   updatedAt?: string;
   // Legacy SIS fields (still used by backend)
   sisStatus?: SISStatusType;

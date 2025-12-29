@@ -10,7 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
-import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment } from "@/lib/asrService";
+import { pollASRStatus, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment, type QueueMetadata } from "@/lib/asrService";
+import { QueueProgressWidget } from "@/components/QueueProgressWidget";
 import { apiClient } from "@/lib/api";
 import { backendApi } from "@/lib/backendApi";
 import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackendAlias } from "@/lib/backgroundUploader";
@@ -56,8 +57,8 @@ const MeetingDetail = () => {
 
   const [meeting, setMeeting] = useState<MeetingSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState<'uploading' | 'processing' | 'done' | 'failed' | null>(null);
-  const [stage, setStage] = useState<'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
+  const [status, setStatus] = useState<'uploading' | 'queued' | 'processing' | 'done' | 'failed' | null>(null);
+  const [stage, setStage] = useState<'uploading' | 'queued' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
   const [reconstructedSegments, setReconstructedSegments] = useState<ReconstructedSegment[] | null>(null);
@@ -66,6 +67,11 @@ const MeetingDetail = () => {
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
   const [isSISDisabled, setIsSISDisabled] = useState(false);
+  
+  // Queue and upload progress state
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [queueMetadata, setQueueMetadata] = useState<QueueMetadata | undefined>(undefined);
+  const [fileSize, setFileSize] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAgendaDialog, setShowAgendaDialog] = useState(false);
@@ -306,12 +312,20 @@ const MeetingDetail = () => {
     const unsubscribe = subscribeToUpload((meetingId, uploadStatus) => {
       if (meetingId !== id) return;
       
+      // Track upload progress and file size
+      setUploadProgress(uploadStatus.progress || 0);
+      if (uploadStatus.file?.size) {
+        setFileSize(uploadStatus.file.size);
+      }
+      
       if (uploadStatus.status === 'complete') {
-        setStatus('processing');
+        setStatus('queued'); // After upload, job goes to queue
+        setUploadProgress(100);
       } else if (uploadStatus.status === 'error') {
         setStatus('failed');
       } else {
         setStatus('uploading');
+        setStage('uploading');
       }
     });
 
@@ -337,10 +351,16 @@ const MeetingDetail = () => {
           setStage(asrStatus.stage);
         }
         
-        if (asrStatus.status === 'processing' || asrStatus.stage === 'transcribing' || asrStatus.stage === 'sis_processing') {
-          if (status === 'uploading') {
-            setStatus('processing');
-          }
+        // Update queue metadata from backend
+        if (asrStatus.metadata) {
+          setQueueMetadata(asrStatus.metadata);
+        }
+        
+        // Update status based on ASR response
+        if (asrStatus.status === 'queued') {
+          setStatus('queued');
+        } else if (asrStatus.status === 'processing' || asrStatus.stage === 'transcribing' || asrStatus.stage === 'sis_processing') {
+          setStatus('processing');
         }
 
         const mainDone = asrStatus.status === 'completed' || asrStatus.status === 'done';
@@ -847,7 +867,7 @@ const MeetingDetail = () => {
   }
 
 
-  const isProcessing = status === 'uploading' || status === 'processing';
+  const isProcessing = status === 'uploading' || status === 'queued' || status === 'processing';
   const hasTranscript = !!transcript && transcript.trim().length > 0;
 
   // Helper to get a nice speaker label like "Talare 1", "Talare 2"
@@ -1371,22 +1391,30 @@ const MeetingDetail = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center justify-center py-24 gap-6"
+                className="flex flex-col items-center justify-center py-16 gap-8"
               >
+                {/* Animated background orb */}
                 <div className="relative">
                   <motion.div 
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 2 }}
-                    className="absolute inset-0 bg-primary/20 rounded-full blur-xl"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.5, 0.3] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                    className="absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-full blur-2xl w-32 h-32 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2"
                   />
-                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <Loader2 className="w-10 h-10 text-primary-foreground animate-spin" />
-                  </div>
                 </div>
-                <div className="text-center space-y-2">
-                  <h2 className="text-xl font-semibold">{getStageInfo().title}</h2>
-                  <p className="text-sm text-muted-foreground">{getStageInfo().subtitle}</p>
+                
+                {/* Queue Progress Widget */}
+                <div className="w-full max-w-md px-4">
+                  <QueueProgressWidget
+                    status={status === 'queued' ? 'queued' : status === 'uploading' ? 'uploading' : 'processing'}
+                    stage={stage || undefined}
+                    uploadProgress={uploadProgress}
+                    queueMetadata={queueMetadata}
+                    fileSize={fileSize}
+                    className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6"
+                  />
                 </div>
+                
+                {/* Additional info badge */}
                 <Badge variant="secondary" className="gap-2">
                   <Clock className="w-3 h-3" />
                   Längre möten kan ta några minuter
