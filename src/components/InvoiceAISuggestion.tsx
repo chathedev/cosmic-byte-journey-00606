@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Check, X, Loader2, Building2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+
+const BACKEND_URL = 'https://api.tivly.se';
 
 interface InvoiceAISuggestionProps {
   companyName: string;
@@ -38,23 +39,63 @@ export function InvoiceAISuggestion({
     setError(null);
     
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('validate-enterprise-pricing', {
-        body: {
-          companyName,
-          analyzeCompany: true,
+      const token = localStorage.getItem('supabase_access_token') || 
+        (await import('@/integrations/supabase/client')).supabase.auth.getSession()
+          .then(r => r.data.session?.access_token);
+
+      const prompt = `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
+
+PRISSÄTTNING:
+- Entry (1-5 användare): 2 000 kr/mån - För små team, startups
+- Growth (6-10 användare): 3 900 kr/mån - Växande företag
+- Core (11-20 användare): 6 900 kr/mån - Medelstora företag
+- Scale (20+ användare): 14 900 kr/mån - Stora organisationer
+
+Svara ENDAST med JSON (ingen markdown):
+{
+  "suggestedAmount": <nummer>,
+  "pricingTier": "<Entry|Growth|Core|Scale>",
+  "reasoning": "<kort förklaring på svenska, max 2 meningar>",
+  "companyInfo": "<kort info om företaget om känt, annars null>"
+}
+
+Analysera och föreslå prissättning för: ${companyName}`;
+
+      const response = await fetch(`${BACKEND_URL}/ai/gemini`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
+        body: JSON.stringify({
+          prompt,
+          model: 'gemini-2.5-flash-lite',
+          costUsd: 0.0003,
+        }),
       });
 
-      if (fnError) throw fnError;
+      if (!response.ok) {
+        throw new Error('AI request failed');
+      }
+
+      const data = await response.json();
+      const content = data.text || data.response;
       
-      setSuggestion({
-        monthlyAmount: data.suggestedAmount || 2000,
-        oneTimeAmount: data.oneTimeAmount,
-        pricingTier: data.pricingTier || 'Entry',
-        reasoning: data.suggestion || `${companyName} passar ${data.pricingTier || 'Entry'}-nivå.`,
-        companyInfo: data.companyInfo,
-      });
-      setStage('suggesting');
+      if (content) {
+        const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+        const parsed = JSON.parse(cleanContent);
+        
+        setSuggestion({
+          monthlyAmount: parsed.suggestedAmount || 2000,
+          oneTimeAmount: parsed.oneTimeAmount,
+          pricingTier: parsed.pricingTier || 'Entry',
+          reasoning: parsed.reasoning || `Föreslår ${parsed.pricingTier}-nivå för ${companyName}.`,
+          companyInfo: parsed.companyInfo,
+        });
+        setStage('suggesting');
+      } else {
+        throw new Error('No content in response');
+      }
     } catch (err: any) {
       console.error('AI pricing analysis failed:', err);
       setError('Kunde inte analysera företaget');
