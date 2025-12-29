@@ -19,6 +19,8 @@ export interface AISuggestion {
   reasoning: string;
   companyInfo?: string;
   valuation?: string;
+  employeeCount?: string;
+  factors?: string[];
 }
 
 type Stage = 'analyzing' | 'suggesting' | 'done' | 'error';
@@ -52,26 +54,38 @@ export function InvoiceAISuggestion({
         return;
       }
 
-      const prompt = `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
+      const prompt = `Du är en prisrådgivare för Tivly Enterprise. ANALYSERA företaget noggrant baserat på dina kunskaper.
 
-VIKTIGT: Föreslå ALDRIG under 2 000 kr/mån.
+FÖRETAG ATT ANALYSERA: ${companyName}
 
-PRISSÄTTNING:
-- Entry (1-5 användare): 2 000 kr/mån - För små team, startups
-- Growth (6-10 användare): 3 900 kr/mån - Växande företag
+STEG 1 - RESEARCH: 
+Använd dina kunskaper om svenska och internationella företag. Försök identifiera:
+- Antal anställda (uppskattat)
+- Bransch
+- Storlek (startup, SME, stort företag, enterprise)
+- Eventuell omsättning eller värdering om känt
+
+STEG 2 - PRISSÄTTNING (baserat på antal POTENTIELLA användare):
+- Entry (1-5 användare): 2 000 kr/mån - ENDAST för mycket små team/startups
+- Growth (6-10 användare): 3 900 kr/mån - Små växande företag
 - Core (11-20 användare): 6 900 kr/mån - Medelstora företag
 - Scale (20+ användare): 14 900 kr/mån - Stora organisationer
 
+VIKTIGT:
+- Om företaget har >50 anställda = MINST Core eller Scale
+- Om företaget har >20 anställda = MINST Growth eller högre
+- Entry (2000kr) ska ENDAST föreslås för mycket små startups med <10 anställda
+
 Svara ENDAST med JSON (ingen markdown):
 {
-  "suggestedAmount": <nummer>,
+  "suggestedAmount": <nummer baserat på uppskattad storlek>,
   "pricingTier": "<Entry|Growth|Core|Scale>",
-  "reasoning": "<kort förklaring på svenska, max 2 meningar>",
-  "companyInfo": "<kort info om företaget om känt, annars null>",
-  "approxValuation": "<ca värdering, t.ex. '500 MSEK' eller null>"
-}
-
-Analysera och föreslå prissättning för: ${companyName}`;
+  "employeeCount": "<uppskattat antal anställda, t.ex. '50-100' eller 'ca 200'>",
+  "reasoning": "<kort förklaring varför detta pris valdes, max 2 meningar>",
+  "companyInfo": "<kort beskrivning av företaget om känt, annars null>",
+  "approxValuation": "<ca värdering om känt, t.ex. '500 MSEK' eller null>",
+  "factors": ["<faktor 1 som påverkade priset>", "<faktor 2>", "<faktor 3>"]
+}`;
 
       const response = await fetch(`${BACKEND_URL}/ai/gemini`, {
         method: 'POST',
@@ -114,6 +128,8 @@ Analysera och föreslå prissättning för: ${companyName}`;
           reasoning: parsed.reasoning || `Föreslår ${parsed.pricingTier}-nivå för ${companyName}.`,
           companyInfo: parsed.companyInfo,
           valuation: parsed.approxValuation || undefined,
+          employeeCount: parsed.employeeCount || undefined,
+          factors: parsed.factors || undefined,
         });
         setStage('suggesting');
       } else {
@@ -181,16 +197,25 @@ Analysera och föreslå prissättning för: ${companyName}`;
           )}
 
           {stage === 'suggesting' && suggestion && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Company insight */}
-              {(suggestion.companyInfo || suggestion.valuation) && (
-                <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-2 space-y-1">
-                  {suggestion.companyInfo && <div>{suggestion.companyInfo}</div>}
-                  {suggestion.valuation && (
-                    <div>
-                      Värdering (ca): <span className="font-medium text-foreground">{suggestion.valuation}</span>
-                    </div>
+              {(suggestion.companyInfo || suggestion.valuation || suggestion.employeeCount) && (
+                <div className="text-xs bg-muted/50 rounded-lg p-3 space-y-1.5">
+                  {suggestion.companyInfo && (
+                    <div className="text-foreground font-medium">{suggestion.companyInfo}</div>
                   )}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                    {suggestion.employeeCount && (
+                      <div>
+                        Anställda: <span className="font-medium text-foreground">{suggestion.employeeCount}</span>
+                      </div>
+                    )}
+                    {suggestion.valuation && (
+                      <div>
+                        Värdering: <span className="font-medium text-foreground">{suggestion.valuation}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -219,6 +244,23 @@ Analysera och föreslå prissättning för: ${companyName}`;
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {suggestion.reasoning}
               </p>
+
+              {/* Factors that influenced price */}
+              {suggestion.factors && suggestion.factors.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Baserat på:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestion.factors.map((factor, i) => (
+                      <span
+                        key={i}
+                        className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                      >
+                        {factor}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
