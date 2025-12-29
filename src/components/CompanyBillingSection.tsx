@@ -13,7 +13,7 @@ import { apiClient } from "@/lib/api";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import BillingSuccessDialog from "@/components/BillingSuccessDialog";
-import { InvoiceAISuggestion } from "@/components/InvoiceAISuggestion";
+import { InvoiceAISuggestion, AISuggestion } from "@/components/InvoiceAISuggestion";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +84,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
   const [cancelRecord, setCancelRecord] = useState<BillingRecord | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(true);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
+  const [activeTab, setActiveTab] = useState('history');
 
   // Track whether invoice email has been sent (separate from Stripe invoice status)
   const sentStorageKey = `enterpriseBillingSent:${companyId}`;
@@ -213,18 +214,30 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
   // Check if this is the first invoice for the company
   const isFirstInvoice = billingHistory.length === 0;
 
+  // Trigger AI suggestion when entering create tab for first invoice
+  useEffect(() => {
+    if (activeTab === 'create' && isFirstInvoice && !loadingHistory) {
+      setShowAISuggestion(true);
+    } else if (activeTab !== 'create') {
+      setShowAISuggestion(false);
+    }
+  }, [activeTab, isFirstInvoice, loadingHistory]);
+
+  const handleAISuggestionAccept = (suggestion: AISuggestion) => {
+    // Set the suggested amounts
+    setLineItems([
+      { description: 'Enterprise-abonnemang', amount: suggestion.monthlyAmount.toString(), type: 'recurring' },
+      ...(suggestion.oneTimeAmount ? [{ description: 'Startavgift', amount: suggestion.oneTimeAmount.toString(), type: 'one_time' as const }] : []),
+    ]);
+    setShowAISuggestion(false);
+  };
+
+  const handleAISuggestionDecline = () => {
+    setShowAISuggestion(false);
+  };
+
   const handleSubmitWithValidation = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const recurringTotal = getRecurringTotal();
-    
-    // Show AI suggestion for first invoice with recurring payment
-    if (isFirstInvoice && recurringTotal > 0) {
-      setShowAISuggestion(true);
-      return;
-    }
-    
-    // Otherwise submit directly
     handleSubmit();
   };
 
@@ -303,17 +316,6 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     }
   };
 
-  const handleAdjustAmount = (suggestedAmount: number) => {
-    // Find the first recurring item and update its amount
-    const recurringIndex = lineItems.findIndex(item => item.type === 'recurring');
-    if (recurringIndex >= 0) {
-      updateLineItem(recurringIndex, 'amount', suggestedAmount.toString());
-    } else {
-      // If no recurring item, add one
-      setLineItems([...lineItems, { description: 'Enterprise-abonnemang', amount: suggestedAmount.toString(), type: 'recurring' }]);
-    }
-    setShowAISuggestion(false);
-  };
 
   const getBillingTypeLabel = (type: string) => {
     switch (type) {
@@ -484,7 +486,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="history" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="history">
               Historik
@@ -751,28 +753,23 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                 </div>
 
                 {/* First invoice badge */}
-                {isFirstInvoice && getRecurringTotal() > 0 && (
+                {isFirstInvoice && !showAISuggestion && (
                   <div className="pt-2">
                     <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20">
-                      Första fakturan – AI-validering
+                      Första fakturan
                     </Badge>
                   </div>
                 )}
               </div>
 
-              {/* AI Suggestion for first invoice */}
-              {showAISuggestion && (
+              {/* AI Suggestion for first invoice - shows as step-by-step flow */}
+              {showAISuggestion && isFirstInvoice ? (
                 <InvoiceAISuggestion
                   companyName={companyName}
-                  monthlyAmount={getRecurringTotal()}
-                  oneTimeAmount={getOneTimeTotal() > 0 ? getOneTimeTotal() : undefined}
-                  isFirstInvoice={isFirstInvoice}
-                  onAccept={handleSubmit}
-                  onAdjust={handleAdjustAmount}
+                  onAccept={handleAISuggestionAccept}
+                  onDecline={handleAISuggestionDecline}
                 />
-              )}
-
-              {!showAISuggestion && (
+              ) : (
                 <Button 
                   type="submit" 
                   className="w-full" 
