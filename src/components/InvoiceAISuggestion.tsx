@@ -123,10 +123,10 @@ export function InvoiceAISuggestion({
       const floorFromEmployees = tierFromEmployees(employeesRange);
       const floorFromMemberLimit = tierFromMemberLimit(memberLimit);
 
-      // AI pricing suggestion (direct call, no LinkedIn)
+      // AI pricing suggestion - focus on estimated USERS, not total employees
       const prompt = `Du är en prisrådgivare för Tivly Enterprise.
 
-MÅL: Föreslå RIMLIGT pris baserat på bolagets storlek och behov.
+MÅL: Uppskatta hur många som FAKTISKT kommer använda Tivly och föreslå rätt prisplan.
 
 INPUT:
 - Företagsnamn: ${companyName}
@@ -135,27 +135,34 @@ INPUT:
 - Nuvarande medlemmar i teamet: ${memberCount ?? "okänt"}
 - Max teamstorlek (memberLimit): ${memberLimit ?? "okänt"}
 
-PRISSÄTTNING (tiers):
+PRISSÄTTNING (baserat på antal ANVÄNDARE):
 - Entry (1–5 användare): 2 000 kr/mån
 - Growth (6–10 användare): 3 900 kr/mån
 - Core (11–20 användare): 6 900 kr/mån
 - Scale (21+ användare): 14 900 kr/mån
 
-REGLER:
-- Entry (2 000) får bara föreslås om bolaget sannolikt är mycket litet (<10 anställda).
-- Om anställda > 20: minst Growth.
-- Om anställda > 50: minst Core.
-- Om anställda > 100: Scale.
-- Om memberLimit finns: respektera det som stark signal för tier.
+VIKTIGT - TÄNK SÅ HÄR:
+1. Tivly är ett mötesprotokoll-verktyg
+2. INTE alla anställda behöver verktyget - bara de som leder/dokumenterar möten
+3. Typiska användare: projektledare, chefer, säljare, konsulter, teamleads
+4. Uppskatta REALISTISKT hur många i bolaget som faktiskt kommer använda Tivly
+5. Välj prisplan baserat på ESTIMERAT ANTAL ANVÄNDARE, inte totala anställda
 
-Svara ENDAST med JSON (ingen markdown):
+EXEMPEL:
+- Konsultbolag 50 pers → kanske 15-20 konsulter behöver det → Core
+- IT-bolag 100 pers → kanske 10 projektledare → Growth  
+- Litet bolag 8 pers → alla kanske använder det → Growth
+- Startup 4 pers → Entry
+
+Svara ENDAST med ren JSON (ingen markdown, inga backticks):
 {
   "pricingTier": "Entry|Growth|Core|Scale",
   "suggestedAmount": 2000,
-  "employeeCount": "<antal anställda om känt>",
-  "companyInfo": "<1 mening: vad bolaget gör>",
-  "reasoning": "<1 mening: varför denna tier>",
-  "factors": ["<kort faktor>", "<kort faktor>"]
+  "estimatedUsers": 5,
+  "employeeCount": 50,
+  "companyInfo": "Kort beskrivning av bolaget",
+  "reasoning": "Motivering varför X antal kommer använda verktyget",
+  "factors": ["faktor1", "faktor2"]
 }`;
 
       const aiResponse = await fetch(`${BACKEND_URL}/ai/gemini`, {
