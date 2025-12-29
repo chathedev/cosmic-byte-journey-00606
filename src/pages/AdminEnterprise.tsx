@@ -223,6 +223,11 @@ export default function AdminEnterprise() {
     const memberLimit = memberLimitRaw.trim() === '' ? null : Number(memberLimitRaw);
 
     const employeeCountHint = ((formData.get('employeeCountHint') as string) || '').trim();
+    const companyAbout = ((formData.get('companyAbout') as string) || '').trim();
+
+    const metadata: Record<string, string> = {};
+    if (employeeCountHint) metadata.employeeCountHint = employeeCountHint;
+    if (companyAbout) metadata.companyAbout = companyAbout;
 
     try {
       setIsSubmitting(true);
@@ -236,7 +241,7 @@ export default function AdminEnterprise() {
         dataAccessMode: dataAccessMode || 'shared',
         adminFullAccessEnabled,
         memberLimit: Number.isFinite(memberLimit as number) ? (memberLimit as number) : memberLimit,
-        metadata: employeeCountHint ? { employeeCountHint } : undefined,
+        metadata: Object.keys(metadata).length ? metadata : undefined,
         preferences: {
           meetingCreatorVisibility: 'shared_only',
           storageRegion: 'eu',
@@ -281,9 +286,11 @@ export default function AdminEnterprise() {
     const memberLimit = memberLimitRaw.trim() === '' ? null : Number(memberLimitRaw);
 
     const employeeCountHint = ((formData.get('employeeCountHint') as string) || '').trim();
+    const companyAbout = ((formData.get('companyAbout') as string) || '').trim();
     const nextMetadata = {
       ...(editingCompany.metadata || {}),
       ...(employeeCountHint ? { employeeCountHint } : {}),
+      ...(companyAbout ? { companyAbout } : {}),
     };
 
     try {
@@ -819,9 +826,21 @@ export default function AdminEnterprise() {
                     placeholder="t.ex. 70 eller 200-500"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Valfritt admin-hint om LinkedIn inte kan hämtas.
+                    Ungefärligt antal anställda i företaget.
                   </p>
                 </div>
+              </div>
+              <div>
+                <Label htmlFor="companyAbout">Om företaget</Label>
+                <Textarea
+                  id="companyAbout"
+                  name="companyAbout"
+                  placeholder="Beskriv vad företaget gör, bransch, etc..."
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Används av AI för prisförslag.
+                </p>
               </div>
               <div>
                 <Label htmlFor="dataAccessMode">Dataåtkomstläge</Label>
@@ -923,6 +942,19 @@ export default function AdminEnterprise() {
                     placeholder="t.ex. 70 eller 200-500"
                   />
                 </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-companyAbout">Om företaget</Label>
+                <Textarea
+                  id="edit-companyAbout"
+                  name="companyAbout"
+                  defaultValue={editingCompany?.metadata?.companyAbout || ''}
+                  placeholder="Beskriv vad företaget gör, bransch, etc..."
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Används av AI för prisförslag.
+                </p>
               </div>
               <div>
                 <Label htmlFor="edit-status">Status</Label>

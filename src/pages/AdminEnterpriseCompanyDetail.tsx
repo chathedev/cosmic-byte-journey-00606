@@ -285,9 +285,11 @@ export default function AdminEnterpriseCompanyDetail() {
     const memberLimit = memberLimitRaw.trim() === '' ? null : Number(memberLimitRaw);
 
     const employeeCountHint = ((formData.get('employeeCountHint') as string) || '').trim();
+    const companyAbout = ((formData.get('companyAbout') as string) || '').trim();
     const nextMetadata = {
       ...(company.metadata || {}),
       ...(employeeCountHint ? { employeeCountHint } : {}),
+      ...(companyAbout ? { companyAbout } : {}),
     };
 
     try {
@@ -1248,6 +1250,19 @@ export default function AdminEnterpriseCompanyDetail() {
                     placeholder="t.ex. 70 eller 200-500"
                   />
                 </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-companyAbout">Om företaget</Label>
+                <Textarea
+                  id="edit-companyAbout"
+                  name="companyAbout"
+                  defaultValue={company.metadata?.companyAbout || ''}
+                  placeholder="Beskriv vad företaget gör, bransch, etc..."
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Används av AI för prisförslag.
+                </p>
               </div>
               <div>
                 <Label htmlFor="edit-status">Status</Label>
