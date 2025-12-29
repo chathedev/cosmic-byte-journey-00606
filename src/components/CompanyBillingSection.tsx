@@ -13,6 +13,7 @@ import { apiClient } from "@/lib/api";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import BillingSuccessDialog from "@/components/BillingSuccessDialog";
+import { InvoiceAISuggestion } from "@/components/InvoiceAISuggestion";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,6 +83,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelRecord, setCancelRecord] = useState<BillingRecord | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(true);
+  const [showAISuggestion, setShowAISuggestion] = useState(false);
 
   // Track whether invoice email has been sent (separate from Stripe invoice status)
   const sentStorageKey = `enterpriseBillingSent:${companyId}`;
@@ -208,8 +210,26 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     return getOneTimeTotal() + getRecurringTotal();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Check if this is the first invoice for the company
+  const isFirstInvoice = billingHistory.length === 0;
+
+  const handleSubmitWithValidation = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const recurringTotal = getRecurringTotal();
+    
+    // Show AI suggestion for first invoice with recurring payment
+    if (isFirstInvoice && recurringTotal > 0) {
+      setShowAISuggestion(true);
+      return;
+    }
+    
+    // Otherwise submit directly
+    handleSubmit();
+  };
+
+  const handleSubmit = async () => {
+    setShowAISuggestion(false);
     
     if (!companyId) {
       toast.error('Inget företag valt');
@@ -281,6 +301,18 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAdjustAmount = (suggestedAmount: number) => {
+    // Find the first recurring item and update its amount
+    const recurringIndex = lineItems.findIndex(item => item.type === 'recurring');
+    if (recurringIndex >= 0) {
+      updateLineItem(recurringIndex, 'amount', suggestedAmount.toString());
+    } else {
+      // If no recurring item, add one
+      setLineItems([...lineItems, { description: 'Enterprise-abonnemang', amount: suggestedAmount.toString(), type: 'recurring' }]);
+    }
+    setShowAISuggestion(false);
   };
 
   const getBillingTypeLabel = (type: string) => {
@@ -613,7 +645,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
 
           {/* Create Tab */}
           <TabsContent value="create" className="mt-0">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmitWithValidation} className="space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Poster</Label>
@@ -717,16 +749,39 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                   <span>Totalt</span>
                   <span>{getTotalAmount().toLocaleString('sv-SE')} kr</span>
                 </div>
+
+                {/* First invoice badge */}
+                {isFirstInvoice && getRecurringTotal() > 0 && (
+                  <div className="pt-2">
+                    <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20">
+                      Första fakturan – AI-validering
+                    </Badge>
+                  </div>
+                )}
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isSubmitting || getTotalAmount() <= 0}
-              >
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Skapa Faktura
-              </Button>
+              {/* AI Suggestion for first invoice */}
+              {showAISuggestion && (
+                <InvoiceAISuggestion
+                  companyName={companyName}
+                  monthlyAmount={getRecurringTotal()}
+                  oneTimeAmount={getOneTimeTotal() > 0 ? getOneTimeTotal() : undefined}
+                  isFirstInvoice={isFirstInvoice}
+                  onAccept={handleSubmit}
+                  onAdjust={handleAdjustAmount}
+                />
+              )}
+
+              {!showAISuggestion && (
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isSubmitting || getTotalAmount() <= 0}
+                >
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Skapa Faktura
+                </Button>
+              )}
             </form>
           </TabsContent>
         </Tabs>
