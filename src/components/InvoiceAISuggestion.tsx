@@ -1,6 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Check, X, Loader2, Building2, TrendingUp, ExternalLink } from "lucide-react";
+import {
+  Sparkles,
+  Check,
+  X,
+  Loader2,
+  Building2,
+  TrendingUp,
+  ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import {
@@ -13,10 +21,31 @@ import {
   type PricingTier,
 } from "@/lib/enterprisePricing";
 
-const BACKEND_URL = 'https://api.tivly.se';
+const BACKEND_URL = "https://api.tivly.se";
+
+type Stage = "analyzing" | "suggesting" | "done" | "error";
+
+type Source = {
+  label: string;
+  url?: string;
+  detail?: string;
+  fetchedAt?: string;
+  cached?: boolean;
+};
+
+type LinkedInCompanyData = {
+  companyName?: string;
+  companyUrl?: string;
+  tagline?: string;
+  taglineItems?: string[];
+  employees?: string;
+  fetchedAt?: string;
+  cached?: boolean;
+};
 
 interface InvoiceAISuggestionProps {
   companyName: string;
+  companyId?: string;
   onAccept: (suggestion: AISuggestion) => void;
   onDecline: () => void;
 }
@@ -24,144 +53,256 @@ interface InvoiceAISuggestionProps {
 export interface AISuggestion {
   monthlyAmount: number;
   oneTimeAmount?: number;
-  pricingTier: string;
+  pricingTier: PricingTier;
   reasoning: string;
   companyInfo?: string;
   valuation?: string;
   employeeCount?: string;
   factors?: string[];
+  sources?: Source[];
 }
 
-type Stage = 'analyzing' | 'suggesting' | 'done' | 'error';
+function friendlyErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    const msg = err.message || "";
+    if (msg.toLowerCase().includes("unauthorized") || msg.includes("401")) {
+      return "Inloggningen gick inte att verifiera. Logga in igen.";
+    }
+    if (msg.toLowerCase().includes("failed to fetch")) {
+      return "Nätverksfel – kunde inte nå tjänsten.";
+    }
+    return msg;
+  }
+  return "Ett oväntat fel uppstod.";
+}
 
 export function InvoiceAISuggestion({
   companyName,
+  companyId,
   onAccept,
   onDecline,
 }: InvoiceAISuggestionProps) {
-  const [stage, setStage] = useState<Stage>('analyzing');
+  const [stage, setStage] = useState<Stage>("analyzing");
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkedIn, setLinkedIn] = useState<LinkedInCompanyData | null>(null);
 
   useEffect(() => {
-    analyzePricing();
-  }, [companyName]);
+    void analyzePricing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyName, companyId]);
+
+  const displayEmployeeCount = useMemo(() => {
+    return suggestion?.employeeCount || linkedIn?.employees;
+  }, [suggestion?.employeeCount, linkedIn?.employees]);
 
   const analyzePricing = async () => {
-    setStage('analyzing');
+    setStage("analyzing");
     setError(null);
-    
-    try {
-      // Tivly backend expects the app user JWT stored by apiClient
-      const token = apiClient.getAuthToken();
-      const isJwt = !!token && token.split('.').length === 3;
-      console.log('[InvoiceAISuggestion] auth', { hasToken: !!token, isJwt });
+    setSuggestion(null);
+    setLinkedIn(null);
 
+    try {
+      const token = apiClient.getAuthToken();
       if (!token) {
-        setError('Du behöver vara inloggad för att få AI-förslag');
-        setStage('error');
+        setError("Du behöver vara inloggad för att få AI-förslag");
+        setStage("error");
         return;
       }
 
-      const prompt = `Du är en prisrådgivare för Tivly Enterprise. ANALYSERA företaget noggrant baserat på dina kunskaper.
+      // 1) Enterprise context (memberLimit + member count + optional employee hint)
+      let memberLimit: number | null | undefined = undefined;
+      let memberCount: number | undefined = undefined;
+      let employeeCountHint: string | undefined = undefined;
+      let companyMetaInfo: string | undefined = undefined;
 
-FÖRETAG ATT ANALYSERA: ${companyName}
+      if (companyId) {
+        try {
+          const enterpriseResp = await apiClient.getEnterpriseCompany(companyId);
+          const enterpriseCompany = enterpriseResp?.company;
+          memberLimit =
+            enterpriseCompany?.memberLimit ??
+            enterpriseCompany?.member_limit ??
+            enterpriseCompany?.preferences?.memberLimit ??
+            null;
+          memberCount = Array.isArray(enterpriseCompany?.members) ? enterpriseCompany.members.length : undefined;
+          employeeCountHint =
+            enterpriseCompany?.metadata?.employeeCountHint ||
+            enterpriseCompany?.metadata?.employeeCount ||
+            undefined;
+          companyMetaInfo = enterpriseCompany?.notes || undefined;
+        } catch {
+          // best-effort only
+        }
+      }
 
-STEG 1 - RESEARCH: 
-Använd dina kunskaper om svenska och internationella företag. Försök identifiera:
-- Antal anställda (uppskattat)
-- Bransch
-- Storlek (startup, SME, stort företag, enterprise)
-- Eventuell omsättning eller värdering om känt
+      // 2) LinkedIn prefetch
+      let linkedInData: LinkedInCompanyData | null = null;
+      try {
+        const liRes = await fetch(`${BACKEND_URL}/linkedin/company`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ companyName }),
+        });
 
-STEG 2 - PRISSÄTTNING (baserat på antal POTENTIELLA användare):
-- Entry (1-5 användare): 2 000 kr/mån - ENDAST för mycket små team/startups
-- Growth (6-10 användare): 3 900 kr/mån - Små växande företag
-- Core (11-20 användare): 6 900 kr/mån - Medelstora företag
-- Scale (20+ användare): 14 900 kr/mån - Stora organisationer
+        if (liRes.ok) {
+          const liJson = await liRes.json();
+          linkedInData = (liJson?.data || liJson) as LinkedInCompanyData;
+          setLinkedIn(linkedInData);
+        }
+      } catch {
+        // Ignore LinkedIn failures; AI can still proceed.
+      }
 
-VIKTIGT:
-- Om företaget har >50 anställda = MINST Core eller Scale
-- Om företaget har >20 anställda = MINST Growth eller högre
-- Entry (2000kr) ska ENDAST föreslås för mycket små startups med <10 anställda
+      // Floors: ensure we never pick Entry for obvious larger orgs.
+      const employeesRaw =
+        linkedInData?.employees || employeeCountHint || undefined;
+      const employeesRange = parseEmployeeCountRange(employeesRaw);
+      const floorFromEmployees = tierFromEmployees(employeesRange);
+      const floorFromMemberLimit = tierFromMemberLimit(memberLimit);
+
+      // 3) AI pricing suggestion
+      const prompt = `Du är en prisrådgivare för Tivly Enterprise.
+
+MÅL: Föreslå RIMLIGT pris baserat på bolagets sannolika storlek och behov. Om du är osäker, välj hellre för högt än för lågt.
+
+INPUT (KÄLLOR):
+- Företagsnamn: ${companyName}
+- LinkedIn (om tillgängligt):
+  - URL: ${linkedInData?.companyUrl ?? "okänt"}
+  - Tagline: ${linkedInData?.tagline ?? "okänt"}
+  - Anställda: ${linkedInData?.employees ?? "okänt"}
+- Enterprise-kontekst (internt):
+  - Nuvarande medlemmar i teamet: ${memberCount ?? "okänt"}
+  - Max teamstorlek (memberLimit): ${memberLimit ?? "okänt"}
+  - Admin-notes (om finns): ${companyMetaInfo ? companyMetaInfo.slice(0, 300) : "-"}
+
+PRISSÄTTNING (tiers):
+- Entry (1–5 användare): 2 000 kr/mån
+- Growth (6–10 användare): 3 900 kr/mån
+- Core (11–20 användare): 6 900 kr/mån
+- Scale (21+ användare): 14 900 kr/mån
+
+REGLER:
+- Entry (2 000) får bara föreslås om bolaget sannolikt är mycket litet (<10 anställda) och inga signaler tyder på större behov.
+- Om anställda > 20: minst Growth.
+- Om anställda > 50: minst Core.
+- Om memberLimit finns: respektera det som stark signal för tier.
 
 Svara ENDAST med JSON (ingen markdown):
 {
-  "suggestedAmount": <nummer baserat på uppskattad storlek>,
-  "pricingTier": "<Entry|Growth|Core|Scale>",
-  "employeeCount": "<uppskattat antal anställda, t.ex. '50-100' eller 'ca 200'>",
-  "reasoning": "<kort förklaring varför detta pris valdes, max 2 meningar>",
-  "companyInfo": "<kort beskrivning av företaget om känt, annars null>",
-  "approxValuation": "<ca värdering om känt, t.ex. '500 MSEK' eller null>",
-  "factors": ["<faktor 1 som påverkade priset>", "<faktor 2>", "<faktor 3>"]
+  "pricingTier": "Entry|Growth|Core|Scale",
+  "suggestedAmount": 2000,
+  "employeeCount": "<t.ex. '200-500' eller 'ca 70'>",
+  "companyInfo": "<1 mening: vad bolaget gör>",
+  "reasoning": "<1 mening: varför denna tier>",
+  "factors": ["<kort faktor>", "<kort faktor>", "<kort faktor>"]
 }`;
 
-      const response = await fetch(`${BACKEND_URL}/ai/gemini`, {
-        method: 'POST',
-        credentials: 'include',
+      const aiResponse = await fetch(`${BACKEND_URL}/ai/gemini`, {
+        method: "POST",
+        credentials: "include",
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt,
-          model: 'gemini-2.5-flash-lite',
-          costUsd: 0.0003,
+          model: "gemini-2.5-flash",
+          costUsd: 0.0008,
         }),
       });
 
-      if (!response.ok) {
-        console.error('[InvoiceAISuggestion] /ai/gemini failed', { status: response.status });
-        if (response.status === 401) {
-          setError('Inloggningen gick inte att verifiera (401). Logga in igen.');
-          setStage('error');
-          return;
+      if (!aiResponse.ok) {
+        if (aiResponse.status === 401) {
+          throw new Error("401");
         }
-        throw new Error(`AI request failed (${response.status})`);
+        throw new Error(`AI request failed (${aiResponse.status})`);
       }
 
-      const data = await response.json();
-      const content = data.text || data.response;
-      
-      if (content) {
-        const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
-        const parsed = JSON.parse(cleanContent);
-        
-        const suggestedMonthly = Math.max(2000, Number(parsed.suggestedAmount) || 2000);
+      const aiJson = await aiResponse.json();
+      const content = aiJson.text || aiJson.response;
+      if (!content) {
+        throw new Error("Inget innehåll i AI-svar");
+      }
 
-        setSuggestion({
-          monthlyAmount: suggestedMonthly,
-          oneTimeAmount: parsed.oneTimeAmount,
-          pricingTier: parsed.pricingTier || 'Entry',
-          reasoning: parsed.reasoning || `Föreslår ${parsed.pricingTier}-nivå för ${companyName}.`,
-          companyInfo: parsed.companyInfo,
-          valuation: parsed.approxValuation || undefined,
-          employeeCount: parsed.employeeCount || undefined,
-          factors: parsed.factors || undefined,
+      const clean = String(content).replace(/```json\n?|\n?```/g, "").trim();
+      let parsed: any;
+      try {
+        parsed = typeof clean === "string" ? JSON.parse(clean) : clean;
+      } catch {
+        throw new Error("Kunde inte tolka AI-svaret (JSON)");
+      }
+
+      const aiTier = normalizeTier(parsed.pricingTier);
+      const finalTier = maxTier(aiTier, floorFromEmployees, floorFromMemberLimit);
+      const finalAmount = PRICING_TIERS[finalTier].price;
+
+      const sources: Source[] = [];
+      if (linkedInData?.companyUrl || linkedInData?.employees || linkedInData?.tagline) {
+        sources.push({
+          label: "LinkedIn",
+          url: linkedInData.companyUrl,
+          detail: [linkedInData.tagline, linkedInData.employees].filter(Boolean).join(" • ") || undefined,
+          fetchedAt: linkedInData.fetchedAt,
+          cached: linkedInData.cached,
         });
-        setStage('suggesting');
-      } else {
-        throw new Error('No content in response');
       }
-    } catch (err: any) {
-      console.error('AI pricing analysis failed:', err);
-      setError('Kunde inte analysera företaget');
-      // Fallback suggestion
+
+      if (memberLimit !== undefined || memberCount !== undefined || employeeCountHint) {
+        sources.push({
+          label: "Enterprise-inställning",
+          detail: [
+            memberCount !== undefined ? `Nuvarande medlemmar: ${memberCount}` : null,
+            memberLimit !== undefined && memberLimit !== null ? `MemberLimit: ${memberLimit}` : memberLimit === null ? "MemberLimit: obegränsat" : null,
+            employeeCountHint ? `Admin-hint anställda: ${employeeCountHint}` : null,
+          ]
+            .filter(Boolean)
+            .join(" • ") || undefined,
+        });
+      }
+
       setSuggestion({
-        monthlyAmount: 2000,
-        pricingTier: 'Entry',
-        reasoning: `Föreslår Entry-nivå (2 000 kr/mån) för ${companyName}.`,
+        monthlyAmount: finalAmount,
+        pricingTier: finalTier,
+        oneTimeAmount: parsed.oneTimeAmount,
+        reasoning:
+          typeof parsed.reasoning === "string" && parsed.reasoning.trim()
+            ? parsed.reasoning.trim()
+            : `Föreslår ${finalTier}-nivå (${finalAmount.toLocaleString("sv-SE")} kr/mån) för ${companyName}.`,
+        companyInfo:
+          typeof parsed.companyInfo === "string" && parsed.companyInfo.trim()
+            ? parsed.companyInfo.trim()
+            : linkedInData?.tagline || undefined,
+        valuation: typeof parsed.approxValuation === "string" ? parsed.approxValuation : undefined,
+        employeeCount:
+          typeof parsed.employeeCount === "string" && parsed.employeeCount.trim()
+            ? parsed.employeeCount.trim()
+            : linkedInData?.employees || employeeCountHint,
+        factors: Array.isArray(parsed.factors)
+          ? parsed.factors.map((x: any) => String(x)).filter(Boolean).slice(0, 5)
+          : undefined,
+        sources: sources.length ? sources : undefined,
       });
-      setStage('suggesting');
+
+      setStage("suggesting");
+    } catch (err) {
+      console.error("[InvoiceAISuggestion] pricing analysis failed:", err);
+      setError(friendlyErrorMessage(err));
+      setStage("error");
     }
   };
 
   const handleAccept = () => {
-    if (suggestion) {
-      setStage('done');
-      onAccept(suggestion);
-    }
+    if (!suggestion) return;
+    setStage("done");
+    onAccept(suggestion);
   };
 
   return (
@@ -174,8 +315,7 @@ Svara ENDAST med JSON (ingen markdown):
         transition={{ duration: 0.2 }}
         className="rounded-xl border bg-gradient-to-br from-card to-card/80 overflow-hidden"
       >
-        {/* Header */}
-        <div className="px-4 py-3 border-b bg-muted/30 flex items-center gap-2">
+        <header className="px-4 py-3 border-b bg-muted/30 flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-primary/10">
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
@@ -183,12 +323,11 @@ Svara ENDAST med JSON (ingen markdown):
             <p className="text-sm font-medium">AI-prisförslag</p>
             <p className="text-[10px] text-muted-foreground">Baserat på företagsanalys</p>
           </div>
-        </div>
+        </header>
 
-        {/* Content */}
-        <div className="p-4">
-          {stage === 'analyzing' && (
-            <div className="flex flex-col items-center py-6 space-y-3">
+        <main className="p-4">
+          {stage === "analyzing" && (
+            <section className="flex flex-col items-center py-6 space-y-3" aria-live="polite">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
                 <div className="relative p-3 rounded-full bg-primary/10">
@@ -197,38 +336,33 @@ Svara ENDAST med JSON (ingen markdown):
               </div>
               <div className="text-center space-y-1">
                 <p className="text-sm font-medium">Analyserar {companyName}...</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Föreslår prissättning</span>
+                  <span>Hämtar info & föreslår prissättning</span>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          {stage === 'suggesting' && suggestion && (
-            <div className="space-y-3">
-              {/* Company insight */}
-              {(suggestion.companyInfo || suggestion.valuation || suggestion.employeeCount) && (
+          {stage === "suggesting" && suggestion && (
+            <section className="space-y-3">
+              {/* Minimal company hint */}
+              {(suggestion.companyInfo || displayEmployeeCount) && (
                 <div className="text-xs bg-muted/50 rounded-lg p-3 space-y-1.5">
                   {suggestion.companyInfo && (
-                    <div className="text-foreground font-medium">{suggestion.companyInfo}</div>
+                    <div className="text-foreground font-medium line-clamp-2">
+                      {suggestion.companyInfo}
+                    </div>
                   )}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
-                    {suggestion.employeeCount && (
-                      <div>
-                        Anställda: <span className="font-medium text-foreground">{suggestion.employeeCount}</span>
-                      </div>
-                    )}
-                    {suggestion.valuation && (
-                      <div>
-                        Värdering: <span className="font-medium text-foreground">{suggestion.valuation}</span>
-                      </div>
-                    )}
-                  </div>
+                  {displayEmployeeCount && (
+                    <div className="text-muted-foreground">
+                      Anställda: <span className="font-medium text-foreground">{displayEmployeeCount}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Price suggestion */}
+              {/* Price */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
                 <div className="p-2 rounded-full bg-primary/10">
                   <TrendingUp className="h-4 w-4 text-primary" />
@@ -236,14 +370,14 @@ Svara ENDAST med JSON (ingen markdown):
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="text-xl font-bold">
-                      {suggestion.monthlyAmount.toLocaleString('sv-SE')}
+                      {suggestion.monthlyAmount.toLocaleString("sv-SE")}
                     </span>
                     <span className="text-sm text-muted-foreground">kr/mån</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {suggestion.pricingTier}-nivå
                     {suggestion.oneTimeAmount && suggestion.oneTimeAmount > 0 && (
-                      <span> + {suggestion.oneTimeAmount.toLocaleString('sv-SE')} kr engång</span>
+                      <span> + {suggestion.oneTimeAmount.toLocaleString("sv-SE")} kr engång</span>
                     )}
                   </p>
                 </div>
@@ -254,55 +388,97 @@ Svara ENDAST med JSON (ingen markdown):
                 {suggestion.reasoning}
               </p>
 
-              {/* Factors that influenced price */}
-              {suggestion.factors && suggestion.factors.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Baserat på:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {suggestion.factors.map((factor, i) => (
-                      <span
-                        key={i}
-                        className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                      >
-                        {factor}
-                      </span>
-                    ))}
+              {/* Details (collapsed by default) */}
+              {(suggestion.factors?.length || suggestion.sources?.length) ? (
+                <details className="rounded-lg border bg-muted/20 p-3">
+                  <summary className="cursor-pointer text-xs font-medium text-muted-foreground select-none">
+                    Visa detaljer
+                  </summary>
+                  <div className="pt-2 space-y-3">
+                    {suggestion.factors && suggestion.factors.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                          Faktorer
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {suggestion.factors.map((factor, i) => (
+                            <span
+                              key={i}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                            >
+                              {factor}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {suggestion.sources && suggestion.sources.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                          Källor
+                        </p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {suggestion.sources.map((s, i) => (
+                            <li key={i} className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium text-foreground">{s.label}</div>
+                                {s.detail && <div className="text-muted-foreground break-words">{s.detail}</div>}
+                                {s.fetchedAt && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {new Date(s.fetchedAt).toLocaleString("sv-SE")}
+                                    {typeof s.cached === "boolean" ? (s.cached ? " • cache" : "") : ""}
+                                  </div>
+                                )}
+                              </div>
+                              {s.url && (
+                                <a
+                                  href={s.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                  Länk
+                                </a>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                </details>
+              ) : null}
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={handleAccept}
-                  size="sm"
-                  className="flex-1 gap-1.5"
-                >
+              <div className="flex gap-2 pt-1">
+                <Button onClick={handleAccept} size="sm" className="flex-1 gap-1.5">
                   <Check className="h-3.5 w-3.5" />
                   Acceptera
                 </Button>
-                <Button
-                  onClick={onDecline}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 gap-1.5"
-                >
+                <Button onClick={onDecline} variant="outline" size="sm" className="flex-1 gap-1.5">
                   <X className="h-3.5 w-3.5" />
                   Manuellt
                 </Button>
               </div>
-            </div>
+            </section>
           )}
 
-          {stage === 'error' && (
-            <div className="py-4 text-center">
-              <p className="text-sm text-destructive mb-3">{error}</p>
-              <Button onClick={analyzePricing} variant="outline" size="sm">
-                Försök igen
-              </Button>
-            </div>
+          {stage === "error" && (
+            <section className="py-4 text-center space-y-3">
+              <p className="text-sm text-destructive">{error}</p>
+              <div className="flex gap-2">
+                <Button onClick={analyzePricing} variant="outline" size="sm" className="flex-1">
+                  Försök igen
+                </Button>
+                <Button onClick={onDecline} variant="outline" size="sm" className="flex-1">
+                  Manuellt
+                </Button>
+              </div>
+            </section>
           )}
-        </div>
+        </main>
       </motion.div>
     </AnimatePresence>
   );

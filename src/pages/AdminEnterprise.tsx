@@ -49,6 +49,7 @@ interface Company {
   domains?: string[];
   notes?: string;
   metadata?: any;
+  memberLimit?: number | null;
   dataAccessMode?: 'shared' | 'individual';
   adminFullAccessEnabled?: boolean;
   trial?: {
@@ -218,6 +219,11 @@ export default function AdminEnterprise() {
     const adminFullAccessEnabled = formData.get('adminFullAccessEnabled') === 'true';
     const speakerIdentificationEnabled = formData.get('speakerIdentificationEnabled') === 'true';
 
+    const memberLimitRaw = (formData.get('memberLimit') as string) || '';
+    const memberLimit = memberLimitRaw.trim() === '' ? null : Number(memberLimitRaw);
+
+    const employeeCountHint = ((formData.get('employeeCountHint') as string) || '').trim();
+
     try {
       setIsSubmitting(true);
       await apiClient.createEnterpriseCompany({
@@ -229,6 +235,8 @@ export default function AdminEnterprise() {
         status: 'active',
         dataAccessMode: dataAccessMode || 'shared',
         adminFullAccessEnabled,
+        memberLimit: Number.isFinite(memberLimit as number) ? (memberLimit as number) : memberLimit,
+        metadata: employeeCountHint ? { employeeCountHint } : undefined,
         preferences: {
           meetingCreatorVisibility: 'shared_only',
           storageRegion: 'eu',
@@ -237,12 +245,12 @@ export default function AdminEnterprise() {
           speakerIdentificationEnabled,
         },
       });
-      
+
       toast({
         title: 'Success',
         description: 'Company created successfully',
       });
-      
+
       setShowCreateCompany(false);
       loadCompanies();
     } catch (error) {
@@ -269,6 +277,15 @@ export default function AdminEnterprise() {
     const adminFullAccessEnabled = formData.get('adminFullAccessEnabled') === 'true';
     const speakerIdentificationEnabled = formData.get('speakerIdentificationEnabled') === 'true';
 
+    const memberLimitRaw = (formData.get('memberLimit') as string) || '';
+    const memberLimit = memberLimitRaw.trim() === '' ? null : Number(memberLimitRaw);
+
+    const employeeCountHint = ((formData.get('employeeCountHint') as string) || '').trim();
+    const nextMetadata = {
+      ...(editingCompany.metadata || {}),
+      ...(employeeCountHint ? { employeeCountHint } : {}),
+    };
+
     try {
       setIsSubmitting(true);
       await apiClient.updateEnterpriseCompany(editingCompany.id, {
@@ -279,6 +296,8 @@ export default function AdminEnterprise() {
         status,
         dataAccessMode,
         adminFullAccessEnabled,
+        memberLimit: Number.isFinite(memberLimit as number) ? (memberLimit as number) : memberLimit,
+        metadata: Object.keys(nextMetadata).length ? nextMetadata : undefined,
         preferences: {
           meetingCreatorVisibility: 'shared_only',
           storageRegion: 'eu',
@@ -287,12 +306,12 @@ export default function AdminEnterprise() {
           speakerIdentificationEnabled,
         },
       });
-      
+
       toast({
         title: 'Success',
         description: 'Company updated successfully',
       });
-      
+
       setShowEditCompany(false);
       setEditingCompany(null);
       loadCompanies();
@@ -778,6 +797,32 @@ export default function AdminEnterprise() {
                 <Label htmlFor="domains">Domäner (kommaseparerade)</Label>
                 <Input id="domains" name="domains" placeholder="foretag.se, foretag.com" />
               </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="memberLimit">Max teamstorlek (memberLimit)</Label>
+                  <Input
+                    id="memberLimit"
+                    name="memberLimit"
+                    type="number"
+                    min={0}
+                    placeholder="Lämna tomt = obegränsat"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Används som signal i AI-prisförslag och kan användas för att begränsa teamstorlek.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="employeeCountHint">Antal anställda (ca)</Label>
+                  <Input
+                    id="employeeCountHint"
+                    name="employeeCountHint"
+                    placeholder="t.ex. 70 eller 200-500"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Valfritt admin-hint om LinkedIn inte kan hämtas.
+                  </p>
+                </div>
+              </div>
               <div>
                 <Label htmlFor="dataAccessMode">Dataåtkomstläge</Label>
                 <Select name="dataAccessMode" defaultValue="shared">
@@ -856,6 +901,28 @@ export default function AdminEnterprise() {
               <div>
                 <Label htmlFor="edit-domains">Domäner (kommaseparerade)</Label>
                 <Input id="edit-domains" name="domains" defaultValue={editingCompany?.domains?.join(', ')} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="edit-memberLimit">Max teamstorlek (memberLimit)</Label>
+                  <Input
+                    id="edit-memberLimit"
+                    name="memberLimit"
+                    type="number"
+                    min={0}
+                    defaultValue={editingCompany?.memberLimit ?? ''}
+                    placeholder="Lämna tomt = obegränsat"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-employeeCountHint">Antal anställda (ca)</Label>
+                  <Input
+                    id="edit-employeeCountHint"
+                    name="employeeCountHint"
+                    defaultValue={editingCompany?.metadata?.employeeCountHint || ''}
+                    placeholder="t.ex. 70 eller 200-500"
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="edit-status">Status</Label>
