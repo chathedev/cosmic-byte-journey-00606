@@ -181,16 +181,31 @@ Svara ENDAST med JSON (ingen markdown):
       }
 
       const aiJson = await aiResponse.json();
-      const content = aiJson.text || aiJson.response;
+      
+      // Extract content - handle nested Gemini response structure
+      let content: string | undefined;
+      if (aiJson.response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        content = aiJson.response.candidates[0].content.parts[0].text;
+      } else if (aiJson.candidates?.[0]?.content?.parts?.[0]?.text) {
+        content = aiJson.candidates[0].content.parts[0].text;
+      } else if (typeof aiJson.text === "string") {
+        content = aiJson.text;
+      } else if (typeof aiJson.response === "string") {
+        content = aiJson.response;
+      }
+      
       if (!content) {
+        console.error("[InvoiceAISuggestion] Unexpected AI response structure:", aiJson);
         throw new Error("Inget innehåll i AI-svar");
       }
 
-      const clean = String(content).replace(/```json\n?|\n?```/g, "").trim();
+      // Strip markdown code blocks if present
+      const clean = content.replace(/```json\n?|\n?```/g, "").trim();
       let parsed: any;
       try {
-        parsed = typeof clean === "string" ? JSON.parse(clean) : clean;
-      } catch {
+        parsed = JSON.parse(clean);
+      } catch (parseErr) {
+        console.error("[InvoiceAISuggestion] JSON parse failed:", clean);
         throw new Error("Kunde inte tolka AI-svaret (JSON)");
       }
 
