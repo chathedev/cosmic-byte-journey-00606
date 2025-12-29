@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const BACKEND_URL = 'https://api.tivly.se';
+
 // Enterprise pricing tiers
 const PRICING_TIERS = {
   entry: { min: 1, max: 5, price: 2000, name: 'Entry' },
@@ -19,38 +21,15 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('authorization');
     const { companyName, monthlyAmount, oneTimeAmount, analyzeCompany } = await req.json();
 
     console.log('[validate-enterprise-pricing] Request:', { companyName, monthlyAmount, analyzeCompany });
 
     // If analyzing company, use AI to suggest pricing
     if (analyzeCompany && companyName) {
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      
-      if (!LOVABLE_API_KEY) {
-        console.warn('[validate-enterprise-pricing] No LOVABLE_API_KEY, using fallback');
-        return new Response(JSON.stringify({
-          suggestedAmount: 2000,
-          pricingTier: 'Entry',
-          suggestion: `Föreslår Entry-nivå (2 000 kr/mån) för ${companyName}.`,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
       try {
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-lite',
-            messages: [
-              {
-                role: 'system',
-                content: `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
+        const prompt = `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
 
 PRISSÄTTNING:
 - Entry (1-5 användare): 2 000 kr/mån - För små team, startups
@@ -64,21 +43,26 @@ Svara ENDAST med JSON (ingen markdown):
   "pricingTier": "<Entry|Growth|Core|Scale>",
   "reasoning": "<kort förklaring på svenska, max 2 meningar>",
   "companyInfo": "<kort info om företaget om känt, annars null>"
-}`
-              },
-              {
-                role: 'user',
-                content: `Analysera och föreslå prissättning för: ${companyName}`
-              }
-            ],
-            max_tokens: 200,
-            temperature: 0.3,
+}
+
+Analysera och föreslå prissättning för: ${companyName}`;
+
+        const aiResponse = await fetch(`${BACKEND_URL}/ai/gemini`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authHeader ? { 'Authorization': authHeader } : {}),
+          },
+          body: JSON.stringify({
+            prompt,
+            model: 'gemini-2.5-flash-lite',
+            costUsd: 0.0003,
           }),
         });
 
         if (aiResponse.ok) {
           const data = await aiResponse.json();
-          const content = data.choices?.[0]?.message?.content;
+          const content = data.text || data.response;
           
           if (content) {
             try {
