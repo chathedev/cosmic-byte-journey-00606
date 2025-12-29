@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -7,7 +7,6 @@ import {
   Loader2,
   Building2,
   TrendingUp,
-  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -27,20 +26,7 @@ type Stage = "analyzing" | "suggesting" | "done" | "error";
 
 type Source = {
   label: string;
-  url?: string;
   detail?: string;
-  fetchedAt?: string;
-  cached?: boolean;
-};
-
-type LinkedInCompanyData = {
-  companyName?: string;
-  companyUrl?: string;
-  tagline?: string;
-  taglineItems?: string[];
-  employees?: string;
-  fetchedAt?: string;
-  cached?: boolean;
 };
 
 interface InvoiceAISuggestionProps {
@@ -56,7 +42,6 @@ export interface AISuggestion {
   pricingTier: PricingTier;
   reasoning: string;
   companyInfo?: string;
-  valuation?: string;
   employeeCount?: string;
   factors?: string[];
   sources?: Source[];
@@ -85,22 +70,16 @@ export function InvoiceAISuggestion({
   const [stage, setStage] = useState<Stage>("analyzing");
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [linkedIn, setLinkedIn] = useState<LinkedInCompanyData | null>(null);
 
   useEffect(() => {
     void analyzePricing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyName, companyId]);
 
-  const displayEmployeeCount = useMemo(() => {
-    return suggestion?.employeeCount || linkedIn?.employees;
-  }, [suggestion?.employeeCount, linkedIn?.employees]);
-
   const analyzePricing = async () => {
     setStage("analyzing");
     setError(null);
     setSuggestion(null);
-    setLinkedIn(null);
 
     try {
       const token = apiClient.getAuthToken();
@@ -110,11 +89,11 @@ export function InvoiceAISuggestion({
         return;
       }
 
-      // 1) Enterprise context (memberLimit + member count + optional employee hint)
+      // Fetch enterprise context directly (no LinkedIn call)
       let memberLimit: number | null | undefined = undefined;
       let memberCount: number | undefined = undefined;
       let employeeCountHint: string | undefined = undefined;
-      let companyMetaInfo: string | undefined = undefined;
+      let companyAbout: string | undefined = undefined;
 
       if (companyId) {
         try {
@@ -130,57 +109,31 @@ export function InvoiceAISuggestion({
             enterpriseCompany?.metadata?.employeeCountHint ||
             enterpriseCompany?.metadata?.employeeCount ||
             undefined;
-          companyMetaInfo = enterpriseCompany?.notes || undefined;
+          companyAbout =
+            enterpriseCompany?.metadata?.companyAbout ||
+            enterpriseCompany?.notes ||
+            undefined;
         } catch {
           // best-effort only
         }
       }
 
-      // 2) LinkedIn prefetch
-      let linkedInData: LinkedInCompanyData | null = null;
-      try {
-        const liRes = await fetch(`${BACKEND_URL}/linkedin/company`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ companyName }),
-        });
-
-        if (liRes.ok) {
-          const liJson = await liRes.json();
-          linkedInData = (liJson?.data || liJson) as LinkedInCompanyData;
-          setLinkedIn(linkedInData);
-        }
-      } catch {
-        // Ignore LinkedIn failures; AI can still proceed.
-      }
-
-      // Floors: ensure we never pick Entry for obvious larger orgs.
-      const employeesRaw =
-        linkedInData?.employees || employeeCountHint || undefined;
-      const employeesRange = parseEmployeeCountRange(employeesRaw);
+      // Floors: ensure we never pick Entry for obvious larger orgs
+      const employeesRange = parseEmployeeCountRange(employeeCountHint);
       const floorFromEmployees = tierFromEmployees(employeesRange);
       const floorFromMemberLimit = tierFromMemberLimit(memberLimit);
 
-      // 3) AI pricing suggestion
+      // AI pricing suggestion (direct call, no LinkedIn)
       const prompt = `Du är en prisrådgivare för Tivly Enterprise.
 
-MÅL: Föreslå RIMLIGT pris baserat på bolagets sannolika storlek och behov. Om du är osäker, välj hellre för högt än för lågt.
+MÅL: Föreslå RIMLIGT pris baserat på bolagets storlek och behov.
 
-INPUT (KÄLLOR):
+INPUT:
 - Företagsnamn: ${companyName}
-- LinkedIn (om tillgängligt):
-  - URL: ${linkedInData?.companyUrl ?? "okänt"}
-  - Tagline: ${linkedInData?.tagline ?? "okänt"}
-  - Anställda: ${linkedInData?.employees ?? "okänt"}
-- Enterprise-kontekst (internt):
-  - Nuvarande medlemmar i teamet: ${memberCount ?? "okänt"}
-  - Max teamstorlek (memberLimit): ${memberLimit ?? "okänt"}
-  - Admin-notes (om finns): ${companyMetaInfo ? companyMetaInfo.slice(0, 300) : "-"}
+- Om företaget: ${companyAbout || "Ej angivet"}
+- Antal anställda (ca): ${employeeCountHint || "Ej angivet"}
+- Nuvarande medlemmar i teamet: ${memberCount ?? "okänt"}
+- Max teamstorlek (memberLimit): ${memberLimit ?? "okänt"}
 
 PRISSÄTTNING (tiers):
 - Entry (1–5 användare): 2 000 kr/mån
@@ -189,19 +142,20 @@ PRISSÄTTNING (tiers):
 - Scale (21+ användare): 14 900 kr/mån
 
 REGLER:
-- Entry (2 000) får bara föreslås om bolaget sannolikt är mycket litet (<10 anställda) och inga signaler tyder på större behov.
+- Entry (2 000) får bara föreslås om bolaget sannolikt är mycket litet (<10 anställda).
 - Om anställda > 20: minst Growth.
 - Om anställda > 50: minst Core.
+- Om anställda > 100: Scale.
 - Om memberLimit finns: respektera det som stark signal för tier.
 
 Svara ENDAST med JSON (ingen markdown):
 {
   "pricingTier": "Entry|Growth|Core|Scale",
   "suggestedAmount": 2000,
-  "employeeCount": "<t.ex. '200-500' eller 'ca 70'>",
+  "employeeCount": "<antal anställda om känt>",
   "companyInfo": "<1 mening: vad bolaget gör>",
   "reasoning": "<1 mening: varför denna tier>",
-  "factors": ["<kort faktor>", "<kort faktor>", "<kort faktor>"]
+  "factors": ["<kort faktor>", "<kort faktor>"]
 }`;
 
       const aiResponse = await fetch(`${BACKEND_URL}/ai/gemini`, {
@@ -245,23 +199,13 @@ Svara ENDAST med JSON (ingen markdown):
       const finalAmount = PRICING_TIERS[finalTier].price;
 
       const sources: Source[] = [];
-      if (linkedInData?.companyUrl || linkedInData?.employees || linkedInData?.tagline) {
-        sources.push({
-          label: "LinkedIn",
-          url: linkedInData.companyUrl,
-          detail: [linkedInData.tagline, linkedInData.employees].filter(Boolean).join(" • ") || undefined,
-          fetchedAt: linkedInData.fetchedAt,
-          cached: linkedInData.cached,
-        });
-      }
-
-      if (memberLimit !== undefined || memberCount !== undefined || employeeCountHint) {
+      if (memberCount !== undefined || memberLimit !== undefined || employeeCountHint || companyAbout) {
         sources.push({
           label: "Enterprise-inställning",
           detail: [
-            memberCount !== undefined ? `Nuvarande medlemmar: ${memberCount}` : null,
-            memberLimit !== undefined && memberLimit !== null ? `MemberLimit: ${memberLimit}` : memberLimit === null ? "MemberLimit: obegränsat" : null,
-            employeeCountHint ? `Admin-hint anställda: ${employeeCountHint}` : null,
+            memberCount !== undefined ? `Medlemmar: ${memberCount}` : null,
+            memberLimit !== undefined && memberLimit !== null ? `Max: ${memberLimit}` : null,
+            employeeCountHint ? `Anställda: ${employeeCountHint}` : null,
           ]
             .filter(Boolean)
             .join(" • ") || undefined,
@@ -279,14 +223,13 @@ Svara ENDAST med JSON (ingen markdown):
         companyInfo:
           typeof parsed.companyInfo === "string" && parsed.companyInfo.trim()
             ? parsed.companyInfo.trim()
-            : linkedInData?.tagline || undefined,
-        valuation: typeof parsed.approxValuation === "string" ? parsed.approxValuation : undefined,
+            : companyAbout?.slice(0, 100) || undefined,
         employeeCount:
           typeof parsed.employeeCount === "string" && parsed.employeeCount.trim()
             ? parsed.employeeCount.trim()
-            : linkedInData?.employees || employeeCountHint,
+            : employeeCountHint,
         factors: Array.isArray(parsed.factors)
-          ? parsed.factors.map((x: any) => String(x)).filter(Boolean).slice(0, 5)
+          ? parsed.factors.map((x: any) => String(x)).filter(Boolean).slice(0, 4)
           : undefined,
         sources: sources.length ? sources : undefined,
       });
@@ -347,16 +290,16 @@ Svara ENDAST med JSON (ingen markdown):
           {stage === "suggesting" && suggestion && (
             <section className="space-y-3">
               {/* Minimal company hint */}
-              {(suggestion.companyInfo || displayEmployeeCount) && (
-                <div className="text-xs bg-muted/50 rounded-lg p-3 space-y-1.5">
+              {(suggestion.companyInfo || suggestion.employeeCount) && (
+                <div className="text-xs bg-muted/50 rounded-lg p-3 space-y-1">
                   {suggestion.companyInfo && (
                     <div className="text-foreground font-medium line-clamp-2">
                       {suggestion.companyInfo}
                     </div>
                   )}
-                  {displayEmployeeCount && (
+                  {suggestion.employeeCount && (
                     <div className="text-muted-foreground">
-                      Anställda: <span className="font-medium text-foreground">{displayEmployeeCount}</span>
+                      Anställda: <span className="font-medium text-foreground">{suggestion.employeeCount}</span>
                     </div>
                   )}
                 </div>
@@ -374,12 +317,7 @@ Svara ENDAST med JSON (ingen markdown):
                     </span>
                     <span className="text-sm text-muted-foreground">kr/mån</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {suggestion.pricingTier}-nivå
-                    {suggestion.oneTimeAmount && suggestion.oneTimeAmount > 0 && (
-                      <span> + {suggestion.oneTimeAmount.toLocaleString("sv-SE")} kr engång</span>
-                    )}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{suggestion.pricingTier}-nivå</p>
                 </div>
               </div>
 
@@ -388,68 +326,19 @@ Svara ENDAST med JSON (ingen markdown):
                 {suggestion.reasoning}
               </p>
 
-              {/* Details (collapsed by default) */}
-              {(suggestion.factors?.length || suggestion.sources?.length) ? (
-                <details className="rounded-lg border bg-muted/20 p-3">
-                  <summary className="cursor-pointer text-xs font-medium text-muted-foreground select-none">
-                    Visa detaljer
-                  </summary>
-                  <div className="pt-2 space-y-3">
-                    {suggestion.factors && suggestion.factors.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                          Faktorer
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {suggestion.factors.map((factor, i) => (
-                            <span
-                              key={i}
-                              className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                            >
-                              {factor}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {suggestion.sources && suggestion.sources.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                          Källor
-                        </p>
-                        <ul className="space-y-1 text-xs text-muted-foreground">
-                          {suggestion.sources.map((s, i) => (
-                            <li key={i} className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-medium text-foreground">{s.label}</div>
-                                {s.detail && <div className="text-muted-foreground break-words">{s.detail}</div>}
-                                {s.fetchedAt && (
-                                  <div className="text-[10px] text-muted-foreground">
-                                    {new Date(s.fetchedAt).toLocaleString("sv-SE")}
-                                    {typeof s.cached === "boolean" ? (s.cached ? " • cache" : "") : ""}
-                                  </div>
-                                )}
-                              </div>
-                              {s.url && (
-                                <a
-                                  href={s.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                  Länk
-                                </a>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </details>
-              ) : null}
+              {/* Factors (inline, minimal) */}
+              {suggestion.factors && suggestion.factors.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestion.factors.map((factor, i) => (
+                    <span
+                      key={i}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                    >
+                      {factor}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-2 pt-1">
