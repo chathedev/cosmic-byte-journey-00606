@@ -39,9 +39,10 @@ export function InvoiceAISuggestion({
     setError(null);
     
     try {
-      const token = localStorage.getItem('supabase_access_token') || 
-        (await import('@/integrations/supabase/client')).supabase.auth.getSession()
-          .then(r => r.data.session?.access_token);
+      // Get user auth token from Supabase session
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
       const prompt = `Du är en prisrådgivare för Tivly Enterprise. Analysera företagsnamn och föreslå prissättning.
 
@@ -65,7 +66,7 @@ Analysera och föreslå prissättning för: ${companyName}`;
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt,
