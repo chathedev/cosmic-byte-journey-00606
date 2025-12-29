@@ -85,6 +85,7 @@ const MeetingDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSpeakers, setShowSpeakers] = useState(true);
+  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
 
   // Protocol management state
   const [protocolData, setProtocolData] = useState<{
@@ -1571,87 +1572,139 @@ const MeetingDetail = () => {
                   transition={{ delay: 0.15 }}
                   className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
                 >
-                  <div className="px-5 py-4 border-b border-border/30 flex items-center justify-between">
+                  {/* Header - clickable to expand/collapse */}
+                  <button
+                    onClick={() => !isEditing && setIsTranscriptExpanded(!isTranscriptExpanded)}
+                    className="w-full px-5 py-4 border-b border-border/30 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
                         <FileText className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="font-medium text-sm">Transkription</span>
+                      <div className="text-left">
+                        <span className="font-medium text-sm">Transkription</span>
+                        {!isTranscriptExpanded && !isEditing && (
+                          <p className="text-xs text-muted-foreground">
+                            Klicka för att visa hela
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleResetFromASR}
-                        className="gap-1.5 text-xs rounded-full"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Återställ
-                      </Button>
-                    )}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      {isEditing && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleResetFromASR(); }}
+                          className="gap-1.5 text-xs rounded-full"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Återställ
+                        </Button>
+                      )}
+                      {!isEditing && (
+                        <ChevronDown 
+                          className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isTranscriptExpanded ? 'rotate-180' : ''}`} 
+                        />
+                      )}
+                    </div>
+                  </button>
 
-                  <div className="p-5">
-                    {isEditing ? (
-                      <Textarea
-                        value={editedTranscript}
-                        onChange={(e) => handleTranscriptChange(e.target.value)}
-                        className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
-                        placeholder="Redigera transkriptionen..."
-                      />
-                    ) : hasSegments ? (
-                      // Clean linear transcript with speaker attribution
-                      <div className="space-y-0">
-                        {groupedSegments.map((segment, idx) => {
-                          // Use speakerName from reconstructed segments (source of truth) or fallback to lookup
-                          const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
-                          const colorClass = getSpeakerColorClass(segment.speakerId);
-                          const dotClass = getSpeakerDotClass(segment.speakerId);
-                          const textClass = getSpeakerTextClass(segment.speakerId);
-                          const timestamp = formatTimestamp(segment.start);
-                          const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
-                          const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
-                          
-                          return (
-                            <div key={idx}>
-                              {/* Subtle divider between different speakers */}
-                              {showDivider && (
-                                <div className="h-px bg-border/40 my-3" />
-                              )}
-                              
-                              {/* Speaker segment with colored left border */}
-                              <div className={`pl-4 py-2 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
-                                {/* Speaker name and time */}
-                                <div className="flex items-center gap-2 mb-1">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-                                  <span className={`text-xs font-semibold ${textClass}`}>
-                                    {speakerName}
-                                  </span>
-                                  {timestamp && (
-                                    <span className="text-[10px] text-muted-foreground/50 tabular-nums">
-                                      {timestamp}
-                                    </span>
-                                  )}
-                                </div>
+                  {/* Content - collapsible */}
+                  <AnimatePresence initial={false}>
+                    {(isEditing || isTranscriptExpanded) ? (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-5">
+                          {isEditing ? (
+                            <Textarea
+                              value={editedTranscript}
+                              onChange={(e) => handleTranscriptChange(e.target.value)}
+                              className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
+                              placeholder="Redigera transkriptionen..."
+                            />
+                          ) : hasSegments ? (
+                            // Clean linear transcript with speaker attribution
+                            <div className="space-y-0">
+                              {groupedSegments.map((segment, idx) => {
+                                // Use speakerName from reconstructed segments (source of truth) or fallback to lookup
+                                const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
+                                const colorClass = getSpeakerColorClass(segment.speakerId);
+                                const dotClass = getSpeakerDotClass(segment.speakerId);
+                                const textClass = getSpeakerTextClass(segment.speakerId);
+                                const timestamp = formatTimestamp(segment.start);
+                                const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
+                                const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
                                 
-                                {/* Text content */}
-                                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-3.5">
-                                  {segment.text}
-                                </p>
+                                return (
+                                  <div key={idx}>
+                                    {/* Subtle divider between different speakers */}
+                                    {showDivider && (
+                                      <div className="h-px bg-border/40 my-3" />
+                                    )}
+                                    
+                                    {/* Speaker segment with colored left border */}
+                                    <div className={`pl-4 py-2 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
+                                      {/* Speaker name and time */}
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                                        <span className={`text-xs font-semibold ${textClass}`}>
+                                          {speakerName}
+                                        </span>
+                                        {timestamp && (
+                                          <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+                                            {timestamp}
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Text content */}
+                                      <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-3.5">
+                                        {segment.text}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            // Fallback to plain text display
+                            <div className="prose prose-sm max-w-none dark:prose-invert">
+                              <div className="space-y-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                                {displayTranscript}
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      // Fallback to plain text display
-                      <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <div className="space-y-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                          {displayTranscript}
+                          )}
                         </div>
-                      </div>
+                      </motion.div>
+                    ) : (
+                      // Collapsed preview
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="p-5"
+                      >
+                        <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                          {hasSegments && groupedSegments.length > 0 
+                            ? groupedSegments.slice(0, 2).map(s => s.text).join(' ').slice(0, 250) + '...'
+                            : displayTranscript?.slice(0, 250) + '...'
+                          }
+                        </div>
+                        <button
+                          onClick={() => setIsTranscriptExpanded(true)}
+                          className="mt-3 text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                        >
+                          Visa hela transkriptionen
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                      </motion.div>
                     )}
-                  </div>
+                  </AnimatePresence>
                 </motion.div>
 
                 {/* Protocol Section - Show if protocol exists */}
