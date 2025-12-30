@@ -539,7 +539,7 @@ export default function AdminEnterpriseBilling() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base font-medium">Lägg till betalning</CardTitle>
-                  <CardDescription>Lägg till poster och välj om de är engångsbetalningar eller återkommande</CardDescription>
+                  <CardDescription>Lägg till poster och välj om de är engångsbetalningar eller återkommande. Alla priser exkl. moms.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
@@ -583,7 +583,7 @@ export default function AdminEnterpriseBilling() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                placeholder="Belopp (SEK)"
+                                placeholder="Belopp exkl. moms (SEK)"
                                 value={item.amount}
                                 onChange={(e) => updateLineItem(index, 'amount', e.target.value)}
                                 required
@@ -643,30 +643,34 @@ export default function AdminEnterpriseBilling() {
                       <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
                         {getOneTimeTotal() > 0 && (
                           <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Engångsbelopp</span>
+                            <span className="text-muted-foreground">Engångsbelopp (exkl. moms)</span>
                             <span className="font-medium">{getOneTimeTotal().toLocaleString('sv-SE')} kr</span>
                           </div>
                         )}
                         {getRecurringTotal() > 0 && (
                           <div className="flex justify-between items-center text-sm">
                             <span className="text-muted-foreground">
-                              Återkommande ({recurringInterval === 'monthly' ? 'månad' : 'år'})
+                              Återkommande ({recurringInterval === 'monthly' ? 'månad' : 'år'}) (exkl. moms)
                             </span>
                             <span className="font-medium">{getRecurringTotal().toLocaleString('sv-SE')} kr</span>
                           </div>
                         )}
-                        {getOneTimeTotal() > 0 && getRecurringTotal() > 0 && (
-                          <>
-                            <div className="border-t pt-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium">Första fakturan</span>
-                                <span className="text-lg font-semibold">
-                                  {getTotalAmount().toLocaleString('sv-SE')} kr
-                                </span>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                        <div className="border-t pt-2 mt-2 space-y-1">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Subtotal exkl. moms</span>
+                            <span className="font-medium">{getTotalAmount().toLocaleString('sv-SE')} kr</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Moms (25%)</span>
+                            <span className="font-medium">{(getTotalAmount() * 0.25).toLocaleString('sv-SE')} kr</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="text-sm font-medium">Totalt inkl. moms</span>
+                            <span className="text-lg font-semibold">
+                              {(getTotalAmount() * 1.25).toLocaleString('sv-SE')} kr
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
 
