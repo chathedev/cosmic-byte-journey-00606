@@ -727,7 +727,7 @@ export default function AdminEnterpriseBilling() {
                           <TableRow>
                             <TableHead>Skapad</TableHead>
                             <TableHead>Typ</TableHead>
-                            <TableHead className="text-right">Belopp</TableHead>
+                            <TableHead className="text-right">Belopp (inkl. moms)</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Länkar</TableHead>
                           </TableRow>
