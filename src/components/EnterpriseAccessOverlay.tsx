@@ -599,92 +599,92 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
   // Payment success screen
   if (paymentSuccess) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6">
-        <div className="text-center space-y-6 max-w-sm">
-          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
-            <CheckCircle2 className="w-8 h-8 text-green-500" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-xl font-semibold tracking-tight">Betalning genomförd!</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Tack för din betalning. Ett kvitto skickas till din e-post.
-            </p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Sidan uppdateras automatiskt...
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      <div className="fixed inset-0 z-[9999] bg-background overflow-y-auto">
+        <div className="min-h-full flex items-center justify-center p-6">
+          <div className="text-center space-y-6 max-w-sm w-full">
+            <div className="w-20 h-20 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
+              <CheckCircle2 className="w-10 h-10 text-green-500" />
+            </div>
+            <div className="space-y-3">
+              <h1 className="text-2xl font-semibold tracking-tight">Betalning genomförd!</h1>
+              <p className="text-muted-foreground leading-relaxed">
+                Tack för din betalning. Ett kvitto skickas till din e-post.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Uppdaterar...</span>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // Payment form screen
+  // Payment form screen - fully scrollable
   if (showPaymentForm && clientSecret && stripePromise) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6 overflow-y-auto">
-        <div className="w-full max-w-md">
-          {/* Header */}
-          <div className="bg-muted/50 border border-border rounded-t-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-                  <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
+      <div className="fixed inset-0 z-[9999] bg-background overflow-y-auto">
+        <div className="min-h-full py-8 px-4 sm:px-6">
+          <div className="w-full max-w-md mx-auto">
+            {/* Back button */}
+            <button
+              onClick={handleBackToOverlay}
+              className="mb-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+              <span>Tillbaka</span>
+            </button>
+
+            {/* Header Card */}
+            <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-border rounded-2xl p-6 mb-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 rounded-xl bg-primary/10 overflow-hidden flex items-center justify-center shadow-sm">
+                  <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-2" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-foreground">Tivly Enterprise</h2>
+                  <h1 className="text-lg font-semibold text-foreground">Tivly Enterprise</h1>
                   {accessState.type === 'unpaid_invoice' && (
-                    <p className="text-xs text-muted-foreground">{accessState.companyName}</p>
+                    <p className="text-sm text-muted-foreground">{accessState.companyName}</p>
                   )}
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleBackToOverlay}
-                className="h-8 w-8 rounded-full"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
 
-            {/* Amount display */}
-            <div className="text-center py-2">
-              <p className="text-3xl font-bold text-foreground">
-                {safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'} kr
-              </p>
-              <Badge variant="secondary" className="mt-2">
-                <CreditCard className="h-3 w-3 mr-1.5" />
-                {liveBilling?.latestInvoice?.billingType === 'monthly' ? 'Månadsbetalning' :
-                 liveBilling?.latestInvoice?.billingType === 'yearly' ? 'Årsbetalning' :
-                 liveBilling?.latestInvoice?.billingType === 'one_time' ? 'Engångsbetalning' :
-                 'Obetald faktura'}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Payment Form */}
-          <div className="bg-background border-x border-b border-border rounded-b-xl p-6">
-            {/* Cost breakdown */}
-            <div className="mb-6 p-4 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2 mb-3">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Kostnadssammanställning</span>
+              {/* Amount display */}
+              <div className="text-center py-4 px-6 bg-background/60 rounded-xl backdrop-blur-sm">
+                <p className="text-sm text-muted-foreground mb-1">Att betala</p>
+                <p className="text-4xl font-bold text-foreground tracking-tight">
+                  {safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'}
+                  <span className="text-2xl font-medium ml-1">kr</span>
+                </p>
+                <Badge variant="secondary" className="mt-3">
+                  <CreditCard className="h-3 w-3 mr-1.5" />
+                  {liveBilling?.latestInvoice?.billingType === 'monthly' ? 'Månadsbetalning' :
+                   liveBilling?.latestInvoice?.billingType === 'yearly' ? 'Årsbetalning' :
+                   liveBilling?.latestInvoice?.billingType === 'one_time' ? 'Engångsbetalning' :
+                   'Faktura'}
+                </Badge>
               </div>
-              <div className="space-y-2 text-sm">
+            </div>
+
+            {/* Cost breakdown */}
+            <div className="bg-muted/30 border border-border rounded-xl p-5 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Sammanställning</span>
+              </div>
+              <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Belopp exkl. moms</span>
-                  <span className="text-foreground">{netAmount > 0 ? netAmount.toLocaleString('sv-SE') : '—'} kr</span>
+                  <span className="text-foreground font-medium">{netAmount > 0 ? netAmount.toLocaleString('sv-SE') : '—'} kr</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Moms (25%)</span>
-                  <span className="text-foreground">{vatAmount > 0 ? vatAmount.toLocaleString('sv-SE') : '—'} kr</span>
+                  <span className="text-foreground font-medium">{vatAmount > 0 ? vatAmount.toLocaleString('sv-SE') : '—'} kr</span>
                 </div>
-                <Separator className="my-2" />
-                <div className="flex justify-between font-semibold">
-                  <span className="text-foreground">Totalt att betala</span>
+                <Separator className="my-3" />
+                <div className="flex justify-between text-base font-semibold">
+                  <span className="text-foreground">Totalt</span>
                   <span className="text-primary">{safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'} kr</span>
                 </div>
               </div>
@@ -692,120 +692,177 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
 
             {/* Error message */}
             {paymentError && (
-              <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-                {paymentError}
+              <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                <span>{paymentError}</span>
               </div>
             )}
 
             {/* Stripe Payment Form */}
-            <Elements 
-              stripe={stripePromise} 
-              options={{
-                clientSecret,
-                appearance: {
-                  theme: 'stripe',
-                  variables: {
-                    colorPrimary: 'hsl(173, 80%, 40%)',
-                    borderRadius: '8px',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
+            <div className="bg-background border border-border rounded-xl p-6 mb-6">
+              <h2 className="text-sm font-medium text-foreground mb-4">Betalningsuppgifter</h2>
+              <Elements 
+                stripe={stripePromise} 
+                options={{
+                  clientSecret,
+                  appearance: {
+                    theme: 'stripe',
+                    variables: {
+                      colorPrimary: 'hsl(173, 80%, 40%)',
+                      borderRadius: '10px',
+                      fontFamily: 'system-ui, -apple-system, sans-serif',
+                      spacingUnit: '4px',
+                    },
+                    rules: {
+                      '.Label': {
+                        color: 'hsl(var(--foreground))',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                      },
+                      '.Input': {
+                        borderColor: 'hsl(var(--border))',
+                        boxShadow: 'none',
+                        padding: '12px',
+                      },
+                      '.Input:focus': {
+                        borderColor: 'hsl(173, 80%, 40%)',
+                        boxShadow: '0 0 0 2px hsl(173, 80%, 40%, 0.15)',
+                      },
+                      '.Tab': {
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px',
+                      },
+                      '.Tab--selected': {
+                        borderColor: 'hsl(173, 80%, 40%)',
+                        color: 'hsl(173, 80%, 40%)',
+                      },
+                    },
                   },
-                  rules: {
-                    '.Label': {
-                      color: 'hsl(var(--foreground))',
-                      marginBottom: '8px',
-                    },
-                    '.Input': {
-                      borderColor: 'hsl(var(--border))',
-                      boxShadow: 'none',
-                    },
-                    '.Input:focus': {
-                      borderColor: 'hsl(173, 80%, 40%)',
-                      boxShadow: '0 0 0 1px hsl(173, 80%, 40%)',
-                    },
-                    '.Tab': {
-                      borderColor: 'hsl(var(--border))',
-                    },
-                    '.Tab--selected': {
-                      borderColor: 'hsl(173, 80%, 40%)',
-                      color: 'hsl(173, 80%, 40%)',
-                    },
-                  },
-                },
-                loader: 'auto',
-              }}
-            >
-              <InlinePaymentForm 
-                onSuccess={handlePaymentSuccess}
-                onError={setPaymentError}
-                isProcessing={isProcessing}
-                setIsProcessing={setIsProcessing}
-                amount={paymentAmount}
-              />
-            </Elements>
-
-            {/* Terms disclaimer */}
-            <Separator className="my-6" />
-            <p className="text-xs text-muted-foreground text-center">
-              Genom att slutföra betalningen godkänner du{' '}
-              <a 
-                href="https://www.tivly.se/enterprise-villkor" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                  loader: 'auto',
+                }}
               >
-                Tivly Enterprise-villkor
-              </a>
-            </p>
+                <InlinePaymentForm 
+                  onSuccess={handlePaymentSuccess}
+                  onError={setPaymentError}
+                  isProcessing={isProcessing}
+                  setIsProcessing={setIsProcessing}
+                  amount={paymentAmount}
+                />
+              </Elements>
+            </div>
+
+            {/* Terms and security footer */}
+            <div className="text-center space-y-4 pb-8">
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Shield className="h-4 w-4" />
+                <span>Säker och krypterad betalning via Stripe</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Genom att slutföra betalningen godkänner du{' '}
+                <a 
+                  href="https://www.tivly.se/enterprise-villkor" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Tivly Enterprise-villkor
+                </a>
+              </p>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // Enhanced unpaid invoice / blocked access screen
   return (
-    <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6">
-      <div className="text-center space-y-6 max-w-sm">
-        <div className="w-14 h-14 mx-auto rounded-full bg-muted flex items-center justify-center">
-          <IconComponent className="w-7 h-7 text-muted-foreground" />
-        </div>
-
-        <div className="space-y-2">
-          <h1 className="text-xl font-semibold tracking-tight">{content.title}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">{content.message}</p>
-          <p className="text-sm text-muted-foreground leading-relaxed">{content.action}</p>
-        </div>
-
-        {/* Error message */}
-        {paymentError && (
-          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {paymentError}
+    <div className="fixed inset-0 z-[9999] bg-background overflow-y-auto">
+      <div className="min-h-full flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 overflow-hidden flex items-center justify-center shadow-sm">
+              <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-3" />
+            </div>
           </div>
-        )}
 
-        {content.showPayButton && (
-          <Button
-            onClick={handlePayNow}
-            disabled={isLoadingPayment}
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium"
-          >
-            {isLoadingPayment ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Laddar betalning...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-4 h-4" />
-                Betala nu
-              </>
+          {/* Main card */}
+          <div className="bg-gradient-to-br from-muted/50 via-muted/30 to-muted/50 border border-border rounded-2xl p-8 text-center">
+            {/* Icon */}
+            <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 flex items-center justify-center mb-6">
+              <IconComponent className="w-8 h-8 text-amber-500" />
+            </div>
+
+            {/* Content */}
+            <div className="space-y-3 mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{content.title}</h1>
+              <p className="text-muted-foreground leading-relaxed">{content.message}</p>
+              
+              {/* Show amount if available */}
+              {accessState.type === 'unpaid_invoice' && accessState.amountDue && accessState.amountDue > 0 && (
+                <div className="py-4 px-6 bg-background/60 rounded-xl mt-4">
+                  <p className="text-sm text-muted-foreground mb-1">Belopp att betala</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {accessState.amountDue.toLocaleString('sv-SE')}
+                    <span className="text-lg font-medium ml-1">kr</span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Error message */}
+            {paymentError && (
+              <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start gap-3 text-left">
+                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                <span>{paymentError}</span>
+              </div>
             )}
-          </Button>
-        )}
 
-        <div className="pt-4 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            Alla möten och data är säkrade och kommer att vara tillgängliga igen när tillgången förnyas.
-          </p>
+            {/* Action button */}
+            {content.showPayButton && (
+              <Button
+                onClick={handlePayNow}
+                disabled={isLoadingPayment}
+                size="lg"
+                className="w-full h-14 text-base font-medium rounded-xl shadow-lg shadow-primary/20"
+              >
+                {isLoadingPayment ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Laddar betalning...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Betala nu
+                  </>
+                )}
+              </Button>
+            )}
+
+            {/* Action text if no button */}
+            {!content.showPayButton && (
+              <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4">
+                {content.action}
+              </p>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 text-xs text-muted-foreground">
+              <Shield className="h-3.5 w-3.5" />
+              <span>Alla möten och data är säkrade</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              Kontakta{' '}
+              <a href="mailto:support@tivly.se" className="text-primary hover:underline">
+                support@tivly.se
+              </a>
+              {' '}vid frågor
+            </p>
+          </div>
         </div>
       </div>
     </div>
