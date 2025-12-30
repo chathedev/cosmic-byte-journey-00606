@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { apiClient } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, ExternalLink, CheckCircle, Clock, AlertCircle, XCircle } from "lucide-react";
-import tivlyLogo from "@/assets/tivly-logo.png";
+import { FileText, ExternalLink, CheckCircle, Clock, AlertCircle, XCircle, ArrowLeft } from "lucide-react";
 
 interface Invoice {
   id: string;
@@ -65,11 +64,9 @@ export default function BillingInvoices() {
 
       try {
         setLoading(true);
-        // Use enterprise/me endpoint to get billing history for the member
         const response = await apiClient.getMyEnterpriseMembership();
         const billingHistory = (response as any)?.company?.billingHistory || [];
         
-        // Sort by date descending
         const sorted = billingHistory.sort((a: any, b: any) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -90,7 +87,7 @@ export default function BillingInvoices() {
 
   // Not logged in
   if (!authLoading && !user) {
-    return null; // Will be redirected by parent
+    return null;
   }
 
   // Not enterprise member
@@ -111,31 +108,35 @@ export default function BillingInvoices() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-              <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
-            </div>
-            <div>
-              <h1 className="font-semibold text-foreground">Fakturering</h1>
-              {enterpriseMembership?.company?.name && (
-                <p className="text-xs text-muted-foreground">{enterpriseMembership.company.name}</p>
-              )}
-            </div>
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
+      {/* Header with back button */}
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => navigate('/')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Tillbaka
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Fakturering</h1>
+            {enterpriseMembership?.company?.name && (
+              <p className="text-muted-foreground text-sm mt-1">{enterpriseMembership.company.name}</p>
+            )}
           </div>
           <Badge variant="outline" className="bg-primary/10 border-primary/20 text-primary">
             Enterprise
           </Badge>
         </div>
-      </header>
 
-      {/* Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Dina fakturor</h2>
+          <h2 className="text-lg font-semibold text-foreground">Dina fakturor</h2>
           <p className="text-muted-foreground text-sm mt-1">
             Hantera och betala dina enterprise-fakturor
           </p>
@@ -184,7 +185,7 @@ export default function BillingInvoices() {
                 <Card 
                   key={invoice.id} 
                   className={`transition-all hover:shadow-md ${canPay ? 'cursor-pointer hover:border-primary/50' : ''}`}
-                  onClick={() => canPay && navigate(`/invoices/${invoice.id}`)}
+                  onClick={() => navigate(`/billing/invoices/${invoice.id}`)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
@@ -227,7 +228,7 @@ export default function BillingInvoices() {
                             className="gap-1.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/invoices/${invoice.id}`);
+                              navigate(`/billing/invoices/${invoice.id}`);
                             }}
                           >
                             Visa
@@ -251,7 +252,7 @@ export default function BillingInvoices() {
             </a>
           </p>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

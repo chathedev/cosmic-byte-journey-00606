@@ -15,15 +15,9 @@ import {
   Clock, 
   AlertCircle, 
   XCircle, 
-  Shield,
-  Loader2
+  CreditCard
 } from "lucide-react";
-import { loadStripe, Stripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import tivlyLogo from "@/assets/tivly-logo.png";
-
-// Get Stripe publishable key from backend or use default
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_51RBmwME0yFmyBl81G1NTIqm31T3hPUmYvdYQl5QLa3WKwrJhqNpHKYCLpLNjg0RfN9xZiS89s5t1z0SnDzk1lBQy00BjPV4ERK';
+import { InvoicePaymentDialog } from "@/components/InvoicePaymentDialog";
 
 interface InvoiceDetail {
   id: string;
@@ -69,85 +63,6 @@ const formatBillingType = (type: string) => {
   }
 };
 
-// Payment Form Component
-function PaymentForm({ 
-  onSuccess, 
-  onError,
-  isProcessing,
-  setIsProcessing 
-}: { 
-  onSuccess: () => void; 
-  onError: (msg: string) => void;
-  isProcessing: boolean;
-  setIsProcessing: (v: boolean) => void;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: window.location.href,
-        },
-        redirect: 'if_required',
-      });
-
-      if (error) {
-        onError(error.message || 'Betalningen misslyckades');
-        setIsProcessing(false);
-      } else if (paymentIntent?.status === 'succeeded') {
-        onSuccess();
-      } else {
-        // Payment requires additional action or is processing
-        setIsProcessing(false);
-      }
-    } catch (err: any) {
-      onError(err.message || 'Ett fel uppstod');
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement 
-        options={{
-          layout: 'tabs',
-        }}
-      />
-      
-      <Button 
-        type="submit" 
-        className="w-full h-12 text-base font-medium"
-        disabled={!stripe || !elements || isProcessing}
-      >
-        {isProcessing ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Bearbetar...
-          </>
-        ) : (
-          'Slutför betalning'
-        )}
-      </Button>
-      
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        <Shield className="h-3.5 w-3.5" />
-        <span>Säker betalning med kryptering</span>
-      </div>
-    </form>
-  );
-}
-
 export default function BillingInvoiceDetail() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
   const { user, isLoading: authLoading } = useAuth();
@@ -157,15 +72,7 @@ export default function BillingInvoiceDetail() {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-
-  // Initialize Stripe
-  useEffect(() => {
-    setStripePromise(loadStripe(STRIPE_PUBLISHABLE_KEY));
-  }, []);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   // Fetch invoice details
   const fetchInvoice = useCallback(async () => {
@@ -175,11 +82,9 @@ export default function BillingInvoiceDetail() {
 
     try {
       setLoading(true);
-      // Get billing history from enterprise membership
-        const response = await apiClient.getMyEnterpriseMembership();
+      const response = await apiClient.getMyEnterpriseMembership();
       const billingHistory = (response as any)?.company?.billingHistory || [];
       
-      // Find the specific invoice
       const found = billingHistory.find((inv: any) => inv.id === invoiceId);
       
       if (found) {
@@ -204,38 +109,10 @@ export default function BillingInvoiceDetail() {
     }
   }, [user, authLoading, subLoading, fetchInvoice]);
 
-  // Poll for payment status after payment
-  useEffect(() => {
-    if (!paymentSuccess || !invoice) return;
-
-    const pollStatus = async () => {
-      try {
-        const response = await apiClient.getMyEnterpriseMembership();
-        const billingHistory = (response as any)?.company?.billingHistory || [];
-        const updated = billingHistory.find((inv: any) => inv.id === invoiceId);
-        
-        if (updated && updated.status.toLowerCase() === 'paid') {
-          setInvoice(prev => prev ? { ...prev, status: 'paid' } : null);
-        }
-      } catch (err) {
-        console.error('Failed to poll status:', err);
-      }
-    };
-
-    const interval = setInterval(pollStatus, 2000);
-    pollStatus();
-    
-    return () => clearInterval(interval);
-  }, [paymentSuccess, invoice, invoiceId]);
-
-  const handlePaymentSuccess = () => {
-    setPaymentSuccess(true);
-    setIsProcessing(false);
-  };
-
-  const handlePaymentError = (msg: string) => {
-    setPaymentError(msg);
-    setIsProcessing(false);
+  const handlePaymentSuccess = async () => {
+    // Refresh invoice data after successful payment
+    await fetchInvoice();
+    setPaymentDialogOpen(false);
   };
 
   // Not logged in
@@ -269,31 +146,21 @@ export default function BillingInvoiceDetail() {
   const vatAmount = invoice ? invoice.amountSek - netAmount : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => navigate('/invoices')}
-              className="shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-                <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-0.5" />
-              </div>
-              <span className="font-semibold text-foreground">Faktura</span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => navigate('/billing/invoices')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Tillbaka till fakturor
+          </Button>
         </div>
-      </header>
 
-      {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 py-8">
         {loading ? (
           <Card>
             <CardContent className="p-6 space-y-4">
@@ -310,7 +177,7 @@ export default function BillingInvoiceDetail() {
               <Button 
                 variant="outline" 
                 className="mt-4"
-                onClick={() => navigate('/invoices')}
+                onClick={() => navigate('/billing/invoices')}
               >
                 Tillbaka till fakturor
               </Button>
@@ -392,17 +259,7 @@ export default function BillingInvoiceDetail() {
             </Card>
 
             {/* Payment Section */}
-            {paymentSuccess ? (
-              <Card className="border-green-500/30 bg-green-500/5">
-                <CardContent className="pt-6 text-center py-8">
-                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-green-600 mb-2">Betalning genomförd!</h3>
-                  <p className="text-muted-foreground">
-                    Tack för din betalning. Du får ett kvitto via e-post.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : isPaid ? (
+            {isPaid ? (
               <Card className="border-green-500/30 bg-green-500/5">
                 <CardContent className="pt-6 text-center py-8">
                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
@@ -412,39 +269,22 @@ export default function BillingInvoiceDetail() {
                   </p>
                 </CardContent>
               </Card>
-            ) : canPay && stripePromise ? (
+            ) : canPay ? (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Betala faktura</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {paymentError && (
-                    <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-                      {paymentError}
-                    </div>
-                  )}
-                  
-                  <Elements 
-                    stripe={stripePromise} 
-                    options={{
-                      clientSecret: invoice.paymentIntentClientSecret,
-                      appearance: {
-                        theme: 'stripe',
-                        variables: {
-                          colorPrimary: 'hsl(173, 80%, 40%)',
-                          borderRadius: '8px',
-                        },
-                      },
-                      loader: 'auto',
-                    }}
+                <CardContent className="pt-6 text-center py-8">
+                  <CreditCard className="h-12 w-12 text-primary mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Redo att betala</h3>
+                  <p className="text-muted-foreground text-sm mb-6">
+                    Klicka på knappen nedan för att slutföra betalningen säkert.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    className="gap-2 px-8"
+                    onClick={() => setPaymentDialogOpen(true)}
                   >
-                    <PaymentForm 
-                      onSuccess={handlePaymentSuccess}
-                      onError={handlePaymentError}
-                      isProcessing={isProcessing}
-                      setIsProcessing={setIsProcessing}
-                    />
-                  </Elements>
+                    <CreditCard className="h-4 w-4" />
+                    Betala {invoice.amountSek.toLocaleString('sv-SE')} kr
+                  </Button>
                 </CardContent>
               </Card>
             ) : invoice.status.toLowerCase() === 'void' || invoice.status.toLowerCase() === 'uncollectible' ? (
@@ -473,7 +313,20 @@ export default function BillingInvoiceDetail() {
             </p>
           </div>
         ) : null}
-      </main>
+      </div>
+
+      {/* Payment Dialog */}
+      {invoice && canPay && (
+        <InvoicePaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          clientSecret={invoice.paymentIntentClientSecret!}
+          amount={invoice.amountSek}
+          companyName={invoice.companyName}
+          invoiceType={invoice.type}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }
