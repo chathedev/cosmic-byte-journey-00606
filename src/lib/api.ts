@@ -1780,6 +1780,40 @@ class ApiClient {
     return response.json();
   }
 
+  // Member-safe invoice detail endpoint - fetches fresh paymentIntentClientSecret
+  async getEnterpriseInvoiceDetail(invoiceId: string): Promise<{
+    success: boolean;
+    invoice: {
+      id: string;
+      invoiceId: string;
+      status: string;
+      amountSek: number;
+      oneTimeAmountSek?: number;
+      billingType: 'one_time' | 'monthly' | 'yearly';
+      createdAt: string;
+      dueAt?: string;
+      paymentIntentClientSecret?: string;
+      paymentIntentId?: string;
+      paymentIntentStatus?: string;
+      subscriptionId?: string;
+      companyName?: string;
+      combineOneTime?: boolean;
+      hostedInvoiceUrl?: string;
+      hostedInvoicePath?: string;
+      stripeInvoiceUrl?: string;
+    };
+  }> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/billing/${invoiceId}`,
+      { suppressAuthRedirect: true }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch invoice' }));
+      throw new Error(error.error || error.message || 'Failed to fetch invoice details');
+    }
+    return response.json();
+  }
+
   async cancelEnterpriseSubscription(
     companyId: string, 
     subscriptionId: string, 
