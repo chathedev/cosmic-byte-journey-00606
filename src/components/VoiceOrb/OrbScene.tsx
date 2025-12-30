@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { Float } from '@react-three/drei';
 import { VoiceOrb } from './VoiceOrb';
-import { Suspense, useRef, useEffect, useState } from 'react';
+import { Suspense, useRef, useEffect, useState, useCallback } from 'react';
 
 interface OrbSceneProps {
   stream: MediaStream | null;
@@ -9,44 +9,85 @@ interface OrbSceneProps {
   size?: number;
 }
 
-export function OrbScene({ stream, isActive, size = 120 }: OrbSceneProps) {
+export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
   const [volume, setVolume] = useState(0);
   const [frequency, setFrequency] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const smoothedVolumeRef = useRef(0);
 
+  const cleanup = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (sourceRef.current) {
+      try {
+        sourceRef.current.disconnect();
+      } catch {}
+      sourceRef.current = null;
+    }
+    if (analyserRef.current) {
+      try {
+        analyserRef.current.disconnect();
+      } catch {}
+      analyserRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        audioContextRef.current.close();
+      } catch {}
+      audioContextRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!stream || !isActive) {
-      setVolume(0);
-      setFrequency(0);
-      return;
+      cleanup();
+      // Gentle breathing animation when inactive
+      let idleFrame: number;
+      const idleAnimate = () => {
+        const t = Date.now() * 0.001;
+        const breathe = (Math.sin(t * 0.5) + 1) * 0.03;
+        setVolume(breathe);
+        idleFrame = requestAnimationFrame(idleAnimate);
+      };
+      idleAnimate();
+      return () => cancelAnimationFrame(idleFrame);
     }
 
     const setupAudio = async () => {
       try {
+        // Create new audio context
         const audioContext = new AudioContext();
         audioContextRef.current = audioContext;
 
+        // Resume if suspended
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.9;
+        analyser.smoothingTimeConstant = 0.85;
         analyserRef.current = analyser;
 
         const source = audioContext.createMediaStreamSource(stream);
+        sourceRef.current = source;
         source.connect(analyser);
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         const frequencyArray = new Uint8Array(analyser.frequencyBinCount);
 
         const analyze = () => {
-          if (!analyserRef.current) return;
+          if (!analyserRef.current || !isActive) return;
 
           analyserRef.current.getByteTimeDomainData(dataArray);
           analyserRef.current.getByteFrequencyData(frequencyArray);
 
-          // Calculate RMS volume
+          // Calculate RMS volume with more sensitivity
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             const amplitude = (dataArray[i] - 128) / 128;
@@ -54,11 +95,12 @@ export function OrbScene({ stream, isActive, size = 120 }: OrbSceneProps) {
           }
           const rms = Math.sqrt(sum / dataArray.length);
           
-          // Extra smooth volume changes
-          smoothedVolumeRef.current += (rms - smoothedVolumeRef.current) * 0.05;
+          // More responsive volume with minimum breathing
+          const targetVolume = Math.max(0.02, rms * 2.5);
+          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.15;
           setVolume(smoothedVolumeRef.current);
 
-          // Get dominant frequency
+          // Get dominant frequency for color/shape variations
           let maxFreqIndex = 0;
           let maxFreqValue = 0;
           for (let i = 0; i < frequencyArray.length; i++) {
@@ -80,39 +122,34 @@ export function OrbScene({ stream, isActive, size = 120 }: OrbSceneProps) {
 
     setupAudio();
 
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
-  }, [stream, isActive]);
+    return cleanup;
+  }, [stream, isActive, cleanup]);
 
   return (
     <div style={{ width: size, height: size }} className="relative">
       <Canvas
-        camera={{ position: [0, 0, 4], fov: 50 }}
+        camera={{ position: [0, 0, 3.5], fov: 45 }}
         dpr={[1, 2]}
         className="w-full h-full"
         style={{ background: 'transparent' }}
+        gl={{ alpha: true, antialias: true }}
       >
         <Suspense fallback={null}>
-          <ambientLight intensity={0.4} />
-          <pointLight position={[5, 5, 5]} intensity={0.5} color="#0099ff" />
-          <pointLight position={[-5, -5, -5]} intensity={0.3} color="#0066cc" />
+          <ambientLight intensity={0.5} />
+          <pointLight position={[3, 3, 3]} intensity={0.6} color="#0099ff" />
+          <pointLight position={[-3, -3, -3]} intensity={0.4} color="#0066cc" />
+          <pointLight position={[0, 3, 0]} intensity={0.3} color="#ffffff" />
           
           <Float
-            speed={0.5}
-            rotationIntensity={0.1}
-            floatIntensity={0.15}
-            floatingRange={[-0.03, 0.03]}
+            speed={0.3}
+            rotationIntensity={0.08}
+            floatIntensity={0.1}
+            floatingRange={[-0.02, 0.02]}
           >
             <VoiceOrb
               volume={volume}
               frequency={frequency}
-              isSpeaking={isActive && volume > 0.01}
+              isSpeaking={isActive && volume > 0.03}
             />
           </Float>
         </Suspense>
