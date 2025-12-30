@@ -175,8 +175,8 @@ Svara ENDAST med ren JSON (ingen markdown, inga backticks):
         },
         body: JSON.stringify({
           prompt,
-          model: "gemini-2.5-flash",
-          costUsd: 0.0008,
+          model: "gemini-2.5-flash-lite",
+          costUsd: 0.0003,
         }),
       });
 
@@ -337,9 +337,15 @@ Svara ENDAST med ren JSON (ingen markdown, inga backticks):
                     <span className="text-xl font-bold">
                       {suggestion.monthlyAmount.toLocaleString("sv-SE")}
                     </span>
-                    <span className="text-sm text-muted-foreground">kr/mån</span>
+                    <span className="text-sm text-muted-foreground">kr/mån exkl. moms</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{suggestion.pricingTier}-nivå</p>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-sm font-medium text-primary">
+                      {Math.round(suggestion.monthlyAmount * 1.25).toLocaleString("sv-SE")}
+                    </span>
+                    <span className="text-xs text-muted-foreground">kr/mån inkl. moms (25%)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{suggestion.pricingTier}-nivå</p>
                 </div>
               </div>
 
