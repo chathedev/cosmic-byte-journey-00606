@@ -228,16 +228,20 @@ export default function AdminEnterpriseBilling() {
       let billingType: 'one_time' | 'monthly' | 'yearly';
       let requestData: any;
 
+      // Add 25% VAT to all amounts (B2B Swedish VAT)
+      const oneTimeTotalWithVat = Math.round(oneTimeTotal * 1.25);
+      const recurringTotalWithVat = Math.round(recurringTotal * 1.25);
+
       if (recurringTotal > 0) {
         // Has recurring items, use monthly/yearly with optional one-time add-on
         billingType = recurringInterval;
         requestData = {
           billingType,
-          amountSek: recurringTotal,
+          amountSek: recurringTotalWithVat,
         };
         
         if (oneTimeTotal > 0) {
-          requestData.oneTimeAmountSek = oneTimeTotal;
+          requestData.oneTimeAmountSek = oneTimeTotalWithVat;
           requestData.combineOneTime = true;
         }
       } else {
@@ -245,7 +249,7 @@ export default function AdminEnterpriseBilling() {
         billingType = 'one_time';
         requestData = {
           billingType,
-          amountSek: oneTimeTotal,
+          amountSek: oneTimeTotalWithVat,
         };
       }
 
