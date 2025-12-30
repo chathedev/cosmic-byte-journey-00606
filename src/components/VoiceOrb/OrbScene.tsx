@@ -93,12 +93,12 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
           }
           const rms = Math.sqrt(sum / dataArray.length);
           
-          // Much more sensitive - amplify small sounds
-          const amplifiedVolume = Math.pow(rms, 0.6) * 4; // Power curve makes quiet sounds visible
-          const targetVolume = Math.max(0.03, Math.min(1, amplifiedVolume));
+          // Balanced sensitivity
+          const amplifiedVolume = Math.pow(rms, 0.7) * 3;
+          const targetVolume = Math.max(0.02, Math.min(1, amplifiedVolume));
           
-          // Faster response
-          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.3;
+          // Smooth response
+          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.25;
           setVolume(smoothedVolumeRef.current);
 
           // Get dominant frequency
