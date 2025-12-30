@@ -68,7 +68,7 @@ const formatBillingType = (type: string) => {
 // Helper to convert öre (cents) to kronor and format
 // Stripe amounts are in smallest currency unit (öre for SEK)
 const formatAmountSEK = (amountInOre: number | undefined | null): string => {
-  if (typeof amountInOre !== 'number' || amountInOre <= 0) return '—';
+  if (typeof amountInOre !== 'number' || amountInOre <= 0) return '0,00';
   const kronor = amountInOre / 100;
   return kronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
@@ -77,6 +77,22 @@ const formatAmountSEK = (amountInOre: number | undefined | null): string => {
 const oreToKronor = (amountInOre: number | undefined | null): number => {
   if (typeof amountInOre !== 'number') return 0;
   return amountInOre / 100;
+};
+
+// Format date safely
+const formatDate = (dateStr: string | undefined | null): string => {
+  if (!dateStr) return '—';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('sv-SE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return '—';
+  }
 };
 
 export default function BillingInvoiceDetail() {
@@ -109,16 +125,20 @@ export default function BillingInvoiceDetail() {
       const response = await apiClient.getEnterpriseInvoiceDetail(invoiceId);
       
       if (response.success && response.invoice) {
-        const inv = response.invoice;
+        const inv = response.invoice as any;
+        // API may return amountSek or amountDue/amountPaid (in öre)
+        // Use amountSek if present, otherwise use amountDue or amountPaid
+        const amount = inv.amountSek ?? inv.amountDue ?? inv.amountPaid ?? 0;
+        
         setInvoice({
           id: inv.id,
           invoiceId: inv.invoiceId || invoiceId,
-          type: inv.billingType,
-          amountSek: inv.amountSek,
+          type: inv.billingType || 'monthly',
+          amountSek: amount,
           oneTimeAmountSek: inv.oneTimeAmountSek,
-          status: inv.status,
-          createdAt: inv.createdAt,
-          dueAt: inv.dueAt,
+          status: inv.status || 'unknown',
+          createdAt: inv.createdAt || inv.paidAt || new Date().toISOString(),
+          dueAt: inv.dueAt || inv.dueDate,
           hostedInvoiceUrl: inv.hostedInvoiceUrl,
           hostedInvoicePath: inv.hostedInvoicePath,
           stripeInvoiceUrl: inv.stripeInvoiceUrl,
@@ -270,24 +290,12 @@ export default function BillingInvoiceDetail() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Fakturadatum</span>
-                    <p className="font-medium">
-                      {new Date(invoice.createdAt).toLocaleDateString('sv-SE', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
+                    <p className="font-medium">{formatDate(invoice.createdAt)}</p>
                   </div>
                   {invoice.dueAt && (
                     <div>
                       <span className="text-muted-foreground">Förfallodatum</span>
-                      <p className="font-medium">
-                        {new Date(invoice.dueAt).toLocaleDateString('sv-SE', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
+                      <p className="font-medium">{formatDate(invoice.dueAt)}</p>
                     </div>
                   )}
                 </div>
