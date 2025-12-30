@@ -11,7 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_51RBmwME0yFmyBl81G1NTIqm31T3hPUmYvdYQl5QLa3WKwrJhqNpHKYCLpLNjg0RfN9xZiS89s5t1z0SnDzk1lBQy00BjPV4ERK';
+// Enterprise billing uses the Tivly Enterprise Stripe account
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
 
 interface EnterpriseAccessOverlayProps {
   membership: EnterpriseMembership;
