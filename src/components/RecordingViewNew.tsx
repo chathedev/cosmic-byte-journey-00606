@@ -9,7 +9,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { SubscribeDialog } from "./SubscribeDialog";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { OrbScene } from "./VoiceOrb";
@@ -849,88 +848,51 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg space-y-6">
-            {/* Recording Status */}
-            <section className="relative rounded-3xl border border-border/50 bg-card/40 backdrop-blur-sm shadow-xl p-8 md:p-12">
-              {/* Test button for allowed user */}
-              {hasTestAccess && !isTestMode && (
-                <button
-                  onClick={startTestMode}
-                  className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 z-10"
-                  title="Simulera Tivly-möte"
-                >
-                  Test
-                </button>
-              )}
-
-              <div className="flex flex-col items-center text-center gap-6">
-                <div className="font-mono text-4xl md:text-5xl tracking-tight">
-                  {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
-                </div>
-
-                <OrbScene
-                  stream={streamRef.current}
-                  isActive={isRecording && !isPaused}
-                  size={160}
-                />
-
-                <div className="space-y-1">
-                  <h2 className="text-base md:text-lg font-medium">
-                    {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
-                  </h2>
-                  <p className="text-sm text-muted-foreground max-w-xs">
-                    {isPaused
-                      ? 'Tryck "Återuppta" för att fortsätta'
-                      : useAsrMode
-                        ? 'Ljudet spelas in för transkribering i bakgrunden.'
-                        : 'Tala tydligt – texten visas i realtid.'}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* Live Transcript Display (Free/Pro only) */}
-            {!useAsrMode && (
-              <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                <div className="px-4 py-2 border-b bg-muted/30">
-                  <span className="text-xs font-medium text-muted-foreground">Transkribering</span>
-                </div>
-                <ScrollArea className="h-[200px] md:h-[240px]">
-                  <div ref={transcriptScrollRef} className="p-4 text-sm leading-relaxed">
-                    {liveTranscript || interimText ? (
-                      <>
-                        <span className="text-foreground">{liveTranscript}</span>
-                        {interimText && (
-                          <span className="text-muted-foreground/60 italic">{interimText}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground italic">
-                        Börja tala för att se transkriberingen...
-                      </span>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
+        {/* Main Content - Blob Focused */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          {/* The Orb - Main Focus */}
+          <div className="relative">
+            {/* Test button for allowed user */}
+            {hasTestAccess && !isTestMode && (
+              <button
+                onClick={startTestMode}
+                className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 z-10"
+                title="Simulera Tivly-möte"
+              >
+                Test
+              </button>
             )}
-
-            {/* Folder Selection */}
-            <div className="flex items-center justify-center gap-3">
-              <span className="text-sm text-muted-foreground">Spara i:</span>
-              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {folders.map((f) => (
-                    <SelectItem key={f} value={f}>{f}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            
+            <OrbScene
+              stream={streamRef.current}
+              isActive={isRecording && !isPaused}
+              size={280}
+            />
           </div>
+
+          {/* Minimal Status */}
+          <div className="mt-6 text-center">
+            <div className="font-mono text-2xl md:text-3xl tracking-tight text-foreground/80">
+              {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
+            </p>
+          </div>
+
+          {/* Live Transcript Display (Free/Pro only) - Compact */}
+          {!useAsrMode && (liveTranscript || interimText) && (
+            <div className="mt-6 w-full max-w-md">
+              <ScrollArea className="h-[120px] md:h-[160px] rounded-xl bg-card/60 backdrop-blur-sm border border-border/30">
+                <div ref={transcriptScrollRef} className="p-4 text-sm leading-relaxed">
+                  <span className="text-foreground">{liveTranscript}</span>
+                  {interimText && (
+                    <span className="text-muted-foreground/60 italic">{interimText}</span>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
         </div>
 
         {/* Bottom Controls */}

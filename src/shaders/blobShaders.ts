@@ -76,16 +76,16 @@ export const vertexShader = `
     vUv = uv;
     vNormal = normal;
     
-    // Very gentle displacement - super slow and smooth
-    float noiseFreq = 0.8 + uVolume * 0.3;
-    float noiseAmp = 0.08 + uVolume * 0.12;
+    // Volume-reactive displacement
+    float noiseFreq = 1.2 + uVolume * 0.8;
+    float noiseAmp = 0.12 + uVolume * 0.25;
     
-    // Much slower time progression
-    vec3 noisePos = position + uTime * 0.03;
+    // Animated noise position
+    vec3 noisePos = position + uTime * 0.08;
     float noise = snoise(noisePos * noiseFreq) * noiseAmp;
     
-    float secondaryNoise = snoise(noisePos * noiseFreq * 1.5 + uTime * 0.02) * noiseAmp * 0.15;
-    float tertiaryNoise = snoise(noisePos * noiseFreq * 2.0 + uTime * 0.025) * noiseAmp * 0.05;
+    float secondaryNoise = snoise(noisePos * noiseFreq * 2.0 + uTime * 0.06) * noiseAmp * 0.3;
+    float tertiaryNoise = snoise(noisePos * noiseFreq * 3.0 + uTime * 0.1) * noiseAmp * 0.1;
     
     float totalDisplacement = noise + secondaryNoise + tertiaryNoise;
     vDisplacement = totalDisplacement;
@@ -112,20 +112,22 @@ export const fragmentShader = `
   
   void main() {
     vec3 viewDirection = normalize(cameraPosition - vPosition);
-    float fresnel = pow(1.0 - dot(viewDirection, vNormal), 2.5);
+    float fresnel = pow(1.0 - dot(viewDirection, vNormal), 2.0);
     
-    // Slow flowing gradient between colors
-    float flow = sin(vUv.x * 1.2 + uTime * 0.05) * 0.5 + 0.5;
-    vec3 color = mix(uColor1, uColor2, flow * 0.6);
+    // Flowing gradient between main colors
+    float flow = sin(vUv.x * 2.0 + uTime * 0.15) * 0.5 + 0.5;
+    float flow2 = cos(vUv.y * 1.5 + uTime * 0.1) * 0.5 + 0.5;
+    vec3 color = mix(uColor1, uColor2, flow * 0.7);
+    color = mix(color, uColor2, flow2 * 0.3);
     
-    // Subtle highlight based on displacement
-    float highlight = smoothstep(0.01, 0.08, vDisplacement);
-    color = mix(color, uColor3, highlight * 0.5);
+    // Highlights based on displacement and volume
+    float highlight = smoothstep(0.02, 0.15, vDisplacement + uVolume * 0.1);
+    color = mix(color, uColor3, highlight * 0.6);
     
-    // Soft fresnel rim glow
-    color = mix(color, uColor2, fresnel * 0.3);
+    // Soft fresnel rim
+    color = mix(color, uColor3, fresnel * 0.25);
     
-    float alpha = 0.92;
+    float alpha = 0.94;
     
     gl_FragColor = vec4(color, alpha);
   }
