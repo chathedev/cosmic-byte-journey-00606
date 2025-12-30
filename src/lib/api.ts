@@ -1042,9 +1042,15 @@ class ApiClient {
       id: string;
       status: string;
       hostedInvoiceUrl?: string;
+      hostedInvoicePath?: string;
+      stripeInvoiceUrl?: string;
+      paymentIntentClientSecret?: string;
+      paymentIntentId?: string;
+      paymentIntentStatus?: string;
       amountDue?: number;
       amountPaid?: number;
       amountRemaining?: number;
+      amountSek?: number;
       currency?: string;
       collectionMethod?: string;
       dueDate?: string | null;
@@ -1052,6 +1058,8 @@ class ApiClient {
       createdAt?: string | null;
       periodStart?: string | null;
       periodEnd?: string | null;
+      billingType?: 'one_time' | 'monthly' | 'yearly';
+      companyName?: string;
     };
     timestamp: string;
   }> {
