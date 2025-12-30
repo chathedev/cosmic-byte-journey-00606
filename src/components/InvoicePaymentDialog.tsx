@@ -18,6 +18,19 @@ import tivlyLogo from "@/assets/tivly-logo.png";
 // Enterprise billing uses the Tivly Enterprise Stripe account
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
 
+// Helper to convert öre (cents) to kronor and format
+const formatAmountSEK = (amountInOre: number | undefined | null): string => {
+  if (typeof amountInOre !== 'number' || amountInOre <= 0) return '—';
+  const kronor = amountInOre / 100;
+  return kronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Convert öre to kronor
+const oreToKronor = (amountInOre: number | undefined | null): number => {
+  if (typeof amountInOre !== 'number') return 0;
+  return amountInOre / 100;
+};
+
 interface InvoicePaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -101,7 +114,7 @@ function PaymentFormContent({
           </>
         ) : (
           <>
-            Betala {amount.toLocaleString('sv-SE')} kr
+            Betala {formatAmountSEK(amount)} kr
           </>
         )}
       </Button>
@@ -153,9 +166,10 @@ export function InvoicePaymentDialog({
     onOpenChange(false);
   };
 
-  // Calculate VAT breakdown
-  const netAmount = Math.round(amount / 1.25);
-  const vatAmount = amount - netAmount;
+  // Calculate VAT breakdown - amounts are in öre
+  const totalKronor = oreToKronor(amount);
+  const netKronor = totalKronor / 1.25;
+  const vatKronor = totalKronor - netKronor;
 
   const formatBillingType = (type: string) => {
     switch (type) {
@@ -196,7 +210,7 @@ export function InvoicePaymentDialog({
           {/* Amount display */}
           <div className="text-center py-2">
             <p className="text-3xl font-bold text-foreground">
-              {amount.toLocaleString('sv-SE')} kr
+              {formatAmountSEK(amount)} kr
             </p>
             <Badge variant="secondary" className="mt-2">
               <CreditCard className="h-3 w-3 mr-1.5" />
@@ -233,16 +247,16 @@ export function InvoicePaymentDialog({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Belopp exkl. moms</span>
-                    <span className="text-foreground">{netAmount.toLocaleString('sv-SE')} kr</span>
+                    <span className="text-foreground">{netKronor > 0 ? netKronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} kr</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Moms (25%)</span>
-                    <span className="text-foreground">{vatAmount.toLocaleString('sv-SE')} kr</span>
+                    <span className="text-foreground">{vatKronor > 0 ? vatKronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} kr</span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between font-semibold">
                     <span className="text-foreground">Totalt att betala</span>
-                    <span className="text-primary">{amount.toLocaleString('sv-SE')} kr</span>
+                    <span className="text-primary">{formatAmountSEK(amount)} kr</span>
                   </div>
                 </div>
               </div>

@@ -65,6 +65,20 @@ const formatBillingType = (type: string) => {
   }
 };
 
+// Helper to convert öre (cents) to kronor and format
+// Stripe amounts are in smallest currency unit (öre for SEK)
+const formatAmountSEK = (amountInOre: number | undefined | null): string => {
+  if (typeof amountInOre !== 'number' || amountInOre <= 0) return '—';
+  const kronor = amountInOre / 100;
+  return kronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Convert öre to kronor (for calculations)
+const oreToKronor = (amountInOre: number | undefined | null): number => {
+  if (typeof amountInOre !== 'number') return 0;
+  return amountInOre / 100;
+};
+
 export default function BillingInvoiceDetail() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
   const { user, isLoading: authLoading } = useAuth();
@@ -169,9 +183,10 @@ export default function BillingInvoiceDetail() {
   const isPaid = invoice?.status.toLowerCase() === 'paid';
   const canPay = invoice && ['open', 'draft'].includes(invoice.status.toLowerCase()) && invoice.paymentIntentClientSecret;
 
-  // Calculate VAT breakdown (amounts are VAT-inclusive)
-  const netAmount = invoice ? Math.round(invoice.amountSek / 1.25) : 0;
-  const vatAmount = invoice ? invoice.amountSek - netAmount : 0;
+  // Calculate VAT breakdown (amounts are in öre, VAT-inclusive)
+  const totalKronor = oreToKronor(invoice?.amountSek);
+  const netKronor = totalKronor / 1.25;
+  const vatKronor = totalKronor - netKronor;
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
@@ -231,7 +246,7 @@ export default function BillingInvoiceDetail() {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-2xl">
-                      {invoice.amountSek.toLocaleString('sv-SE')} kr
+                      {formatAmountSEK(invoice.amountSek)} kr
                     </CardTitle>
                     <p className="text-muted-foreground text-sm mt-1">
                       {invoice.companyName || 'Enterprise'}
@@ -283,16 +298,16 @@ export default function BillingInvoiceDetail() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Belopp exkl. moms</span>
-                    <span>{netAmount.toLocaleString('sv-SE')} kr</span>
+                    <span>{netKronor > 0 ? netKronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} kr</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Moms (25%)</span>
-                    <span>{vatAmount.toLocaleString('sv-SE')} kr</span>
+                    <span>{vatKronor > 0 ? vatKronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} kr</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Totalt inkl. moms</span>
-                    <span>{invoice.amountSek.toLocaleString('sv-SE')} kr</span>
+                    <span>{formatAmountSEK(invoice.amountSek)} kr</span>
                   </div>
                 </div>
               </CardContent>
@@ -323,7 +338,7 @@ export default function BillingInvoiceDetail() {
                     onClick={() => setPaymentDialogOpen(true)}
                   >
                     <CreditCard className="h-4 w-4" />
-                    Betala {invoice.amountSek.toLocaleString('sv-SE')} kr
+                    Betala {formatAmountSEK(invoice.amountSek)} kr
                   </Button>
                 </CardContent>
               </Card>
