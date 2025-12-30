@@ -20,7 +20,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3, Mic } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -152,7 +152,7 @@ export function AppSidebar() {
     }
   }, [location.pathname]);
 
-  const handleNavigation = (path: string, title: string, locked: boolean = false) => {
+  const handleNavigation = (path: string, title: string, locked: boolean = false, external: boolean = false) => {
     if (locked) {
       toast({
         title: "Låst funktion",
@@ -161,6 +161,15 @@ export function AppSidebar() {
       setShowSubscribe(true);
       return;
     }
+    
+    if (external) {
+      window.open(path, '_blank', 'noopener,noreferrer');
+      if (isMobile) {
+        setOpen(false);
+      }
+      return;
+    }
+    
     setSelected(title);
     navigate(path);
     if (isMobile) {
@@ -187,6 +196,7 @@ export function AppSidebar() {
     { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
     ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats", locked: false }] : []),
+    ...(enterpriseMembership?.isMember ? [{ Icon: CreditCard, title: "Fakturering", path: "https://billing.tivly.se/invoices", locked: false, external: true }] : []),
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
   ];
 
@@ -378,7 +388,7 @@ export function AppSidebar() {
             {navItems.map((item) => (
               <button
                 key={item.title}
-                onClick={() => handleNavigation(item.path, item.title, item.locked)}
+                onClick={() => handleNavigation(item.path, item.title, item.locked, (item as any).external)}
                 className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg transition-all duration-200 ${
                   selected === item.title
                     ? 'bg-primary/10 text-primary font-medium'

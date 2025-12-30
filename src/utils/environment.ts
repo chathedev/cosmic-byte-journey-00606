@@ -112,6 +112,21 @@ export function isAuthDomain(): boolean {
 }
 
 /**
+ * Detects if we're on the billing domain
+ * @returns {boolean} True if on billing.tivly.se
+ */
+export function isBillingDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const hostname = window.location.hostname;
+    return hostname === 'billing.tivly.se';
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * Gets the appropriate redirect domain based on where user came from
  * @returns {string} The domain to redirect to after auth
  */
