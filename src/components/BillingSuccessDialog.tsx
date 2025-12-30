@@ -13,8 +13,8 @@ interface BillingSuccessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   billingType: 'one_time' | 'monthly' | 'yearly';
-  amountSek: number;
-  oneTimeAmountSek?: number;
+  amountSek: number; // This is now VAT-inclusive
+  oneTimeAmountSek?: number; // This is now VAT-inclusive
   invoiceUrl: string;
   portalUrl?: string;
   companyName: string;
@@ -39,8 +39,20 @@ export default function BillingSuccessDialog({
     }
   };
 
-  const getTotalAmount = () => {
+  // Calculate net amounts (amounts are VAT-inclusive, so divide by 1.25)
+  const netAmount = Math.round(amountSek / 1.25);
+  const netOneTimeAmount = oneTimeAmountSek ? Math.round(oneTimeAmountSek / 1.25) : 0;
+  
+  const getTotalInclVat = () => {
     return amountSek + (oneTimeAmountSek || 0);
+  };
+
+  const getTotalExclVat = () => {
+    return netAmount + netOneTimeAmount;
+  };
+
+  const getTotalVat = () => {
+    return getTotalInclVat() - getTotalExclVat();
   };
 
   return (
@@ -65,31 +77,41 @@ export default function BillingSuccessDialog({
             {billingType !== 'one_time' && (
               <>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Återkommande ({billingType === 'monthly' ? 'månad' : 'år'})</span>
-                  <span className="text-sm font-medium">{amountSek.toLocaleString('sv-SE')} kr</span>
+                  <span className="text-sm text-muted-foreground">
+                    Återkommande ({billingType === 'monthly' ? 'månad' : 'år'}) exkl. moms
+                  </span>
+                  <span className="text-sm font-medium">{netAmount.toLocaleString('sv-SE')} kr</span>
                 </div>
                 {oneTimeAmountSek && oneTimeAmountSek > 0 && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Engångsavgift</span>
-                      <span className="text-sm font-medium">{oneTimeAmountSek.toLocaleString('sv-SE')} kr</span>
-                    </div>
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Första fakturan</span>
-                        <span className="text-base font-semibold">{getTotalAmount().toLocaleString('sv-SE')} kr</span>
-                      </div>
-                    </div>
-                  </>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Engångsavgift exkl. moms</span>
+                    <span className="text-sm font-medium">{netOneTimeAmount.toLocaleString('sv-SE')} kr</span>
+                  </div>
                 )}
               </>
             )}
             {billingType === 'one_time' && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Engångsbelopp</span>
-                <span className="text-base font-semibold">{amountSek.toLocaleString('sv-SE')} kr</span>
+                <span className="text-sm text-muted-foreground">Engångsbelopp exkl. moms</span>
+                <span className="text-sm font-medium">{netAmount.toLocaleString('sv-SE')} kr</span>
               </div>
             )}
+            
+            {/* VAT breakdown */}
+            <div className="border-t pt-2 mt-2 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Subtotal exkl. moms</span>
+                <span className="text-sm font-medium">{getTotalExclVat().toLocaleString('sv-SE')} kr</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Moms (25%)</span>
+                <span className="text-sm font-medium">{getTotalVat().toLocaleString('sv-SE')} kr</span>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm font-semibold">Totalt inkl. moms</span>
+                <span className="text-base font-bold">{getTotalInclVat().toLocaleString('sv-SE')} kr</span>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">
