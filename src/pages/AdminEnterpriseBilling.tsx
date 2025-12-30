@@ -10,6 +10,7 @@ import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUp
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { addVat } from "@/lib/enterpriseVat";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -228,9 +229,9 @@ export default function AdminEnterpriseBilling() {
       let billingType: 'one_time' | 'monthly' | 'yearly';
       let requestData: any;
 
-      // Add 25% VAT to all amounts (B2B Swedish VAT)
-      const oneTimeTotalWithVat = Math.round(oneTimeTotal * 1.25);
-      const recurringTotalWithVat = Math.round(recurringTotal * 1.25);
+      // Add 25% VAT to all amounts (admin enters exkl. moms, invoice is inkl. moms)
+      const oneTimeTotalWithVat = addVat(oneTimeTotal);
+      const recurringTotalWithVat = addVat(recurringTotal);
 
       if (recurringTotal > 0) {
         // Has recurring items, use monthly/yearly with optional one-time add-on
@@ -261,8 +262,9 @@ export default function AdminEnterpriseBilling() {
       
       setSuccessDialogData({
         billingType,
-        amountSek: recurringTotal > 0 ? recurringTotal : oneTimeTotal,
-        oneTimeAmountSek: recurringTotal > 0 && oneTimeTotal > 0 ? oneTimeTotal : undefined,
+        // Show the same amounts as on the Stripe invoice (inkl. moms)
+        amountSek: recurringTotal > 0 ? recurringTotalWithVat : oneTimeTotalWithVat,
+        oneTimeAmountSek: recurringTotal > 0 && oneTimeTotal > 0 ? oneTimeTotalWithVat : undefined,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: selectedCompany?.name || selectedCompany?.slug || selectedCompanyId,
