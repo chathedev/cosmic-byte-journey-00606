@@ -196,7 +196,7 @@ export function AppSidebar() {
     { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
     ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats", locked: false }] : []),
-    ...(enterpriseMembership?.isMember ? [{ Icon: CreditCard, title: "Fakturering", path: "https://billing.tivly.se/invoices", locked: false, external: true }] : []),
+    ...(enterpriseMembership?.isMember ? [{ Icon: CreditCard, title: "Fakturering", path: "/billing/invoices", locked: false }] : []),
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
   ];
 
