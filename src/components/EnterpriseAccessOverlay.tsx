@@ -257,17 +257,28 @@ function InlinePaymentForm({
 }) {
   const stripe = useStripe();
   const elements = useElements();
+  const [isElementReady, setIsElementReady] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!stripe || !elements) {
+    if (!stripe || !elements || !isElementReady) {
+      console.warn('Stripe not ready:', { stripe: !!stripe, elements: !!elements, isElementReady });
       return;
     }
 
     setIsProcessing(true);
 
     try {
+      // First submit the elements to validate them
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        onError(submitError.message || 'Vänligen fyll i betalningsuppgifterna');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Then confirm the payment
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -281,37 +292,64 @@ function InlinePaymentForm({
         setIsProcessing(false);
       } else if (paymentIntent?.status === 'succeeded') {
         onSuccess();
+      } else if (paymentIntent?.status === 'requires_action') {
+        // 3D Secure or other authentication required - handled by Stripe
+        // Will redirect if needed
       } else {
         setIsProcessing(false);
       }
     } catch (err: any) {
-      onError(err.message || 'Ett fel uppstod');
+      console.error('Payment error:', err);
+      onError(err.message || 'Ett fel uppstod vid betalningen');
       setIsProcessing(false);
     }
   };
 
+  const isReady = stripe && elements && isElementReady;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement 
-        options={{
-          layout: 'tabs',
-          wallets: {
-            applePay: 'auto',
-            googlePay: 'auto',
-          },
-          paymentMethodOrder: ['card', 'apple_pay', 'google_pay', 'klarna'],
-        }}
-      />
+      <div className="min-h-[200px]">
+        <PaymentElement 
+          onReady={() => {
+            console.log('PaymentElement ready');
+            setIsElementReady(true);
+          }}
+          onLoadError={(error) => {
+            console.error('PaymentElement load error:', error);
+            onError('Kunde inte ladda betalningsformuläret. Försök igen.');
+          }}
+          options={{
+            layout: 'tabs',
+            wallets: {
+              applePay: 'auto',
+              googlePay: 'auto',
+            },
+            paymentMethodOrder: ['card', 'apple_pay', 'google_pay', 'klarna'],
+          }}
+        />
+        {!isElementReady && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Laddar betalningsformulär...</span>
+          </div>
+        )}
+      </div>
       
       <Button 
         type="submit" 
         className="w-full h-12 text-base font-medium"
-        disabled={!stripe || !elements || isProcessing}
+        disabled={!isReady || isProcessing}
       >
         {isProcessing ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             Bearbetar betalning...
+          </>
+        ) : !isReady ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Laddar...
           </>
         ) : (
           <>
