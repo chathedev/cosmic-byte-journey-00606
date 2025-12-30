@@ -1566,24 +1566,14 @@ const MeetingDetail = () => {
                 )}
 
                 {/* Transcript Section */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15 }}
-                  className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
-                >
-                {/* Header - NOT clickable, just informational */}
-                  <div className="w-full px-5 py-4 border-b border-border/30 flex items-center justify-between">
+                <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+                  {/* Header with inline toggle */}
+                  <div className="px-5 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
                         <FileText className="w-4 h-4 text-primary" />
                       </div>
-                      <div className="text-left">
-                        <span className="font-medium text-sm">Transkription</span>
-                        <p className="text-xs text-muted-foreground">
-                          {isTranscriptExpanded ? 'Visar hela transkriptionen' : 'Förhandsgranskning'}
-                        </p>
-                      </div>
+                      <span className="font-medium text-sm">Transkription</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {isEditing && (
@@ -1591,119 +1581,83 @@ const MeetingDetail = () => {
                           variant="ghost"
                           size="sm"
                           onClick={handleResetFromASR}
-                          className="gap-1.5 text-xs rounded-full"
+                          className="gap-1.5 text-xs h-8"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           Återställ
                         </Button>
                       )}
+                      {!isEditing && hasTranscript && (
+                        <button
+                          onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+                          className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
+                        >
+                          {isTranscriptExpanded ? 'Visa mindre' : 'Visa allt'}
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isTranscriptExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {/* Content - collapsible */}
-                  <AnimatePresence initial={false}>
-                    {(isEditing || isTranscriptExpanded) ? (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="overflow-hidden"
-                      >
-                        <div className="p-5">
-                          {isEditing ? (
-                            <Textarea
-                              value={editedTranscript}
-                              onChange={(e) => handleTranscriptChange(e.target.value)}
-                              className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
-                              placeholder="Redigera transkriptionen..."
-                            />
-                          ) : hasSegments ? (
-                            // Clean linear transcript with speaker attribution
-                            <div className="space-y-0">
-                              {groupedSegments.map((segment, idx) => {
-                                // Use speakerName from reconstructed segments (source of truth) or fallback to lookup
-                                const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
-                                const colorClass = getSpeakerColorClass(segment.speakerId);
-                                const dotClass = getSpeakerDotClass(segment.speakerId);
-                                const textClass = getSpeakerTextClass(segment.speakerId);
-                                const timestamp = formatTimestamp(segment.start);
-                                const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
-                                const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
-                                
-                                return (
-                                  <div key={idx}>
-                                    {/* Subtle divider between different speakers */}
-                                    {showDivider && (
-                                      <div className="h-px bg-border/40 my-3" />
+                  {/* Content */}
+                  <div className="px-5 pb-5">
+                    {isEditing ? (
+                      <Textarea
+                        value={editedTranscript}
+                        onChange={(e) => handleTranscriptChange(e.target.value)}
+                        className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
+                        placeholder="Redigera transkriptionen..."
+                      />
+                    ) : isTranscriptExpanded ? (
+                      // Full transcript
+                      hasSegments ? (
+                        <div className="space-y-0 max-h-[60vh] overflow-y-auto">
+                          {groupedSegments.map((segment, idx) => {
+                            const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
+                            const colorClass = getSpeakerColorClass(segment.speakerId);
+                            const dotClass = getSpeakerDotClass(segment.speakerId);
+                            const textClass = getSpeakerTextClass(segment.speakerId);
+                            const timestamp = formatTimestamp(segment.start);
+                            const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
+                            const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
+                            
+                            return (
+                              <div key={idx}>
+                                {showDivider && <div className="h-px bg-border/40 my-3" />}
+                                <div className={`pl-4 py-2 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                                    <span className={`text-xs font-semibold ${textClass}`}>{speakerName}</span>
+                                    {timestamp && (
+                                      <span className="text-[10px] text-muted-foreground/50 tabular-nums">{timestamp}</span>
                                     )}
-                                    
-                                    {/* Speaker segment with colored left border */}
-                                    <div className={`pl-4 py-2 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
-                                      {/* Speaker name and time */}
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-                                        <span className={`text-xs font-semibold ${textClass}`}>
-                                          {speakerName}
-                                        </span>
-                                        {timestamp && (
-                                          <span className="text-[10px] text-muted-foreground/50 tabular-nums">
-                                            {timestamp}
-                                          </span>
-                                        )}
-                                      </div>
-                                      
-                                      {/* Text content */}
-                                      <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-3.5">
-                                        {segment.text}
-                                      </p>
-                                    </div>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            // Fallback to plain text display
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                              <div className="space-y-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                                {displayTranscript}
+                                  <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-3.5">
+                                    {segment.text}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
-                      </motion.div>
+                      ) : (
+                        <div className="prose prose-sm max-w-none dark:prose-invert max-h-[60vh] overflow-y-auto">
+                          <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                            {displayTranscript}
+                          </div>
+                        </div>
+                      )
                     ) : (
                       // Collapsed preview
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="p-5"
-                      >
-                        <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                          {hasSegments && groupedSegments.length > 0 
-                            ? groupedSegments.slice(0, 2).map(s => s.text).join(' ').slice(0, 250) + '...'
-                            : displayTranscript?.slice(0, 250) + '...'
-                          }
-                        </div>
-                      </motion.div>
+                      <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                        {hasSegments && groupedSegments.length > 0 
+                          ? groupedSegments.slice(0, 2).map(s => s.text).join(' ').slice(0, 200) + '...'
+                          : displayTranscript?.slice(0, 200) + '...'
+                        }
+                      </div>
                     )}
-                  </AnimatePresence>
-
-                  {/* Always visible button - enabled/disabled based on transcript availability */}
-                  <div className="px-5 py-3 border-t border-border/30">
-                    <Button
-                      onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
-                      variant="outline"
-                      size="sm"
-                      disabled={isEditing || !hasTranscript}
-                      className="w-full gap-2 rounded-full"
-                    >
-                      <Eye className="w-4 h-4" />
-                      {isTranscriptExpanded ? 'Dölj transkriptionen' : 'Visa hela transkriptionen'}
-                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isTranscriptExpanded ? 'rotate-180' : ''}`} />
-                    </Button>
                   </div>
-                </motion.div>
+                </div>
 
                 {/* Protocol Section - Show if protocol exists */}
                 {protocolData && !isEditing && (
