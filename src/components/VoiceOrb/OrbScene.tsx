@@ -93,12 +93,12 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
           }
           const rms = Math.sqrt(sum / dataArray.length);
           
-          // Balanced sensitivity
-          const amplifiedVolume = Math.pow(rms, 0.7) * 3;
-          const targetVolume = Math.max(0.02, Math.min(1, amplifiedVolume));
+          // Calm sensitivity - requires real speech to react
+          const amplifiedVolume = Math.pow(rms, 0.85) * 2;
+          const targetVolume = Math.max(0.015, Math.min(0.8, amplifiedVolume));
           
-          // Smooth response
-          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.25;
+          // Smoother response
+          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.18;
           setVolume(smoothedVolumeRef.current);
 
           // Get dominant frequency
