@@ -520,7 +520,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                     <TableRow>
                       <TableHead className="text-xs">Datum</TableHead>
                       <TableHead className="text-xs">Typ</TableHead>
-                      <TableHead className="text-xs text-right">Belopp</TableHead>
+                      <TableHead className="text-xs text-right">Belopp (inkl. moms)</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
                       <TableHead className="text-xs text-right">Åtgärder</TableHead>
                     </TableRow>
@@ -695,7 +695,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                         <div className="flex-1">
                           <Input
                             type="number"
-                            placeholder="Belopp (SEK)"
+                            placeholder="Belopp exkl. moms (SEK)"
                             value={item.amount}
                             onChange={(e) => updateLineItem(index, 'amount', e.target.value)}
                             min="0"
@@ -739,34 +739,46 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                 </div>
               )}
 
-              {/* Summary */}
-              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                {getOneTimeTotal() > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Engångsbelopp</span>
-                    <span className="font-medium">{getOneTimeTotal().toLocaleString('sv-SE')} kr</span>
+              {/* Summary with VAT breakdown */}
+              {getTotalAmount() > 0 && (
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                  {getOneTimeTotal() > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Engångsbelopp (exkl. moms)</span>
+                      <span className="font-medium">{getOneTimeTotal().toLocaleString('sv-SE')} kr</span>
+                    </div>
+                  )}
+                  {getRecurringTotal() > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Återkommande ({recurringInterval === 'monthly' ? 'mån' : 'år'}) (exkl. moms)</span>
+                      <span className="font-medium">{getRecurringTotal().toLocaleString('sv-SE')} kr</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-1 mt-1 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Subtotal exkl. moms</span>
+                      <span className="font-medium">{getTotalAmount().toLocaleString('sv-SE')} kr</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Moms (25%)</span>
+                      <span className="font-medium">{Math.round(getTotalAmount() * 0.25).toLocaleString('sv-SE')} kr</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold pt-1">
+                      <span>Totalt inkl. moms</span>
+                      <span>{Math.round(getTotalAmount() * 1.25).toLocaleString('sv-SE')} kr</span>
+                    </div>
                   </div>
-                )}
-                {getRecurringTotal() > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Återkommande ({recurringInterval === 'monthly' ? 'mån' : 'år'})</span>
-                    <span className="font-medium">{getRecurringTotal().toLocaleString('sv-SE')} kr</span>
-                  </div>
-                )}
-                <div className="border-t pt-1 flex justify-between text-sm font-semibold">
-                  <span>Totalt</span>
-                  <span>{getTotalAmount().toLocaleString('sv-SE')} kr</span>
-                </div>
 
-                {/* First invoice badge */}
-                {isFirstInvoice && !showAISuggestion && (
-                  <div className="pt-2">
-                    <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20">
-                      Första fakturan
-                    </Badge>
-                  </div>
-                )}
-              </div>
+                  {/* First invoice badge */}
+                  {isFirstInvoice && !showAISuggestion && (
+                    <div className="pt-2">
+                      <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20">
+                        Första fakturan
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* AI Suggestion for first invoice - shows as step-by-step flow */}
               {showAISuggestion && isFirstInvoice ? (
