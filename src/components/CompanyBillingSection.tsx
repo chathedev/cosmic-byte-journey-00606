@@ -10,9 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt, XCircle, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
+import { addVat } from "@/lib/enterpriseVat";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
-import BillingSuccessDialog from "@/components/BillingSuccessDialog";
 import { InvoiceAISuggestion, AISuggestion } from "@/components/InvoiceAISuggestion";
 import {
   DropdownMenu,
@@ -251,6 +251,9 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
 
     const oneTimeTotal = getOneTimeTotal();
     const recurringTotal = getRecurringTotal();
+
+    const oneTimeTotalWithVat = addVat(oneTimeTotal);
+    const recurringTotalWithVat = addVat(recurringTotal);
     
     if (oneTimeTotal <= 0 && recurringTotal <= 0) {
       toast.error('Vänligen ange minst ett belopp');
@@ -270,22 +273,23 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
       let billingType: 'one_time' | 'monthly' | 'yearly';
       let requestData: any;
 
+      // Admin enters exkl. moms, invoice should always be inkl. moms (+25%)
       if (recurringTotal > 0) {
         billingType = recurringInterval;
         requestData = {
           billingType,
-          amountSek: recurringTotal,
+          amountSek: recurringTotalWithVat,
         };
         
         if (oneTimeTotal > 0) {
-          requestData.oneTimeAmountSek = oneTimeTotal;
+          requestData.oneTimeAmountSek = oneTimeTotalWithVat;
           requestData.combineOneTime = true;
         }
       } else {
         billingType = 'one_time';
         requestData = {
           billingType,
-          amountSek: oneTimeTotal,
+          amountSek: oneTimeTotalWithVat,
         };
       }
 
@@ -297,8 +301,9 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
       
       setSuccessDialogData({
         billingType,
-        amountSek: recurringTotal > 0 ? recurringTotal : oneTimeTotal,
-        oneTimeAmountSek: recurringTotal > 0 && oneTimeTotal > 0 ? oneTimeTotal : undefined,
+        // Show the same amounts as on the Stripe invoice (inkl. moms)
+        amountSek: recurringTotal > 0 ? recurringTotalWithVat : oneTimeTotalWithVat,
+        oneTimeAmountSek: recurringTotal > 0 && oneTimeTotal > 0 ? oneTimeTotalWithVat : undefined,
         invoiceUrl: response.invoiceUrl,
         portalUrl: response.portalUrl,
         companyName: companyName,
