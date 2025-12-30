@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState, useContext } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
+import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, isBillingDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
 import { toast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { apiClient } from "@/lib/api";
@@ -56,6 +56,8 @@ import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import BillingInvoices from "./pages/BillingInvoices";
+import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -439,6 +441,43 @@ const App = () => {
   // Block native app access to app.tivly.se domain
   if (isNativeAppOnWebDomain()) {
     return <WebOnlyAccess />;
+  }
+
+  // Routes for billing.tivly.se - enterprise billing portal
+  if (isBillingDomain()) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthProvider>
+                <SubscriptionProvider>
+                  <ScrollToTop />
+                  <AuthRedirectHandler />
+                  <Suspense
+                    fallback={
+                      <div className="min-h-screen bg-background flex items-center justify-center">
+                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    }
+                  >
+                    <Routes>
+                      <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                      <Route path="/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
+                      <Route path="/invoices/:invoiceId" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
+                      <Route path="/" element={<Navigate to="/invoices" replace />} />
+                      <Route path="*" element={<Navigate to="/invoices" replace />} />
+                    </Routes>
+                  </Suspense>
+                </SubscriptionProvider>
+              </AuthProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ErrorBoundary>
+      </QueryClientProvider>
+    );
   }
 
   // Routes for auth.tivly.se - only verification endpoints
