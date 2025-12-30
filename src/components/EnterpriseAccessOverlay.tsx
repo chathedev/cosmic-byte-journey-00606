@@ -245,7 +245,7 @@ function InlinePaymentForm({
   onError: (msg: string) => void;
   isProcessing: boolean;
   setIsProcessing: (v: boolean) => void;
-  amount: number;
+  amount: number | undefined;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -307,7 +307,7 @@ function InlinePaymentForm({
           </>
         ) : (
           <>
-            Betala {amount.toLocaleString('sv-SE')} kr
+            Betala {typeof amount === 'number' ? amount.toLocaleString('sv-SE') : '—'} kr
           </>
         )}
       </Button>
@@ -409,7 +409,11 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
       
       if (response.success && response.invoice?.paymentIntentClientSecret) {
         setClientSecret(response.invoice.paymentIntentClientSecret);
-        setPaymentAmount(response.invoice.amountSek);
+        // Safely get amount with fallback
+        const amt = typeof response.invoice.amountSek === 'number' 
+          ? response.invoice.amountSek 
+          : (accessState.type === 'unpaid_invoice' && typeof accessState.amountDue === 'number' ? accessState.amountDue : 0);
+        setPaymentAmount(amt);
         setShowPaymentForm(true);
       } else if (response.invoice?.hostedInvoiceUrl || response.invoice?.stripeInvoiceUrl) {
         // Fallback to hosted URL
@@ -470,9 +474,10 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     );
   }
 
-  // Calculate VAT breakdown for payment form
-  const netAmount = Math.round(paymentAmount / 1.25);
-  const vatAmount = paymentAmount - netAmount;
+  // Calculate VAT breakdown for payment form - with safe fallbacks
+  const safePaymentAmount = typeof paymentAmount === 'number' && paymentAmount > 0 ? paymentAmount : 0;
+  const netAmount = Math.round(safePaymentAmount / 1.25);
+  const vatAmount = safePaymentAmount - netAmount;
 
   // Blocking overlays - minimalistic design matching MaintenanceOverlay
   const overlayContent = () => {
@@ -576,7 +581,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
             {/* Amount display */}
             <div className="text-center py-2">
               <p className="text-3xl font-bold text-foreground">
-                {paymentAmount.toLocaleString('sv-SE')} kr
+                {safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'} kr
               </p>
               <Badge variant="secondary" className="mt-2">
                 <CreditCard className="h-3 w-3 mr-1.5" />
@@ -596,16 +601,16 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Belopp exkl. moms</span>
-                  <span className="text-foreground">{netAmount.toLocaleString('sv-SE')} kr</span>
+                  <span className="text-foreground">{netAmount > 0 ? netAmount.toLocaleString('sv-SE') : '—'} kr</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Moms (25%)</span>
-                  <span className="text-foreground">{vatAmount.toLocaleString('sv-SE')} kr</span>
+                  <span className="text-foreground">{vatAmount > 0 ? vatAmount.toLocaleString('sv-SE') : '—'} kr</span>
                 </div>
                 <Separator className="my-2" />
                 <div className="flex justify-between font-semibold">
                   <span className="text-foreground">Totalt att betala</span>
-                  <span className="text-primary">{paymentAmount.toLocaleString('sv-SE')} kr</span>
+                  <span className="text-primary">{safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'} kr</span>
                 </div>
               </div>
             </div>
