@@ -544,6 +544,12 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     return null;
   }
 
+  // Show nothing while checking billing status for the first time
+  // This prevents flashing "no subscription" before the check completes
+  if (!hasInitialCheck && companyId) {
+    return null;
+  }
+
   // No overlay needed
   if (accessState.type === 'allowed') {
     return null;
