@@ -15,12 +15,14 @@ import {
   Clock, 
   AlertCircle, 
   XCircle, 
-  CreditCard
+  CreditCard,
+  RefreshCw
 } from "lucide-react";
 import { InvoicePaymentDialog } from "@/components/InvoicePaymentDialog";
 
 interface InvoiceDetail {
   id: string;
+  invoiceId: string;
   type: 'one_time' | 'monthly' | 'yearly';
   amountSek: number;
   oneTimeAmountSek?: number;
@@ -71,26 +73,47 @@ export default function BillingInvoiceDetail() {
   
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
-  // Fetch invoice details
-  const fetchInvoice = useCallback(async () => {
-    if (!enterpriseMembership?.isMember || !enterpriseMembership.company?.id || !invoiceId) {
+  // Fetch invoice details from member-safe endpoint
+  const fetchInvoice = useCallback(async (showRefreshState = false) => {
+    if (!enterpriseMembership?.isMember || !invoiceId) {
       return;
     }
 
     try {
-      setLoading(true);
-      const response = await apiClient.getMyEnterpriseMembership();
-      const billingHistory = (response as any)?.company?.billingHistory || [];
+      if (showRefreshState) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
       
-      const found = billingHistory.find((inv: any) => inv.id === invoiceId);
+      // Use member-safe endpoint to get fresh paymentIntentClientSecret
+      const response = await apiClient.getEnterpriseInvoiceDetail(invoiceId);
       
-      if (found) {
+      if (response.success && response.invoice) {
+        const inv = response.invoice;
         setInvoice({
-          ...found,
-          companyName: enterpriseMembership.company?.name,
+          id: inv.id,
+          invoiceId: inv.invoiceId || invoiceId,
+          type: inv.billingType,
+          amountSek: inv.amountSek,
+          oneTimeAmountSek: inv.oneTimeAmountSek,
+          status: inv.status,
+          createdAt: inv.createdAt,
+          dueAt: inv.dueAt,
+          hostedInvoiceUrl: inv.hostedInvoiceUrl,
+          hostedInvoicePath: inv.hostedInvoicePath,
+          stripeInvoiceUrl: inv.stripeInvoiceUrl,
+          paymentIntentClientSecret: inv.paymentIntentClientSecret,
+          paymentIntentId: inv.paymentIntentId,
+          paymentIntentStatus: inv.paymentIntentStatus,
+          subscriptionId: inv.subscriptionId,
+          companyName: inv.companyName || enterpriseMembership.company?.name,
+          combineOneTime: inv.combineOneTime,
         });
       } else {
         setError('Fakturan hittades inte');
@@ -100,19 +123,24 @@ export default function BillingInvoiceDetail() {
       setError(err.message || 'Kunde inte hämta faktura');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [enterpriseMembership, invoiceId]);
 
   useEffect(() => {
-    if (!authLoading && !subLoading && user) {
+    if (!authLoading && !subLoading && user && enterpriseMembership?.isMember) {
       fetchInvoice();
     }
-  }, [user, authLoading, subLoading, fetchInvoice]);
+  }, [user, authLoading, subLoading, enterpriseMembership?.isMember, fetchInvoice]);
 
   const handlePaymentSuccess = async () => {
     // Refresh invoice data after successful payment
-    await fetchInvoice();
+    await fetchInvoice(true);
     setPaymentDialogOpen(false);
+  };
+
+  const handleRefresh = () => {
+    fetchInvoice(true);
   };
 
   // Not logged in
@@ -149,7 +177,7 @@ export default function BillingInvoiceDetail() {
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6">
           <Button 
             variant="ghost" 
             size="sm"
@@ -159,6 +187,18 @@ export default function BillingInvoiceDetail() {
             <ArrowLeft className="h-4 w-4" />
             Tillbaka till fakturor
           </Button>
+          {invoice && !loading && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Uppdatera
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -295,6 +335,26 @@ export default function BillingInvoiceDetail() {
                   <p className="text-sm text-muted-foreground mt-1">
                     Kontakta support om du har frågor.
                   </p>
+                </CardContent>
+              </Card>
+            ) : ['open', 'draft'].includes(invoice.status.toLowerCase()) && !invoice.paymentIntentClientSecret ? (
+              <Card className="border-yellow-500/30 bg-yellow-500/5">
+                <CardContent className="pt-6 text-center py-8">
+                  <Clock className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-yellow-600 mb-2">Betalning förbereds</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Fakturan bearbetas. Prova att uppdatera sidan om en stund.
+                  </p>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 gap-2"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    Uppdatera status
+                  </Button>
                 </CardContent>
               </Card>
             ) : null}

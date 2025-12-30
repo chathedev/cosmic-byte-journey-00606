@@ -11,6 +11,7 @@ import { FileText, ExternalLink, CheckCircle, Clock, AlertCircle, XCircle, Arrow
 
 interface Invoice {
   id: string;
+  invoiceId?: string; // Stripe invoice ID
   type: 'one_time' | 'monthly' | 'yearly';
   amountSek: number;
   oneTimeAmountSek?: number;
@@ -180,12 +181,14 @@ export default function BillingInvoices() {
             {invoices.map((invoice) => {
               const isPaid = invoice.status.toLowerCase() === 'paid';
               const canPay = ['open', 'draft'].includes(invoice.status.toLowerCase());
+              // Use Stripe invoiceId for navigation, fallback to entry id
+              const invoiceUrlId = (invoice as any).invoiceId || invoice.id;
               
               return (
                 <Card 
                   key={invoice.id} 
                   className={`transition-all hover:shadow-md ${canPay ? 'cursor-pointer hover:border-primary/50' : ''}`}
-                  onClick={() => navigate(`/billing/invoices/${invoice.id}`)}
+                  onClick={() => navigate(`/billing/invoices/${invoiceUrlId}`)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
@@ -228,7 +231,7 @@ export default function BillingInvoices() {
                             className="gap-1.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/billing/invoices/${invoice.id}`);
+                              navigate(`/billing/invoices/${invoiceUrlId}`);
                             }}
                           >
                             Visa
