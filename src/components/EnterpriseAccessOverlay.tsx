@@ -14,6 +14,20 @@ import tivlyLogo from '@/assets/tivly-logo.png';
 // Enterprise billing uses the Tivly Enterprise Stripe account
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
 
+// Helper to convert öre (cents) to kronor and format
+// Stripe amounts are in smallest currency unit (öre for SEK)
+const formatAmountSEK = (amountInOre: number | undefined | null): string => {
+  if (typeof amountInOre !== 'number' || amountInOre <= 0) return '—';
+  const kronor = amountInOre / 100;
+  return kronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Convert öre to kronor (for calculations)
+const oreToKronor = (amountInOre: number | undefined | null): number => {
+  if (typeof amountInOre !== 'number') return 0;
+  return amountInOre / 100;
+};
+
 interface EnterpriseAccessOverlayProps {
   membership: EnterpriseMembership;
   isAdmin?: boolean;
@@ -354,7 +368,7 @@ function InlinePaymentForm({
           </>
         ) : (
           <>
-            Betala {typeof amount === 'number' ? amount.toLocaleString('sv-SE') : '—'} kr
+            Betala {formatAmountSEK(amount)} kr
           </>
         )}
       </Button>
@@ -546,10 +560,10 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     );
   }
 
-  // Calculate VAT breakdown for payment form - with safe fallbacks
-  const safePaymentAmount = typeof paymentAmount === 'number' && paymentAmount > 0 ? paymentAmount : 0;
-  const netAmount = Math.round(safePaymentAmount / 1.25);
-  const vatAmount = safePaymentAmount - netAmount;
+  // Calculate VAT breakdown for payment form - amounts are in öre, convert to kronor
+  const safePaymentAmountKronor = oreToKronor(paymentAmount);
+  const netAmountKronor = safePaymentAmountKronor / 1.25;
+  const vatAmountKronor = safePaymentAmountKronor - netAmountKronor;
 
   // Blocking overlays - minimalistic design matching MaintenanceOverlay
   const overlayContent = () => {
@@ -654,7 +668,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
               <div className="text-center py-4 px-6 bg-background/60 rounded-xl backdrop-blur-sm">
                 <p className="text-sm text-muted-foreground mb-1">Att betala</p>
                 <p className="text-4xl font-bold text-foreground tracking-tight">
-                  {safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'}
+                  {formatAmountSEK(paymentAmount)}
                   <span className="text-2xl font-medium ml-1">kr</span>
                 </p>
                 <Badge variant="secondary" className="mt-3">
@@ -676,16 +690,16 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Belopp exkl. moms</span>
-                  <span className="text-foreground font-medium">{netAmount > 0 ? netAmount.toLocaleString('sv-SE') : '—'} kr</span>
+                  <span className="text-foreground font-medium">{netAmountKronor > 0 ? netAmountKronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} kr</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Moms (25%)</span>
-                  <span className="text-foreground font-medium">{vatAmount > 0 ? vatAmount.toLocaleString('sv-SE') : '—'} kr</span>
+                  <span className="text-foreground font-medium">{vatAmountKronor > 0 ? vatAmountKronor.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} kr</span>
                 </div>
                 <Separator className="my-3" />
                 <div className="flex justify-between text-base font-semibold">
                   <span className="text-foreground">Totalt</span>
-                  <span className="text-primary">{safePaymentAmount > 0 ? safePaymentAmount.toLocaleString('sv-SE') : '—'} kr</span>
+                  <span className="text-primary">{formatAmountSEK(paymentAmount)} kr</span>
                 </div>
               </div>
             </div>
@@ -799,12 +813,12 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">{content.title}</h1>
               <p className="text-muted-foreground leading-relaxed">{content.message}</p>
               
-              {/* Show amount if available */}
+              {/* Show amount if available - amounts are in öre */}
               {accessState.type === 'unpaid_invoice' && accessState.amountDue && accessState.amountDue > 0 && (
                 <div className="py-4 px-6 bg-background/60 rounded-xl mt-4">
                   <p className="text-sm text-muted-foreground mb-1">Belopp att betala</p>
                   <p className="text-3xl font-bold text-foreground">
-                    {accessState.amountDue.toLocaleString('sv-SE')}
+                    {formatAmountSEK(accessState.amountDue)}
                     <span className="text-lg font-medium ml-1">kr</span>
                   </p>
                 </div>
