@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { AudioWaveVisualizer } from "./AudioWaveVisualizer";
+import { OrbScene } from "./VoiceOrb";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -870,10 +870,10 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                   {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
                 </div>
 
-                <AudioWaveVisualizer
+                <OrbScene
                   stream={streamRef.current}
                   isActive={isRecording && !isPaused}
-                  size={120}
+                  size={160}
                 />
 
                 <div className="space-y-1">
