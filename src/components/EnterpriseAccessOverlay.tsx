@@ -1,9 +1,17 @@
-import { AlertCircle, CreditCard, Clock, Mail } from 'lucide-react';
+import { AlertCircle, CreditCard, Clock, Mail, Loader2, CheckCircle2, Shield, Building2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { EnterpriseMembership } from '@/contexts/SubscriptionContext';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import tivlyLogo from '@/assets/tivly-logo.png';
+
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51RBmwME0yFmyBl81G1NTIqm31T3hPUmYvdYQl5QLa3WKwrJhqNpHKYCLpLNjg0RfN9xZiS89s5t1z0SnDzk1lBQy00BjPV4ERK';
 
 interface EnterpriseAccessOverlayProps {
   membership: EnterpriseMembership;
@@ -13,7 +21,7 @@ interface EnterpriseAccessOverlayProps {
 type AccessState = 
   | { type: 'allowed' }
   | { type: 'trial_expired'; companyName: string }
-  | { type: 'unpaid_invoice'; companyName: string; invoiceUrl?: string; amountDue?: number }
+  | { type: 'unpaid_invoice'; companyName: string; invoiceId?: string; invoiceUrl?: string; amountDue?: number }
   | { type: 'canceled_active'; companyName: string; cancelAt: Date }
   | { type: 'canceled_expired'; companyName: string }
   | { type: 'no_billing'; companyName: string };
@@ -91,6 +99,7 @@ function determineAccessState(membership: EnterpriseMembership): AccessState {
     return {
       type: 'unpaid_invoice',
       companyName,
+      invoiceId: billing.latestInvoice?.id,
       invoiceUrl: billing.latestInvoice?.invoiceUrl,
       amountDue: billing.latestInvoice?.amountDue,
     };
@@ -224,11 +233,113 @@ function mapLiveToCompanyBilling(live: LiveBillingStatusResponse | null): Compan
   } as CompanyBilling;
 }
 
+// Inline Payment Form Component
+function InlinePaymentForm({ 
+  onSuccess, 
+  onError,
+  isProcessing,
+  setIsProcessing,
+  amount
+}: { 
+  onSuccess: () => void; 
+  onError: (msg: string) => void;
+  isProcessing: boolean;
+  setIsProcessing: (v: boolean) => void;
+  amount: number;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        onError(error.message || 'Betalningen misslyckades');
+        setIsProcessing(false);
+      } else if (paymentIntent?.status === 'succeeded') {
+        onSuccess();
+      } else {
+        setIsProcessing(false);
+      }
+    } catch (err: any) {
+      onError(err.message || 'Ett fel uppstod');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PaymentElement 
+        options={{
+          layout: 'tabs',
+          wallets: {
+            applePay: 'auto',
+            googlePay: 'auto',
+          },
+          paymentMethodOrder: ['card', 'apple_pay', 'google_pay', 'klarna'],
+        }}
+      />
+      
+      <Button 
+        type="submit" 
+        className="w-full h-12 text-base font-medium"
+        disabled={!stripe || !elements || isProcessing}
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Bearbetar betalning...
+          </>
+        ) : (
+          <>
+            Betala {amount.toLocaleString('sv-SE')} kr
+          </>
+        )}
+      </Button>
+      
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <Shield className="h-3.5 w-3.5" />
+        <span>Säker och krypterad betalning</span>
+      </div>
+    </form>
+  );
+}
+
 export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAccessOverlayProps) => {
   const companyId = membership.company?.id;
   const [liveBilling, setLiveBilling] = useState<LiveBillingStatusResponse | null>(null);
   const [isCheckingBilling, setIsCheckingBilling] = useState(false);
   const [billingCheckError, setBillingCheckError] = useState<string | null>(null);
+  const [hasInitialCheck, setHasInitialCheck] = useState(false);
+
+  // Payment form states
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+
+  useEffect(() => {
+    setStripePromise(loadStripe(STRIPE_PUBLISHABLE_KEY));
+  }, []);
 
   const companyBillingFromLive = useMemo(() => mapLiveToCompanyBilling(liveBilling), [liveBilling]);
 
@@ -252,9 +363,11 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
       const data = (await apiClient.getEnterpriseCompanyBillingSubscription(companyId)) as LiveBillingStatusResponse;
       setLiveBilling(data);
       setBillingCheckError(null);
+      setHasInitialCheck(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Okänt fel';
       setBillingCheckError(message);
+      setHasInitialCheck(true);
     } finally {
       setIsCheckingBilling(false);
     }
@@ -275,6 +388,57 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     const id = window.setInterval(checkBillingNow, 3000);
     return () => window.clearInterval(id);
   }, [companyId, isAdmin, accessState.type, checkBillingNow]);
+
+  // Handle "Betala nu" button click
+  const handlePayNow = async () => {
+    const invoiceId = accessState.type === 'unpaid_invoice' ? accessState.invoiceId : null;
+    
+    if (!invoiceId) {
+      // Fallback to hosted URL if no invoice ID
+      if (accessState.type === 'unpaid_invoice' && accessState.invoiceUrl) {
+        window.open(accessState.invoiceUrl, '_blank');
+      }
+      return;
+    }
+
+    setIsLoadingPayment(true);
+    setPaymentError(null);
+
+    try {
+      const response = await apiClient.getEnterpriseInvoiceDetail(invoiceId);
+      
+      if (response.success && response.invoice?.paymentIntentClientSecret) {
+        setClientSecret(response.invoice.paymentIntentClientSecret);
+        setPaymentAmount(response.invoice.amountSek);
+        setShowPaymentForm(true);
+      } else if (response.invoice?.hostedInvoiceUrl || response.invoice?.stripeInvoiceUrl) {
+        // Fallback to hosted URL
+        window.open(response.invoice.hostedInvoiceUrl || response.invoice.stripeInvoiceUrl, '_blank');
+      } else {
+        setPaymentError('Kunde inte ladda betalningsformuläret. Försök igen.');
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Ett fel uppstod';
+      setPaymentError(message);
+    } finally {
+      setIsLoadingPayment(false);
+    }
+  };
+
+  const handlePaymentSuccess = () => {
+    setPaymentSuccess(true);
+    setIsProcessing(false);
+    // Trigger billing check to update state
+    setTimeout(() => {
+      checkBillingNow();
+    }, 1500);
+  };
+
+  const handleBackToOverlay = () => {
+    setShowPaymentForm(false);
+    setClientSecret(null);
+    setPaymentError(null);
+  };
 
   // Admins bypass all overlays
   if (isAdmin) {
@@ -306,6 +470,10 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     );
   }
 
+  // Calculate VAT breakdown for payment form
+  const netAmount = Math.round(paymentAmount / 1.25);
+  const vatAmount = paymentAmount - netAmount;
+
   // Blocking overlays - minimalistic design matching MaintenanceOverlay
   const overlayContent = () => {
     switch (accessState.type) {
@@ -320,19 +488,12 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
       case 'unpaid_invoice':
         return {
           icon: CreditCard,
-          title: isCheckingBilling ? 'Kontrollerar faktureringsstatus…' : 'Obetald faktura',
-          message: isCheckingBilling
-            ? `Kontrollerar fakturering för ${accessState.companyName}…`
-            : `Det finns en obetald faktura för ${accessState.companyName}.`,
-          action: accessState.invoiceUrl
+          title: 'Obetald faktura',
+          message: `Det finns en obetald faktura för ${accessState.companyName}.`,
+          action: accessState.invoiceId || accessState.invoiceUrl
             ? 'Betala fakturan för att fortsätta använda tjänsten.'
             : 'Kontakta din företagsadministratör för betalning.',
-          actionButton: accessState.invoiceUrl
-            ? {
-                label: 'Betala nu',
-                url: accessState.invoiceUrl,
-              }
-            : undefined,
+          showPayButton: !!(accessState.invoiceId || accessState.invoiceUrl),
         };
 
       case 'canceled_expired':
@@ -345,14 +506,10 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
 
       case 'no_billing':
         return {
-          icon: isCheckingBilling ? Clock : Mail,
-          title: isCheckingBilling ? 'Kontrollerar faktureringsstatus…' : 'Ingen aktiv prenumeration',
-          message: isCheckingBilling
-            ? `Kontrollerar fakturering för ${accessState.companyName}…`
-            : `Det finns ingen aktiv prenumeration för ${accessState.companyName}.`,
-          action: isCheckingBilling
-            ? 'Detta uppdateras automatiskt var 3:e sekund.'
-            : 'Kontakta din företagsadministratör för att aktivera.',
+          icon: Mail,
+          title: 'Ingen aktiv prenumeration',
+          message: `Det finns ingen aktiv prenumeration för ${accessState.companyName}.`,
+          action: 'Kontakta din företagsadministratör för att aktivera.',
         };
     }
   };
@@ -361,6 +518,169 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
   if (!content) return null;
 
   const IconComponent = content.icon;
+
+  // Payment success screen
+  if (paymentSuccess) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6">
+        <div className="text-center space-y-6 max-w-sm">
+          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
+            <CheckCircle2 className="w-8 h-8 text-green-500" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-semibold tracking-tight">Betalning genomförd!</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Tack för din betalning. Ett kvitto skickas till din e-post.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Sidan uppdateras automatiskt...
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Payment form screen
+  if (showPaymentForm && clientSecret && stripePromise) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-md">
+          {/* Header */}
+          <div className="bg-muted/50 border border-border rounded-t-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
+                  <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-foreground">Tivly Enterprise</h2>
+                  {accessState.type === 'unpaid_invoice' && (
+                    <p className="text-xs text-muted-foreground">{accessState.companyName}</p>
+                  )}
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleBackToOverlay}
+                className="h-8 w-8 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Amount display */}
+            <div className="text-center py-2">
+              <p className="text-3xl font-bold text-foreground">
+                {paymentAmount.toLocaleString('sv-SE')} kr
+              </p>
+              <Badge variant="secondary" className="mt-2">
+                <CreditCard className="h-3 w-3 mr-1.5" />
+                Obetald faktura
+              </Badge>
+            </div>
+          </div>
+
+          {/* Payment Form */}
+          <div className="bg-background border-x border-b border-border rounded-b-xl p-6">
+            {/* Cost breakdown */}
+            <div className="mb-6 p-4 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Kostnadssammanställning</span>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Belopp exkl. moms</span>
+                  <span className="text-foreground">{netAmount.toLocaleString('sv-SE')} kr</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Moms (25%)</span>
+                  <span className="text-foreground">{vatAmount.toLocaleString('sv-SE')} kr</span>
+                </div>
+                <Separator className="my-2" />
+                <div className="flex justify-between font-semibold">
+                  <span className="text-foreground">Totalt att betala</span>
+                  <span className="text-primary">{paymentAmount.toLocaleString('sv-SE')} kr</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {paymentError && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                {paymentError}
+              </div>
+            )}
+
+            {/* Stripe Payment Form */}
+            <Elements 
+              stripe={stripePromise} 
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: 'stripe',
+                  variables: {
+                    colorPrimary: 'hsl(173, 80%, 40%)',
+                    borderRadius: '8px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                  },
+                  rules: {
+                    '.Label': {
+                      color: 'hsl(var(--foreground))',
+                      marginBottom: '8px',
+                    },
+                    '.Input': {
+                      borderColor: 'hsl(var(--border))',
+                      boxShadow: 'none',
+                    },
+                    '.Input:focus': {
+                      borderColor: 'hsl(173, 80%, 40%)',
+                      boxShadow: '0 0 0 1px hsl(173, 80%, 40%)',
+                    },
+                    '.Tab': {
+                      borderColor: 'hsl(var(--border))',
+                    },
+                    '.Tab--selected': {
+                      borderColor: 'hsl(173, 80%, 40%)',
+                      color: 'hsl(173, 80%, 40%)',
+                    },
+                  },
+                },
+                loader: 'auto',
+              }}
+            >
+              <InlinePaymentForm 
+                onSuccess={handlePaymentSuccess}
+                onError={setPaymentError}
+                isProcessing={isProcessing}
+                setIsProcessing={setIsProcessing}
+                amount={paymentAmount}
+              />
+            </Elements>
+
+            {/* Terms disclaimer */}
+            <Separator className="my-6" />
+            <p className="text-xs text-muted-foreground text-center">
+              Genom att slutföra betalningen godkänner du{' '}
+              <a 
+                href="https://www.tivly.se/enterprise-villkor" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Tivly Enterprise-villkor
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center p-6">
@@ -375,18 +695,32 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
           <p className="text-sm text-muted-foreground leading-relaxed">{content.action}</p>
         </div>
 
-        {content.actionButton && (
-          <a
-            href={content.actionButton.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            <CreditCard className="w-4 h-4" />
-            {content.actionButton.label}
-          </a>
+        {/* Error message */}
+        {paymentError && (
+          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            {paymentError}
+          </div>
         )}
 
+        {content.showPayButton && (
+          <Button
+            onClick={handlePayNow}
+            disabled={isLoadingPayment}
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium"
+          >
+            {isLoadingPayment ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Laddar betalning...
+              </>
+            ) : (
+              <>
+                <CreditCard className="w-4 h-4" />
+                Betala nu
+              </>
+            )}
+          </Button>
+        )}
 
         <div className="pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground">
