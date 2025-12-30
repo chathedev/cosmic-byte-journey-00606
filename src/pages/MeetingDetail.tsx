@@ -1572,22 +1572,17 @@ const MeetingDetail = () => {
                   transition={{ delay: 0.15 }}
                   className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
                 >
-                  {/* Header - clickable to expand/collapse */}
-                  <button
-                    onClick={() => !isEditing && setIsTranscriptExpanded(!isTranscriptExpanded)}
-                    className="w-full px-5 py-4 border-b border-border/30 flex items-center justify-between hover:bg-muted/30 transition-colors"
-                  >
+                {/* Header - NOT clickable, just informational */}
+                  <div className="w-full px-5 py-4 border-b border-border/30 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
                         <FileText className="w-4 h-4 text-primary" />
                       </div>
                       <div className="text-left">
                         <span className="font-medium text-sm">Transkription</span>
-                        {!isTranscriptExpanded && !isEditing && (
-                          <p className="text-xs text-muted-foreground">
-                            Klicka för att visa hela
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {isTranscriptExpanded ? 'Visar hela transkriptionen' : 'Förhandsgranskning'}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1595,20 +1590,15 @@ const MeetingDetail = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleResetFromASR(); }}
+                          onClick={handleResetFromASR}
                           className="gap-1.5 text-xs rounded-full"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           Återställ
                         </Button>
                       )}
-                      {!isEditing && (
-                        <ChevronDown 
-                          className={`w-5 h-5 text-muted-foreground transition-transform duration-200 ${isTranscriptExpanded ? 'rotate-180' : ''}`} 
-                        />
-                      )}
                     </div>
-                  </button>
+                  </div>
 
                   {/* Content - collapsible */}
                   <AnimatePresence initial={false}>
@@ -1695,16 +1685,24 @@ const MeetingDetail = () => {
                             : displayTranscript?.slice(0, 250) + '...'
                           }
                         </div>
-                        <button
-                          onClick={() => setIsTranscriptExpanded(true)}
-                          className="mt-3 text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1"
-                        >
-                          Visa hela transkriptionen
-                          <ChevronDown className="w-4 h-4" />
-                        </button>
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* Always visible button - enabled/disabled based on transcript availability */}
+                  <div className="px-5 py-3 border-t border-border/30">
+                    <Button
+                      onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+                      variant="outline"
+                      size="sm"
+                      disabled={isEditing || !hasTranscript}
+                      className="w-full gap-2 rounded-full"
+                    >
+                      <Eye className="w-4 h-4" />
+                      {isTranscriptExpanded ? 'Dölj transkriptionen' : 'Visa hela transkriptionen'}
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isTranscriptExpanded ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </div>
                 </motion.div>
 
                 {/* Protocol Section - Show if protocol exists */}

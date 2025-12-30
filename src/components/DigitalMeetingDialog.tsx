@@ -9,7 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { SubscribeDialog } from "./SubscribeDialog";
-import { uploadToAsr } from "@/lib/asrUpload";
+import { startBackgroundUpload } from "@/lib/backgroundUploader";
+import { meetingStorage } from "@/utils/meetingStorage";
 interface DigitalMeetingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -158,7 +159,7 @@ export const DigitalMeetingDialog = ({
     const languageCode = selectedLanguage === 'sv-SE' ? 'sv' : 'en';
     const meetingTitle = file.name.replace(/\.[^/.]+$/, '') || 'Uppladdat möte';
     
-    console.log('📤 Starting upload flow - POST to /transcribe first');
+    console.log('📤 Starting instant redirect upload flow');
     console.log('  - File:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     
     if (file.size < 1000) {
@@ -171,66 +172,55 @@ export const DigitalMeetingDialog = ({
       return;
     }
 
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      toast({
-        title: "Autentisering krävs",
-        description: "Ladda om sidan och logga in igen.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    setUploadProgress(0);
-
-    const traceId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
-    console.log('📤 Starting upload via fetch...', { traceId, fileName: file.name, size: file.size });
-
     try {
-      const result = await uploadToAsr({
-        file,
-        language: languageCode,
+      // Create meeting immediately with processing status
+      const now = new Date().toISOString();
+      const meetingData = {
         title: meetingTitle,
-        traceId,
-        onProgress: (percent) => setUploadProgress(percent),
-      });
+        folder: 'General',
+        transcript: '',
+        protocol: '',
+        createdAt: now,
+        updatedAt: now,
+        userId: user.uid,
+        isCompleted: false,
+        source: 'upload' as const,
+        transcriptionStatus: 'uploading' as const,
+        forceCreate: true,
+      };
 
-      if (!result.success || !result.meetingId) {
-        throw new Error(result.error || 'Uppladdningen misslyckades');
-      }
-
-      const meetingId = result.meetingId;
-      console.log('✅ Upload complete - meetingId:', meetingId, '| traceId:', traceId);
+      // Save meeting to get an ID
+      const meetingId = await meetingStorage.saveMeeting(meetingData as any);
+      console.log('✅ Meeting created with ID:', meetingId);
 
       // Save pending meeting to sessionStorage for instant display on meeting page
       const pendingMeeting = {
+        ...meetingData,
         id: meetingId,
-        title: meetingTitle,
-        transcript: '',
-        transcriptionStatus: 'processing',
-        folder: 'General',
-        source: 'upload',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        transcriptionStatus: 'uploading',
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Close dialog and redirect immediately (do not wait for any extra checks)
+      // Close dialog immediately and redirect
       onOpenChange(false);
       setSelectedFile(null);
       setIsSubmitting(false);
       setUploadProgress(0);
 
+      // Navigate to meeting detail page - upload progress will show there
+      navigate(`/meetings/${meetingId}`);
+
+      // Start background upload - this happens after redirect
+      console.log('🎤 Starting background upload for file...');
+      startBackgroundUpload(file, meetingId, languageCode);
+
       toast({
-        title: 'Uppladdning klar! 🎉',
-        description: 'Transkription har startat. Vi har den klar åt dig snart.',
+        title: 'Uppladdning startar',
+        description: 'Du kan följa framstegen på mötessidan.',
       });
 
-      navigate(`/meetings/${meetingId}`);
     } catch (error: any) {
-      console.error('Upload error:', { traceId, error });
+      console.error('Upload error:', error);
       setIsSubmitting(false);
       toast({
         title: 'Något gick fel',
