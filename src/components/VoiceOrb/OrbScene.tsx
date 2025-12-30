@@ -50,7 +50,7 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
       let idleFrame: number;
       const idleAnimate = () => {
         const t = Date.now() * 0.001;
-        const breathe = (Math.sin(t * 0.5) + 1) * 0.03;
+        const breathe = (Math.sin(t * 0.8) + 1) * 0.04;
         setVolume(breathe);
         idleFrame = requestAnimationFrame(idleAnimate);
       };
@@ -60,18 +60,16 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
 
     const setupAudio = async () => {
       try {
-        // Create new audio context
         const audioContext = new AudioContext();
         audioContextRef.current = audioContext;
 
-        // Resume if suspended
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
         }
 
         const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.85;
+        analyser.fftSize = 128; // Smaller for faster response
+        analyser.smoothingTimeConstant = 0.6; // Less smoothing = faster response
         analyserRef.current = analyser;
 
         const source = audioContext.createMediaStreamSource(stream);
@@ -87,7 +85,7 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
           analyserRef.current.getByteTimeDomainData(dataArray);
           analyserRef.current.getByteFrequencyData(frequencyArray);
 
-          // Calculate RMS volume with more sensitivity
+          // Calculate RMS volume with HIGH sensitivity
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             const amplitude = (dataArray[i] - 128) / 128;
@@ -95,12 +93,15 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
           }
           const rms = Math.sqrt(sum / dataArray.length);
           
-          // More responsive volume with minimum breathing
-          const targetVolume = Math.max(0.02, rms * 2.5);
-          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.15;
+          // Much more sensitive - amplify small sounds
+          const amplifiedVolume = Math.pow(rms, 0.6) * 4; // Power curve makes quiet sounds visible
+          const targetVolume = Math.max(0.03, Math.min(1, amplifiedVolume));
+          
+          // Faster response
+          smoothedVolumeRef.current += (targetVolume - smoothedVolumeRef.current) * 0.3;
           setVolume(smoothedVolumeRef.current);
 
-          // Get dominant frequency for color/shape variations
+          // Get dominant frequency
           let maxFreqIndex = 0;
           let maxFreqValue = 0;
           for (let i = 0; i < frequencyArray.length; i++) {
@@ -141,15 +142,15 @@ export function OrbScene({ stream, isActive, size = 200 }: OrbSceneProps) {
           <pointLight position={[0, 3, 0]} intensity={0.3} color="#ffffff" />
           
           <Float
-            speed={0.3}
-            rotationIntensity={0.08}
-            floatIntensity={0.1}
-            floatingRange={[-0.02, 0.02]}
+            speed={0.6}
+            rotationIntensity={0.12}
+            floatIntensity={0.15}
+            floatingRange={[-0.03, 0.03]}
           >
             <VoiceOrb
               volume={volume}
               frequency={frequency}
-              isSpeaking={isActive && volume > 0.03}
+              isSpeaking={isActive && volume > 0.02}
             />
           </Float>
         </Suspense>
