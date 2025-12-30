@@ -174,16 +174,17 @@ export const DigitalMeetingDialog = ({
 
     try {
       // Create meeting immediately with processing status
+      // IMPORTANT: isCompleted must be true to get a real backend ID (not a temp draft ID)
       const now = new Date().toISOString();
       const meetingData = {
         title: meetingTitle,
-        folder: 'General',
+        folder: 'Allmänt',
         transcript: '',
         protocol: '',
         createdAt: now,
         updatedAt: now,
         userId: user.uid,
-        isCompleted: false,
+        isCompleted: true,  // Must be true to create real backend meeting
         source: 'upload' as const,
         transcriptionStatus: 'uploading' as const,
         forceCreate: true,
