@@ -151,9 +151,15 @@ type LiveBillingStatusResponse = {
     id: string;
     status: string;
     hostedInvoiceUrl?: string;
+    hostedInvoicePath?: string;
+    stripeInvoiceUrl?: string;
+    paymentIntentClientSecret?: string;
+    paymentIntentId?: string;
+    paymentIntentStatus?: string;
     amountDue?: number;
     amountPaid?: number;
     amountRemaining?: number;
+    amountSek?: number;
     currency?: string;
     collectionMethod?: string;
     dueDate?: string | null;
@@ -161,6 +167,8 @@ type LiveBillingStatusResponse = {
     createdAt?: string | null;
     periodStart?: string | null;
     periodEnd?: string | null;
+    billingType?: 'one_time' | 'monthly' | 'yearly';
+    companyName?: string;
   };
   timestamp: string;
 };
@@ -389,40 +397,65 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     return () => window.clearInterval(id);
   }, [companyId, isAdmin, accessState.type, checkBillingNow]);
 
-  // Handle "Betala nu" button click
+  // Handle "Betala nu" button click - Uses Tivly-hosted approach with embedded Stripe Elements
   const handlePayNow = async () => {
-    const invoiceId = accessState.type === 'unpaid_invoice' ? accessState.invoiceId : null;
-    
-    if (!invoiceId) {
-      // Fallback to hosted URL if no invoice ID
-      if (accessState.type === 'unpaid_invoice' && accessState.invoiceUrl) {
-        window.open(accessState.invoiceUrl, '_blank');
-      }
-      return;
-    }
-
     setIsLoadingPayment(true);
     setPaymentError(null);
 
     try {
-      const response = await apiClient.getEnterpriseInvoiceDetail(invoiceId);
-      
-      if (response.success && response.invoice?.paymentIntentClientSecret) {
-        setClientSecret(response.invoice.paymentIntentClientSecret);
-        // Safely get amount with fallback
-        const amt = typeof response.invoice.amountSek === 'number' 
-          ? response.invoice.amountSek 
-          : (accessState.type === 'unpaid_invoice' && typeof accessState.amountDue === 'number' ? accessState.amountDue : 0);
+      // Strategy 1: Try subscription endpoint first (has latest invoice with paymentIntentClientSecret)
+      if (companyId && liveBilling?.latestInvoice?.paymentIntentClientSecret) {
+        const inv = liveBilling.latestInvoice;
+        setClientSecret(inv.paymentIntentClientSecret);
+        const amt = inv.amountSek ?? inv.amountRemaining ?? inv.amountDue ?? 
+          (accessState.type === 'unpaid_invoice' ? accessState.amountDue : 0) ?? 0;
         setPaymentAmount(amt);
         setShowPaymentForm(true);
-      } else if (response.invoice?.hostedInvoiceUrl || response.invoice?.stripeInvoiceUrl) {
-        // Fallback to hosted URL
-        window.open(response.invoice.hostedInvoiceUrl || response.invoice.stripeInvoiceUrl, '_blank');
-      } else {
-        setPaymentError('Kunde inte ladda betalningsformuläret. Försök igen.');
+        setIsLoadingPayment(false);
+        return;
       }
+
+      // Strategy 2: Fetch fresh data from subscription endpoint
+      if (companyId) {
+        try {
+          const subResponse = await apiClient.getEnterpriseCompanyBillingSubscription(companyId) as LiveBillingStatusResponse;
+          if (subResponse.latestInvoice?.paymentIntentClientSecret) {
+            setClientSecret(subResponse.latestInvoice.paymentIntentClientSecret);
+            const amt = subResponse.latestInvoice.amountSek ?? 
+              subResponse.latestInvoice.amountRemaining ?? 
+              subResponse.latestInvoice.amountDue ?? 0;
+            setPaymentAmount(amt);
+            setLiveBilling(subResponse);
+            setShowPaymentForm(true);
+            setIsLoadingPayment(false);
+            return;
+          }
+        } catch (subError) {
+          console.warn('Subscription endpoint failed, trying invoice detail:', subError);
+        }
+      }
+
+      // Strategy 3: Try invoice detail endpoint
+      const invoiceId = accessState.type === 'unpaid_invoice' ? accessState.invoiceId : liveBilling?.latestInvoice?.id;
+      
+      if (invoiceId) {
+        const response = await apiClient.getEnterpriseInvoiceDetail(invoiceId);
+        
+        if (response.success && response.invoice?.paymentIntentClientSecret) {
+          setClientSecret(response.invoice.paymentIntentClientSecret);
+          const amt = response.invoice.amountSek ?? 
+            (accessState.type === 'unpaid_invoice' ? accessState.amountDue : 0) ?? 0;
+          setPaymentAmount(amt);
+          setShowPaymentForm(true);
+          setIsLoadingPayment(false);
+          return;
+        }
+      }
+
+      // No payment intent available - show error
+      setPaymentError('Betalningsuppgifter kunde inte hämtas. Kontakta support.');
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Ett fel uppstod';
+      const message = e instanceof Error ? e.message : 'Ett fel uppstod vid hämtning av betalning';
       setPaymentError(message);
     } finally {
       setIsLoadingPayment(false);
@@ -585,7 +618,10 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
               </p>
               <Badge variant="secondary" className="mt-2">
                 <CreditCard className="h-3 w-3 mr-1.5" />
-                Obetald faktura
+                {liveBilling?.latestInvoice?.billingType === 'monthly' ? 'Månadsbetalning' :
+                 liveBilling?.latestInvoice?.billingType === 'yearly' ? 'Årsbetalning' :
+                 liveBilling?.latestInvoice?.billingType === 'one_time' ? 'Engångsbetalning' :
+                 'Obetald faktura'}
               </Badge>
             </div>
           </div>
