@@ -180,9 +180,24 @@ export function InvoicePaymentDialog({
     }
   };
 
+  const getBillingDisclaimer = (type: string) => {
+    switch (type) {
+      case 'monthly': 
+        return 'Detta abonnemang förnyas automatiskt varje månad tills det avbryts.';
+      case 'yearly': 
+        return 'Detta abonnemang förnyas automatiskt varje år tills det avbryts.';
+      case 'one_time': 
+        return 'Detta är en engångsbetalning. Ingen automatisk förnyelse.';
+      default: 
+        return null;
+    }
+  };
+
+  const billingDisclaimer = getBillingDisclaimer(invoiceType);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="bg-primary/5 border-b border-border p-6">
           <div className="flex items-center justify-between mb-4">
@@ -219,7 +234,7 @@ export function InvoicePaymentDialog({
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1">
           {paymentSuccess ? (
             /* Success State */
             <div className="text-center py-6">
@@ -238,6 +253,18 @@ export function InvoicePaymentDialog({
             </div>
           ) : (
             <>
+              {/* Billing frequency disclaimer */}
+              {billingDisclaimer && (
+                <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm text-foreground">
+                  <p className="font-medium mb-1">
+                    {invoiceType === 'one_time' ? '💳 Engångsbetalning' : '🔄 Återkommande betalning'}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {billingDisclaimer}
+                  </p>
+                </div>
+              )}
+
               {/* Cost breakdown */}
               <div className="mb-6 p-4 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 mb-3">
