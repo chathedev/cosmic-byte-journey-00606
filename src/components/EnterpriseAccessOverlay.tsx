@@ -544,10 +544,22 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
     return null;
   }
 
-  // Show nothing while checking billing status for the first time
-  // This prevents flashing "no subscription" before the check completes
+  // Show a blank loading screen while checking billing status for the first time
+  // This prevents the dashboard from flashing before the check completes
   if (!hasInitialCheck && companyId) {
-    return null;
+    return (
+      <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 overflow-hidden flex items-center justify-center">
+            <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-3" />
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Kontrollerar åtkomst...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // No overlay needed
