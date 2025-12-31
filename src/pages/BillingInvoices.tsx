@@ -57,34 +57,59 @@ export default function BillingInvoices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      if (!enterpriseMembership?.isMember || !enterpriseMembership.company?.id) {
-        return;
-      }
+  // Check if any invoice is open/unpaid to enable auto-polling
+  const hasOpenInvoice = invoices.some(inv => 
+    ['open', 'draft'].includes(inv.status.toLowerCase())
+  );
 
-      try {
+  const fetchInvoices = async (isPolling = false) => {
+    if (!enterpriseMembership?.isMember || !enterpriseMembership.company?.id) {
+      return;
+    }
+
+    try {
+      // Only show loading skeleton on initial load, not during polling
+      if (!isPolling) {
         setLoading(true);
-        const response = await apiClient.getMyEnterpriseMembership();
-        const billingHistory = (response as any)?.company?.billingHistory || [];
-        
-        const sorted = billingHistory.sort((a: any, b: any) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        
-        setInvoices(sorted);
-      } catch (err: any) {
-        console.error('Failed to fetch invoices:', err);
+      }
+      const response = await apiClient.getMyEnterpriseMembership();
+      const billingHistory = (response as any)?.company?.billingHistory || [];
+      
+      const sorted = billingHistory.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      setInvoices(sorted);
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to fetch invoices:', err);
+      if (!isPolling) {
         setError(err.message || 'Kunde inte hämta fakturor');
-      } finally {
+      }
+    } finally {
+      if (!isPolling) {
         setLoading(false);
       }
-    };
+    }
+  };
 
+  // Initial fetch
+  useEffect(() => {
     if (!authLoading && !subLoading && user) {
-      fetchInvoices();
+      fetchInvoices(false);
     }
   }, [user, authLoading, subLoading, enterpriseMembership]);
+
+  // Auto-poll for payment status updates when there are open invoices
+  useEffect(() => {
+    if (!hasOpenInvoice || loading) return;
+
+    const pollInterval = setInterval(() => {
+      fetchInvoices(true);
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [hasOpenInvoice, loading, enterpriseMembership]);
 
   // Not logged in
   if (!authLoading && !user) {
