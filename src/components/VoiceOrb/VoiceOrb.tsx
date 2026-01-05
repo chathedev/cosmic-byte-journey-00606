@@ -13,15 +13,15 @@ export function VoiceOrb({ volume, frequency, isSpeaking }: VoiceOrbProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const smoothedVolumeRef = useRef(0);
 
-  // Space-like colors: deep blue, purple, teal, warm accent
+  // Vibrant space colors that flow beautifully
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uVolume: { value: 0 },
-      uColor1: { value: new THREE.Color('#0a1628') },  // Deep space blue
-      uColor2: { value: new THREE.Color('#1e3a5f') },  // Ocean blue
-      uColor3: { value: new THREE.Color('#4a2c6a') },  // Purple nebula
-      uColor4: { value: new THREE.Color('#2d6a6a') },  // Teal accent
+      uColor1: { value: new THREE.Color('#1a4a7a') },  // Rich blue
+      uColor2: { value: new THREE.Color('#6b3fa0') },  // Vibrant purple
+      uColor3: { value: new THREE.Color('#2aa5a0') },  // Bright teal
+      uColor4: { value: new THREE.Color('#e05080') },  // Warm pink accent
     }),
     []
   );

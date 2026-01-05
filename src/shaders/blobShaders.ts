@@ -58,45 +58,48 @@ export const fragmentShader = `
     float dist = length(uv - center);
     
     // Hard circle mask
-    float circle = 1.0 - smoothstep(0.48, 0.5, dist);
+    float circle = 1.0 - smoothstep(0.46, 0.5, dist);
     
     if (circle < 0.01) {
       discard;
     }
     
-    // Time and volume factors
-    float time = uTime * 0.15;
-    float volumeEffect = uVolume * 0.8;
+    // Time and volume factors - more dynamic
+    float time = uTime * 0.25;
+    float volumeEffect = uVolume * 2.5 + 0.1; // Always some movement
     
-    // Create flowing noise layers with different speeds
-    float noise1 = snoise(uv * 2.0 + vec2(time * 0.3, time * 0.2)) * 0.5 + 0.5;
-    float noise2 = snoise(uv * 3.0 - vec2(time * 0.25, time * 0.35) + 10.0) * 0.5 + 0.5;
-    float noise3 = snoise(uv * 1.5 + vec2(time * 0.4, -time * 0.15) + 20.0) * 0.5 + 0.5;
-    float noise4 = snoise(uv * 2.5 - vec2(-time * 0.2, time * 0.3) + 30.0) * 0.5 + 0.5;
+    // Create flowing noise layers with different speeds - more variation
+    float noise1 = snoise(uv * 2.5 + vec2(time * 0.5, time * 0.3)) * 0.5 + 0.5;
+    float noise2 = snoise(uv * 3.5 - vec2(time * 0.4, time * 0.55) + 10.0) * 0.5 + 0.5;
+    float noise3 = snoise(uv * 2.0 + vec2(time * 0.6, -time * 0.25) + 20.0) * 0.5 + 0.5;
+    float noise4 = snoise(uv * 3.0 - vec2(-time * 0.35, time * 0.45) + 30.0) * 0.5 + 0.5;
     
-    // Volume-reactive swirl
-    float swirl = snoise(uv * 4.0 + vec2(sin(time * 2.0) * volumeEffect, cos(time * 2.0) * volumeEffect)) * 0.5 + 0.5;
+    // Volume-reactive swirl - stronger effect
+    float swirl = snoise(uv * 5.0 + vec2(sin(time * 3.0) * volumeEffect, cos(time * 3.0) * volumeEffect)) * 0.5 + 0.5;
     
-    // Blend colors based on noise
+    // Dynamic color blending based on noise and position
     vec3 color = uColor1;
-    color = mix(color, uColor2, noise1 * 0.7);
-    color = mix(color, uColor3, noise2 * 0.5);
-    color = mix(color, uColor4, noise3 * 0.4);
+    color = mix(color, uColor2, noise1 * 0.8 + swirl * 0.2);
+    color = mix(color, uColor3, noise2 * 0.7);
+    color = mix(color, uColor4, noise3 * 0.5 * volumeEffect);
     
-    // Add volume-reactive brightness pulse
-    float pulse = swirl * volumeEffect * 0.6;
-    color += pulse * 0.3;
+    // Add volume-reactive brightness and saturation boost
+    float pulse = swirl * volumeEffect * 0.8;
+    color += vec3(pulse * 0.4, pulse * 0.3, pulse * 0.5);
     
-    // Subtle edge glow
-    float edgeGlow = smoothstep(0.3, 0.5, dist) * 0.15;
-    color = mix(color, uColor4, edgeGlow);
+    // Center glow - brighter core
+    float centerGlow = 1.0 - smoothstep(0.0, 0.35, dist);
+    color += centerGlow * 0.25 * (1.0 + volumeEffect * 0.5);
     
-    // Inner depth effect
-    float innerDepth = 1.0 - smoothstep(0.0, 0.4, dist);
-    color = mix(color, uColor1 * 1.2, innerDepth * 0.2);
+    // Edge accent with color4
+    float edgeGlow = smoothstep(0.25, 0.48, dist) * 0.3;
+    color = mix(color, uColor4, edgeGlow * noise4);
+    
+    // Boost overall brightness
+    color *= 1.3;
     
     // Soft anti-aliased edge
-    float alpha = circle * 0.95;
+    float alpha = circle;
     
     gl_FragColor = vec4(color, alpha);
   }
