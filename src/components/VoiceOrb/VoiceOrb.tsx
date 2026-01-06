@@ -13,15 +13,14 @@ export function VoiceOrb({ volume, frequency, isSpeaking }: VoiceOrbProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const smoothedVolumeRef = useRef(0);
 
-  // Vibrant cosmic colors - highly visible and beautiful
+  // Three distinct, rich colors
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uVolume: { value: 0 },
-      uColor1: { value: new THREE.Color('#0f2a4a') },  // Deep ocean blue base
-      uColor2: { value: new THREE.Color('#8b5cf6') },  // Vivid purple
-      uColor3: { value: new THREE.Color('#06b6d4') },  // Bright cyan
-      uColor4: { value: new THREE.Color('#f43f5e') },  // Hot pink accent
+      uColor1: { value: new THREE.Color('#1e3a5f') },  // Deep navy blue
+      uColor2: { value: new THREE.Color('#7c3aed') },  // Rich purple
+      uColor3: { value: new THREE.Color('#0d9488') },  // Teal green
     }),
     []
   );
