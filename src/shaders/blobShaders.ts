@@ -52,55 +52,91 @@ export const fragmentShader = `
     return 130.0 * dot(m, g);
   }
   
+  // Fractal brownian motion for richer patterns
+  float fbm(vec2 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    for(int i = 0; i < 4; i++) {
+      value += amplitude * snoise(p * frequency);
+      amplitude *= 0.5;
+      frequency *= 2.0;
+    }
+    return value;
+  }
+  
   void main() {
     vec2 center = vec2(0.5, 0.5);
     vec2 uv = vUv;
-    float dist = length(uv - center);
+    vec2 centeredUv = uv - center;
+    float dist = length(centeredUv);
+    float angle = atan(centeredUv.y, centeredUv.x);
     
-    // Hard circle mask
-    float circle = 1.0 - smoothstep(0.46, 0.5, dist);
+    // Hard circle mask with soft edge
+    float circle = 1.0 - smoothstep(0.44, 0.48, dist);
     
     if (circle < 0.01) {
       discard;
     }
     
-    // Time and volume factors - more dynamic
-    float time = uTime * 0.25;
-    float volumeEffect = uVolume * 2.5 + 0.1; // Always some movement
+    // Time and volume - voice reactivity
+    float time = uTime * 0.2;
+    float vol = uVolume * 3.0 + 0.15; // Always some base movement
     
-    // Create flowing noise layers with different speeds - more variation
-    float noise1 = snoise(uv * 2.5 + vec2(time * 0.5, time * 0.3)) * 0.5 + 0.5;
-    float noise2 = snoise(uv * 3.5 - vec2(time * 0.4, time * 0.55) + 10.0) * 0.5 + 0.5;
-    float noise3 = snoise(uv * 2.0 + vec2(time * 0.6, -time * 0.25) + 20.0) * 0.5 + 0.5;
-    float noise4 = snoise(uv * 3.0 - vec2(-time * 0.35, time * 0.45) + 30.0) * 0.5 + 0.5;
+    // Create large flowing color regions using polar coordinates
+    float polarNoise1 = fbm(vec2(angle * 0.5 + time * 0.3, dist * 2.0 + time * 0.2));
+    float polarNoise2 = fbm(vec2(angle * 0.7 - time * 0.25, dist * 1.5 - time * 0.15));
+    float polarNoise3 = fbm(vec2(angle * 0.4 + time * 0.4, dist * 2.5 + sin(time) * 0.3));
     
-    // Volume-reactive swirl - stronger effect
-    float swirl = snoise(uv * 5.0 + vec2(sin(time * 3.0) * volumeEffect, cos(time * 3.0) * volumeEffect)) * 0.5 + 0.5;
+    // Large flowing bands based on angle and radius
+    float band1 = sin(angle * 2.0 + time * 0.5 + polarNoise1 * 3.0) * 0.5 + 0.5;
+    float band2 = sin(angle * 1.5 - time * 0.4 + polarNoise2 * 2.5) * 0.5 + 0.5;
+    float band3 = cos(angle * 2.5 + time * 0.6 + polarNoise3 * 2.0) * 0.5 + 0.5;
     
-    // Dynamic color blending based on noise and position
+    // Voice-reactive wave distortion
+    float voiceWave = sin(dist * 8.0 - time * 4.0 * vol) * vol * 0.3;
+    float voicePulse = sin(time * 3.0 + angle * 3.0) * vol * 0.4;
+    
+    // Blend colors in large, flowing regions
     vec3 color = uColor1;
-    color = mix(color, uColor2, noise1 * 0.8 + swirl * 0.2);
-    color = mix(color, uColor3, noise2 * 0.7);
-    color = mix(color, uColor4, noise3 * 0.5 * volumeEffect);
     
-    // Add volume-reactive brightness and saturation boost
-    float pulse = swirl * volumeEffect * 0.8;
-    color += vec3(pulse * 0.4, pulse * 0.3, pulse * 0.5);
+    // Large color band 1 - sweeping across
+    float blend1 = smoothstep(0.3, 0.7, band1 + voiceWave);
+    color = mix(color, uColor2, blend1 * 0.85);
     
-    // Center glow - brighter core
-    float centerGlow = 1.0 - smoothstep(0.0, 0.35, dist);
-    color += centerGlow * 0.25 * (1.0 + volumeEffect * 0.5);
+    // Large color band 2 - counter-rotating
+    float blend2 = smoothstep(0.35, 0.75, band2 + voicePulse);
+    color = mix(color, uColor3, blend2 * 0.75);
     
-    // Edge accent with color4
-    float edgeGlow = smoothstep(0.25, 0.48, dist) * 0.3;
-    color = mix(color, uColor4, edgeGlow * noise4);
+    // Accent color in specific regions
+    float blend3 = smoothstep(0.4, 0.8, band3 * (1.0 + vol * 0.5));
+    color = mix(color, uColor4, blend3 * 0.6);
     
-    // Boost overall brightness
-    color *= 1.3;
+    // Radial gradient - brighter center, darker edges
+    float radialGradient = 1.0 - smoothstep(0.0, 0.45, dist);
+    color += radialGradient * 0.3 * (1.0 + vol * 0.5);
     
-    // Soft anti-aliased edge
-    float alpha = circle;
+    // Inner glow that pulses with voice
+    float innerGlow = 1.0 - smoothstep(0.0, 0.25, dist);
+    vec3 glowColor = mix(uColor2, uColor3, sin(time * 2.0) * 0.5 + 0.5);
+    color += innerGlow * glowColor * 0.4 * (1.0 + vol);
     
-    gl_FragColor = vec4(color, alpha);
+    // Voice-reactive brightness waves
+    float brightWave = sin(dist * 6.0 - time * 5.0) * vol * 0.15;
+    color += brightWave;
+    
+    // Edge highlight with accent color
+    float edgeHighlight = smoothstep(0.35, 0.46, dist) * (1.0 - smoothstep(0.46, 0.48, dist));
+    color = mix(color, uColor4 * 1.3, edgeHighlight * 0.5);
+    
+    // Saturation and vibrancy boost
+    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(luminance), color, 1.3); // Boost saturation
+    color *= 1.2; // Overall brightness
+    
+    // Clamp to prevent over-bright
+    color = clamp(color, 0.0, 1.2);
+    
+    gl_FragColor = vec4(color, circle);
   }
 `;

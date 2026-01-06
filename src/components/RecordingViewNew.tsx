@@ -848,25 +848,17 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           </div>
         </div>
 
-        {/* Main Content - Blob Focused */}
+        {/* Main Content - Orb Focused */}
         <div className="flex-1 flex flex-col items-center justify-center p-4">
-          {/* The Orb - Main Focus */}
+          {/* The Orb - Main Focus with ambient glow */}
           <div className="relative">
-            {/* Test button for allowed user */}
-            {hasTestAccess && !isTestMode && (
-              <button
-                onClick={startTestMode}
-                className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-muted/80 hover:bg-muted text-[10px] font-mono text-muted-foreground hover:text-foreground transition-all shadow-sm border border-border/50 z-10"
-                title="Simulera Tivly-möte"
-              >
-                Test
-              </button>
-            )}
+            {/* Ambient glow behind orb */}
+            <div className="absolute inset-0 -m-8 rounded-full bg-gradient-radial from-primary/20 via-primary/5 to-transparent blur-2xl pointer-events-none" />
             
             <OrbScene
               stream={streamRef.current}
               isActive={isRecording && !isPaused}
-              size={280}
+              size={320}
             />
           </div>
 
