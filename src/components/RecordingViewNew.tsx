@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { OrbScene } from "./VoiceOrb";
+import { VoiceAurora } from "./VoiceAurora";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -850,15 +850,15 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
 
         {/* Main Content - Orb Focused */}
         <div className="flex-1 flex flex-col items-center justify-center p-4">
-          {/* The Orb - Main Focus with ambient glow */}
+          {/* Voice Aurora Visualization */}
           <div className="relative">
-            {/* Ambient glow behind orb */}
-            <div className="absolute inset-0 -m-8 rounded-full bg-gradient-radial from-primary/20 via-primary/5 to-transparent blur-2xl pointer-events-none" />
+            {/* Ambient glow behind */}
+            <div className="absolute inset-0 -m-12 rounded-full bg-gradient-radial from-violet-500/15 via-cyan-500/10 to-transparent blur-3xl pointer-events-none" />
             
-            <OrbScene
+            <VoiceAurora
               stream={streamRef.current}
               isActive={isRecording && !isPaused}
-              size={320}
+              size={300}
             />
           </div>
 

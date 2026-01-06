@@ -1,0 +1,1 @@
+export { VoiceAurora } from './VoiceAurora';
