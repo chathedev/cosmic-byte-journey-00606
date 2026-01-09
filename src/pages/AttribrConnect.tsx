@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,85 +7,143 @@ import { Loader2, Link2, AlertCircle, FileText, CheckCircle2, LogIn } from "luci
 import { apiClient } from "@/lib/api";
 
 const API_BASE_URL = 'https://api.tivly.se';
-const APP_URL = 'https://app.tivly.se';
+const AUTH_HANDOFF_URL = 'https://app.tivly.se/auth/handoff';
+
+/**
+ * AttribrConnect - Secure Attribr organization connection flow
+ * 
+ * Uses postMessage handshake for cross-domain auth:
+ * 1. Opens app.tivly.se/auth/handoff as popup
+ * 2. Receives JWT via postMessage (never in URL)
+ * 3. Token stored in memory only
+ * 4. Calls API with token, then redirects to Attribr
+ */
 
 export default function AttribrConnect() {
   const [searchParams] = useSearchParams();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasInitiatedLogin, setHasInitiatedLogin] = useState(false);
+  const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Debug logging to confirm query params are preserved
-  useEffect(() => {
-    console.log('CONNECT PATH', window.location.pathname);
-    console.log('CONNECT SEARCH', window.location.search);
-  }, []);
+  
+  // Store token in memory only (not localStorage on connect.tivly.se)
+  const tokenRef = useRef<string | null>(null);
+  const popupRef = useRef<Window | null>(null);
 
   const attribrOrgId = searchParams.get("attribrOrgId");
   const returnUrl = searchParams.get("returnUrl");
   const hasRequiredParams = !!attribrOrgId && !!returnUrl;
 
-  // Build the current connect URL to use as return destination after login
-  const currentConnectUrl = `${window.location.origin}/connect/attribr?attribrOrgId=${encodeURIComponent(attribrOrgId || '')}&returnUrl=${encodeURIComponent(returnUrl || '')}`;
+  // Handle incoming postMessage from auth handoff popup
+  const handleMessage = useCallback((event: MessageEvent) => {
+    // Verify origin
+    const allowedOrigins = [
+      'https://app.tivly.se',
+      'https://d6dd0efa-1798-4d07-aaa8-544f61f29b34.lovableproject.com',
+    ];
+    
+    if (!allowedOrigins.some(o => event.origin === o || event.origin.endsWith('.tivly.se'))) {
+      console.log('[AttribrConnect] Ignoring message from:', event.origin);
+      return;
+    }
 
-  const handleLogin = () => {
-    // Redirect to app.tivly.se auth with return URL back to this connect page
-    const authUrl = `${APP_URL}/auth?redirect=${encodeURIComponent(currentConnectUrl)}`;
-    window.location.href = authUrl;
-  };
-
-  // If the user isn't authenticated on connect.tivly.se, automatically bounce to app.tivly.se.
-  // If they're already logged in there, they'll come straight back with an authToken.
-  useEffect(() => {
-    if (isCheckingAuth) return;
-    if (isAuthenticated) return;
-    if (!hasRequiredParams) return;
-    if (hasInitiatedLogin) return;
-
-    setHasInitiatedLogin(true);
-    handleLogin();
-  }, [isCheckingAuth, isAuthenticated, hasRequiredParams, hasInitiatedLogin]);
-
-  // Check for authToken in URL (passed from app.tivly.se after login)
-  useEffect(() => {
-    const urlAuthToken = new URLSearchParams(window.location.search).get('authToken');
-    if (urlAuthToken) {
-      apiClient.applyAuthToken(urlAuthToken);
-
-      // Remove authToken from URL to keep it clean
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('authToken');
-      window.history.replaceState({}, '', cleanUrl.toString());
-
-      console.log('[AttribrConnect] Applied auth token from URL');
+    if (event.data?.type === 'tivly-auth' && event.data?.token) {
+      console.log('[AttribrConnect] Received auth token via postMessage');
+      tokenRef.current = event.data.token;
+      setIsAuthenticated(true);
+      setIsWaitingForAuth(false);
+      
+      // Close popup if still open
+      if (popupRef.current && !popupRef.current.closed) {
+        popupRef.current.close();
+      }
     }
   }, []);
 
-  // Check if user is authenticated on mount
+  // Set up postMessage listener
+  useEffect(() => {
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [handleMessage]);
+
+  // Check if user already has a token (from previous session on this domain)
   useEffect(() => {
     const checkAuth = async () => {
-      const token = apiClient.getAuthToken();
-      if (!token) {
-        setIsAuthenticated(false);
-        setIsCheckingAuth(false);
-        return;
+      // On connect.tivly.se we don't store tokens, so check if one was passed via URL
+      // (fallback for the old flow, will be removed once postMessage is working)
+      const urlAuthToken = searchParams.get('authToken');
+      if (urlAuthToken) {
+        tokenRef.current = urlAuthToken;
+        
+        // Clean URL
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('authToken');
+        window.history.replaceState({}, '', cleanUrl.toString());
       }
 
-      try {
-        // Verify token is valid by calling /me
-        await apiClient.getMe();
-        setIsAuthenticated(true);
-      } catch {
-        setIsAuthenticated(false);
-      } finally {
-        setIsCheckingAuth(false);
+      // Also check localStorage as fallback (for same-domain case)
+      const storedToken = apiClient.getAuthToken();
+      if (storedToken && !tokenRef.current) {
+        tokenRef.current = storedToken;
       }
+
+      if (tokenRef.current) {
+        try {
+          // Verify token is valid
+          const response = await fetch(`${API_BASE_URL}/me`, {
+            headers: { 'Authorization': `Bearer ${tokenRef.current}` },
+          });
+          if (response.ok) {
+            setIsAuthenticated(true);
+          } else {
+            tokenRef.current = null;
+          }
+        } catch {
+          tokenRef.current = null;
+        }
+      }
+
+      setIsCheckingAuth(false);
     };
 
     checkAuth();
-  }, []);
+  }, [searchParams]);
+
+  const handleLogin = () => {
+    setIsWaitingForAuth(true);
+    setError(null);
+
+    // Open auth handoff popup
+    const width = 450;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      `${AUTH_HANDOFF_URL}?origin=${encodeURIComponent(window.location.origin)}`,
+      'tivly-auth-handoff',
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+    );
+
+    if (!popup) {
+      setError('Popup blocked. Please allow popups for this site and try again.');
+      setIsWaitingForAuth(false);
+      return;
+    }
+
+    popupRef.current = popup;
+
+    // Monitor popup close
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        if (!tokenRef.current) {
+          setIsWaitingForAuth(false);
+        }
+      }
+    }, 500);
+  };
 
   const handleConnect = async () => {
     if (!attribrOrgId || !returnUrl) {
@@ -93,9 +151,8 @@ export default function AttribrConnect() {
       return;
     }
 
-    const token = apiClient.getAuthToken();
-    if (!token) {
-      setError("Not authenticated");
+    if (!tokenRef.current) {
+      setError("Not authenticated. Please log in first.");
       return;
     }
 
@@ -107,13 +164,14 @@ export default function AttribrConnect() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${tokenRef.current}`,
         },
         body: JSON.stringify({ attribrOrgId }),
       });
 
       if (!response.ok) {
         if (response.status === 401) {
+          tokenRef.current = null;
           setIsAuthenticated(false);
           throw new Error("Session expired. Please log in again.");
         }
@@ -123,7 +181,14 @@ export default function AttribrConnect() {
       const data = await response.json();
 
       if (data?.token) {
-        // Redirect back to Attribr with the token
+        // Send done message to any listening opener
+        if (window.opener) {
+          try {
+            window.opener.postMessage({ type: 'tivly-connect-done' }, '*');
+          } catch { /* ignore */ }
+        }
+
+        // Redirect back to Attribr with the integration token
         const redirectUrl = new URL(returnUrl);
         redirectUrl.searchParams.set("token", data.token);
         window.location.href = redirectUrl.toString();
@@ -208,10 +273,19 @@ export default function AttribrConnect() {
                 onClick={handleLogin}
                 className="w-full h-12 text-base font-medium"
                 size="lg"
-                disabled={!hasRequiredParams}
+                disabled={!hasRequiredParams || isWaitingForAuth}
               >
-                <LogIn className="w-5 h-5" />
-                Log in to Tivly
+                {isWaitingForAuth ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Waiting for login...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    Log in to Tivly
+                  </>
+                )}
               </Button>
             </div>
           )}
