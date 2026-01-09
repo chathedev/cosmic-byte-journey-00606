@@ -1,27 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Link2, AlertCircle, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, Link2, AlertCircle, FileText, CheckCircle2, LogIn } from "lucide-react";
+import { apiClient } from "@/lib/api";
 
 const API_BASE_URL = 'https://api.tivly.se';
+const APP_URL = 'https://app.tivly.se';
 
 export default function AttribrConnect() {
   const [searchParams] = useSearchParams();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Debug logging to confirm query params are preserved
-  console.log('CONNECT PATH', window.location.pathname);
-  console.log('CONNECT SEARCH', window.location.search);
 
   const attribrOrgId = searchParams.get("attribrOrgId");
   const returnUrl = searchParams.get("returnUrl");
 
+  // Build the current connect URL to use as return destination after login
+  const currentConnectUrl = `${window.location.origin}/connect/attribr?attribrOrgId=${encodeURIComponent(attribrOrgId || '')}&returnUrl=${encodeURIComponent(returnUrl || '')}`;
+
+  // Check if user is authenticated on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = apiClient.getAuthToken();
+      if (!token) {
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+        return;
+      }
+
+      try {
+        // Verify token is valid by calling /me
+        await apiClient.getMe();
+        setIsAuthenticated(true);
+      } catch {
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const handleLogin = () => {
+    // Redirect to app.tivly.se auth with return URL back to this connect page
+    const authUrl = `${APP_URL}/auth?redirect=${encodeURIComponent(currentConnectUrl)}`;
+    window.location.href = authUrl;
+  };
+
   const handleConnect = async () => {
     if (!attribrOrgId || !returnUrl) {
       setError("Missing required parameters");
+      return;
+    }
+
+    const token = apiClient.getAuthToken();
+    if (!token) {
+      setError("Not authenticated");
       return;
     }
 
@@ -33,11 +72,16 @@ export default function AttribrConnect() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({ attribrOrgId }),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setIsAuthenticated(false);
+          throw new Error("Session expired. Please log in again.");
+        }
         throw new Error("Failed to create token");
       }
 
@@ -53,13 +97,27 @@ export default function AttribrConnect() {
       }
     } catch (err) {
       console.error("Failed to connect:", err);
-      setError("Failed to connect. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to connect. Please try again.");
       setIsConnecting(false);
     }
   };
 
   // Validate required params
   const hasRequiredParams = attribrOrgId && returnUrl;
+
+  // Loading state
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-12 flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Checking authentication...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -105,6 +163,27 @@ export default function AttribrConnect() {
             </div>
           </div>
 
+          {/* Not authenticated - show login prompt */}
+          {!isAuthenticated && (
+            <div className="space-y-4">
+              <Alert>
+                <LogIn className="h-4 w-4" />
+                <AlertDescription>
+                  Please log in to your Tivly account to connect this organization.
+                </AlertDescription>
+              </Alert>
+              <Button
+                onClick={handleLogin}
+                className="w-full h-12 text-base font-medium"
+                size="lg"
+                disabled={!hasRequiredParams}
+              >
+                <LogIn className="w-5 h-5" />
+                Log in to Tivly
+              </Button>
+            </div>
+          )}
+
           {/* Error state */}
           {error && (
             <Alert variant="destructive">
@@ -123,25 +202,27 @@ export default function AttribrConnect() {
             </Alert>
           )}
 
-          {/* Connect button */}
-          <Button
-            onClick={handleConnect}
-            disabled={isConnecting || !hasRequiredParams}
-            className="w-full h-12 text-base font-medium"
-            size="lg"
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Link2 className="w-5 h-5" />
-                Connect Organization
-              </>
-            )}
-          </Button>
+          {/* Connect button - only show when authenticated */}
+          {isAuthenticated && (
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting || !hasRequiredParams}
+              className="w-full h-12 text-base font-medium"
+              size="lg"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Link2 className="w-5 h-5" />
+                  Connect Organization
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Cancel link */}
           {returnUrl && (
