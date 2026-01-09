@@ -7,7 +7,7 @@ import { Loader2, Link2, AlertCircle, FileText, CheckCircle2, LogIn } from "luci
 import { apiClient } from "@/lib/api";
 
 const TIVLY_API_BASE_URL = 'https://api.tivly.se';
-const ATTRIBR_API_BASE_URL = 'https://app.attribr.com'; // Attribr's API endpoint
+const ATTRIBR_API_BASE_URL = 'https://api.attribr.com'; // Attribr's API endpoint
 const AUTH_HANDOFF_URL = 'https://app.tivly.se/auth/handoff';
 
 /**
