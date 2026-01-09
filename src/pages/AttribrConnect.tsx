@@ -12,6 +12,10 @@ export default function AttribrConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Debug logging to confirm query params are preserved
+  console.log('CONNECT PATH', window.location.pathname);
+  console.log('CONNECT SEARCH', window.location.search);
+
   const attribrOrgId = searchParams.get("attribrOrgId");
   const returnUrl = searchParams.get("returnUrl");
 

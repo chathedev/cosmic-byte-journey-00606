@@ -495,8 +495,9 @@ const App = () => {
                 }
               >
                 <Routes>
+                  <Route path="/connect/attribr" element={<AttribrConnect />} />
                   <Route path="/attribr" element={<AttribrConnect />} />
-                  <Route path="*" element={<Navigate to="/attribr" replace />} />
+                  <Route path="*" element={<AttribrConnect />} />
                 </Routes>
               </Suspense>
             </BrowserRouter>
