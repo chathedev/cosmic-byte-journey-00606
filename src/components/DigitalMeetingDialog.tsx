@@ -78,6 +78,7 @@ export const DigitalMeetingDialog = ({
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userPlan, isAdmin } = useSubscription();
@@ -121,10 +122,7 @@ export const DigitalMeetingDialog = ({
     return hasValidType || hasValidExtension;
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const validateAndSetFile = (file: File) => {
     // Validate file type
     if (!isValidAudioFile(file)) {
       toast({
@@ -148,6 +146,39 @@ export const DigitalMeetingDialog = ({
     }
 
     setSelectedFile(file);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    validateAndSetFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isSubmitting) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (isSubmitting) return;
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
   };
 
   const handleUpload = async () => {
@@ -323,11 +354,18 @@ export const DigitalMeetingDialog = ({
           {!selectedFile ? (
             <div 
               onClick={() => !isSubmitting && fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary hover:bg-accent/5 transition-colors"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200 ${
+                isDragging 
+                  ? 'border-primary bg-primary/10 scale-[1.02]' 
+                  : 'border-border hover:border-primary hover:bg-accent/5'
+              }`}
             >
-              <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <Upload className={`w-12 h-12 mx-auto mb-4 transition-colors ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
               <p className="text-sm font-medium text-foreground mb-1">
-                Klicka för att välja en ljudfil
+                {isDragging ? 'Släpp filen här' : 'Dra och släpp eller klicka för att välja'}
               </p>
               <p className="text-xs text-muted-foreground">
                 MP3, WAV eller M4A (max 500MB)
