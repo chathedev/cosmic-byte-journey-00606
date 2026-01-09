@@ -29,13 +29,28 @@ export default function AttribrConnect() {
   const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Store Tivly token in memory only (never in localStorage on connect.tivly.se)
-  const tokenRef = useRef<string | null>(null);
+  // Store tokens in memory only (never in localStorage on connect.tivly.se)
+  const tivlyTokenRef = useRef<string | null>(null);
+  const attribrTokenRef = useRef<string | null>(null); // Attribr access token for API auth
   const popupRef = useRef<Window | null>(null);
 
   const attribrOrgId = searchParams.get("attribrOrgId");
   const returnUrl = searchParams.get("returnUrl");
   const hasRequiredParams = !!attribrOrgId && !!returnUrl;
+
+  // Extract Attribr access token from URL on mount (Attribr passes this when opening connect page)
+  useEffect(() => {
+    const urlAttribrToken = searchParams.get('attribrToken') || searchParams.get('accessToken');
+    if (urlAttribrToken) {
+      attribrTokenRef.current = urlAttribrToken;
+      // Clean URL to not expose token
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('attribrToken');
+      cleanUrl.searchParams.delete('accessToken');
+      window.history.replaceState({}, '', cleanUrl.toString());
+      console.log('[AttribrConnect] Received Attribr access token from URL');
+    }
+  }, [searchParams]);
 
   // Handle incoming postMessage from auth handoff popup
   const handleMessage = useCallback((event: MessageEvent) => {
@@ -51,8 +66,8 @@ export default function AttribrConnect() {
     }
 
     if (event.data?.type === 'tivly-auth' && event.data?.token) {
-      console.log('[AttribrConnect] Received auth token via postMessage');
-      tokenRef.current = event.data.token;
+      console.log('[AttribrConnect] Received Tivly auth token via postMessage');
+      tivlyTokenRef.current = event.data.token;
       setIsAuthenticated(true);
       setIsWaitingForAuth(false);
 
@@ -69,14 +84,14 @@ export default function AttribrConnect() {
     return () => window.removeEventListener('message', handleMessage);
   }, [handleMessage]);
 
-  // Check if user already has a token (from previous session on this domain)
+  // Check if user already has a Tivly token (from previous session on this domain)
   useEffect(() => {
     const checkAuth = async () => {
       // Check if Tivly token was passed via URL (fallback for old flow)
       const urlTivlyAuthToken = searchParams.get('authToken');
 
       if (urlTivlyAuthToken) {
-        tokenRef.current = urlTivlyAuthToken;
+        tivlyTokenRef.current = urlTivlyAuthToken;
         // Clean URL
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('authToken');
@@ -85,23 +100,23 @@ export default function AttribrConnect() {
 
       // Also check localStorage as fallback (for same-domain case)
       const storedToken = apiClient.getAuthToken();
-      if (storedToken && !tokenRef.current) {
-        tokenRef.current = storedToken;
+      if (storedToken && !tivlyTokenRef.current) {
+        tivlyTokenRef.current = storedToken;
       }
 
-      if (tokenRef.current) {
+      if (tivlyTokenRef.current) {
         try {
           // Verify Tivly token is valid by calling /me
           const response = await fetch(`${TIVLY_API_BASE_URL}/me`, {
-            headers: { 'Authorization': `Bearer ${tokenRef.current}` },
+            headers: { 'Authorization': `Bearer ${tivlyTokenRef.current}` },
           });
           if (response.ok) {
             setIsAuthenticated(true);
           } else {
-            tokenRef.current = null;
+            tivlyTokenRef.current = null;
           }
         } catch {
-          tokenRef.current = null;
+          tivlyTokenRef.current = null;
         }
       }
 
@@ -139,7 +154,7 @@ export default function AttribrConnect() {
     const checkClosed = setInterval(() => {
       if (popup.closed) {
         clearInterval(checkClosed);
-        if (!tokenRef.current) {
+        if (!tivlyTokenRef.current) {
           setIsWaitingForAuth(false);
         }
       }
@@ -152,8 +167,13 @@ export default function AttribrConnect() {
       return;
     }
 
-    if (!tokenRef.current) {
-      setError("Not authenticated. Please log in first.");
+    if (!tivlyTokenRef.current) {
+      setError("Not authenticated with Tivly. Please log in first.");
+      return;
+    }
+
+    if (!attribrTokenRef.current) {
+      setError("Missing Attribr session. Please restart the connect flow from Attribr.");
       return;
     }
 
@@ -161,17 +181,21 @@ export default function AttribrConnect() {
     setError(null);
 
     try {
-      const tivlyToken = tokenRef.current;
+      const tivlyToken = tivlyTokenRef.current;
+      const attribrToken = attribrTokenRef.current;
 
-      // Call Attribr's connect endpoint with Tivly JWT
-      // Attribr validates the token by calling Tivly's /me endpoint
+      // Call Attribr's connect endpoint
+      // - Authorization: Bearer <attribrToken> for Attribr's auth guard
+      // - X-Tivly-Token: <tivlyToken> for Tivly user verification
       const connectUrl = `${ATTRIBR_API_BASE_URL}/integrations/tivly/connect?orgId=${encodeURIComponent(attribrOrgId)}`;
+
+      console.log('[AttribrConnect] Calling connect endpoint with Attribr token and Tivly token');
 
       const response = await fetch(connectUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${tivlyToken}`,
+          "Authorization": `Bearer ${attribrToken}`,
           "X-Tivly-Token": tivlyToken,
         },
         body: JSON.stringify({ tivlyToken }),
@@ -187,11 +211,10 @@ export default function AttribrConnect() {
               : null;
 
         if (response.status === 401) {
-          // Token rejected - clear and ask user to re-authenticate
-          tokenRef.current = null;
-          setIsAuthenticated(false);
+          // Attribr token rejected - need to restart flow from Attribr
+          attribrTokenRef.current = null;
           throw new Error(
-            serverMessage || "Session expired or unauthorized. Please log in again."
+            serverMessage || "Attribr session expired (401). Please return to Attribr and try connecting again."
           );
         }
 
