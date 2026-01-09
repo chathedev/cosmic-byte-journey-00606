@@ -136,17 +136,45 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 // Redirect authenticated users away from /auth (handles test mode too)
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  const spinner = (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  // If the user is already logged in and we have a redirect param (e.g. connect.tivly.se handoff),
+  // perform the redirect instead of sending them to the dashboard.
+  useEffect(() => {
+    if (!user) return;
+
+    const params = new URLSearchParams(location.search);
+    const redirectUrl = params.get('redirect');
+    if (!redirectUrl) return;
+
+    try {
+      const url = new URL(redirectUrl);
+      const isAllowed = url.hostname.endsWith('tivly.se') || url.hostname.endsWith('.lovableproject.com');
+      if (!isAllowed) return;
+
+      const token = apiClient.getAuthToken();
+      if (!token) return;
+
+      url.searchParams.set('authToken', token);
+      window.location.href = url.toString();
+    } catch {
+      // Ignore invalid redirect URL and fall back to normal behavior.
+    }
+  }, [user, location.search]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return spinner;
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    const hasRedirectParam = new URLSearchParams(location.search).has('redirect');
+    return hasRedirectParam ? spinner : <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

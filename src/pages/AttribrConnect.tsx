@@ -14,39 +14,58 @@ export default function AttribrConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasInitiatedLogin, setHasInitiatedLogin] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Debug logging to confirm query params are preserved
+  useEffect(() => {
+    console.log('CONNECT PATH', window.location.pathname);
+    console.log('CONNECT SEARCH', window.location.search);
+  }, []);
 
   const attribrOrgId = searchParams.get("attribrOrgId");
   const returnUrl = searchParams.get("returnUrl");
+  const hasRequiredParams = !!attribrOrgId && !!returnUrl;
 
   // Build the current connect URL to use as return destination after login
   const currentConnectUrl = `${window.location.origin}/connect/attribr?attribrOrgId=${encodeURIComponent(attribrOrgId || '')}&returnUrl=${encodeURIComponent(returnUrl || '')}`;
 
+  const handleLogin = () => {
+    // Redirect to app.tivly.se auth with return URL back to this connect page
+    const authUrl = `${APP_URL}/auth?redirect=${encodeURIComponent(currentConnectUrl)}`;
+    window.location.href = authUrl;
+  };
+
+  // If the user isn't authenticated on connect.tivly.se, automatically bounce to app.tivly.se.
+  // If they're already logged in there, they'll come straight back with an authToken.
+  useEffect(() => {
+    if (isCheckingAuth) return;
+    if (isAuthenticated) return;
+    if (!hasRequiredParams) return;
+    if (hasInitiatedLogin) return;
+
+    setHasInitiatedLogin(true);
+    handleLogin();
+  }, [isCheckingAuth, isAuthenticated, hasRequiredParams, hasInitiatedLogin]);
+
   // Check for authToken in URL (passed from app.tivly.se after login)
   useEffect(() => {
-    const urlAuthToken = searchParams.get('authToken');
+    const urlAuthToken = new URLSearchParams(window.location.search).get('authToken');
     if (urlAuthToken) {
-      // Store the token from URL and clean up the URL
       apiClient.applyAuthToken(urlAuthToken);
-      
+
       // Remove authToken from URL to keep it clean
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('authToken');
       window.history.replaceState({}, '', cleanUrl.toString());
-      
+
       console.log('[AttribrConnect] Applied auth token from URL');
     }
-  }, [searchParams]);
+  }, []);
 
   // Check if user is authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
-      // First check for token in URL (cross-domain auth)
-      const urlAuthToken = searchParams.get('authToken');
-      if (urlAuthToken) {
-        apiClient.applyAuthToken(urlAuthToken);
-      }
-      
       const token = apiClient.getAuthToken();
       if (!token) {
         setIsAuthenticated(false);
@@ -66,13 +85,7 @@ export default function AttribrConnect() {
     };
 
     checkAuth();
-  }, [searchParams]);
-
-  const handleLogin = () => {
-    // Redirect to app.tivly.se auth with return URL back to this connect page
-    const authUrl = `${APP_URL}/auth?redirect=${encodeURIComponent(currentConnectUrl)}`;
-    window.location.href = authUrl;
-  };
+  }, []);
 
   const handleConnect = async () => {
     if (!attribrOrgId || !returnUrl) {
