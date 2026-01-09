@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState, useContext } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, isBillingDomain, storeOriginDomain, isIosApp } from "@/utils/environment";
+import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, isBillingDomain, storeOriginDomain, isIosApp, isConnectDomain } from "@/utils/environment";
 import { toast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { apiClient } from "@/lib/api";
@@ -58,7 +58,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
-
+import AttribrConnect from "./pages/AttribrConnect";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -471,6 +471,34 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </AuthProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ErrorBoundary>
+      </QueryClientProvider>
+    );
+  }
+
+  // Routes for connect.tivly.se - Attribr integration
+  if (isConnectDomain()) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Suspense
+                fallback={
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                }
+              >
+                <Routes>
+                  <Route path="/attribr" element={<AttribrConnect />} />
+                  <Route path="*" element={<Navigate to="/attribr" replace />} />
+                </Routes>
+              </Suspense>
             </BrowserRouter>
           </TooltipProvider>
         </ErrorBoundary>
