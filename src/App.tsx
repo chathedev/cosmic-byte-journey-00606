@@ -59,6 +59,8 @@ import NotFound from "./pages/NotFound";
 import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
 import AttribrConnect from "./pages/AttribrConnect";
+import AuthHandoff from "./pages/AuthHandoff";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -334,6 +336,7 @@ const AppContent = () => {
             >
               <Routes>
                 <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                <Route path="/auth/handoff" element={<AuthHandoff />} />
                 <Route path="/magic-login" element={<MagicLogin />} />
                 <Route path="/sis-required" element={<ProtectedRoute><SISRequired /></ProtectedRoute>} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
