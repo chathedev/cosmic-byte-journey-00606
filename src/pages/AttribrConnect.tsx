@@ -6,7 +6,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Link2, AlertCircle, FileText, CheckCircle2, LogIn } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
-const API_BASE_URL = 'https://api.tivly.se';
+const TIVLY_API_BASE_URL = 'https://api.tivly.se';
+const ATTRIBR_API_BASE_URL = 'https://app.attribr.com'; // Attribr's API endpoint
 const AUTH_HANDOFF_URL = 'https://app.tivly.se/auth/handoff';
 
 /**
@@ -90,8 +91,8 @@ export default function AttribrConnect() {
 
       if (tokenRef.current) {
         try {
-          // Verify token is valid
-          const response = await fetch(`${API_BASE_URL}/me`, {
+          // Verify Tivly token is valid by calling /me
+          const response = await fetch(`${TIVLY_API_BASE_URL}/me`, {
             headers: { 'Authorization': `Bearer ${tokenRef.current}` },
           });
           if (response.ok) {
@@ -160,13 +161,16 @@ export default function AttribrConnect() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/integrations/attribr/token`, {
+      // Call Attribr's connect endpoint with Tivly JWT
+      // Attribr will validate token by calling Tivly's /me endpoint
+      const connectUrl = `${ATTRIBR_API_BASE_URL}/integrations/tivly/connect?orgId=${encodeURIComponent(attribrOrgId)}`;
+      
+      const response = await fetch(connectUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${tokenRef.current}`,
         },
-        body: JSON.stringify({ attribrOrgId }),
       });
 
       if (!response.ok) {
@@ -175,26 +179,19 @@ export default function AttribrConnect() {
           setIsAuthenticated(false);
           throw new Error("Session expired. Please log in again.");
         }
-        throw new Error("Failed to create token");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to connect to Attribr");
       }
 
-      const data = await response.json();
-
-      if (data?.token) {
-        // Send done message to any listening opener
-        if (window.opener) {
-          try {
-            window.opener.postMessage({ type: 'tivly-connect-done' }, '*');
-          } catch { /* ignore */ }
-        }
-
-        // Redirect back to Attribr with the integration token
-        const redirectUrl = new URL(returnUrl);
-        redirectUrl.searchParams.set("token", data.token);
-        window.location.href = redirectUrl.toString();
-      } else {
-        throw new Error("No token received");
+      // Send done message to any listening opener
+      if (window.opener) {
+        try {
+          window.opener.postMessage({ type: 'tivly-connect-done' }, '*');
+        } catch { /* ignore */ }
       }
+
+      // Redirect back to Attribr (success - no token needed in URL)
+      window.location.href = returnUrl;
     } catch (err) {
       console.error("Failed to connect:", err);
       setError(err instanceof Error ? err.message : "Failed to connect. Please try again.");
