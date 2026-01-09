@@ -220,11 +220,8 @@ export default function Auth() {
       
       setIsNavigating(true);
       await refreshUser();
-      
-      setTimeout(() => {
-        navigate('/', { replace: true });
-      }, 300);
-      
+      // IMPORTANT: do not navigate here.
+      // The /auth route wrapper handles redirecting (including cross-domain ?redirect=... flows).
       setLoading(false);
       return;
     }
@@ -371,12 +368,11 @@ export default function Auth() {
           console.log('[Auth] ✅ User has app access, proceeding...');
         }
 
-        console.log('[Auth] 🚀 Redirecting to dashboard...');
+        console.log('[Auth] ✅ Authenticated, handing off to route redirect...');
         setIsNavigating(true);
         await refreshUser();
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 300);
+        // IMPORTANT: do not navigate here.
+        // The /auth route wrapper handles redirecting (including cross-domain ?redirect=... flows).
         return;
       }
 
