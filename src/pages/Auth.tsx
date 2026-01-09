@@ -116,9 +116,34 @@ export default function Auth() {
     console.log(`[Auth] 🎯 Platform detected: ${detectedPlatform.toUpperCase()}`);
   }, []);
 
+  // Handle redirect param for cross-domain auth (e.g., connect.tivly.se)
   useEffect(() => {
     if (!isLoading && user && !isNavigating) {
       setIsNavigating(true);
+      
+      // Check for redirect param (used by connect.tivly.se and other subdomains)
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectUrl = urlParams.get('redirect');
+      
+      if (redirectUrl) {
+        try {
+          const url = new URL(redirectUrl);
+          // Only allow redirects to tivly.se subdomains for security
+          if (url.hostname.endsWith('tivly.se') || url.hostname.endsWith('.lovableproject.com')) {
+            const token = apiClient.getAuthToken();
+            if (token) {
+              // Append token to redirect URL for cross-domain auth
+              url.searchParams.set('authToken', token);
+              console.log('[Auth] Redirecting to external URL with token:', url.origin);
+              window.location.href = url.toString();
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('[Auth] Invalid redirect URL:', redirectUrl);
+        }
+      }
+      
       navigate('/', { replace: true });
     }
   }, [user, isLoading, navigate, isNavigating]);

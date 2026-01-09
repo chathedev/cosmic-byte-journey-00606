@@ -22,9 +22,31 @@ export default function AttribrConnect() {
   // Build the current connect URL to use as return destination after login
   const currentConnectUrl = `${window.location.origin}/connect/attribr?attribrOrgId=${encodeURIComponent(attribrOrgId || '')}&returnUrl=${encodeURIComponent(returnUrl || '')}`;
 
+  // Check for authToken in URL (passed from app.tivly.se after login)
+  useEffect(() => {
+    const urlAuthToken = searchParams.get('authToken');
+    if (urlAuthToken) {
+      // Store the token from URL and clean up the URL
+      apiClient.applyAuthToken(urlAuthToken);
+      
+      // Remove authToken from URL to keep it clean
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('authToken');
+      window.history.replaceState({}, '', cleanUrl.toString());
+      
+      console.log('[AttribrConnect] Applied auth token from URL');
+    }
+  }, [searchParams]);
+
   // Check if user is authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
+      // First check for token in URL (cross-domain auth)
+      const urlAuthToken = searchParams.get('authToken');
+      if (urlAuthToken) {
+        apiClient.applyAuthToken(urlAuthToken);
+      }
+      
       const token = apiClient.getAuthToken();
       if (!token) {
         setIsAuthenticated(false);
@@ -44,7 +66,7 @@ export default function AttribrConnect() {
     };
 
     checkAuth();
-  }, []);
+  }, [searchParams]);
 
   const handleLogin = () => {
     // Redirect to app.tivly.se auth with return URL back to this connect page
