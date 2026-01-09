@@ -137,9 +137,6 @@ export default function AttribrConnect() {
     }
   };
 
-  // Validate required params
-  const hasRequiredParams = attribrOrgId && returnUrl;
-
   // Loading state
   if (isCheckingAuth) {
     return (
