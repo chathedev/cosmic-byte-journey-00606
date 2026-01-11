@@ -85,7 +85,6 @@ const MeetingDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSpeakers, setShowSpeakers] = useState(true);
-  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
 
   // Protocol management state
   const [protocolData, setProtocolData] = useState<{
@@ -1703,15 +1702,6 @@ const MeetingDetail = () => {
                           Återställ
                         </Button>
                       )}
-                      {!isEditing && hasTranscript && (
-                        <button
-                          onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
-                          className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
-                        >
-                          {isTranscriptExpanded ? 'Visa mindre' : 'Visa allt'}
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isTranscriptExpanded ? 'rotate-180' : ''}`} />
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -1726,8 +1716,8 @@ const MeetingDetail = () => {
                       />
                     ) : hasSegments ? (
                       // Speaker-segmented view (always show segments if available)
-                      <div className={`space-y-0 ${isTranscriptExpanded ? 'max-h-[60vh] overflow-y-auto' : ''}`}>
-                        {(isTranscriptExpanded ? groupedSegments : groupedSegments.slice(0, 3)).map((segment, idx) => {
+                      <div className="space-y-0 max-h-[60vh] overflow-y-auto">
+                        {groupedSegments.map((segment, idx) => {
                           const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
                           const colorClass = getSpeakerColorClass(segment.speakerId);
                           const dotClass = getSpeakerDotClass(segment.speakerId);
@@ -1735,7 +1725,7 @@ const MeetingDetail = () => {
                           const timestamp = formatTimestamp(segment.start);
                           const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
                           const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
-                          
+
                           return (
                             <div key={idx}>
                               {showDivider && <div className="h-px bg-border/40 my-3" />}
@@ -1748,23 +1738,18 @@ const MeetingDetail = () => {
                                   )}
                                 </div>
                                 <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap pl-4">
-                                  {isTranscriptExpanded ? (segment.text || '') : ((segment.text || '').slice(0, 150) + ((segment.text || '').length > 150 ? '...' : ''))}
+                                  {segment.text || ''}
                                 </p>
                               </div>
                             </div>
                           );
                         })}
-                        {!isTranscriptExpanded && groupedSegments.length > 3 && (
-                          <p className="text-xs text-muted-foreground pt-3 pl-4">
-                            + {groupedSegments.length - 3} fler segment...
-                          </p>
-                        )}
                       </div>
                     ) : (
-                      // Plain text fallback
-                      <div className={`prose prose-sm max-w-none dark:prose-invert ${isTranscriptExpanded ? 'max-h-[60vh] overflow-y-auto' : ''}`}>
+                      // Plain text fallback (always show full transcript)
+                      <div className="prose prose-sm max-w-none dark:prose-invert max-h-[60vh] overflow-y-auto">
                         <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                          {isTranscriptExpanded ? displayTranscript : displayTranscript?.slice(0, 300) + '...'}
+                          {displayTranscript}
                         </div>
                       </div>
                     )}
