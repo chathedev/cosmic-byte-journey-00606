@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Suspense, useEffect, useRef, useState, useContext } from "react";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { isWebBrowserOnAppDomain, isNativeAppOnWebDomain, isAuthDomain, isBillingDomain, storeOriginDomain, isIosApp, isConnectDomain } from "@/utils/environment";
@@ -312,6 +312,12 @@ const EnterpriseSISGate = ({ children }: { children: React.ReactNode }) => {
 
 // Preferred Name Gate removed - now handled via auto-opening Settings in AppSidebar
 
+// Legacy route support: some older links still use singular "/meeting/:id"
+const MeetingLegacyRedirect = () => {
+  const { id } = useParams();
+  return <Navigate to={id ? `/meetings/${id}` : "/library"} replace />;
+};
+
 // Shared app content for all routes
 const AppContent = () => {
   return (
@@ -345,6 +351,7 @@ const AppContent = () => {
                 <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
                 <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
                 <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+                <Route path="/meeting/:id" element={<ProtectedRoute><MeetingLegacyRedirect /></ProtectedRoute>} />
                 <Route path="/meetings/:id" element={<ProtectedRoute><MeetingDetail /></ProtectedRoute>} />
                 <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
                 <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
