@@ -628,6 +628,18 @@ const MeetingDetail = () => {
         });
       }
       
+      // Also check the transcript itself for embedded speaker labels like [Talare 1]: or [Speaker 0]:
+      const transcriptSpeakerPattern = /\[(?:Talare|Speaker)[_\s]?\d+\]:/gi;
+      const transcriptMatches = transcript?.match(transcriptSpeakerPattern);
+      if (transcriptMatches && transcriptMatches.length > 0) {
+        transcriptMatches.forEach(match => {
+          // Extract the speaker name from [Talare 1]: format
+          const speakerName = match.replace(/[\[\]:]/g, '').trim();
+          allSpeakerLabels.add(speakerName);
+        });
+      }
+      
+      // If no speaker labels found at all, no generic names to warn about
       if (allSpeakerLabels.size === 0) return false;
       
       const genericPatterns = [
