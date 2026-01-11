@@ -249,205 +249,68 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const displayName = preferredName || user?.displayName?.split(' ')[0] || '';
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col overflow-hidden relative">
-      {/* Animated background gradient */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-transparent rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-accent/10 via-transparent to-transparent rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
-
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-start p-4 pt-8 md:p-8 md:justify-center overflow-y-auto relative z-10">
-        <div className="max-w-5xl w-full space-y-8 md:space-y-12">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
+        <div className="max-w-md w-full space-y-8">
           
-          {/* Hero section */}
-          <div className="text-center space-y-4 md:space-y-6">
-            {displayName && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 animate-fade-in">
-                <span className="text-sm md:text-base text-muted-foreground font-medium">
-                  {getGreeting()},
-                </span>
-                <span className="text-sm md:text-base font-semibold text-primary">{displayName}</span>
-                <span className="text-lg">👋</span>
-              </div>
-            )}
-            
-            {/* Animated microphone icon */}
-            <div className="relative inline-flex items-center justify-center">
-              <div className="absolute inset-0 w-20 h-20 md:w-28 md:h-28 rounded-full bg-primary/20 animate-ping opacity-20" />
-              <div className="absolute inset-0 w-20 h-20 md:w-28 md:h-28 rounded-full bg-primary/10 animate-pulse" />
-              <div className="relative w-20 h-20 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl shadow-primary/30">
-                <Mic className="w-10 h-10 md:w-14 md:h-14 text-primary-foreground" />
-              </div>
-            </div>
-            
-            <div className="space-y-3 md:space-y-4">
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-foreground tracking-tight">
-                <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                  Mötestranskribering
-                </span>
-              </h1>
-              <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
-                Omvandla dina möten till text på sekunder. 
-                <span className="hidden md:inline"> AI-driven transkribering med stöd för svenska.</span>
-              </p>
-            </div>
+          {/* Greeting */}
+          {displayName && (
+            <p className="text-center text-muted-foreground">
+              {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
+            </p>
+          )}
+          
+          {/* Simple hero */}
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
+              Transkribera möten
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Spela in eller ladda upp ljudfiler
+            </p>
           </div>
 
-          {/* CTA Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-3xl mx-auto">
-            {/* Record Card */}
-            <div 
+          {/* Action buttons */}
+          <div className="space-y-3">
+            <Button 
               onClick={handleStartRecording}
-              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary/80 p-6 md:p-8 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/30 active:scale-[0.98]"
+              size="lg"
+              className="w-full h-14 text-base gap-3"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative z-10 space-y-4">
-                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <Mic className="w-7 h-7 md:w-8 md:h-8 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold text-primary-foreground mb-1">
-                    Spela in live
-                  </h3>
-                  <p className="text-sm md:text-base text-primary-foreground/80">
-                    Transkribera möten i realtid direkt i webbläsaren
-                  </p>
-                </div>
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-primary-foreground/90 pt-2">
-                  <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm">
-                    ✨ Bäst för fysiska möten
-                  </span>
-                </div>
-              </div>
-              {/* Decorative circles */}
-              <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/10" />
-              <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/5" />
-            </div>
+              <Mic className="w-5 h-5" />
+              Spela in live
+            </Button>
 
-            {/* Upload Card */}
-            <div 
+            <Button 
               onClick={handleOpenDigitalMeeting}
-              className="group relative overflow-hidden rounded-2xl bg-card border-2 border-border p-6 md:p-8 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:border-accent/50 active:scale-[0.98]"
+              variant="outline"
+              size="lg"
+              className="w-full h-14 text-base gap-3"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative z-10 space-y-4">
-                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-                  <Upload className="w-7 h-7 md:w-8 md:h-8 text-accent" />
-                </div>
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold text-foreground mb-1">
-                    Ladda upp fil
-                  </h3>
-                  <p className="text-sm md:text-base text-muted-foreground">
-                    Ladda upp ljudfiler för snabb transkribering
-                  </p>
-                </div>
-                <div className="inline-flex items-center gap-2 text-sm font-medium pt-2">
-                  {hasProAccess ? (
-                    <span className="px-3 py-1 rounded-full bg-accent/10 text-accent">
-                      🎯 Alla format stöds
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-                      🔒 Pro/Enterprise
-                    </span>
-                  )}
-                </div>
-              </div>
-              {/* Decorative elements */}
-              <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-accent/5" />
-            </div>
+              <Upload className="w-5 h-5" />
+              Ladda upp fil
+              {!hasProAccess && (
+                <span className="text-xs text-muted-foreground ml-1">(Pro)</span>
+              )}
+            </Button>
           </div>
 
-          {/* Features section */}
-          <div className="space-y-4 md:space-y-6">
-            <h2 className="text-center text-lg md:text-xl font-semibold text-muted-foreground">
-              Allt du behöver för effektiva möten
-            </h2>
-            
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 max-w-4xl mx-auto">
-              {/* Feature 1 */}
-              <div className="group relative bg-card rounded-xl p-4 md:p-6 border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-lg">
-                <div className="space-y-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <svg className="w-5 h-5 md:w-6 md:h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm md:text-base text-foreground">Realtid</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mt-1 hidden md:block">
-                      Transkribering medan du pratar
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Feature 2 */}
-              <div className="group relative bg-card rounded-xl p-4 md:p-6 border border-border hover:border-accent/30 transition-all duration-300 hover:shadow-lg">
-                <div className="space-y-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <svg className="w-5 h-5 md:w-6 md:h-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm md:text-base text-foreground">Visualisering</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mt-1 hidden md:block">
-                      Animerad ljudvisualisering
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Feature 3 */}
-              <div className="group relative bg-card rounded-xl p-4 md:p-6 border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-lg">
-                <div className="space-y-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <FileText className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm md:text-base text-foreground">Protokoll</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mt-1 hidden md:block">
-                      Generera Word-dokument
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="group relative bg-card rounded-xl p-4 md:p-6 border border-border hover:border-accent/30 transition-all duration-300 hover:shadow-lg">
-                <div className="space-y-3">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <svg className="w-5 h-5 md:w-6 md:h-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm md:text-base text-foreground">Bibliotek</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mt-1 hidden md:block">
-                      Organisera i mappar
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Minimal features */}
+          <div className="flex justify-center gap-6 pt-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+              Realtid
+            </span>
+            <span className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+              Svenska
+            </span>
+            <span className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+              AI-protokoll
+            </span>
           </div>
-
-          {/* Pro tip */}
-          <div className="hidden md:block max-w-2xl mx-auto">
-            <Alert className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm">
-              <AlertCircle className="h-5 w-5 text-primary" />
-              <AlertDescription className="text-sm ml-2">
-                <span className="font-semibold text-foreground">Pro-tips:</span>{' '}
-                <span className="text-muted-foreground">
-                  Inspelaren är optimerad för fysiska möten. Vid digitala möten (Teams, Zoom) fungerar det bättre att spela in ljudet och ladda upp filen efteråt.
-                </span>
-              </AlertDescription>
-            </Alert>
-          </div>
-
         </div>
       </div>
 
