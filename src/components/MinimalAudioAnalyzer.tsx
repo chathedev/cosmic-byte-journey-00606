@@ -7,6 +7,27 @@ interface MinimalAudioAnalyzerProps {
   size?: number;
 }
 
+// Helper to get computed CSS color value
+const getCssColor = (varName: string, alpha: number = 1): string => {
+  if (typeof window === 'undefined') return '#3b82f6';
+  
+  const root = document.documentElement;
+  const hslValue = getComputedStyle(root).getPropertyValue(varName).trim();
+  
+  if (!hslValue) return '#3b82f6';
+  
+  // hslValue is like "221.2 83.2% 53.3%" - space-separated
+  const parts = hslValue.split(' ');
+  if (parts.length >= 3) {
+    const h = parts[0];
+    const s = parts[1];
+    const l = parts[2];
+    return alpha < 1 ? `hsla(${h}, ${s}, ${l}, ${alpha})` : `hsl(${h}, ${s}, ${l})`;
+  }
+  
+  return '#3b82f6';
+};
+
 export const MinimalAudioAnalyzer = ({ stream, isActive, size = 200 }: MinimalAudioAnalyzerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const audioMotionRef = useRef<AudioMotionAnalyzer | null>(null);
@@ -14,6 +35,11 @@ export const MinimalAudioAnalyzer = ({ stream, isActive, size = 200 }: MinimalAu
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Get actual color values from CSS variables
+    const primaryColor = getCssColor('--primary');
+    const primaryColor70 = getCssColor('--primary', 0.7);
+    const primaryColor40 = getCssColor('--primary', 0.4);
 
     // Initialize analyzer
     const audioMotion = new AudioMotionAnalyzer(containerRef.current, {
@@ -39,15 +65,21 @@ export const MinimalAudioAnalyzer = ({ stream, isActive, size = 200 }: MinimalAu
       spinSpeed: 1,
     });
 
-    // Custom minimal gradient
-    audioMotion.registerGradient("minimal", {
-      colorStops: [
-        { color: "hsl(var(--primary))", pos: 0 },
-        { color: "hsl(var(--primary) / 0.7)", pos: 0.5 },
-        { color: "hsl(var(--primary) / 0.4)", pos: 1 },
-      ],
-    });
-    audioMotion.gradient = "minimal";
+    // Custom minimal gradient with computed colors
+    try {
+      audioMotion.registerGradient("minimal", {
+        colorStops: [
+          { color: primaryColor, pos: 0 },
+          { color: primaryColor70, pos: 0.5 },
+          { color: primaryColor40, pos: 1 },
+        ],
+      });
+      audioMotion.gradient = "minimal";
+    } catch (e) {
+      // Fallback to built-in gradient if custom fails
+      console.warn("Failed to register custom gradient, using classic:", e);
+      audioMotion.gradient = "classic";
+    }
 
     audioMotionRef.current = audioMotion;
 
