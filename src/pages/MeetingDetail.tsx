@@ -1755,6 +1755,72 @@ const MeetingDetail = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
+                {/* Quick Actions Bar - At the top for easy access */}
+                {!isEditing && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
+                  >
+                    <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                      {/* Primary action - Create Protocol */}
+                      <Button
+                        onClick={handleCreateProtocol}
+                        variant={protocolData ? "outline" : "default"}
+                        className="gap-2 h-11 text-sm font-medium sm:flex-1"
+                        disabled={loadingProtocol || !canGenerateMoreProtocols}
+                      >
+                        {loadingProtocol ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : !canGenerateMoreProtocols ? (
+                          <Lock className="w-4 h-4" />
+                        ) : protocolData ? (
+                          <RefreshCw className="w-4 h-4" />
+                        ) : (
+                          <FileText className="w-4 h-4" />
+                        )}
+                        {!canGenerateMoreProtocols 
+                          ? 'Gräns nådd'
+                          : protocolData 
+                            ? 'Ersätt protokoll'
+                            : 'Skapa protokoll'
+                        }
+                      </Button>
+                      
+                      <Badge variant="secondary" className="text-xs px-2.5 py-1.5 shrink-0">
+                        {protocolCountRemaining > 0 
+                          ? `${protocolCountRemaining} av ${maxProtocolGenerations} kvar`
+                          : `0 av ${maxProtocolGenerations} kvar`
+                        }
+                      </Badge>
+
+                      {/* Secondary actions */}
+                      <div className="flex items-center gap-1 sm:ml-auto">
+                        {hasPlusAccess(user, userPlan) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/chat?meeting=${meeting.id}`)}
+                            className="gap-1.5 text-xs h-9"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Chatta</span>
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="gap-1.5 text-xs h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Ta bort</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Status Bar */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <Badge variant="outline" className="gap-1.5 text-green-600 border-green-500/30 bg-green-500/5">
@@ -2015,75 +2081,6 @@ const MeetingDetail = () => {
                           title="Ta bort protokoll"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Action Buttons - Enhanced layout */}
-                {!isEditing && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
-                  >
-                    <div className="p-5 space-y-4">
-                      {/* Primary action - Create Protocol */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <Button
-                          onClick={handleCreateProtocol}
-                          variant={protocolData ? "outline" : "default"}
-                          className="flex-1 gap-2.5 h-12 text-base font-medium"
-                          disabled={loadingProtocol || !canGenerateMoreProtocols}
-                        >
-                          {loadingProtocol ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : !canGenerateMoreProtocols ? (
-                            <Lock className="w-5 h-5" />
-                          ) : protocolData ? (
-                            <RefreshCw className="w-5 h-5" />
-                          ) : (
-                            <FileText className="w-5 h-5" />
-                          )}
-                          {!canGenerateMoreProtocols 
-                            ? 'Gräns nådd'
-                            : protocolData 
-                              ? 'Ersätt protokoll'
-                              : 'Skapa protokoll'
-                          }
-                        </Button>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Badge variant="secondary" className="text-xs px-2.5 py-1">
-                            {protocolCountRemaining > 0 
-                              ? `${protocolCountRemaining} av ${maxProtocolGenerations} kvar`
-                              : `0 av ${maxProtocolGenerations} kvar`
-                            }
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {/* Secondary actions */}
-                      <div className="flex flex-wrap gap-2 pt-2 border-t border-border/30">
-                        {hasPlusAccess(user, userPlan) && (
-                          <Button
-                            variant="ghost"
-                            onClick={() => navigate(`/chat?meeting=${meeting.id}`)}
-                            className="gap-2 text-sm h-10"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            Chatta med mötet
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="ghost"
-                          onClick={() => setShowDeleteConfirm(true)}
-                          className="gap-2 text-sm h-10 text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Ta bort
                         </Button>
                       </div>
                     </div>
