@@ -633,6 +633,24 @@ const MeetingDetail = () => {
       return;
     }
 
+    // Defensive: SIS kan vara avstängt även om state inte hunnit uppdateras ännu.
+    // Om backend säger "disabled" ska vi INTE visa dialogen "Talarnamn saknas".
+    if (!isSISDisabled) {
+      try {
+        const asrStatus = await pollASRStatus(meeting.id);
+        const sisDisabledNow =
+          (asrStatus as any)?.lyraStatus === 'disabled' || (asrStatus as any)?.sisStatus === 'disabled';
+
+        if (sisDisabledNow) {
+          setIsSISDisabled(true);
+          await proceedWithProtocolGeneration();
+          return;
+        }
+      } catch (e) {
+        // Ignore - fall back to existing UX
+      }
+    }
+
     // Check if speakers have generic names - show confirmation if so
     // SKIP this check entirely when SIS is disabled (no speaker segmentation = no speaker names to warn about)
     if (!isSISDisabled) {
@@ -672,11 +690,7 @@ const MeetingDetail = () => {
         // If no speaker labels found at all, no generic names to warn about
         if (allSpeakerLabels.size === 0) return false;
 
-        const genericPatterns = [
-          /^(?:speaker|talare)[_\s-]?\d+$/i,
-          /^unknown$/i,
-          /^okänd$/i,
-        ];
+        const genericPatterns = [/^(?:speaker|talare)[_\s-]?\d+$/i, /^unknown$/i, /^okänd$/i];
 
         const getCustomName = (label: string) =>
           speakerNames[label] ??
