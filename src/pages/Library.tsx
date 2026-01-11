@@ -776,15 +776,22 @@ const Library = () => {
     let sisMatches: SISMatch[] | undefined;
     let transcriptSegments: TranscriptSegment[] | undefined;
     let speakerNames: Record<string, string> = {};
-    
+    let sisDisabled = false;
+
     try {
       const asrStatus = await pollASRStatus(meeting.id);
+
+      // If SIS is disabled for this company/user, skip the "Talarnamn saknas" warning entirely.
+      sisDisabled =
+        (asrStatus as any)?.lyraStatus === "disabled" || (asrStatus as any)?.sisStatus === "disabled";
+
       if (asrStatus?.sisSpeakers) sisSpeakers = asrStatus.sisSpeakers;
       if (asrStatus?.sisMatches) sisMatches = asrStatus.sisMatches;
       if ((asrStatus as any)?.speakerNames) speakerNames = (asrStatus as any).speakerNames;
-      if ((asrStatus as any)?.lyraSpeakerNames) speakerNames = { ...speakerNames, ...(asrStatus as any).lyraSpeakerNames };
+      if ((asrStatus as any)?.lyraSpeakerNames)
+        speakerNames = { ...speakerNames, ...(asrStatus as any).lyraSpeakerNames };
       if (asrStatus?.transcriptSegments) {
-        transcriptSegments = asrStatus.transcriptSegments.map(seg => ({
+        transcriptSegments = asrStatus.transcriptSegments.map((seg) => ({
           speaker: seg.speakerId,
           text: seg.text,
           start: seg.start,
@@ -793,62 +800,63 @@ const Library = () => {
           speakerId: seg.speakerId,
         })) as any;
       }
-      console.log('🎤 Fetched SIS data for protocol:', { 
+      console.log("🎤 Fetched SIS data for protocol:", {
         hasSisSpeakers: !!sisSpeakers?.length,
         hasSisMatches: !!sisMatches?.length,
-        hasSegments: !!transcriptSegments?.length
+        hasSegments: !!transcriptSegments?.length,
+        sisDisabled,
       });
     } catch (e) {
-      console.warn('⚠️ Could not fetch SIS data for protocol:', e);
+      console.warn("⚠️ Could not fetch SIS data for protocol:", e);
     }
 
     // Check if speakers have generic names - show confirmation if so
     // Check transcriptSegments, SIS data, and speakerNames for any generic labels
     const hasGenericNames = (() => {
       const allSpeakerLabels = new Set<string>();
-      sisMatches?.forEach(m => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
-      sisSpeakers?.forEach(s => s.label && allSpeakerLabels.add(s.label));
-      
+      sisMatches?.forEach((m) => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
+      sisSpeakers?.forEach((s) => s.label && allSpeakerLabels.add(s.label));
+
       // Also check transcriptSegments for speaker IDs
       if (transcriptSegments && transcriptSegments.length > 0) {
-        transcriptSegments.forEach(seg => {
+        transcriptSegments.forEach((seg) => {
           if ((seg as any).speakerId) allSpeakerLabels.add((seg as any).speakerId);
           if ((seg as any).speaker) allSpeakerLabels.add((seg as any).speaker);
         });
       }
-      
+
       // Also check the transcript itself for embedded speaker labels like [Talare 1]: or [Speaker 0]:
-      const transcriptText = effectiveMeeting.transcript || '';
+      const transcriptText = effectiveMeeting.transcript || "";
       const transcriptSpeakerPattern = /\[(?:Talare|Speaker)[_\s]?\d+\]:/gi;
       const transcriptMatches = transcriptText.match(transcriptSpeakerPattern);
       if (transcriptMatches && transcriptMatches.length > 0) {
-        transcriptMatches.forEach(match => {
+        transcriptMatches.forEach((match) => {
           // Extract the speaker name from [Talare 1]: format
-          const speakerName = match.replace(/[\[\]:]/g, '').trim();
+          const speakerName = match.replace(/[\[\]:]/g, "").trim();
           allSpeakerLabels.add(speakerName);
         });
       }
-      
+
       // If no speaker labels found at all, no generic names to warn about
       if (allSpeakerLabels.size === 0) return false;
-      
+
       const genericPatterns = [
         /^speaker[_\s]?\d+$/i,
         /^talare[_\s]?\d+$/i,
         /^unknown$/i,
         /^okänd$/i,
       ];
-      
+
       for (const label of allSpeakerLabels) {
         const customName = speakerNames[label];
         const nameToCheck = customName || label;
-        const isGeneric = genericPatterns.some(p => p.test(nameToCheck.trim()));
+        const isGeneric = genericPatterns.some((p) => p.test(nameToCheck.trim()));
         if (isGeneric) return true;
       }
       return false;
     })();
 
-    if (hasGenericNames) {
+    if (!sisDisabled && hasGenericNames) {
       // Store data for later and show confirmation
       setPendingMeetingForSpeakerConfirm(effectiveMeeting);
       setPendingMeetingData({
