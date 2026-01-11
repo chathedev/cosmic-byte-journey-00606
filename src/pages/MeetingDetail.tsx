@@ -1706,7 +1706,7 @@ const MeetingDetail = () => {
                                   )}
                                 </div>
                                 <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap pl-4">
-                                  {isTranscriptExpanded ? segment.text : segment.text.slice(0, 150) + (segment.text.length > 150 ? '...' : '')}
+                                  {isTranscriptExpanded ? (segment.text || '') : ((segment.text || '').slice(0, 150) + ((segment.text || '').length > 150 ? '...' : ''))}
                                 </p>
                               </div>
                             </div>
