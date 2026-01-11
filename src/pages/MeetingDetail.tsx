@@ -1167,32 +1167,65 @@ const MeetingDetail = () => {
     }
     
     // Fallback: use transcriptSegments with time-based speaker matching
+    // NOTE: transcriptSegments sometimes contain timing + speakerId but no text; in that case
+    // we distribute the full transcript proportionally so the UI never renders empty segments.
     if (transcriptSegments && transcriptSegments.length > 0) {
       console.log('[MeetingDetail] Falling back to transcriptSegments:', transcriptSegments.length);
+
+      const hasAnyText = transcriptSegments.some(
+        (s: any) => typeof s?.text === 'string' && s.text.trim().length > 0
+      );
+
       const grouped: { speakerId: string; speakerName?: string; text: string; start: number; end: number }[] = [];
-      
-      for (const seg of transcriptSegments) {
-        let rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || '';
-        
+
+      for (const seg of transcriptSegments as any[]) {
+        let rawSpeakerId = seg.speakerId || seg.speaker || '';
+
         // If no speaker, use time-based matching from lyraSpeakers
-        if (!rawSpeakerId || rawSpeakerId.toLowerCase() === 'unknown') {
+        if (!rawSpeakerId || String(rawSpeakerId).toLowerCase() === 'unknown') {
           const midpoint = (seg.start + seg.end) / 2;
           rawSpeakerId = findSpeakerAtTime(midpoint);
           if (rawSpeakerId === 'unknown') {
             rawSpeakerId = findSpeakerAtTime(seg.start);
           }
         }
-        
+
         const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
+        const segText = typeof seg.text === 'string' ? seg.text : '';
         const prev = grouped[grouped.length - 1];
 
         if (prev && prev.speakerId === speakerId) {
-          prev.text = `${prev.text}\n${seg.text}`;
+          prev.text = [prev.text, segText].filter(Boolean).join('\n');
           prev.end = seg.end;
         } else {
-          grouped.push({ speakerId, text: seg.text, start: seg.start, end: seg.end });
+          grouped.push({ speakerId, text: segText, start: seg.start, end: seg.end });
         }
       }
+
+      if (!hasAnyText && transcript && grouped.length > 0) {
+        const totalDuration = grouped.reduce((sum, s) => sum + Math.max(0, s.end - s.start), 0);
+        const transcriptWords = transcript.split(/\s+/).filter((w) => w.trim());
+        const totalWords = transcriptWords.length;
+
+        if (totalWords > 0 && totalDuration > 0) {
+          let wordIndex = 0;
+          for (const seg of grouped) {
+            const segDuration = Math.max(0, seg.end - seg.start);
+            const segWordCount = Math.max(1, Math.round((segDuration / totalDuration) * totalWords));
+            seg.text = transcriptWords.slice(wordIndex, wordIndex + segWordCount).join(' ');
+            wordIndex += segWordCount;
+          }
+
+          if (wordIndex < transcriptWords.length) {
+            grouped[grouped.length - 1].text = `${grouped[grouped.length - 1].text} ${transcriptWords
+              .slice(wordIndex)
+              .join(' ')}`.trim();
+          }
+        } else if (grouped.length === 1) {
+          grouped[0].text = transcript;
+        }
+      }
+
       return grouped;
     }
     
@@ -1376,8 +1409,11 @@ const MeetingDetail = () => {
   };
 
   const displayTranscript = isEditing ? editedTranscript : (transcript || '');
-  // Show speaker-attributed segments when available (even if SIS disabled, we may have segments from ASR)
-  const hasSegments = groupedSegments.length > 0 && !isEditing;
+  // Only show segmented view if we have at least one segment with text; otherwise fall back to plain transcript.
+  const hasSegments =
+    !isEditing &&
+    groupedSegments.length > 0 &&
+    groupedSegments.some((s) => (s as any)?.text && String((s as any).text).trim().length > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">

@@ -42,24 +42,24 @@ function findSpeakerAtTime(time: number, speakers: SISSpeaker[]): string {
  * Get speaker display name from speakerNames map or generate a fallback
  */
 function getSpeakerDisplayName(
-  speakerId: string, 
+  speakerId: string,
   speakerNames: Record<string, string>,
   speakerIndex: number
 ): string {
   if (speakerNames[speakerId]) {
     return speakerNames[speakerId];
   }
-  
+
   // Generate fallback name
   const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
   if (numMatch) {
     return `Talare ${parseInt(numMatch[1], 10) + 1}`;
   }
-  
+
   if (/^[A-Z]$/i.test(speakerId)) {
     return `Talare ${speakerId.toUpperCase()}`;
   }
-  
+
   return `Talare ${speakerIndex + 1}`;
 }
 
@@ -78,13 +78,17 @@ export function reconstructTranscriptSegments(
   speakerNames: Record<string, string>,
   transcript?: string
 ): ReconstructedSegment[] {
-  // If no speaker data, return empty - let caller handle fallback
+  // If SIS is disabled we may still get word-level tokens with speakerId.
+  // In that case we can reconstruct without diarization speakers.
   if (!speakers || speakers.length === 0) {
+    if (words && words.length > 0) {
+      return reconstructFromWordSpeakerIds(words, speakerNames);
+    }
     return [];
   }
 
   // Build ordered list of speaker labels for indexing
-  const speakerLabels = speakers.map(s => s.label);
+  const speakerLabels = speakers.map((s) => s.label);
   const getSpeakerIndex = (label: string) => {
     const idx = speakerLabels.indexOf(label);
     return idx >= 0 ? idx : speakerLabels.length;
@@ -101,7 +105,7 @@ export function reconstructTranscriptSegments(
       // Use word start time to determine speaker
       const wordTime = word.start;
       const speaker = findSpeakerAtTime(wordTime, speakers);
-      
+
       if (speaker !== currentSpeaker && currentWords.length > 0) {
         // Flush current segment
         const speakerIndex = getSpeakerIndex(currentSpeaker);
@@ -110,16 +114,16 @@ export function reconstructTranscriptSegments(
           speakerName: getSpeakerDisplayName(currentSpeaker, speakerNames, speakerIndex),
           start: segmentStart,
           end: currentWords[currentWords.length - 1].end,
-          text: currentWords.map(w => w.word || w.text || '').join(' ').trim(),
+          text: currentWords.map((w) => (w as any).word || (w as any).text || '').join(' ').trim(),
         });
         currentWords = [];
         segmentStart = word.start;
       }
-      
+
       if (currentWords.length === 0) {
         segmentStart = word.start;
       }
-      
+
       currentSpeaker = speaker;
       currentWords.push(word);
     }
@@ -132,7 +136,7 @@ export function reconstructTranscriptSegments(
         speakerName: getSpeakerDisplayName(currentSpeaker, speakerNames, speakerIndex),
         start: segmentStart,
         end: currentWords[currentWords.length - 1].end,
-        text: currentWords.map(w => w.word || w.text || '').join(' ').trim(),
+        text: currentWords.map((w) => (w as any).word || (w as any).text || '').join(' ').trim(),
       });
     }
 
@@ -143,7 +147,7 @@ export function reconstructTranscriptSegments(
   // Fallback: use speaker segment times to slice transcript proportionally
   // This is less accurate but works when word-level data is unavailable
   if (transcript && transcript.trim()) {
-    return reconstructFromSpeakerTimes(speakers, speakerNames, transcript);
+    return reconstructFromSpeakerTimes(speakers, speaker-Names, transcript);
   }
 
   return [];
@@ -169,9 +173,72 @@ function mergeConsecutiveSegments(segments: ReconstructedSegment[]): Reconstruct
       current = { ...seg };
     }
   }
-  
+
   merged.push(current);
   return merged;
+}
+
+/**
+ * Reconstruct segments directly from word-level speaker ids.
+ * This is useful when SIS/diarization speakers payload is missing/disabled,
+ * but the backend still returns per-word speaker labels.
+ */
+function reconstructFromWordSpeakerIds(
+  words: TranscriptWord[],
+  speakerNames: Record<string, string>
+): ReconstructedSegment[] {
+  const segments: ReconstructedSegment[] = [];
+  const speakerIndex = new Map<string, number>();
+  const getIdx = (id: string) => {
+    if (!speakerIndex.has(id)) speakerIndex.set(id, speakerIndex.size);
+    return speakerIndex.get(id) ?? 0;
+  };
+
+  let currentSpeaker: string | null = null;
+  let currentTokens: string[] = [];
+  let segmentStart = 0;
+  let segmentEnd = 0;
+
+  const flush = () => {
+    if (!currentSpeaker || currentTokens.length === 0) return;
+    const idx = getIdx(currentSpeaker);
+    segments.push({
+      speaker: currentSpeaker,
+      speakerName: getSpeakerDisplayName(currentSpeaker, speakerNames, idx),
+      start: segmentStart,
+      end: segmentEnd,
+      text: currentTokens.join(' ').trim(),
+    });
+    currentTokens = [];
+  };
+
+  for (const w of words as any[]) {
+    const speakerRaw = w.speakerId ?? w.speaker ?? 'unknown';
+    const speaker = String(speakerRaw || 'unknown');
+    const token = String(w.word ?? w.text ?? '').trim();
+
+    if (!token) continue;
+
+    if (currentSpeaker !== null && speaker !== currentSpeaker) {
+      flush();
+      currentSpeaker = speaker;
+      segmentStart = w.start;
+      segmentEnd = w.end;
+      currentTokens.push(token);
+      continue;
+    }
+
+    if (currentTokens.length === 0) {
+      segmentStart = w.start;
+    }
+
+    currentSpeaker = speaker;
+    segmentEnd = w.end;
+    currentTokens.push(token);
+  }
+
+  flush();
+  return mergeConsecutiveSegments(segments);
 }
 
 /**
@@ -185,7 +252,7 @@ function reconstructFromSpeakerTimes(
 ): ReconstructedSegment[] {
   // Flatten all speaker segments with their labels
   const allSegments: { speaker: string; start: number; end: number }[] = [];
-  
+
   for (const speaker of speakers) {
     for (const seg of speaker.segments) {
       allSegments.push({
@@ -224,7 +291,7 @@ function reconstructFromSpeakerTimes(
 
   // Calculate total duration for proportional text splitting
   const totalDuration = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
-  const words = transcript.split(/\s+/).filter(w => w.trim());
+  const words = transcript.split(/\s+/).filter((w) => w.trim());
   const totalWords = words.length;
 
   if (totalDuration === 0 || totalWords === 0) {
@@ -233,7 +300,7 @@ function reconstructFromSpeakerTimes(
   }
 
   // Build speaker labels list for indexing
-  const speakerLabels = [...new Set(speakers.map(s => s.label))];
+  const speakerLabels = [...new Set(speakers.map((s) => s.label))];
   const getSpeakerIndex = (label: string) => {
     const idx = speakerLabels.indexOf(label);
     return idx >= 0 ? idx : speakerLabels.length;
@@ -251,7 +318,7 @@ function reconstructFromSpeakerTimes(
 
     const speakerIndex = getSpeakerIndex(seg.speaker);
     const speakerName = getSpeakerDisplayName(seg.speaker, speakerNames, speakerIndex);
-    
+
     result.push({
       speaker: seg.speaker,
       speakerName,
@@ -267,7 +334,7 @@ function reconstructFromSpeakerTimes(
     lastSeg.text = `${lastSeg.text} ${words.slice(wordIndex).join(' ')}`.trim();
   }
 
-  console.log('[Reconstruct] Result segments:', result.length, result.map(r => `${r.speaker}:${r.speakerName}`));
+  console.log('[Reconstruct] Result segments:', result.length, result.map((r) => `${r.speaker}:${r.speakerName}`));
 
   return result;
 }
@@ -289,36 +356,39 @@ export function processASRResponseWithReconstruction(
 ): ReconstructedSegment[] {
   const speakers = response.lyraSpeakers || response.sisSpeakers || [];
   const speakerNames = response.lyraSpeakerNames || response.speakerNames || {};
-  
-  // If we have diarization data, reconstruct segments
-  if (speakers.length > 0) {
-    const reconstructed = reconstructTranscriptSegments(
-      response.words,
-      speakers,
-      speakerNames,
-      response.transcript
-    );
-    
-    if (reconstructed.length > 0) {
-      return reconstructed;
-    }
+
+  // Try reconstruction first (works and returns segments even when speakers are missing,
+  // as long as words contain speaker ids).
+  const reconstructed = reconstructTranscriptSegments(
+    response.words,
+    speakers,
+    speakerNames,
+    response.transcript
+  );
+
+  if (reconstructed.length > 0) {
+    return reconstructed;
   }
 
   // Fallback: convert existing transcriptSegments to our format
   if (response.transcriptSegments && response.transcriptSegments.length > 0) {
-    const speakerLabels = [...new Set(
-      response.transcriptSegments.map(s => s.speakerId || s.speaker || 'unknown')
-    )];
-    
-    return response.transcriptSegments.map((seg, idx) => {
+    const speakerLabels = [
+      ...new Set(response.transcriptSegments.map((s: any) => s.speakerId || s.speaker || 'unknown')),
+    ];
+
+    return response.transcriptSegments.map((seg: any, idx) => {
       const speakerId = seg.speakerId || seg.speaker || 'unknown';
       const speakerIndex = speakerLabels.indexOf(speakerId);
       return {
         speaker: speakerId,
-        speakerName: getSpeakerDisplayName(speakerId, speakerNames, speakerIndex >= 0 ? speakerIndex : idx),
+        speakerName: getSpeakerDisplayName(
+          speakerId,
+          speakerNames,
+          speakerIndex >= 0 ? speakerIndex : idx
+        ),
         start: seg.start,
         end: seg.end,
-        text: seg.text,
+        text: typeof seg.text === 'string' ? seg.text : '',
       };
     });
   }
