@@ -1599,9 +1599,14 @@ const MeetingDetail = () => {
   };
 
   const displayTranscript = isEditing ? editedTranscript : (transcript || '');
-  // Only show segmented view if we have at least one segment with text; otherwise fall back to plain transcript.
+  
+  // Only show segmented view if:
+  // 1. Not editing
+  // 2. SIS is NOT disabled (companies with SIS off should see plain text)
+  // 3. We have segments with text
   const hasSegments =
     !isEditing &&
+    !isSISDisabled &&
     groupedSegments.length > 0 &&
     groupedSegments.some((s) => (s as any)?.text && String((s as any).text).trim().length > 0);
 
@@ -1770,8 +1775,8 @@ const MeetingDetail = () => {
                   )}
                 </div>
 
-                {/* Speakers Section - Inline in transcript when possible, collapsible edit panel */}
-                {uniqueSpeakers.length > 0 && isEditing && (
+                {/* Speakers Section - Only show when SIS is enabled and editing */}
+                {!isSISDisabled && uniqueSpeakers.length > 0 && isEditing && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1875,9 +1880,14 @@ const MeetingDetail = () => {
                       </div>
                       <div>
                         <span className="font-medium text-sm">Transkription</span>
-                        {hasSegments && !isEditing && (
+                        {hasSegments && !isEditing && !isSISDisabled && (
                           <p className="text-xs text-muted-foreground">
                             {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • {groupedSegments.length} segment
+                          </p>
+                        )}
+                        {isSISDisabled && !isEditing && (
+                          <p className="text-xs text-muted-foreground">
+                            Ren textvisning
                           </p>
                         )}
                       </div>
@@ -1938,10 +1948,19 @@ const MeetingDetail = () => {
                         })}
                       </div>
                     ) : (
-                      // Plain text fallback (always show full transcript)
-                      <div className="prose prose-sm max-w-none dark:prose-invert max-h-[60vh] overflow-y-auto">
-                        <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                          {displayTranscript}
+                      // Plain text view - clean and enhanced for companies without SIS
+                      <div className="max-h-[60vh] overflow-y-auto">
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          <div className="text-[15px] leading-[1.85] text-foreground selection:bg-primary/20">
+                            {displayTranscript
+                              .split(/\n+/)
+                              .filter(p => p.trim())
+                              .map((paragraph, idx) => (
+                                <p key={idx} className="mb-5 last:mb-0 first-letter:text-lg first-letter:font-medium">
+                                  {paragraph.trim()}
+                                </p>
+                              ))}
+                          </div>
                         </div>
                       </div>
                     )}
