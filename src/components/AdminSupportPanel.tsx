@@ -684,9 +684,10 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                                     </span>
                                   )}
                                 </div>
-                                {meeting.transcript && (
+                                {/* Always show transcript preview if exists, regardless of status */}
+                                {meeting.transcript && meeting.transcript.length > 0 && (
                                   <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                                    {meeting.transcript.slice(0, 150)}...
+                                    {meeting.transcript.slice(0, 150)}{meeting.transcript.length > 150 ? '...' : ''}
                                   </p>
                                 )}
                               </div>
@@ -798,12 +799,19 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                         </div>
                       )}
 
-                      {/* Transcript */}
-                      {selectedMeeting.transcript && (
+                      {/* Transcript - ALWAYS show if exists, regardless of status */}
+                      {selectedMeeting.transcript && selectedMeeting.transcript.length > 0 && (
                         <div>
-                          <Label className="text-xs text-muted-foreground">
-                            Transkription ({selectedMeeting.transcript.length} tecken)
-                          </Label>
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs text-muted-foreground">
+                              Transkription ({selectedMeeting.transcript.length} tecken)
+                            </Label>
+                            {selectedMeeting.status && selectedMeeting.status !== 'done' && selectedMeeting.status !== 'transcript_ready' && (
+                              <Badge variant="secondary" className="text-xs animate-pulse">
+                                {selectedMeeting.status}
+                              </Badge>
+                            )}
+                          </div>
                           <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border max-h-48 overflow-y-auto">
                             <p className="text-sm whitespace-pre-wrap">{selectedMeeting.transcript}</p>
                           </div>
