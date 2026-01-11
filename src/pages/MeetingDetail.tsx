@@ -46,6 +46,7 @@ interface MeetingDataForDialog {
   transcriptSegments?: { speakerId: string; text: string; start: number; end: number }[];
   sisSpeakers?: AgendaLyraSpeaker[];
   sisMatches?: AgendaLyraMatch[];
+  speakerNames?: Record<string, string>;
 }
 
 const MeetingDetail = () => {
@@ -605,13 +606,27 @@ const MeetingDetail = () => {
     }
 
     // Check if speakers have generic names - show confirmation if so
-    // We check directly using lyraSpeakers/speakerNames since uniqueSpeakers isn't available here
+    // Check transcriptSegments, lyraSpeakers, speakerNames for any generic labels
     const hasGenericNames = (() => {
       if (isSISDisabled) return false;
       
       const allSpeakerLabels = new Set<string>();
       lyraMatches.forEach(m => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
       lyraSpeakers.forEach(s => s.label && allSpeakerLabels.add(s.label));
+      
+      // Also check transcriptSegments for speaker IDs
+      if (transcriptSegments && transcriptSegments.length > 0) {
+        transcriptSegments.forEach(seg => {
+          if (seg.speakerId) allSpeakerLabels.add(seg.speakerId);
+        });
+      }
+      
+      // Also check reconstructedSegments
+      if (reconstructedSegments && reconstructedSegments.length > 0) {
+        reconstructedSegments.forEach(seg => {
+          if (seg.speaker) allSpeakerLabels.add(seg.speaker);
+        });
+      }
       
       if (allSpeakerLabels.size === 0) return false;
       
@@ -692,6 +707,7 @@ const MeetingDetail = () => {
       transcriptSegments: fetchedSegments,
       sisSpeakers: fetchedLyraSpeakers.length > 0 ? fetchedLyraSpeakers : undefined,
       sisMatches: fetchedLyraMatches.length > 0 ? fetchedLyraMatches : undefined,
+      speakerNames: Object.keys(speakerNames).length > 0 ? speakerNames : undefined,
     });
     setShowAgendaDialog(true);
   };

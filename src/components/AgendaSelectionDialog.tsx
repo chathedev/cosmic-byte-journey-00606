@@ -42,6 +42,7 @@ interface AgendaSelectionDialogProps {
     transcriptSegments?: TranscriptSegment[];
     sisSpeakers?: SISSpeaker[];
     sisMatches?: SISMatch[];
+    speakerNames?: Record<string, string>;
   };
 }
 
@@ -122,6 +123,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           transcriptSegments: meetingData.transcriptSegments,
           sisSpeakers: meetingData.sisSpeakers,
           sisMatches: meetingData.sisMatches,
+          speakerNames: meetingData.speakerNames,
         }
       });
       

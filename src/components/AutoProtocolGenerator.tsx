@@ -72,6 +72,7 @@ interface AutoProtocolGeneratorProps {
   transcriptSegments?: TranscriptSegment[];
   sisSpeakers?: SISSpeaker[];
   sisMatches?: SISMatch[];
+  speakerNames?: Record<string, string>;
 }
 
 export const AutoProtocolGenerator = ({
@@ -88,6 +89,7 @@ export const AutoProtocolGenerator = ({
   transcriptSegments,
   sisSpeakers,
   sisMatches,
+  speakerNames: propSpeakerNames,
 }: AutoProtocolGeneratorProps) => {
   const [generatedProtocol, setGeneratedProtocol] = useState<AIProtocol | null>(aiProtocol);
   const [isGenerating, setIsGenerating] = useState(!aiProtocol);
@@ -164,16 +166,37 @@ export const AutoProtocolGenerator = ({
         let formattedTranscript = transcript;
         let speakerInfo: { name: string; segments: number }[] = [];
         
-        if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers)) {
+        if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers || propSpeakerNames)) {
           // 70%+ confidence required for reliable speaker identification
           const SIS_CONFIDENCE_THRESHOLD = 70; // Percent
           
           // Build speaker name map from SIS data
           const speakerNameMap = new Map<string, string>();
           
+          // Priority 0: Use passed speakerNames prop (user-assigned names)
+          if (propSpeakerNames && Object.keys(propSpeakerNames).length > 0) {
+            Object.entries(propSpeakerNames).forEach(([label, name]) => {
+              if (name && name.trim()) {
+                // Check if name is NOT a generic pattern
+                const genericPatterns = [
+                  /^speaker[_\s]?\d+$/i,
+                  /^talare[_\s]?\d+$/i,
+                  /^unknown$/i,
+                  /^okänd$/i,
+                ];
+                const isGeneric = genericPatterns.some(p => p.test(name.trim()));
+                if (!isGeneric) {
+                  speakerNameMap.set(label, name);
+                  console.log(`🎤 Using propSpeakerNames: ${label} -> ${name}`);
+                }
+              }
+            });
+          }
+          
           // Priority 1: Use sisSpeakers with speakerName if confidence >= 70%
           if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
+              if (speakerNameMap.has(speaker.label)) return; // Already set by prop
               const confidencePercent = (speaker.similarity || 0) * 100;
               if (speaker.speakerName && speaker.speakerName.trim() && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                 speakerNameMap.set(speaker.label, speaker.speakerName);
@@ -201,8 +224,9 @@ export const AutoProtocolGenerator = ({
           // Priority 3: Fallback to email-based name if similarity >= 70%
           if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
+              if (speakerNameMap.has(speaker.label)) return; // Already set
               const confidencePercent = (speaker.similarity || 0) * 100;
-              if (!speakerNameMap.has(speaker.label) && speaker.bestMatchEmail && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
+              if (speaker.bestMatchEmail && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                 const namePart = speaker.bestMatchEmail.split('@')[0];
                 const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
                 speakerNameMap.set(speaker.label, formattedName);

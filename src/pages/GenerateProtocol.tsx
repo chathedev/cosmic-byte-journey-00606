@@ -42,6 +42,7 @@ interface LocationState {
   transcriptSegments?: TranscriptSegment[];
   sisSpeakers?: SISSpeaker[];
   sisMatches?: SISMatch[];
+  speakerNames?: Record<string, string>;
 }
 
 export default function GenerateProtocol() {
@@ -244,6 +245,7 @@ export default function GenerateProtocol() {
           transcriptSegments={pageState.transcriptSegments}
           sisSpeakers={pageState.sisSpeakers}
           sisMatches={pageState.sisMatches}
+          speakerNames={pageState.speakerNames}
         />
       )}
     </div>
