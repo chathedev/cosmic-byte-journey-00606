@@ -1370,8 +1370,8 @@ const MeetingDetail = () => {
   };
 
   const displayTranscript = isEditing ? editedTranscript : (transcript || '');
-  // Only show speaker-attributed segments if SIS/LYRA is enabled
-  const hasSegments = groupedSegments.length > 0 && !isEditing && !isSISDisabled;
+  // Show speaker-attributed segments when available (even if SIS disabled, we may have segments from ASR)
+  const hasSegments = groupedSegments.length > 0 && !isEditing;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
@@ -1537,8 +1537,8 @@ const MeetingDetail = () => {
                   )}
                 </div>
 
-                {/* Speakers Section - Show when we have speakers (from SIS/Lyra or segments) */}
-                {uniqueSpeakers.length > 0 && (
+                {/* Speakers Section - Inline in transcript when possible, collapsible edit panel */}
+                {uniqueSpeakers.length > 0 && isEditing && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1554,15 +1554,9 @@ const MeetingDetail = () => {
                           <Users className="w-4 h-4 text-primary" />
                         </div>
                         <div className="text-left">
-                          <span className="font-medium text-sm">Talare</span>
+                          <span className="font-medium text-sm">Redigera talarnamn</span>
                           <p className="text-xs text-muted-foreground">
-                            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'}
-                            {isSISDisabled 
-                              ? ' • Redigera namn för protokollet'
-                              : uniqueSpeakers.some(s => s.isIdentified) 
-                                ? ' • Röstidentifiering via Lyra'
-                                : ' • Namnge för att lära Lyra'
-                            }
+                            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • Namnge för protokollet
                           </p>
                         </div>
                       </div>
@@ -1641,12 +1635,19 @@ const MeetingDetail = () => {
                 {/* Transcript Section */}
                 <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
                   {/* Header with inline toggle */}
-                  <div className="px-5 py-4 flex items-center justify-between">
+                  <div className="px-5 py-4 flex items-center justify-between border-b border-border/30">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
                         <FileText className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="font-medium text-sm">Transkription</span>
+                      <div>
+                        <span className="font-medium text-sm">Transkription</span>
+                        {hasSegments && !isEditing && (
+                          <p className="text-xs text-muted-foreground">
+                            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • {groupedSegments.length} segment
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {isEditing && (
@@ -1673,7 +1674,7 @@ const MeetingDetail = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="px-5 pb-5">
+                  <div className="px-5 py-4">
                     {isEditing ? (
                       <Textarea
                         value={editedTranscript}
@@ -1681,52 +1682,48 @@ const MeetingDetail = () => {
                         className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
                         placeholder="Redigera transkriptionen..."
                       />
-                    ) : isTranscriptExpanded ? (
-                      // Full transcript
-                      hasSegments ? (
-                        <div className="space-y-0 max-h-[60vh] overflow-y-auto">
-                          {groupedSegments.map((segment, idx) => {
-                            const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
-                            const colorClass = getSpeakerColorClass(segment.speakerId);
-                            const dotClass = getSpeakerDotClass(segment.speakerId);
-                            const textClass = getSpeakerTextClass(segment.speakerId);
-                            const timestamp = formatTimestamp(segment.start);
-                            const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
-                            const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
-                            
-                            return (
-                              <div key={idx}>
-                                {showDivider && <div className="h-px bg-border/40 my-3" />}
-                                <div className={`pl-4 py-2 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-                                    <span className={`text-xs font-semibold ${textClass}`}>{speakerName}</span>
-                                    {timestamp && (
-                                      <span className="text-[10px] text-muted-foreground/50 tabular-nums">{timestamp}</span>
-                                    )}
-                                  </div>
-                                  <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pl-3.5">
-                                    {segment.text}
-                                  </p>
+                    ) : hasSegments ? (
+                      // Speaker-segmented view (always show segments if available)
+                      <div className={`space-y-0 ${isTranscriptExpanded ? 'max-h-[60vh] overflow-y-auto' : ''}`}>
+                        {(isTranscriptExpanded ? groupedSegments : groupedSegments.slice(0, 3)).map((segment, idx) => {
+                          const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
+                          const colorClass = getSpeakerColorClass(segment.speakerId);
+                          const dotClass = getSpeakerDotClass(segment.speakerId);
+                          const textClass = getSpeakerTextClass(segment.speakerId);
+                          const timestamp = formatTimestamp(segment.start);
+                          const prevSegment = idx > 0 ? groupedSegments[idx - 1] : null;
+                          const showDivider = prevSegment && prevSegment.speakerId !== segment.speakerId;
+                          
+                          return (
+                            <div key={idx}>
+                              {showDivider && <div className="h-px bg-border/40 my-3" />}
+                              <div className={`pl-4 py-2.5 border-l-2 hover:bg-muted/20 transition-colors rounded-r ${colorClass}`}>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className={`w-2 h-2 rounded-full ${dotClass}`} />
+                                  <span className={`text-sm font-semibold ${textClass}`}>{speakerName}</span>
+                                  {timestamp && (
+                                    <span className="text-xs text-muted-foreground/60 tabular-nums">{timestamp}</span>
+                                  )}
                                 </div>
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap pl-4">
+                                  {isTranscriptExpanded ? segment.text : segment.text.slice(0, 150) + (segment.text.length > 150 ? '...' : '')}
+                                </p>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="prose prose-sm max-w-none dark:prose-invert max-h-[60vh] overflow-y-auto">
-                          <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                            {displayTranscript}
-                          </div>
-                        </div>
-                      )
+                            </div>
+                          );
+                        })}
+                        {!isTranscriptExpanded && groupedSegments.length > 3 && (
+                          <p className="text-xs text-muted-foreground pt-3 pl-4">
+                            + {groupedSegments.length - 3} fler segment...
+                          </p>
+                        )}
+                      </div>
                     ) : (
-                      // Collapsed preview
-                      <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                        {hasSegments && groupedSegments.length > 0 
-                          ? groupedSegments.slice(0, 2).map(s => s.text).join(' ').slice(0, 200) + '...'
-                          : displayTranscript?.slice(0, 200) + '...'
-                        }
+                      // Plain text fallback
+                      <div className={`prose prose-sm max-w-none dark:prose-invert ${isTranscriptExpanded ? 'max-h-[60vh] overflow-y-auto' : ''}`}>
+                        <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                          {isTranscriptExpanded ? displayTranscript : displayTranscript?.slice(0, 300) + '...'}
+                        </div>
                       </div>
                     )}
                   </div>

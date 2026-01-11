@@ -252,22 +252,20 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
-        <div className="max-w-md w-full space-y-8">
+        <div className="max-w-lg w-full space-y-10">
           
-          {/* Greeting */}
-          {displayName && (
-            <p className="text-center text-muted-foreground">
-              {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
-            </p>
-          )}
-          
-          {/* Simple hero */}
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-              Transkribera möten
+          {/* Greeting & Hero */}
+          <div className="text-center space-y-3">
+            {displayName && (
+              <p className="text-muted-foreground">
+                {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
+              </p>
+            )}
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+              Mötesprotokoll på minuter
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Spela in eller ladda upp ljudfiler
+            <p className="text-base text-muted-foreground max-w-sm mx-auto">
+              Spela in eller ladda upp dina möten. Vi transkriberar och genererar professionella protokoll med AI.
             </p>
           </div>
 
@@ -276,7 +274,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             <Button 
               onClick={handleStartRecording}
               size="lg"
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 shadow-lg shadow-primary/20"
             >
               <Mic className="w-5 h-5" />
               Spela in live
@@ -290,26 +288,38 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             >
               <Upload className="w-5 h-5" />
               Ladda upp fil
-              {!hasProAccess && (
-                <span className="text-xs text-muted-foreground ml-1">(Pro)</span>
-              )}
             </Button>
           </div>
 
-          {/* Minimal features */}
-          <div className="flex justify-center gap-6 pt-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-              Realtid
-            </span>
-            <span className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-              Svenska
-            </span>
-            <span className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-              AI-protokoll
-            </span>
+          {/* Features */}
+          <div className="grid grid-cols-3 gap-4 pt-2">
+            <div className="text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Mic className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Realtid</p>
+                <p className="text-xs text-muted-foreground">Live-transkribering</p>
+              </div>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">AI-protokoll</p>
+                <p className="text-xs text-muted-foreground">Automatiskt genererat</p>
+              </div>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <span className="text-xs font-bold text-primary">SV/EN</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Flerspråkig</p>
+                <p className="text-xs text-muted-foreground">Svenska & engelska</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
