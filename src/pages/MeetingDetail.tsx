@@ -535,8 +535,16 @@ const MeetingDetail = () => {
     setIsSaving(true);
 
     try {
-      // Save transcript if changed
-      const transcriptChanged = editedTranscript.trim() !== (transcript || '').trim();
+      // Save transcript if changed - use normalized comparison to avoid false positives from whitespace
+      const normalizedEdited = editedTranscript.replace(/\s+/g, ' ').trim();
+      const normalizedOriginal = (transcript || '').replace(/\s+/g, ' ').trim();
+      const transcriptChanged = normalizedEdited !== normalizedOriginal;
+      
+      console.log('[MeetingDetail] Save check - transcriptChanged:', transcriptChanged, {
+        editedLen: normalizedEdited.length,
+        originalLen: normalizedOriginal.length,
+      });
+      
       if (transcriptChanged) {
         await apiClient.updateMeeting(id, { transcript: editedTranscript.trim() });
         setTranscript(editedTranscript.trim());
@@ -547,6 +555,7 @@ const MeetingDetail = () => {
         // The segments are from ASR and no longer match the edited text
         setTranscriptSegments(null);
         setReconstructedSegments(null);
+        console.log('[MeetingDetail] Transcript changed - cleared segments');
       }
 
       // Save speaker names if changed
@@ -985,6 +994,16 @@ const MeetingDetail = () => {
     const processedLabels = new Set<string>();
     let speakerIndex = 0;
 
+    // Helper for case-insensitive name lookup
+    const getNameFromSource = (label: string, namesSource: Record<string, string>): string | undefined => {
+      // Direct match first
+      if (namesSource[label]) return namesSource[label];
+      // Case-insensitive match
+      const lowerLabel = label.toLowerCase();
+      const matchKey = Object.keys(namesSource).find(k => k.toLowerCase() === lowerLabel);
+      return matchKey ? namesSource[matchKey] : undefined;
+    };
+
     // First add from lyraMatches (high confidence)
     for (const match of lyraMatches) {
       const label = match.speakerLabel || '';
@@ -992,7 +1011,8 @@ const MeetingDetail = () => {
       
       const namesSource = isEditing ? editedSpeakerNames : speakerNames;
       const fallbackName = getSpeakerFallbackName(label, speakerIndex);
-      const name = namesSource[label] || match.speakerName || match.sampleOwnerEmail?.split('@')[0] || fallbackName;
+      const customName = getNameFromSource(label, namesSource);
+      const name = customName || match.speakerName || match.sampleOwnerEmail?.split('@')[0] || fallbackName;
       const learningEntry = lyraLearning.find(l => l.email === match.sampleOwnerEmail);
       const isIdentified = match.confidencePercent >= SIS_DISPLAY_THRESHOLD_PERCENT;
       
@@ -1014,7 +1034,8 @@ const MeetingDetail = () => {
       
       const namesSource = isEditing ? editedSpeakerNames : speakerNames;
       const fallbackName = getSpeakerFallbackName(speaker.label, speakerIndex);
-      const name = namesSource[speaker.label] || speaker.speakerName || (speaker.bestMatchEmail ? speaker.bestMatchEmail.split('@')[0] : fallbackName);
+      const customName = getNameFromSource(speaker.label, namesSource);
+      const name = customName || speaker.speakerName || (speaker.bestMatchEmail ? speaker.bestMatchEmail.split('@')[0] : fallbackName);
       const confidence = speaker.similarity != null ? Math.round(speaker.similarity * 100) : 0;
       const learningEntry = lyraLearning.find(l => l.email === speaker.bestMatchEmail);
       const isIdentified = !!speaker.bestMatchEmail && confidence >= SIS_DISPLAY_THRESHOLD_PERCENT;
@@ -1040,7 +1061,8 @@ const MeetingDetail = () => {
           segmentLabels.add(rawId);
           const namesSource = isEditing ? editedSpeakerNames : speakerNames;
           const fallbackName = getSpeakerFallbackName(rawId, speakerIndex);
-          const name = namesSource[rawId] || fallbackName;
+          const customName = getNameFromSource(rawId, namesSource);
+          const name = customName || fallbackName;
           
           speakers.push({
             label: rawId,
@@ -1075,7 +1097,8 @@ const MeetingDetail = () => {
         for (const label of segmentLabels) {
           const namesSource = isEditing ? editedSpeakerNames : speakerNames;
           const fallbackName = getSpeakerFallbackName(label, idx);
-          const name = namesSource[label] || fallbackName;
+          const customName = getNameFromSource(label, namesSource);
+          const name = customName || fallbackName;
           
           speakers.push({
             label,
@@ -1093,7 +1116,8 @@ const MeetingDetail = () => {
       if (speakers.length === 0 && !isSISDisabled) {
         const defaultLabel = 'speaker_0';
         const namesSource = isEditing ? editedSpeakerNames : speakerNames;
-        const name = namesSource[defaultLabel] || 'Talare 1';
+        const customName = getNameFromSource(defaultLabel, namesSource);
+        const name = customName || 'Talare 1';
         
         speakers.push({
           label: defaultLabel,
@@ -1126,20 +1150,48 @@ const MeetingDetail = () => {
   // IMPORTANT: Only use segments if the transcript text matches what's in segments.
   // If user has manually edited the transcript, segments are stale and we fall back to plain text.
   const groupedSegments = (() => {
+    // Helper to strip speaker labels from text for comparison
+    // Labels can be like "[Talare 1]:", "Talare 1:", "speaker_0:", etc.
+    const stripSpeakerLabels = (text: string): string => {
+      return text
+        // Remove [Talare X]: or [Speaker X]: format
+        .replace(/\[(?:talare|speaker)[_\s-]?\d+\]\s*[:\-]?\s*/gi, '')
+        // Remove Talare X: or Speaker X: format (without brackets)
+        .replace(/\b(?:talare|speaker)[_\s-]?\d+\s*[:\-]\s*/gi, '')
+        // Collapse multiple spaces/newlines
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    };
+
     // Helper to check if transcript matches segment text (with tolerance for whitespace differences)
+    // This prevents showing stale segments when the user has edited the transcript
     const segmentsMatchTranscript = (segmentTexts: string[]): boolean => {
       if (!transcript) return false;
-      const joinedSegments = segmentTexts.join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
-      const normalizedTranscript = transcript.replace(/\s+/g, ' ').trim().toLowerCase();
-      // Consider it a match if at least 90% similar (to account for minor whitespace differences)
+      
+      // Strip speaker labels from both and normalize whitespace
+      const joinedSegments = stripSpeakerLabels(segmentTexts.join(' '));
+      const normalizedTranscript = stripSpeakerLabels(transcript);
+      
+      // If either is empty, no match
       if (joinedSegments.length === 0 || normalizedTranscript.length === 0) return false;
+      
+      // If lengths differ significantly, they don't match
       const minLen = Math.min(joinedSegments.length, normalizedTranscript.length);
       const maxLen = Math.max(joinedSegments.length, normalizedTranscript.length);
-      // If lengths differ by more than 10%, they don't match
-      if (minLen / maxLen < 0.9) return false;
-      // Quick prefix check - first 200 chars should match
-      const prefixLen = Math.min(200, minLen);
-      return joinedSegments.substring(0, prefixLen) === normalizedTranscript.substring(0, prefixLen);
+      if (minLen / maxLen < 0.85) {
+        console.log('[MeetingDetail] segmentsMatchTranscript: length mismatch', { segLen: joinedSegments.length, txLen: normalizedTranscript.length });
+        return false;
+      }
+      
+      // Check first 100 chars match (to catch major content changes)
+      const checkLen = Math.min(100, minLen);
+      const segPrefix = joinedSegments.substring(0, checkLen);
+      const txPrefix = normalizedTranscript.substring(0, checkLen);
+      const prefixMatch = segPrefix === txPrefix;
+      
+      console.log('[MeetingDetail] segmentsMatchTranscript:', prefixMatch, { checkLen, segPrefix: segPrefix.substring(0, 40), txPrefix: txPrefix.substring(0, 40) });
+      return prefixMatch;
     };
 
     // Prefer reconstructedSegments (source of truth from backend with proper speaker attribution)
