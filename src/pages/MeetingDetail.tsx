@@ -219,8 +219,24 @@ const MeetingDetail = () => {
                   setTranscriptSegments(asrStatus.transcriptSegments);
                 }
                 // Use reconstructed segments as source of truth when available
+                // But ONLY if the ASR transcript matches the saved meeting transcript
+                // (user might have edited the transcript after ASR finished)
                 if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
-                  setReconstructedSegments(asrStatus.reconstructedSegments);
+                  const asrTranscript = asrStatus.transcript || '';
+                  const savedTranscript = fetchedMeeting.transcript || '';
+                  // Compare normalized transcripts (trim + collapse whitespace)
+                  const normalizedASR = asrTranscript.replace(/\s+/g, ' ').trim().toLowerCase();
+                  const normalizedSaved = savedTranscript.replace(/\s+/g, ' ').trim().toLowerCase();
+                  // Only use segments if transcripts match (or are very similar)
+                  const prefixLen = Math.min(200, normalizedASR.length, normalizedSaved.length);
+                  const transcriptsMatch = prefixLen > 0 && 
+                    normalizedASR.substring(0, prefixLen) === normalizedSaved.substring(0, prefixLen);
+                  
+                  if (transcriptsMatch) {
+                    setReconstructedSegments(asrStatus.reconstructedSegments);
+                  } else {
+                    console.log('[MeetingDetail] ASR transcript differs from saved, skipping segments');
+                  }
                 }
                 setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
                 setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
@@ -526,10 +542,11 @@ const MeetingDetail = () => {
         setTranscript(editedTranscript.trim());
         setMeeting(prev => prev ? { ...prev, transcript: editedTranscript.trim(), updatedAt: new Date().toISOString() } : prev);
         
-        // CRITICAL: Clear transcriptSegments when transcript text is manually edited
+        // CRITICAL: Clear ALL segment data when transcript text is manually edited
         // This forces the UI to show plain text instead of stale segment data
         // The segments are from ASR and no longer match the edited text
         setTranscriptSegments(null);
+        setReconstructedSegments(null);
       }
 
       // Save speaker names if changed
@@ -1106,12 +1123,36 @@ const MeetingDetail = () => {
 
   // Use reconstructedSegments as source of truth when available
   // This eliminates frontend speaker inference - backend provides properly attributed segments
+  // IMPORTANT: Only use segments if the transcript text matches what's in segments.
+  // If user has manually edited the transcript, segments are stale and we fall back to plain text.
   const groupedSegments = (() => {
+    // Helper to check if transcript matches segment text (with tolerance for whitespace differences)
+    const segmentsMatchTranscript = (segmentTexts: string[]): boolean => {
+      if (!transcript) return false;
+      const joinedSegments = segmentTexts.join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      const normalizedTranscript = transcript.replace(/\s+/g, ' ').trim().toLowerCase();
+      // Consider it a match if at least 90% similar (to account for minor whitespace differences)
+      if (joinedSegments.length === 0 || normalizedTranscript.length === 0) return false;
+      const minLen = Math.min(joinedSegments.length, normalizedTranscript.length);
+      const maxLen = Math.max(joinedSegments.length, normalizedTranscript.length);
+      // If lengths differ by more than 10%, they don't match
+      if (minLen / maxLen < 0.9) return false;
+      // Quick prefix check - first 200 chars should match
+      const prefixLen = Math.min(200, minLen);
+      return joinedSegments.substring(0, prefixLen) === normalizedTranscript.substring(0, prefixLen);
+    };
+
     // Prefer reconstructedSegments (source of truth from backend with proper speaker attribution)
-    // But only if they actually have text content
+    // But only if they actually have text content AND match the current transcript
     if (reconstructedSegments && reconstructedSegments.length > 0) {
-      const hasText = reconstructedSegments.some(seg => seg.text && seg.text.trim().length > 0);
+      const segmentTexts = reconstructedSegments.map(seg => seg.text || '').filter(t => t.trim());
+      const hasText = segmentTexts.length > 0;
       if (hasText) {
+        // Check if segments still match the saved transcript
+        if (!segmentsMatchTranscript(segmentTexts)) {
+          console.log('[MeetingDetail] reconstructedSegments text differs from saved transcript, falling back to plain text');
+          return [];
+        }
         console.log('[MeetingDetail] Using reconstructedSegments:', reconstructedSegments.length);
         return reconstructedSegments.map(seg => ({
           speakerId: seg.speaker,
