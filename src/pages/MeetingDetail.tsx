@@ -1163,50 +1163,76 @@ const MeetingDetail = () => {
   const groupedSegments = (() => {
     if (hasManualTranscript) return [];
 
+    // Strip speaker labels like "Talare 1:", "speaker_0:", "[Talare A]:" etc.
     const stripSpeakerLabels = (text: string): string => {
-      return (text || '')
-        // Remove leading speaker labels like "Talare 1:", "speaker_0:", "[Talare 1]:".
-        .replace(/(^|\n)\s*(\[(?:talare|speaker)[_\s-]?\d+\]|\b(?:talare|speaker)[_\s-]?\d+)\s*[:\-]\s*/gi, '$1')
+      if (!text) return '';
+      return text
+        // Remove leading speaker labels with various formats
+        .replace(/(^|\n)\s*(\[?(?:talare|speaker)[_\s-]?[A-Z0-9]+\]?)\s*[:\-]\s*/gi, '$1')
+        // Normalize multiple spaces/newlines
         .replace(/\s+/g, ' ')
         .trim();
     };
 
+    // Normalize text for comparison (strip labels, lowercase, normalize whitespace)
     const normalizeForCompare = (text: string): string => {
-      return stripSpeakerLabels(text).toLowerCase();
+      return stripSpeakerLabels(text).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
     };
 
+    // Check if segment texts match the canonical transcript
+    // More robust check: compare word count AND content overlap
     const segmentsMatchTranscript = (segmentTexts: string[], fullTranscript: string): boolean => {
       const joined = normalizeForCompare(segmentTexts.join(' '));
       const full = normalizeForCompare(fullTranscript);
 
+      // Empty check
       if (!joined || !full) return false;
+      if (joined.length < 10 && full.length > 50) return false;
 
+      // Length ratio check (allow 60-140% range for flexibility)
       const ratio = joined.length / Math.max(1, full.length);
-      if (ratio < 0.7 || ratio > 1.3) return false;
+      if (ratio < 0.6 || ratio > 1.4) return false;
 
-      // Quick prefix sanity check (after stripping labels + normalizing whitespace).
-      const a = joined.slice(0, 120);
-      const b = full.slice(0, 120);
-      if (a.length < 40 || b.length < 40) return true;
+      // Word count comparison
+      const joinedWords = joined.split(/\s+/).filter(Boolean);
+      const fullWords = full.split(/\s+/).filter(Boolean);
+      const wordRatio = joinedWords.length / Math.max(1, fullWords.length);
+      if (wordRatio < 0.6 || wordRatio > 1.4) return false;
 
-      return a.slice(0, 60) === b.slice(0, 60) || full.includes(a.slice(0, 80)) || joined.includes(b.slice(0, 80));
+      // Content overlap: check first and last N words match
+      const checkWords = Math.min(10, Math.floor(joinedWords.length / 4));
+      if (checkWords >= 3) {
+        const firstMatch = joinedWords.slice(0, checkWords).join(' ') === fullWords.slice(0, checkWords).join(' ');
+        const lastMatch = joinedWords.slice(-checkWords).join(' ') === fullWords.slice(-checkWords).join(' ');
+        // If neither first nor last match, segments are likely wrong
+        if (!firstMatch && !lastMatch) return false;
+      }
+
+      return true;
     };
 
+    // Distribute canonical transcript text across segment timings proportionally
     const distributeTranscriptAcrossTimings = (
       segments: Array<{ speakerId: string; speakerName?: string; start: number; end: number }>,
       fullTranscript: string
-    ) => {
+    ): Array<{ speakerId: string; speakerName?: string; text: string; start: number; end: number }> => {
+      // Extract words from canonical transcript
       const words = stripSpeakerLabels(fullTranscript)
         .split(/\s+/)
         .map((w) => w.trim())
         .filter(Boolean);
 
-      if (segments.length === 0) return [] as Array<{ speakerId: string; speakerName?: string; text: string; start: number; end: number }>;
+      if (segments.length === 0) return [];
       if (words.length === 0) {
         return segments.map((s) => ({ ...s, text: '' }));
       }
 
-      const durations = segments.map((s) => Math.max(0, (s.end ?? 0) - (s.start ?? 0)));
+      // Calculate durations, handling missing/invalid timing
+      const durations = segments.map((s) => {
+        const start = typeof s.start === 'number' ? s.start : 0;
+        const end = typeof s.end === 'number' ? s.end : start;
+        return Math.max(0, end - start);
+      });
       const totalDuration = durations.reduce((sum, d) => sum + d, 0);
       const totalWords = words.length;
 
@@ -1214,122 +1240,157 @@ const MeetingDetail = () => {
       const out = segments.map((seg, i) => {
         const isLast = i === segments.length - 1;
 
-        let count = 0;
+        let count: number;
         if (isLast) {
+          // Last segment gets all remaining words
           count = Math.max(0, totalWords - wordIndex);
-        } else if (totalDuration > 0) {
-          count = Math.max(1, Math.round((durations[i] / totalDuration) * totalWords));
+        } else if (totalDuration > 0 && durations[i] > 0) {
+          // Proportional distribution based on duration
+          const proportion = durations[i] / totalDuration;
+          count = Math.max(1, Math.round(proportion * totalWords));
+          // Don't exceed remaining words
+          count = Math.min(count, totalWords - wordIndex);
         } else {
-          // No timing info: split evenly.
-          count = Math.max(1, Math.floor(totalWords / segments.length));
+          // No timing info: split evenly
+          const remaining = segments.length - i;
+          count = Math.max(1, Math.ceil((totalWords - wordIndex) / remaining));
         }
 
         const text = words.slice(wordIndex, wordIndex + count).join(' ');
         wordIndex += count;
 
-        return {
-          ...seg,
-          text,
-        };
+        return { ...seg, text };
       });
 
-      // Safety: if rounding left words behind, append them to the last segment.
+      // Safety: append any leftover words to the last segment
       if (wordIndex < totalWords && out.length > 0) {
-        out[out.length - 1].text = `${out[out.length - 1].text} ${words.slice(wordIndex).join(' ')}`.trim();
+        const remaining = words.slice(wordIndex).join(' ');
+        out[out.length - 1].text = `${out[out.length - 1].text} ${remaining}`.trim();
       }
 
       return out;
     };
 
+    // Extract speaker timings from various segment sources
+    const extractTimings = (
+      segments: Array<{ speakerId?: string; speaker?: string; speakerName?: string; start?: number; end?: number }>
+    ): Array<{ speakerId: string; speakerName?: string; start: number; end: number }> => {
+      const result: Array<{ speakerId: string; speakerName?: string; start: number; end: number }> = [];
+      
+      for (const seg of segments) {
+        let rawSpeakerId = (seg as any).speakerId || (seg as any).speaker || '';
+        
+        // If no speaker, try time-based matching from lyraSpeakers
+        if (!rawSpeakerId || String(rawSpeakerId).toLowerCase() === 'unknown') {
+          const start = typeof seg.start === 'number' ? seg.start : 0;
+          const end = typeof seg.end === 'number' ? seg.end : start;
+          const midpoint = (start + end) / 2;
+          rawSpeakerId = findSpeakerAtTime(midpoint);
+          if (rawSpeakerId === 'unknown') {
+            rawSpeakerId = findSpeakerAtTime(start);
+          }
+        }
+        
+        const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
+        const start = typeof seg.start === 'number' ? seg.start : 0;
+        const end = typeof seg.end === 'number' ? seg.end : start;
+        
+        result.push({
+          speakerId,
+          speakerName: (seg as any).speakerName,
+          start,
+          end,
+        });
+      }
+      
+      return result;
+    };
+
+    // Merge consecutive segments from same speaker
+    const mergeConsecutiveSpeakers = (
+      segments: Array<{ speakerId: string; speakerName?: string; text: string; start: number; end: number }>
+    ): Array<{ speakerId: string; speakerName?: string; text: string; start: number; end: number }> => {
+      if (segments.length === 0) return [];
+      
+      const merged: typeof segments = [];
+      for (const seg of segments) {
+        const prev = merged[merged.length - 1];
+        if (prev && prev.speakerId === seg.speakerId) {
+          prev.text = [prev.text, seg.text].filter(Boolean).join(' ');
+          prev.end = seg.end;
+        } else {
+          merged.push({ ...seg });
+        }
+      }
+      return merged;
+    };
+
     // 1) Prefer reconstructedSegments (backend-prepared speaker turns)
     if (reconstructedSegments && reconstructedSegments.length > 0) {
       const base = reconstructedSegments.map((seg) => ({
-        speakerId: seg.speaker,
+        speakerId: seg.speaker || 'unknown',
         speakerName: seg.speakerName,
         text: seg.text || '',
-        start: seg.start,
-        end: seg.end,
+        start: typeof seg.start === 'number' ? seg.start : 0,
+        end: typeof seg.end === 'number' ? seg.end : 0,
       }));
 
       const hasText = base.some((s) => s.text.trim().length > 0);
+      const canonicalTranscript = transcript?.trim() || '';
 
-      if (transcript && transcript.trim()) {
-        if (!hasText) {
-          return distributeTranscriptAcrossTimings(
-            base.map(({ speakerId, speakerName, start, end }) => ({ speakerId, speakerName, start, end })),
-            transcript
-          );
-        }
-
-        const ok = segmentsMatchTranscript(base.map((s) => s.text), transcript);
-        if (!ok) {
-          return distributeTranscriptAcrossTimings(
-            base.map(({ speakerId, speakerName, start, end }) => ({ speakerId, speakerName, start, end })),
-            transcript
-          );
+      // ALWAYS use canonical transcript if available - this ensures consistency
+      if (canonicalTranscript) {
+        // If segments have no text, or text doesn't match canonical, redistribute
+        if (!hasText || !segmentsMatchTranscript(base.map((s) => s.text), canonicalTranscript)) {
+          const timings = base.map(({ speakerId, speakerName, start, end }) => ({ speakerId, speakerName, start, end }));
+          return mergeConsecutiveSpeakers(distributeTranscriptAcrossTimings(timings, canonicalTranscript));
         }
       }
 
-      return base;
+      return mergeConsecutiveSpeakers(base);
     }
 
-    // 2) Fallback: use transcriptSegments (sometimes these contain timing + speaker but no text)
+    // 2) Fallback: use transcriptSegments
     if (transcriptSegments && transcriptSegments.length > 0) {
-      const grouped: { speakerId: string; speakerName?: string; text: string; start: number; end: number }[] = [];
+      const timings = extractTimings(transcriptSegments as any[]);
+      const canonicalTranscript = transcript?.trim() || '';
 
-      for (const seg of transcriptSegments as any[]) {
-        let rawSpeakerId = seg.speakerId || seg.speaker || '';
-
-        // If no speaker, use time-based matching from lyraSpeakers
-        if (!rawSpeakerId || String(rawSpeakerId).toLowerCase() === 'unknown') {
-          const midpoint = (seg.start + seg.end) / 2;
-          rawSpeakerId = findSpeakerAtTime(midpoint);
-          if (rawSpeakerId === 'unknown') {
-            rawSpeakerId = findSpeakerAtTime(seg.start);
-          }
+      if (canonicalTranscript && timings.length > 0) {
+        // Check if segment texts match
+        const segmentTexts = (transcriptSegments as any[]).map((s) => s.text || '').filter(Boolean);
+        const hasText = segmentTexts.some((t) => t.trim().length > 0);
+        
+        if (!hasText || !segmentsMatchTranscript(segmentTexts, canonicalTranscript)) {
+          return mergeConsecutiveSpeakers(distributeTranscriptAcrossTimings(timings, canonicalTranscript));
         }
 
-        const speakerId = String(rawSpeakerId).toLowerCase() === 'unknown' ? 'unknown' : rawSpeakerId;
-        const segText = typeof seg.text === 'string' ? seg.text : '';
-        const prev = grouped[grouped.length - 1];
-
-        if (prev && prev.speakerId === speakerId) {
-          prev.text = [prev.text, segText].filter(Boolean).join('\n');
-          prev.end = seg.end;
-        } else {
-          grouped.push({ speakerId, text: segText, start: seg.start, end: seg.end });
-        }
+        // Segments have matching text, use them directly
+        const grouped = timings.map((t, i) => ({
+          ...t,
+          text: (transcriptSegments as any[])[i]?.text || '',
+        }));
+        return mergeConsecutiveSpeakers(grouped);
       }
 
-      const hasAnyText = grouped.some((s) => s.text.trim().length > 0);
-
-      if (transcript && transcript.trim()) {
-        if (!hasAnyText) {
-          return distributeTranscriptAcrossTimings(
-            grouped.map(({ speakerId, speakerName, start, end }) => ({ speakerId, speakerName, start, end })),
-            transcript
-          );
-        }
-
-        const ok = segmentsMatchTranscript(grouped.map((s) => s.text), transcript);
-        if (!ok) {
-          return distributeTranscriptAcrossTimings(
-            grouped.map(({ speakerId, speakerName, start, end }) => ({ speakerId, speakerName, start, end })),
-            transcript
-          );
-        }
-      }
-
-      return grouped;
+      // No canonical transcript, use segment texts as-is
+      const grouped = timings.map((t, i) => ({
+        ...t,
+        text: (transcriptSegments as any[])[i]?.text || '',
+      }));
+      return mergeConsecutiveSpeakers(grouped);
     }
 
     // 3) Fallback: use lyraSpeakers with segments and slice transcript proportionally
-    if (lyraSpeakers.length > 0 && transcript) {
+    if (lyraSpeakers.length > 0 && transcript?.trim()) {
       // Flatten all speaker segments
       const allSegments: { speaker: string; start: number; end: number }[] = [];
       for (const speaker of lyraSpeakers) {
-        for (const seg of speaker.segments) {
-          allSegments.push({ speaker: speaker.label, start: seg.start, end: seg.end });
+        if (speaker.segments && speaker.segments.length > 0) {
+          for (const seg of speaker.segments) {
+            if (typeof seg.start === 'number' && typeof seg.end === 'number') {
+              allSegments.push({ speaker: speaker.label, start: seg.start, end: seg.end });
+            }
+          }
         }
       }
 
@@ -1347,35 +1408,14 @@ const MeetingDetail = () => {
           }
         }
 
-        const totalDuration = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
-        const words = stripSpeakerLabels(transcript).split(/\s+/).filter((w) => w.trim());
-        const totalWords = words.length;
+        const timings = merged.map((s) => ({
+          speakerId: s.speaker,
+          speakerName: uniqueSpeakers.find((u) => u.label.toLowerCase() === s.speaker.toLowerCase())?.name,
+          start: s.start,
+          end: s.end,
+        }));
 
-        if (totalDuration > 0 && totalWords > 0) {
-          const result: { speakerId: string; speakerName?: string; text: string; start: number; end: number }[] = [];
-          let wordIndex = 0;
-
-          const speakerLabels = [...new Set(lyraSpeakers.map((s) => s.label))];
-
-          for (const seg of merged) {
-            const segmentDuration = seg.end - seg.start;
-            const segmentWordCount = Math.max(1, Math.round((segmentDuration / totalDuration) * totalWords));
-            const segmentWords = words.slice(wordIndex, wordIndex + segmentWordCount);
-            wordIndex += segmentWordCount;
-
-            const speakerIdx = speakerLabels.indexOf(seg.speaker);
-            const uniqueSpeaker = uniqueSpeakers.find((s) => s.label.toLowerCase() === seg.speaker.toLowerCase());
-            const speakerName = uniqueSpeaker?.name || `Talare ${speakerIdx + 1}`;
-
-            result.push({ speakerId: seg.speaker, speakerName, text: segmentWords.join(' '), start: seg.start, end: seg.end });
-          }
-
-          if (wordIndex < words.length && result.length > 0) {
-            result[result.length - 1].text += ' ' + words.slice(wordIndex).join(' ');
-          }
-
-          return result;
-        }
+        return mergeConsecutiveSpeakers(distributeTranscriptAcrossTimings(timings, transcript.trim()));
       }
     }
 

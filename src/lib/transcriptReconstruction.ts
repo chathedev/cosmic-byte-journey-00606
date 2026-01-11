@@ -289,19 +289,33 @@ function reconstructFromSpeakerTimes(
 
   console.log('[Reconstruct] Merged segments:', merged.length);
 
+  // Strip speaker labels from transcript for clean word extraction
+  const stripSpeakerLabels = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/(^|\n)\s*(\[?(?:talare|speaker)[_\s-]?[A-Z0-9]+\]?)\s*[:\-]\s*/gi, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   // Calculate total duration for proportional text splitting
-  const totalDuration = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
-  const words = transcript.split(/\s+/).filter((w) => w.trim());
+  const totalDuration = merged.reduce((sum, s) => {
+    const start = typeof s.start === 'number' ? s.start : 0;
+    const end = typeof s.end === 'number' ? s.end : start;
+    return sum + Math.max(0, end - start);
+  }, 0);
+  
+  const words = stripSpeakerLabels(transcript).split(/\s+/).filter((w) => w.trim());
   const totalWords = words.length;
 
-  if (totalDuration === 0 || totalWords === 0) {
-    console.log('[Reconstruct] No duration or words');
+  if (totalWords === 0) {
+    console.log('[Reconstruct] No words in transcript');
     return [];
   }
 
   // Build speaker labels list for indexing
   const speakerLabels = [...new Set(speakers.map((s) => s.label))];
-  const getSpeakerIndex = (label: string) => {
+  const getSpeakerIndexLocal = (label: string) => {
     const idx = speakerLabels.indexOf(label);
     return idx >= 0 ? idx : speakerLabels.length;
   };
@@ -310,28 +324,49 @@ function reconstructFromSpeakerTimes(
   const result: ReconstructedSegment[] = [];
   let wordIndex = 0;
 
-  for (const seg of merged) {
-    const segmentDuration = seg.end - seg.start;
-    const segmentWordCount = Math.max(1, Math.round((segmentDuration / totalDuration) * totalWords));
+  for (let i = 0; i < merged.length; i++) {
+    const seg = merged[i];
+    const isLast = i === merged.length - 1;
+    
+    const start = typeof seg.start === 'number' ? seg.start : 0;
+    const end = typeof seg.end === 'number' ? seg.end : start;
+    const segmentDuration = Math.max(0, end - start);
+    
+    let segmentWordCount: number;
+    if (isLast) {
+      // Last segment gets all remaining words
+      segmentWordCount = Math.max(0, totalWords - wordIndex);
+    } else if (totalDuration > 0 && segmentDuration > 0) {
+      // Proportional distribution based on duration
+      segmentWordCount = Math.max(1, Math.round((segmentDuration / totalDuration) * totalWords));
+      // Don't exceed remaining words
+      segmentWordCount = Math.min(segmentWordCount, totalWords - wordIndex);
+    } else {
+      // No timing info: split evenly
+      const remaining = merged.length - i;
+      segmentWordCount = Math.max(1, Math.ceil((totalWords - wordIndex) / remaining));
+    }
+    
     const segmentWords = words.slice(wordIndex, wordIndex + segmentWordCount);
     wordIndex += segmentWordCount;
 
-    const speakerIndex = getSpeakerIndex(seg.speaker);
+    const speakerIndex = getSpeakerIndexLocal(seg.speaker);
     const speakerName = getSpeakerDisplayName(seg.speaker, speakerNames, speakerIndex);
 
     result.push({
       speaker: seg.speaker,
       speakerName,
-      start: seg.start,
-      end: seg.end,
+      start,
+      end,
       text: segmentWords.join(' '),
     });
   }
 
-  // Add any remaining words to the last segment
+  // Safety: add any remaining words to the last segment
   if (wordIndex < words.length && result.length > 0) {
     const lastSeg = result[result.length - 1];
-    lastSeg.text = `${lastSeg.text} ${words.slice(wordIndex).join(' ')}`.trim();
+    const remaining = words.slice(wordIndex).join(' ');
+    lastSeg.text = `${lastSeg.text} ${remaining}`.trim();
   }
 
   console.log('[Reconstruct] Result segments:', result.length, result.map((r) => `${r.speaker}:${r.speakerName}`));
@@ -340,8 +375,50 @@ function reconstructFromSpeakerTimes(
 }
 
 /**
+ * Validate that reconstructed segment texts match the canonical transcript
+ */
+function validateSegmentsAgainstTranscript(
+  segments: ReconstructedSegment[],
+  transcript: string
+): boolean {
+  if (!transcript?.trim() || segments.length === 0) return true;
+
+  const stripSpeakerLabels = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/(^|\n)\s*(\[?(?:talare|speaker)[_\s-]?[A-Z0-9]+\]?)\s*[:\-]\s*/gi, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const normalize = (text: string): string => {
+    return stripSpeakerLabels(text).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  };
+
+  const segmentText = normalize(segments.map((s) => s.text).join(' '));
+  const fullText = normalize(transcript);
+
+  if (!segmentText || !fullText) return false;
+
+  // Check length ratio
+  const ratio = segmentText.length / Math.max(1, fullText.length);
+  if (ratio < 0.6 || ratio > 1.4) return false;
+
+  // Check word count ratio
+  const segmentWords = segmentText.split(/\s+/).filter(Boolean);
+  const fullWords = fullText.split(/\s+/).filter(Boolean);
+  const wordRatio = segmentWords.length / Math.max(1, fullWords.length);
+  if (wordRatio < 0.6 || wordRatio > 1.4) return false;
+
+  return true;
+}
+
+/**
  * Process ASR status response and reconstruct transcriptSegments
  * This should be called when processing ASR polling results
+ * 
+ * IMPORTANT: Always validates reconstructed text against canonical transcript
+ * to ensure consistency between view and edit modes
  */
 export function processASRResponseWithReconstruction(
   response: {
@@ -356,17 +433,21 @@ export function processASRResponseWithReconstruction(
 ): ReconstructedSegment[] {
   const speakers = response.lyraSpeakers || response.sisSpeakers || [];
   const speakerNames = response.lyraSpeakerNames || response.speakerNames || {};
+  const canonicalTranscript = response.transcript?.trim() || '';
 
-  // Try reconstruction first (works and returns segments even when speakers are missing,
-  // as long as words contain speaker ids).
+  // Try reconstruction first
   const reconstructed = reconstructTranscriptSegments(
     response.words,
     speakers,
     speakerNames,
-    response.transcript
+    canonicalTranscript
   );
 
+  // Validate reconstructed segments match canonical transcript
   if (reconstructed.length > 0) {
+    if (canonicalTranscript && !validateSegmentsAgainstTranscript(reconstructed, canonicalTranscript)) {
+      console.log('[Reconstruct] Validation failed, segments don\'t match transcript - will redistribute in UI');
+    }
     return reconstructed;
   }
 
@@ -376,7 +457,7 @@ export function processASRResponseWithReconstruction(
       ...new Set(response.transcriptSegments.map((s: any) => s.speakerId || s.speaker || 'unknown')),
     ];
 
-    return response.transcriptSegments.map((seg: any, idx) => {
+    const converted = response.transcriptSegments.map((seg: any, idx) => {
       const speakerId = seg.speakerId || seg.speaker || 'unknown';
       const speakerIndex = speakerLabels.indexOf(speakerId);
       return {
@@ -386,11 +467,18 @@ export function processASRResponseWithReconstruction(
           speakerNames,
           speakerIndex >= 0 ? speakerIndex : idx
         ),
-        start: seg.start,
-        end: seg.end,
+        start: typeof seg.start === 'number' ? seg.start : 0,
+        end: typeof seg.end === 'number' ? seg.end : 0,
         text: typeof seg.text === 'string' ? seg.text : '',
       };
     });
+
+    // Validate converted segments
+    if (canonicalTranscript && !validateSegmentsAgainstTranscript(converted, canonicalTranscript)) {
+      console.log('[Reconstruct] Converted segments validation failed - UI will redistribute');
+    }
+
+    return converted;
   }
 
   return [];
