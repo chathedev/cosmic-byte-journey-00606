@@ -99,6 +99,8 @@ const Library = () => {
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
+  const [showSpeakerNameConfirm, setShowSpeakerNameConfirm] = useState(false);
+  const [pendingMeetingForSpeakerConfirm, setPendingMeetingForSpeakerConfirm] = useState<MeetingSession | null>(null);
   const [protocolCounts, setProtocolCounts] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const location = useLocation();
@@ -773,11 +775,14 @@ const Library = () => {
     let sisSpeakers: SISSpeaker[] | undefined;
     let sisMatches: SISMatch[] | undefined;
     let transcriptSegments: TranscriptSegment[] | undefined;
+    let speakerNames: Record<string, string> = {};
     
     try {
       const asrStatus = await pollASRStatus(meeting.id);
       if (asrStatus?.sisSpeakers) sisSpeakers = asrStatus.sisSpeakers;
       if (asrStatus?.sisMatches) sisMatches = asrStatus.sisMatches;
+      if ((asrStatus as any)?.speakerNames) speakerNames = (asrStatus as any).speakerNames;
+      if ((asrStatus as any)?.lyraSpeakerNames) speakerNames = { ...speakerNames, ...(asrStatus as any).lyraSpeakerNames };
       if (asrStatus?.transcriptSegments) {
         transcriptSegments = asrStatus.transcriptSegments.map(seg => ({
           speaker: seg.speakerId,
@@ -795,6 +800,46 @@ const Library = () => {
       });
     } catch (e) {
       console.warn('⚠️ Could not fetch SIS data for protocol:', e);
+    }
+
+    // Check if speakers have generic names - show confirmation if so
+    const hasGenericNames = (() => {
+      const allSpeakerLabels = new Set<string>();
+      sisMatches?.forEach(m => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
+      sisSpeakers?.forEach(s => s.label && allSpeakerLabels.add(s.label));
+      
+      if (allSpeakerLabels.size === 0) return false;
+      
+      const genericPatterns = [
+        /^speaker[_\s]?\d+$/i,
+        /^talare[_\s]?\d+$/i,
+        /^unknown$/i,
+        /^okänd$/i,
+      ];
+      
+      for (const label of allSpeakerLabels) {
+        const customName = speakerNames[label];
+        const nameToCheck = customName || label;
+        const isGeneric = genericPatterns.some(p => p.test(nameToCheck.trim()));
+        if (isGeneric) return true;
+      }
+      return false;
+    })();
+
+    if (hasGenericNames) {
+      // Store data for later and show confirmation
+      setPendingMeetingForSpeakerConfirm(effectiveMeeting);
+      setPendingMeetingData({
+        id: effectiveMeeting.id,
+        transcript: effectiveMeeting.transcript,
+        title: effectiveMeeting.title,
+        createdAt: effectiveMeeting.createdAt,
+        transcriptSegments,
+        sisSpeakers,
+        sisMatches,
+      });
+      setShowSpeakerNameConfirm(true);
+      return;
     }
 
     setPendingMeetingData({
@@ -1491,6 +1536,37 @@ const Library = () => {
             setMeetingToReplaceProtocol(null);
           }
         }}
+      />
+
+      {/* Speaker Name Confirmation Dialog */}
+      <ConfirmDialog
+        open={showSpeakerNameConfirm}
+        onOpenChange={(open) => {
+          setShowSpeakerNameConfirm(open);
+          if (!open) {
+            setPendingMeetingForSpeakerConfirm(null);
+          }
+        }}
+        title="Talarnamn saknas"
+        description="Några talare har fortfarande generiska namn (t.ex. 'Talare 1'). För bästa resultat i protokollet, öppna mötet och namnge talarna först. Vill du fortsätta ändå?"
+        confirmText="Fortsätt ändå"
+        cancelText="Öppna mötet"
+        onConfirm={() => {
+          setShowSpeakerNameConfirm(false);
+          setPendingMeetingForSpeakerConfirm(null);
+          // pendingMeetingData is already set, just open agenda dialog
+          setShowAgendaDialog(true);
+        }}
+        onCancel={() => {
+          setShowSpeakerNameConfirm(false);
+          // Navigate to meeting detail to edit speaker names
+          if (pendingMeetingForSpeakerConfirm) {
+            navigate(`/meeting/${pendingMeetingForSpeakerConfirm.id}`);
+          }
+          setPendingMeetingForSpeakerConfirm(null);
+          setPendingMeetingData(null);
+        }}
+        variant="default"
       />
     </div>
   );

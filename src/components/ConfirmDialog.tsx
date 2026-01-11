@@ -17,6 +17,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void;
+  onCancel?: () => void;
   variant?: "default" | "destructive";
 }
 
@@ -28,6 +29,7 @@ export const ConfirmDialog = ({
   confirmText = "Bekräfta",
   cancelText = "Avbryt",
   onConfirm,
+  onCancel,
   variant = "default",
 }: ConfirmDialogProps) => {
   return (
@@ -38,7 +40,16 @@ export const ConfirmDialog = ({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
+          <AlertDialogCancel
+            onClick={(e) => {
+              if (onCancel) {
+                e.preventDefault();
+                onCancel();
+              }
+            }}
+          >
+            {cancelText}
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
