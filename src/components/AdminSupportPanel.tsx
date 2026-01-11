@@ -26,6 +26,7 @@ interface SupportUserData {
     meetingUsageBaseline?: number;
     paymentStatus?: string;
     planCancelledAt?: string | null;
+    googleId?: string | null;
     createdAt?: string;
     updatedAt?: string;
     lastLoginAt?: string;
@@ -34,21 +35,77 @@ interface SupportUserData {
     primaryIp?: string;
     lastIp?: string;
     ipAddresses?: string[];
+    primaryDevice?: string;
+    lastDevice?: string;
+    deviceIds?: string[];
+    primaryBrowserId?: string;
+    lastBrowserId?: string;
+    browserIds?: string[];
     folders?: Array<{
       id: string;
       name: string;
+      color?: string | null;
+      icon?: string | null;
+      sortOrder?: number;
       metadata?: { systemFolder?: boolean };
+      createdAt?: string;
+      updatedAt?: string;
     }>;
     meetings?: Array<{
       id: string;
       folderId?: string | null;
       title: string;
+      subtitle?: string | null;
+      notes?: string | null;
+      summary?: string | null;
       transcript?: string;
+      language?: string;
       status?: string;
+      durationSeconds?: number;
+      meetingAt?: string;
       createdAt: string;
       updatedAt?: string;
-      protocol?: string | null;
+      metadata?: {
+        sourceFileName?: string;
+        emails?: Record<string, any>;
+        attribr?: {
+          orgIds?: string[];
+          notified?: Record<string, string>;
+        };
+      };
+      participants?: any[];
+      agenda?: any;
+      actionItems?: Array<{
+        id: string;
+        meetingId: string;
+        userId: string;
+        title: string;
+        description?: string;
+        owner?: string;
+        deadline?: string | null;
+        priority: string;
+        status: string;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      attachments?: any[];
       speakerNames?: Record<string, string>;
+      protocol?: {
+        id: string;
+        meetingId: string;
+        encoding?: string;
+        blob?: string;
+        digest?: string;
+        fileName?: string;
+        mimeType?: string;
+        size?: number;
+        storedAt?: string;
+        updatedAt?: string;
+        jws?: string;
+        ownerEmail?: string;
+        uploadedBy?: string;
+      } | null;
+      createdByEmail?: string;
     }>;
     enterprise?: {
       companyId: string;
@@ -89,6 +146,7 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [showAllMeetings, setShowAllMeetings] = useState(false);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -111,10 +169,28 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
     return userData?.user?.folders?.find(f => f.name === '__Trash')?.id || null;
   };
 
-  // Filter out trashed meetings
-  const getActiveMeetings = () => {
+  // Get folder name by ID
+  const getFolderName = (folderId: string | null | undefined) => {
+    if (!folderId) return 'Ingen mapp';
+    const folder = userData?.user?.folders?.find(f => f.id === folderId);
+    if (folder?.name === '__Trash') return '🗑️ Papperskorgen';
+    return folder?.name || 'Okänd mapp';
+  };
+
+  // Filter meetings based on showAllMeetings toggle
+  const getDisplayedMeetings = () => {
+    const allMeetings = userData?.user?.meetings || [];
+    if (showAllMeetings) {
+      return allMeetings;
+    }
     const trashFolderId = getTrashFolderId();
-    return userData?.user?.meetings?.filter(m => m.folderId !== trashFolderId) || [];
+    return allMeetings.filter(m => m.folderId !== trashFolderId);
+  };
+
+  // Get trashed meetings count
+  const getTrashedMeetingsCount = () => {
+    const trashFolderId = getTrashFolderId();
+    return userData?.user?.meetings?.filter(m => m.folderId === trashFolderId).length || 0;
   };
 
   const handleClaimCode = async () => {
@@ -228,7 +304,9 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
     }
   };
 
-  const activeMeetings = getActiveMeetings();
+  const displayedMeetings = getDisplayedMeetings();
+  const trashedCount = getTrashedMeetingsCount();
+  const activeMeetingsCount = (userData?.user?.meetings?.length || 0) - trashedCount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -318,7 +396,7 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
               <TabsList className="w-full">
                 <TabsTrigger value="overview" className="flex-1">Översikt</TabsTrigger>
                 <TabsTrigger value="meetings" className="flex-1">
-                  Möten ({activeMeetings.length})
+                  Möten ({displayedMeetings.length}{showAllMeetings && trashedCount > 0 ? ` inkl. ${trashedCount} raderade` : ''})
                 </TabsTrigger>
                 {selectedMeeting && <TabsTrigger value="meeting" className="flex-1">Mötesdetaljer</TabsTrigger>}
               </TabsList>
@@ -388,10 +466,14 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-4 gap-4">
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
-                            <p className="text-2xl font-bold">{activeMeetings.length}</p>
+                            <p className="text-2xl font-bold">{activeMeetingsCount}</p>
                             <p className="text-xs text-muted-foreground">Aktiva möten</p>
+                          </div>
+                          <div className="text-center p-3 bg-muted/50 rounded-lg">
+                            <p className="text-2xl font-bold">{trashedCount}</p>
+                            <p className="text-xs text-muted-foreground">I papperskorgen</p>
                           </div>
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
                             <p className="text-2xl font-bold">{userData.user.meetingUsage?.meetingLimit ?? userData.user.meetingLimit ?? '-'}</p>
@@ -523,54 +605,92 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                 )}
               </TabsContent>
 
-              <TabsContent value="meetings" className="mt-4">
+              <TabsContent value="meetings" className="mt-4 space-y-3">
+                {/* Toggle for showing all meetings */}
+                {trashedCount > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
+                    <span className="text-sm text-muted-foreground">
+                      Visa raderade möten ({trashedCount} st)
+                    </span>
+                    <Button 
+                      variant={showAllMeetings ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setShowAllMeetings(!showAllMeetings)}
+                    >
+                      {showAllMeetings ? 'Dölj raderade' : 'Visa alla'}
+                    </Button>
+                  </div>
+                )}
+                
                 {isLoadingData ? (
                   <div className="flex items-center justify-center py-8">
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : activeMeetings.length > 0 ? (
+                ) : displayedMeetings.length > 0 ? (
                   <div className="space-y-2">
-                    {activeMeetings.map((meeting) => (
-                      <Card 
-                        key={meeting.id} 
-                        className="cursor-pointer hover:bg-accent/50 transition-colors"
-                        onClick={() => handleViewMeeting(meeting)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{meeting.title || 'Utan titel'}</p>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {formatDate(meeting.createdAt)}
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {meeting.status}
-                                </Badge>
-                                {meeting.protocol && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    <FileText className="h-3 w-3 mr-1" />
-                                    Protokoll
+                    {displayedMeetings.map((meeting) => {
+                      const trashFolderId = getTrashFolderId();
+                      const isInTrash = meeting.folderId === trashFolderId;
+                      
+                      return (
+                        <Card 
+                          key={meeting.id} 
+                          className={`cursor-pointer hover:bg-accent/50 transition-colors ${isInTrash ? 'opacity-60 border-dashed' : ''}`}
+                          onClick={() => handleViewMeeting(meeting)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium truncate">{meeting.title || 'Utan titel'}</p>
+                                  {isInTrash && (
+                                    <Badge variant="destructive" className="text-xs shrink-0">
+                                      Raderat
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {formatDate(meeting.createdAt)}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {meeting.status}
                                   </Badge>
+                                  {meeting.durationSeconds && (
+                                    <span className="text-xs">
+                                      {Math.round(meeting.durationSeconds / 60)} min
+                                    </span>
+                                  )}
+                                  {meeting.protocol && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <FileText className="h-3 w-3 mr-1" />
+                                      Protokoll
+                                    </Badge>
+                                  )}
+                                  {!isInTrash && (
+                                    <span className="text-xs opacity-70">
+                                      {getFolderName(meeting.folderId)}
+                                    </span>
+                                  )}
+                                </div>
+                                {meeting.transcript && (
+                                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                                    {meeting.transcript.slice(0, 150)}...
+                                  </p>
                                 )}
                               </div>
-                              {meeting.transcript && (
-                                <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                                  {meeting.transcript.slice(0, 150)}...
-                                </p>
-                              )}
+                              <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
                             </div>
-                            <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Inga aktiva möten hittades</p>
+                    <p>Inga möten hittades</p>
                   </div>
                 )}
               </TabsContent>
