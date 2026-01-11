@@ -803,10 +803,19 @@ const Library = () => {
     }
 
     // Check if speakers have generic names - show confirmation if so
+    // Check transcriptSegments, SIS data, and speakerNames for any generic labels
     const hasGenericNames = (() => {
       const allSpeakerLabels = new Set<string>();
       sisMatches?.forEach(m => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
       sisSpeakers?.forEach(s => s.label && allSpeakerLabels.add(s.label));
+      
+      // Also check transcriptSegments for speaker IDs
+      if (transcriptSegments && transcriptSegments.length > 0) {
+        transcriptSegments.forEach(seg => {
+          if ((seg as any).speakerId) allSpeakerLabels.add((seg as any).speakerId);
+          if ((seg as any).speaker) allSpeakerLabels.add((seg as any).speaker);
+        });
+      }
       
       if (allSpeakerLabels.size === 0) return false;
       
@@ -837,6 +846,7 @@ const Library = () => {
         transcriptSegments,
         sisSpeakers,
         sisMatches,
+        speakerNames: Object.keys(speakerNames).length > 0 ? speakerNames : undefined,
       });
       setShowSpeakerNameConfirm(true);
       return;
@@ -850,6 +860,7 @@ const Library = () => {
       transcriptSegments,
       sisSpeakers,
       sisMatches,
+      speakerNames: Object.keys(speakerNames).length > 0 ? speakerNames : undefined,
     });
     setShowAgendaDialog(true);
   };
@@ -1518,6 +1529,16 @@ const Library = () => {
               console.warn('⚠️ Could not fetch SIS data for replace protocol:', e);
             }
             
+            // Get speaker names from ASR or local state
+            let speakerNamesForReplace: Record<string, string> = {};
+            try {
+              const asrData = await pollASRStatus(meetingToReplaceProtocol.id);
+              if (asrData?.lyraSpeakerNames) speakerNamesForReplace = asrData.lyraSpeakerNames;
+              else if ((asrData as any)?.speakerNames) speakerNamesForReplace = (asrData as any).speakerNames;
+            } catch (e) {
+              // Ignore
+            }
+            
             setPendingMeetingData({
               id: effectiveMeeting.id,
               transcript: effectiveMeeting.transcript,
@@ -1526,6 +1547,7 @@ const Library = () => {
               transcriptSegments,
               sisSpeakers,
               sisMatches,
+              speakerNames: Object.keys(speakerNamesForReplace).length > 0 ? speakerNamesForReplace : undefined,
             });
             setShowAgendaDialog(true);
             
