@@ -1075,15 +1075,21 @@ const MeetingDetail = () => {
   // This eliminates frontend speaker inference - backend provides properly attributed segments
   const groupedSegments = (() => {
     // Prefer reconstructedSegments (source of truth from backend with proper speaker attribution)
+    // But only if they actually have text content
     if (reconstructedSegments && reconstructedSegments.length > 0) {
-      console.log('[MeetingDetail] Using reconstructedSegments:', reconstructedSegments.length);
-      return reconstructedSegments.map(seg => ({
-        speakerId: seg.speaker,
-        speakerName: seg.speakerName,
-        text: seg.text,
-        start: seg.start,
-        end: seg.end,
-      }));
+      const hasText = reconstructedSegments.some(seg => seg.text && seg.text.trim().length > 0);
+      if (hasText) {
+        console.log('[MeetingDetail] Using reconstructedSegments:', reconstructedSegments.length);
+        return reconstructedSegments.map(seg => ({
+          speakerId: seg.speaker,
+          speakerName: seg.speakerName,
+          text: seg.text || '',
+          start: seg.start,
+          end: seg.end,
+        }));
+      } else {
+        console.log('[MeetingDetail] reconstructedSegments have no text, falling back');
+      }
     }
     
     // If we have lyraSpeakers with segments but no reconstructedSegments,
