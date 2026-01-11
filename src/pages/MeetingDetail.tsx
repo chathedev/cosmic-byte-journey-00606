@@ -206,16 +206,9 @@ const MeetingDetail = () => {
         if (fetchedMeeting) {
           setMeeting(fetchedMeeting);
           
-          // Load segments from meeting if available (unless transcript is manually edited)
-          if (!isManualTranscript && fetchedMeeting.transcriptSegments && fetchedMeeting.transcriptSegments.length > 0) {
-            setTranscriptSegments(fetchedMeeting.transcriptSegments.map((seg: any) => ({
-              speakerId: seg.speakerId || seg.speaker || 'unknown',
-              text: seg.text,
-              start: seg.start,
-              end: seg.end,
-              confidence: seg.confidence || 0,
-            })));
-          } else if (isManualTranscript) {
+          // NOTE: We defer loading segments until we know if SIS is disabled
+          // This happens in the ASR status fetch below
+          if (isManualTranscript) {
             setTranscriptSegments(null);
             setReconstructedSegments(null);
           }
@@ -224,33 +217,31 @@ const MeetingDetail = () => {
             setTranscript(fetchedMeeting.transcript);
             setStatus('done');
             
-            // For completed meetings, also fetch Lyra data from ASR if segments not loaded
-            if (!fetchedMeeting.transcriptSegments || fetchedMeeting.transcriptSegments.length === 0) {
-              try {
-                const asrStatus = await pollASRStatus(id);
+            // ALWAYS fetch ASR/SIS status for completed meetings to check if SIS is disabled
+            try {
+              const asrStatus = await pollASRStatus(id);
 
-                // Always load speaker identification metadata (useful for UI and naming)
-                setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
-                setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
-                setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
-                setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+              // Check if SIS/LYRA is disabled - this is critical for UI decisions
+              const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
+              setIsSISDisabled(sisDisabled);
 
-                // Check if SIS/LYRA is disabled
-                const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
-                setIsSISDisabled(sisDisabled);
+              // Always load speaker identification metadata (useful for UI and naming)
+              setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
+              setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
+              setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+              setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
 
-                // Only hydrate segmentation when transcript is NOT manually edited
-                if (!isManualTranscript) {
-                  if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
-                    setTranscriptSegments(asrStatus.transcriptSegments);
-                  }
-                  if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
-                    setReconstructedSegments(asrStatus.reconstructedSegments);
-                  }
+              // Only hydrate segmentation when transcript is NOT manually edited and SIS is not disabled
+              if (!isManualTranscript && !sisDisabled) {
+                if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
+                  setTranscriptSegments(asrStatus.transcriptSegments);
                 }
-              } catch (e) {
-                console.log('Could not fetch ASR data for completed meeting:', e);
+                if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
+                  setReconstructedSegments(asrStatus.reconstructedSegments);
+                }
               }
+            } catch (e) {
+              console.log('Could not fetch ASR data for completed meeting:', e);
             }
             
             // Load speaker names from backend
