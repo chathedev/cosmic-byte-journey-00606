@@ -147,7 +147,7 @@ export function reconstructTranscriptSegments(
   // Fallback: use speaker segment times to slice transcript proportionally
   // This is less accurate but works when word-level data is unavailable
   if (transcript && transcript.trim()) {
-    return reconstructFromSpeakerTimes(speakers, speaker-Names, transcript);
+    return reconstructFromSpeakerTimes(speakers, speakerNames, transcript);
   }
 
   return [];
