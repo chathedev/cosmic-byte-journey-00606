@@ -15,27 +15,19 @@ interface QueueProgressWidgetProps {
   status: 'uploading' | 'queued' | 'processing' | 'done' | 'failed';
   stage?: 'uploading' | 'queued' | 'transcribing' | 'sis_processing' | 'done' | 'error';
   uploadProgress?: number;
+  backendProgress?: number; // Actual progress from backend (0-100)
   queueMetadata?: QueueMetadata;
   fileSize?: number; // in bytes
   onRetry?: () => void;
   className?: string;
 }
 
-// Estimate upload duration based on file size (assuming ~1MB/s average)
-const estimateUploadDuration = (fileSize: number): number => {
-  const fileSizeMB = fileSize / (1024 * 1024);
-  // Small files: 2-5s, Medium: 10-30s, Large: 30-120s
-  if (fileSizeMB < 5) return 3000;
-  if (fileSizeMB < 20) return 10000;
-  if (fileSizeMB < 50) return 30000;
-  if (fileSizeMB < 100) return 60000;
-  return 120000;
-};
 
 export const QueueProgressWidget = ({
   status,
   stage,
   uploadProgress = 0,
+  backendProgress,
   queueMetadata,
   fileSize = 0,
   onRetry,
@@ -44,11 +36,10 @@ export const QueueProgressWidget = ({
   const [displayProgress, setDisplayProgress] = useState(0);
   const [animatedPosition, setAnimatedPosition] = useState(queueMetadata?.queuePosition || 0);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
   
   const { queuePosition = 0, queueDepth = 0, activeCount = 0, maxConcurrent = 3 } = queueMetadata || {};
   
-  // Smooth progress animation based on file size and status
+  // Fast, smooth progress animation
   useEffect(() => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -63,84 +54,71 @@ export const QueueProgressWidget = ({
       return;
     }
     
-    // For uploading, use actual upload progress with smooth interpolation
-    if (status === 'uploading' || stage === 'uploading') {
-      const targetProgress = Math.min(uploadProgress, 95); // Cap at 95% during upload
+    // Calculate target progress based on backend data and stage
+    const getTargetProgress = (currentProgress: number): number => {
+      // Check stage for done/error since status is narrowed
+      if (stage === 'done') return 100;
+      if (stage === 'error') return currentProgress;
       
-      // Smooth transition to target
-      progressIntervalRef.current = setInterval(() => {
-        setDisplayProgress(prev => {
-          const diff = targetProgress - prev;
-          if (Math.abs(diff) < 0.5) return targetProgress;
-          // Smooth easing: faster catch-up for larger gaps
-          return prev + diff * 0.15;
-        });
-      }, 100);
+      // Use backend progress if available and meaningful
+      if (typeof backendProgress === 'number' && backendProgress > 0) {
+        // Backend provides 0-100, use it directly but cap at 98 until truly done
+        return Math.min(backendProgress, 98);
+      }
       
-      return () => {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      };
-    }
+      // Uploading: use uploadProgress (0-100) mapped to 0-30% of total
+      if (status === 'uploading' || stage === 'uploading') {
+        return Math.min(uploadProgress * 0.30, 30);
+      }
+      
+      // Queued: show 30-40% based on position
+      if (status === 'queued' || stage === 'queued') {
+        if (queueDepth > 0 && queuePosition > 0) {
+          const queueProgressPercent = 1 - (queuePosition / queueDepth);
+          return 30 + queueProgressPercent * 10; // 30-40%
+        }
+        return 32; // Default when queued
+      }
+      
+      // Transcribing: 40-85% with gradual increase
+      if (status === 'processing' || stage === 'transcribing') {
+        // Gradually increase from current to 85%
+        if (currentProgress < 85) {
+          return Math.min(currentProgress + 0.8, 85);
+        }
+        return currentProgress;
+      }
+      
+      // SIS processing: 85-98%
+      if (stage === 'sis_processing') {
+        if (currentProgress < 98) {
+          return Math.min(currentProgress + 0.6, 98);
+        }
+        return currentProgress;
+      }
+      
+      return currentProgress;
+    };
     
-    // For queued status, show position-based progress
-    if (status === 'queued' || stage === 'queued') {
-      // Progress based on queue position: closer to front = higher progress
-      const queueProgress = queueDepth > 0 
-        ? Math.max(0, Math.min(30, 30 - (queuePosition / queueDepth) * 30))
-        : 15;
-      
-      progressIntervalRef.current = setInterval(() => {
-        setDisplayProgress(prev => {
-          const diff = queueProgress - prev;
-          if (Math.abs(diff) < 0.5) return queueProgress;
-          return prev + diff * 0.1;
-        });
-      }, 200);
-      
-      return () => {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      };
-    }
-    
-    // For processing/transcribing, animate progress 30-80%
-    if (status === 'processing' || stage === 'transcribing') {
-      let targetProgress = 50;
-      
-      progressIntervalRef.current = setInterval(() => {
-        setDisplayProgress(prev => {
-          // Slowly increment during processing, never exceeding 85%
-          if (prev < 85) {
-            return prev + Math.random() * 0.5;
-          }
-          return prev;
-        });
-      }, 500);
-      
-      return () => {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      };
-    }
-    
-    // For SIS processing, animate 80-95%
-    if (stage === 'sis_processing') {
-      progressIntervalRef.current = setInterval(() => {
-        setDisplayProgress(prev => {
-          if (prev < 95) {
-            return prev + Math.random() * 0.3;
-          }
-          return prev;
-        });
-      }, 500);
-      
-      return () => {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      };
-    }
+    // Fast smooth animation - update every 50ms for responsive feel
+    progressIntervalRef.current = setInterval(() => {
+      setDisplayProgress(prev => {
+        const target = getTargetProgress(prev);
+        const diff = target - prev;
+        
+        // Fast catch-up: larger gaps = faster movement
+        if (Math.abs(diff) < 0.3) return target;
+        
+        // Responsive easing: 20% of difference per tick for smooth animation
+        const speed = Math.max(0.3, Math.abs(diff) * 0.20);
+        return prev + (diff > 0 ? speed : -speed * 0.3);
+      });
+    }, 50); // 50ms for smooth, responsive updates
     
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
-  }, [status, stage, uploadProgress, queuePosition, queueDepth, fileSize]);
+  }, [status, stage, uploadProgress, backendProgress, queuePosition, queueDepth]);
   
   // Animate queue position changes
   useEffect(() => {

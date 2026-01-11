@@ -71,6 +71,7 @@ const MeetingDetail = () => {
   
   // Queue and upload progress state
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [backendProgress, setBackendProgress] = useState<number | undefined>(undefined);
   const [queueMetadata, setQueueMetadata] = useState<QueueMetadata | undefined>(undefined);
   const [fileSize, setFileSize] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -376,6 +377,11 @@ const MeetingDetail = () => {
           setQueueMetadata(asrStatus.metadata);
         }
         
+        // Update backend progress if available
+        if (typeof asrStatus.progress === 'number') {
+          setBackendProgress(asrStatus.progress);
+        }
+        
         // Update status based on ASR response
         if (asrStatus.status === 'queued') {
           setStatus('queued');
@@ -467,7 +473,8 @@ const MeetingDetail = () => {
           return;
         }
 
-        const delay = pollCount < 10 ? 500 : pollCount < 20 ? 1500 : 3000;
+        // Fast polling during active processing (500ms first 30 polls, then 1s, then 2s)
+        const delay = pollCount < 30 ? 500 : pollCount < 60 ? 1000 : 2000;
         if (pollingRef.current && !transcriptionDoneRef.current) {
           setTimeout(doPoll, delay);
         }
@@ -1603,6 +1610,7 @@ const MeetingDetail = () => {
                     status={status === 'queued' ? 'queued' : status === 'uploading' ? 'uploading' : 'processing'}
                     stage={stage || undefined}
                     uploadProgress={uploadProgress}
+                    backendProgress={backendProgress}
                     queueMetadata={queueMetadata}
                     fileSize={fileSize}
                     className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6"
