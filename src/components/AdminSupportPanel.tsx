@@ -279,7 +279,9 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
     if (!supportSession?.token) return;
 
     try {
-      const fullMeeting = await apiClient.getSupportMeeting(supportSession.token, meeting.id);
+      const response = await apiClient.getSupportMeeting(supportSession.token, meeting.id);
+      // Handle response format { meeting: {...} }
+      const fullMeeting = response?.meeting || response;
       setSelectedMeeting(fullMeeting);
       setActiveTab("meeting");
     } catch (error: any) {
@@ -287,6 +289,14 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
       setSelectedMeeting(meeting);
       setActiveTab("meeting");
     }
+  };
+
+  const formatDuration = (seconds: number | undefined): string => {
+    if (!seconds) return '-';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    if (mins === 0) return `${secs}s`;
+    return `${mins}m ${secs}s`;
   };
 
   const getPlanString = (plan: string | { plan?: string } | undefined): string => {
@@ -700,12 +710,54 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">{selectedMeeting.title || 'Utan titel'}</CardTitle>
-                      <CardDescription>
-                        Skapat: {formatDate(selectedMeeting.createdAt)}
-                        {selectedMeeting.status && ` • Status: ${selectedMeeting.status}`}
+                      <CardDescription className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>Skapat: {formatDate(selectedMeeting.createdAt)}</span>
+                          {selectedMeeting.status && (
+                            <Badge variant="outline">{selectedMeeting.status}</Badge>
+                          )}
+                          {selectedMeeting.language && (
+                            <Badge variant="secondary">{selectedMeeting.language.toUpperCase()}</Badge>
+                          )}
+                        </div>
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Meeting Info Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="p-2 bg-muted/50 rounded-lg text-center">
+                          <p className="text-lg font-semibold">{formatDuration(selectedMeeting.durationSeconds)}</p>
+                          <p className="text-xs text-muted-foreground">Längd</p>
+                        </div>
+                        <div className="p-2 bg-muted/50 rounded-lg text-center">
+                          <p className="text-lg font-semibold">{selectedMeeting.protocolCount ?? 0}</p>
+                          <p className="text-xs text-muted-foreground">Protokoll #</p>
+                        </div>
+                        <div className="p-2 bg-muted/50 rounded-lg text-center">
+                          <p className="text-lg font-semibold">{selectedMeeting.actionItems?.length || 0}</p>
+                          <p className="text-xs text-muted-foreground">Åtgärder</p>
+                        </div>
+                        <div className="p-2 bg-muted/50 rounded-lg text-center">
+                          <p className="text-lg font-semibold">{selectedMeeting.participants?.length || 0}</p>
+                          <p className="text-xs text-muted-foreground">Deltagare</p>
+                        </div>
+                      </div>
+
+                      {/* Metadata */}
+                      {selectedMeeting.metadata && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Metadata</Label>
+                          <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border text-xs space-y-1">
+                            {selectedMeeting.metadata.sourceFileName && (
+                              <p><span className="font-medium">Källfil:</span> {selectedMeeting.metadata.sourceFileName}</p>
+                            )}
+                            {selectedMeeting.metadata.attribr?.orgIds?.length > 0 && (
+                              <p><span className="font-medium">Org-ID:</span> {selectedMeeting.metadata.attribr.orgIds.join(', ')}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Speaker Names */}
                       {selectedMeeting.speakerNames && Object.keys(selectedMeeting.speakerNames).length > 0 && (
                         <div>
@@ -720,27 +772,105 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                         </div>
                       )}
 
+                      {/* Action Items */}
+                      {selectedMeeting.actionItems && selectedMeeting.actionItems.length > 0 && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Åtgärdspunkter ({selectedMeeting.actionItems.length})</Label>
+                          <div className="mt-1 space-y-2 max-h-40 overflow-y-auto">
+                            {selectedMeeting.actionItems.map((item: any) => (
+                              <div key={item.id} className="p-2 bg-muted/50 rounded-lg border border-border">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-sm font-medium">{item.title}</p>
+                                  <div className="flex gap-1 shrink-0">
+                                    <Badge variant={item.priority === 'high' ? 'destructive' : 'outline'} className="text-xs">
+                                      {item.priority}
+                                    </Badge>
+                                    <Badge variant={item.status === 'done' ? 'default' : 'secondary'} className="text-xs">
+                                      {item.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                {item.owner && <p className="text-xs text-muted-foreground mt-1">Ansvarig: {item.owner}</p>}
+                                {item.description && <p className="text-xs text-muted-foreground mt-1">{item.description}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Transcript */}
                       {selectedMeeting.transcript && (
                         <div>
-                          <Label className="text-xs text-muted-foreground">Transkription</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            Transkription ({selectedMeeting.transcript.length} tecken)
+                          </Label>
                           <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border max-h-48 overflow-y-auto">
                             <p className="text-sm whitespace-pre-wrap">{selectedMeeting.transcript}</p>
                           </div>
                         </div>
                       )}
-                      
-                      {selectedMeeting.protocol && (
+
+                      {/* Summary */}
+                      {selectedMeeting.summary && (
                         <div>
-                          <Label className="text-xs text-muted-foreground">Protokoll</Label>
-                          <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border max-h-48 overflow-y-auto">
-                            <p className="text-sm whitespace-pre-wrap">{selectedMeeting.protocol}</p>
+                          <Label className="text-xs text-muted-foreground">Sammanfattning</Label>
+                          <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border max-h-32 overflow-y-auto">
+                            <p className="text-sm whitespace-pre-wrap">{selectedMeeting.summary}</p>
                           </div>
                         </div>
                       )}
 
-                      {!selectedMeeting.transcript && !selectedMeeting.protocol && (
+                      {/* Notes */}
+                      {selectedMeeting.notes && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Anteckningar</Label>
+                          <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border max-h-32 overflow-y-auto">
+                            <p className="text-sm whitespace-pre-wrap">{selectedMeeting.notes}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Protocol */}
+                      {selectedMeeting.protocol && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">
+                            Protokoll
+                            {typeof selectedMeeting.protocol === 'object' && selectedMeeting.protocol.fileName && (
+                              <span className="ml-2 font-normal">({selectedMeeting.protocol.fileName})</span>
+                            )}
+                          </Label>
+                          <div className="mt-1 p-3 bg-muted/50 rounded-lg border border-border">
+                            {typeof selectedMeeting.protocol === 'object' ? (
+                              <div className="space-y-1 text-sm">
+                                <p><span className="font-medium">Filnamn:</span> {selectedMeeting.protocol.fileName || '-'}</p>
+                                <p><span className="font-medium">Typ:</span> {selectedMeeting.protocol.mimeType || '-'}</p>
+                                <p><span className="font-medium">Storlek:</span> {selectedMeeting.protocol.size ? `${Math.round(selectedMeeting.protocol.size / 1024)} KB` : '-'}</p>
+                                <p><span className="font-medium">Sparat:</span> {selectedMeeting.protocol.storedAt ? formatDate(selectedMeeting.protocol.storedAt) : '-'}</p>
+                              </div>
+                            ) : (
+                              <p className="text-sm whitespace-pre-wrap">{selectedMeeting.protocol}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Attachments */}
+                      {selectedMeeting.attachments && selectedMeeting.attachments.length > 0 && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Bilagor ({selectedMeeting.attachments.length})</Label>
+                          <div className="mt-1 space-y-1">
+                            {selectedMeeting.attachments.map((att: any, idx: number) => (
+                              <div key={idx} className="p-2 bg-muted/50 rounded border border-border text-sm">
+                                {att.name || att.fileName || `Bilaga ${idx + 1}`}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {!selectedMeeting.transcript && !selectedMeeting.protocol && !selectedMeeting.summary && (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                          Ingen transkription eller protokoll tillgängligt
+                          Ingen transkription, protokoll eller sammanfattning tillgängligt
                         </p>
                       )}
 
