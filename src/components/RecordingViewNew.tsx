@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { isNativeApp } from "@/utils/capacitorDetection";
-import { VoiceAurora } from "./VoiceAurora";
+import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -808,39 +808,39 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
   // Recording View
   if (viewState === 'recording') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
-        {/* Header */}
-        <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 ${isNative ? 'pt-safe' : ''}`}>
-          <div className="max-w-5xl mx-auto px-3 md:px-4 py-2 md:py-3">
-            <div className="flex items-center justify-between gap-2 md:gap-4">
-              <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-                <div className={`w-2 h-2 rounded-full transition-all ${
+      <div className="min-h-[100dvh] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col overflow-hidden">
+        {/* Header - Compact for mobile */}
+        <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
+          <div className="max-w-5xl mx-auto px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className={`w-2 h-2 flex-shrink-0 rounded-full transition-all ${
                   !isPaused ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground/40'
                 }`} />
                 {isEditingName ? (
-                  <div className="flex gap-2 items-center flex-1 min-w-0">
+                  <div className="flex gap-1 items-center flex-1 min-w-0">
                     <Input
                       value={meetingName}
                       onChange={(e) => setMeetingName(e.target.value)}
                       onBlur={() => setIsEditingName(false)}
                       onKeyDown={(e) => e.key === "Enter" && setIsEditingName(false)}
                       autoFocus
-                      className="h-7 md:h-8 text-xs md:text-sm"
+                      className="h-7 text-xs flex-1"
                     />
-                    <Button onClick={() => setIsEditingName(false)} size="sm" variant="ghost" className="h-7 w-7 p-0">
+                    <Button onClick={() => setIsEditingName(false)} size="sm" variant="ghost" className="h-7 w-7 p-0 flex-shrink-0">
                       <Check className="w-3 h-3" />
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 group cursor-pointer flex-1 min-w-0" onClick={() => setIsEditingName(true)}>
-                    <h1 className="text-xs md:text-sm font-medium truncate">{meetingName}</h1>
-                    <Edit2 className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center gap-1.5 group cursor-pointer flex-1 min-w-0" onClick={() => setIsEditingName(true)}>
+                    <h1 className="text-xs font-medium truncate">{meetingName}</h1>
+                    <Edit2 className="w-3 h-3 flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-1 md:gap-1.5">
-                <Clock className="w-3 md:w-3.5 h-3 md:h-3.5 text-muted-foreground" />
-                <span className="font-mono text-[10px] md:text-xs">
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Clock className="w-3 h-3 text-muted-foreground" />
+                <span className="font-mono text-[10px]">
                   {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
                 </span>
               </div>
@@ -848,35 +848,32 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           </div>
         </div>
 
-        {/* Main Content - Orb Focused */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
-          {/* Voice Aurora Visualization */}
-          <div className="relative">
-            {/* Ambient glow behind */}
-            <div className="absolute inset-0 -m-12 rounded-full bg-gradient-radial from-violet-500/15 via-cyan-500/10 to-transparent blur-3xl pointer-events-none" />
-            
-            <VoiceAurora
+        {/* Main Content - Responsive */}
+        <div className="flex-1 flex flex-col items-center justify-center p-3 min-h-0 overflow-hidden">
+          {/* Audio Analyzer Visualization */}
+          <div className="flex-shrink-0">
+            <MinimalAudioAnalyzer
               stream={streamRef.current}
               isActive={isRecording && !isPaused}
-              size={300}
+              size={Math.min(180, window.innerWidth - 48)}
             />
           </div>
 
           {/* Minimal Status */}
-          <div className="mt-6 text-center">
-            <div className="font-mono text-2xl md:text-3xl tracking-tight text-foreground/80">
+          <div className="mt-4 text-center flex-shrink-0">
+            <div className="font-mono text-xl md:text-2xl tracking-tight text-foreground/80">
               {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-1 text-xs md:text-sm text-muted-foreground">
               {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
 
-          {/* Live Transcript Display (Free/Pro only) - Compact */}
+          {/* Live Transcript Display (Free/Pro only) - Responsive height */}
           {!useAsrMode && (liveTranscript || interimText) && (
-            <div className="mt-6 w-full max-w-md">
-              <ScrollArea className="h-[120px] md:h-[160px] rounded-xl bg-card/60 backdrop-blur-sm border border-border/30">
-                <div ref={transcriptScrollRef} className="p-4 text-sm leading-relaxed">
+            <div className="mt-3 w-full max-w-md flex-1 min-h-0 max-h-[25vh] md:max-h-[30vh]">
+              <ScrollArea className="h-full rounded-xl bg-card/60 backdrop-blur-sm border border-border/30">
+                <div ref={transcriptScrollRef} className="p-3 text-sm leading-relaxed">
                   <span className="text-foreground">{liveTranscript}</span>
                   {interimText && (
                     <span className="text-muted-foreground/60 italic">{interimText}</span>
@@ -887,35 +884,35 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           )}
         </div>
 
-        {/* Bottom Controls */}
-        <div className={`sticky bottom-0 bg-background/95 backdrop-blur-sm border-t shadow-lg ${isNative ? 'pb-safe' : ''}`}>
-          <div className="max-w-5xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-center gap-3">
-              <Button onClick={handleBackClick} variant="ghost" size="lg">
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Tillbaka
+        {/* Bottom Controls - Compact for mobile */}
+        <div className={`flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg ${isNative ? 'pb-safe' : ''}`}>
+          <div className="max-w-5xl mx-auto px-3 py-3">
+            <div className="flex items-center justify-center gap-2">
+              <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-10 px-3">
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Tillbaka</span>
               </Button>
               
-              <Button onClick={togglePause} variant="outline" size="lg">
+              <Button onClick={togglePause} variant="outline" size="sm" className="h-10 px-3">
                 {isPaused ? (
                   <>
-                    <Play className="w-5 h-5 mr-2" />
-                    Återuppta
+                    <Play className="w-4 h-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Återuppta</span>
                   </>
                 ) : (
                   <>
-                    <Pause className="w-5 h-5 mr-2" />
-                    Pausa
+                    <Pause className="w-4 h-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Pausa</span>
                   </>
                 )}
               </Button>
 
               <Button 
                 onClick={handleStopRecording} 
-                size="lg" 
-                className="bg-primary hover:bg-primary/90 font-semibold min-w-[140px]"
+                size="sm" 
+                className="h-10 px-4 bg-primary hover:bg-primary/90 font-semibold"
               >
-                <Square className="w-5 h-5 mr-2" />
+                <Square className="w-4 h-4 mr-1" />
                 Färdig
               </Button>
             </div>
