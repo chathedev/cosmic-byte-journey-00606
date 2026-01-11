@@ -1810,64 +1810,72 @@ const MeetingDetail = () => {
                   </motion.div>
                 )}
 
-                {/* Action Buttons */}
+                {/* Action Buttons - Enhanced layout */}
                 {!isEditing && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="flex flex-wrap gap-3"
+                    className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
                   >
-                    <div className="flex flex-col items-start gap-1">
-                      <Button
-                        onClick={handleCreateProtocol}
-                        variant={protocolData ? "outline" : "default"}
-                        className="flex-1 sm:flex-none gap-2 rounded-full h-12"
-                        disabled={loadingProtocol || !canGenerateMoreProtocols}
-                      >
-                        {loadingProtocol ? (
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                        ) : !canGenerateMoreProtocols ? (
-                          <Lock className="w-4 h-4" />
-                        ) : protocolData ? (
-                          <RefreshCw className="w-4 h-4" />
-                        ) : (
-                          <FileText className="w-4 h-4" />
+                    <div className="p-5 space-y-4">
+                      {/* Primary action - Create Protocol */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <Button
+                          onClick={handleCreateProtocol}
+                          variant={protocolData ? "outline" : "default"}
+                          className="flex-1 gap-2.5 h-12 text-base font-medium"
+                          disabled={loadingProtocol || !canGenerateMoreProtocols}
+                        >
+                          {loadingProtocol ? (
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                          ) : !canGenerateMoreProtocols ? (
+                            <Lock className="w-5 h-5" />
+                          ) : protocolData ? (
+                            <RefreshCw className="w-5 h-5" />
+                          ) : (
+                            <FileText className="w-5 h-5" />
+                          )}
+                          {!canGenerateMoreProtocols 
+                            ? 'Gräns nådd'
+                            : protocolData 
+                              ? 'Ersätt protokoll'
+                              : 'Skapa protokoll'
+                          }
+                        </Button>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Badge variant="secondary" className="text-xs px-2.5 py-1">
+                            {protocolCountRemaining > 0 
+                              ? `${protocolCountRemaining} av ${maxProtocolGenerations} kvar`
+                              : `0 av ${maxProtocolGenerations} kvar`
+                            }
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Secondary actions */}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-border/30">
+                        {hasPlusAccess(user, userPlan) && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => navigate(`/chat?meeting=${meeting.id}`)}
+                            className="gap-2 text-sm h-10"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            Chatta med mötet
+                          </Button>
                         )}
-                        {!canGenerateMoreProtocols 
-                          ? 'Gräns nådd'
-                          : protocolData 
-                            ? 'Ersätt protokoll'
-                            : 'Skapa protokoll'
-                        }
-                      </Button>
-                      <span className="text-xs text-muted-foreground pl-1">
-                        {protocolCountRemaining > 0 
-                          ? `Kvar: ${protocolCountRemaining} av ${maxProtocolGenerations}`
-                          : `Inga kvar (${protocolCountUsed}/${maxProtocolGenerations} använda)`
-                        }
-                      </span>
+
+                        <Button
+                          variant="ghost"
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="gap-2 text-sm h-10 text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Ta bort
+                        </Button>
+                      </div>
                     </div>
-
-                    {hasPlusAccess(user, userPlan) && (
-                      <Button
-                        variant="outline"
-                        onClick={() => navigate(`/chat?meeting=${meeting.id}`)}
-                        className="flex-1 sm:flex-none gap-2 rounded-full h-12"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        Chatta med mötet
-                      </Button>
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="gap-2 rounded-full h-12 px-4 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Ta bort möte</span>
-                    </Button>
                   </motion.div>
                 )}
               </motion.div>
