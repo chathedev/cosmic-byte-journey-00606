@@ -86,6 +86,7 @@ const MeetingDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSpeakers, setShowSpeakers] = useState(true);
+  const [hasManualTranscript, setHasManualTranscript] = useState(false);
 
   // Protocol management state
   const [protocolData, setProtocolData] = useState<{
@@ -159,6 +160,14 @@ const MeetingDetail = () => {
       if (resolvedId !== id) {
         console.log('📋 Meeting detail: using resolved backend ID:', { original: id, resolved: resolvedId });
       }
+
+      // If the user has manually edited the transcript, we should NOT show speaker segmentation.
+      // Persisted in localStorage so it survives refresh.
+      const transcriptEditedKeyA = `meeting_transcript_edited_${id}`;
+      const transcriptEditedKeyB = `meeting_transcript_edited_${resolvedId}`;
+      const isManualTranscript =
+        localStorage.getItem(transcriptEditedKeyA) === '1' || localStorage.getItem(transcriptEditedKeyB) === '1';
+      setHasManualTranscript(isManualTranscript);
       
       try {
         // First check sessionStorage for pending meeting
@@ -196,8 +205,8 @@ const MeetingDetail = () => {
         if (fetchedMeeting) {
           setMeeting(fetchedMeeting);
           
-          // Load segments from meeting if available
-          if (fetchedMeeting.transcriptSegments && fetchedMeeting.transcriptSegments.length > 0) {
+          // Load segments from meeting if available (unless transcript is manually edited)
+          if (!isManualTranscript && fetchedMeeting.transcriptSegments && fetchedMeeting.transcriptSegments.length > 0) {
             setTranscriptSegments(fetchedMeeting.transcriptSegments.map((seg: any) => ({
               speakerId: seg.speakerId || seg.speaker || 'unknown',
               text: seg.text,
@@ -205,6 +214,9 @@ const MeetingDetail = () => {
               end: seg.end,
               confidence: seg.confidence || 0,
             })));
+          } else if (isManualTranscript) {
+            setTranscriptSegments(null);
+            setReconstructedSegments(null);
           }
           
           if (fetchedMeeting.transcript && fetchedMeeting.transcript.trim().length > 0) {
@@ -215,36 +227,26 @@ const MeetingDetail = () => {
             if (!fetchedMeeting.transcriptSegments || fetchedMeeting.transcriptSegments.length === 0) {
               try {
                 const asrStatus = await pollASRStatus(id);
-                if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
-                  setTranscriptSegments(asrStatus.transcriptSegments);
-                }
-                // Use reconstructed segments as source of truth when available
-                // But ONLY if the ASR transcript matches the saved meeting transcript
-                // (user might have edited the transcript after ASR finished)
-                if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
-                  const asrTranscript = asrStatus.transcript || '';
-                  const savedTranscript = fetchedMeeting.transcript || '';
-                  // Compare normalized transcripts (trim + collapse whitespace)
-                  const normalizedASR = asrTranscript.replace(/\s+/g, ' ').trim().toLowerCase();
-                  const normalizedSaved = savedTranscript.replace(/\s+/g, ' ').trim().toLowerCase();
-                  // Only use segments if transcripts match (or are very similar)
-                  const prefixLen = Math.min(200, normalizedASR.length, normalizedSaved.length);
-                  const transcriptsMatch = prefixLen > 0 && 
-                    normalizedASR.substring(0, prefixLen) === normalizedSaved.substring(0, prefixLen);
-                  
-                  if (transcriptsMatch) {
-                    setReconstructedSegments(asrStatus.reconstructedSegments);
-                  } else {
-                    console.log('[MeetingDetail] ASR transcript differs from saved, skipping segments');
-                  }
-                }
+
+                // Always load speaker identification metadata (useful for UI and naming)
                 setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
                 setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
                 setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
                 setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+
                 // Check if SIS/LYRA is disabled
                 const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
                 setIsSISDisabled(sisDisabled);
+
+                // Only hydrate segmentation when transcript is NOT manually edited
+                if (!isManualTranscript) {
+                  if (asrStatus.transcriptSegments && asrStatus.transcriptSegments.length > 0) {
+                    setTranscriptSegments(asrStatus.transcriptSegments);
+                  }
+                  if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
+                    setReconstructedSegments(asrStatus.reconstructedSegments);
+                  }
+                }
               } catch (e) {
                 console.log('Could not fetch ASR data for completed meeting:', e);
               }
@@ -396,6 +398,11 @@ const MeetingDetail = () => {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
 
+          // Fresh ASR result overrides any previous manual transcript edit
+          localStorage.removeItem(`meeting_transcript_edited_${id}`);
+          localStorage.removeItem(`meeting_transcript_edited_${resolveBackendMeetingId(id)}`);
+          setHasManualTranscript(false);
+
           const newTranscript = asrStatus.transcript || '';
           setTranscript(newTranscript);
           setTranscriptSegments(asrStatus.transcriptSegments || null);
@@ -539,23 +546,20 @@ const MeetingDetail = () => {
       const normalizedEdited = editedTranscript.replace(/\s+/g, ' ').trim();
       const normalizedOriginal = (transcript || '').replace(/\s+/g, ' ').trim();
       const transcriptChanged = normalizedEdited !== normalizedOriginal;
-      
-      console.log('[MeetingDetail] Save check - transcriptChanged:', transcriptChanged, {
-        editedLen: normalizedEdited.length,
-        originalLen: normalizedOriginal.length,
-      });
-      
+
       if (transcriptChanged) {
         await apiClient.updateMeeting(id, { transcript: editedTranscript.trim() });
         setTranscript(editedTranscript.trim());
         setMeeting(prev => prev ? { ...prev, transcript: editedTranscript.trim(), updatedAt: new Date().toISOString() } : prev);
-        
-        // CRITICAL: Clear ALL segment data when transcript text is manually edited
-        // This forces the UI to show plain text instead of stale segment data
-        // The segments are from ASR and no longer match the edited text
+
+        // Mark transcript as manually edited (persist so refresh doesn't re-enable segments)
+        localStorage.setItem(`meeting_transcript_edited_${id}`, '1');
+        localStorage.setItem(`meeting_transcript_edited_${resolveBackendMeetingId(id)}`, '1');
+        setHasManualTranscript(true);
+
+        // Clear ALL segment data when transcript text is manually edited
         setTranscriptSegments(null);
         setReconstructedSegments(null);
-        console.log('[MeetingDetail] Transcript changed - cleared segments');
       }
 
       // Save speaker names if changed
@@ -1147,77 +1151,28 @@ const MeetingDetail = () => {
 
   // Use reconstructedSegments as source of truth when available
   // This eliminates frontend speaker inference - backend provides properly attributed segments
-  // IMPORTANT: Only use segments if the transcript text matches what's in segments.
-  // If user has manually edited the transcript, segments are stale and we fall back to plain text.
+  // IMPORTANT: If the transcript has been manually edited, segmentation is no longer trustworthy.
   const groupedSegments = (() => {
-    // Helper to strip speaker labels from text for comparison
-    // Labels can be like "[Talare 1]:", "Talare 1:", "speaker_0:", etc.
-    const stripSpeakerLabels = (text: string): string => {
-      return text
-        // Remove [Talare X]: or [Speaker X]: format
-        .replace(/\[(?:talare|speaker)[_\s-]?\d+\]\s*[:\-]?\s*/gi, '')
-        // Remove Talare X: or Speaker X: format (without brackets)
-        .replace(/\b(?:talare|speaker)[_\s-]?\d+\s*[:\-]\s*/gi, '')
-        // Collapse multiple spaces/newlines
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase();
-    };
-
-    // Helper to check if transcript matches segment text (with tolerance for whitespace differences)
-    // This prevents showing stale segments when the user has edited the transcript
-    const segmentsMatchTranscript = (segmentTexts: string[]): boolean => {
-      if (!transcript) return false;
-      
-      // Strip speaker labels from both and normalize whitespace
-      const joinedSegments = stripSpeakerLabels(segmentTexts.join(' '));
-      const normalizedTranscript = stripSpeakerLabels(transcript);
-      
-      // If either is empty, no match
-      if (joinedSegments.length === 0 || normalizedTranscript.length === 0) return false;
-      
-      // If lengths differ significantly, they don't match
-      const minLen = Math.min(joinedSegments.length, normalizedTranscript.length);
-      const maxLen = Math.max(joinedSegments.length, normalizedTranscript.length);
-      if (minLen / maxLen < 0.85) {
-        console.log('[MeetingDetail] segmentsMatchTranscript: length mismatch', { segLen: joinedSegments.length, txLen: normalizedTranscript.length });
-        return false;
-      }
-      
-      // Check first 100 chars match (to catch major content changes)
-      const checkLen = Math.min(100, minLen);
-      const segPrefix = joinedSegments.substring(0, checkLen);
-      const txPrefix = normalizedTranscript.substring(0, checkLen);
-      const prefixMatch = segPrefix === txPrefix;
-      
-      console.log('[MeetingDetail] segmentsMatchTranscript:', prefixMatch, { checkLen, segPrefix: segPrefix.substring(0, 40), txPrefix: txPrefix.substring(0, 40) });
-      return prefixMatch;
-    };
+    if (hasManualTranscript) return [];
 
     // Prefer reconstructedSegments (source of truth from backend with proper speaker attribution)
-    // But only if they actually have text content AND match the current transcript
+    // But only if they actually have text content
     if (reconstructedSegments && reconstructedSegments.length > 0) {
-      const segmentTexts = reconstructedSegments.map(seg => seg.text || '').filter(t => t.trim());
-      const hasText = segmentTexts.length > 0;
+      const hasText = reconstructedSegments.some((seg) => seg.text && seg.text.trim().length > 0);
       if (hasText) {
-        // Check if segments still match the saved transcript
-        if (!segmentsMatchTranscript(segmentTexts)) {
-          console.log('[MeetingDetail] reconstructedSegments text differs from saved transcript, falling back to plain text');
-          return [];
-        }
-        console.log('[MeetingDetail] Using reconstructedSegments:', reconstructedSegments.length);
-        return reconstructedSegments.map(seg => ({
+        return reconstructedSegments.map((seg) => ({
           speakerId: seg.speaker,
           speakerName: seg.speakerName,
           text: seg.text || '',
           start: seg.start,
           end: seg.end,
         }));
-      } else {
-        console.log('[MeetingDetail] reconstructedSegments have no text, falling back');
       }
+
+      // If reconstructed segments exist but have no text, fall back to other strategies
+      console.log('[MeetingDetail] reconstructedSegments have no text, falling back');
     }
-    
+
     // If we have lyraSpeakers with segments but no reconstructedSegments,
     // reconstruct on the frontend using speaker time ranges
     if (lyraSpeakers.length > 0 && transcript) {
@@ -1845,7 +1800,7 @@ const MeetingDetail = () => {
                       // Speaker-segmented view (always show segments if available)
                       <div className="space-y-0 max-h-[60vh] overflow-y-auto">
                         {groupedSegments.map((segment, idx) => {
-                          const speakerName = (segment as any).speakerName || getSegmentSpeakerName(segment.speakerId);
+                          const speakerName = getSegmentSpeakerName(segment.speakerId);
                           const colorClass = getSpeakerColorClass(segment.speakerId);
                           const dotClass = getSpeakerDotClass(segment.speakerId);
                           const textClass = getSpeakerTextClass(segment.speakerId);
