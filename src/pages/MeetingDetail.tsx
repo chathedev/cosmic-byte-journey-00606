@@ -2014,19 +2014,17 @@ const MeetingDetail = () => {
                         })}
                       </div>
                     ) : (
-                      // Plain text view - clean and enhanced for companies without SIS
+                      // Plain text view - clean for companies without SIS
                       <div className="max-h-[60vh] overflow-y-auto">
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
-                          <div className="text-[15px] leading-[1.85] text-foreground selection:bg-primary/20">
-                            {displayTranscript
-                              .split(/\n+/)
-                              .filter(p => p.trim())
-                              .map((paragraph, idx) => (
-                                <p key={idx} className="mb-5 last:mb-0 first-letter:text-lg first-letter:font-medium">
-                                  {paragraph.trim()}
-                                </p>
-                              ))}
-                          </div>
+                        <div className="text-[15px] leading-[1.85] text-foreground selection:bg-primary/20">
+                          {displayTranscript
+                            .split(/\n+/)
+                            .filter(p => p.trim())
+                            .map((paragraph, idx) => (
+                              <p key={idx} className="mb-4 last:mb-0">
+                                {paragraph.trim()}
+                              </p>
+                            ))}
                         </div>
                       </div>
                     )}
