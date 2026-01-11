@@ -99,6 +99,7 @@ const MeetingDetail = () => {
   const [viewingProtocol, setViewingProtocol] = useState(false);
   const [showDeleteProtocolConfirm, setShowDeleteProtocolConfirm] = useState(false);
   const [showReplaceProtocolConfirm, setShowReplaceProtocolConfirm] = useState(false);
+  const [showSpeakerNameConfirm, setShowSpeakerNameConfirm] = useState(false);
 
   // Speaker identification UX thresholds (per docs)
   const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
@@ -604,6 +605,44 @@ const MeetingDetail = () => {
       return;
     }
 
+    // Check if speakers have generic names - show confirmation if so
+    // We check directly using lyraSpeakers/speakerNames since uniqueSpeakers isn't available here
+    const hasGenericNames = (() => {
+      if (isSISDisabled) return false;
+      
+      const allSpeakerLabels = new Set<string>();
+      lyraMatches.forEach(m => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
+      lyraSpeakers.forEach(s => s.label && allSpeakerLabels.add(s.label));
+      
+      if (allSpeakerLabels.size === 0) return false;
+      
+      const genericPatterns = [
+        /^speaker[_\s]?\d+$/i,
+        /^talare[_\s]?\d+$/i,
+        /^unknown$/i,
+        /^okänd$/i,
+      ];
+      
+      for (const label of allSpeakerLabels) {
+        const customName = speakerNames[label];
+        const nameToCheck = customName || label;
+        const isGeneric = genericPatterns.some(p => p.test(nameToCheck.trim()));
+        if (isGeneric) return true;
+      }
+      return false;
+    })();
+
+    if (hasGenericNames) {
+      setShowSpeakerNameConfirm(true);
+      return;
+    }
+
+    await proceedWithProtocolGeneration();
+  };
+
+  // Confirm and proceed with protocol generation (after speaker name warning)
+  const handleConfirmProtocolWithGenericNames = async () => {
+    setShowSpeakerNameConfirm(false);
     await proceedWithProtocolGeneration();
   };
 
@@ -967,22 +1006,54 @@ const MeetingDetail = () => {
       }
     }
 
-    // If SIS/Lyra ran (status done) but found NO matches AND no segments with speakers,
-    // create a default "Talare 1" so users can still name the speaker for learning
-    // Only do this if SIS is NOT disabled
-    if (speakers.length === 0 && status === 'done' && hasTranscript && !isSISDisabled) {
-      const defaultLabel = 'speaker_0';
-      const namesSource = isEditing ? editedSpeakerNames : speakerNames;
-      const name = namesSource[defaultLabel] || 'Talare 1';
+    // If transcription is done and we found speakers from segments (even with SIS disabled),
+    // OR if SIS is disabled but we have segment speakers, show them for editing
+    // This allows users to name speakers even when SIS isn't running
+    if (speakers.length === 0 && status === 'done' && hasTranscript) {
+      // Check if we have any segment-based speakers
+      if (transcriptSegments && transcriptSegments.length > 0) {
+        const segmentLabels = new Set<string>();
+        for (const seg of transcriptSegments) {
+          const rawId = (seg as any).speakerId || (seg as any).speaker;
+          if (rawId && rawId.toLowerCase() !== 'unknown') {
+            segmentLabels.add(rawId);
+          }
+        }
+        
+        // Add speakers found in segments
+        let idx = 0;
+        for (const label of segmentLabels) {
+          const namesSource = isEditing ? editedSpeakerNames : speakerNames;
+          const fallbackName = getSpeakerFallbackName(label, idx);
+          const name = namesSource[label] || fallbackName;
+          
+          speakers.push({
+            label,
+            name,
+            confidence: 0,
+            learned: false,
+            email: undefined,
+            isIdentified: false,
+          });
+          idx++;
+        }
+      }
       
-      speakers.push({
-        label: defaultLabel,
-        name,
-        confidence: 0,
-        learned: false,
-        email: undefined,
-        isIdentified: false,
-      });
+      // If still no speakers, create a default one (but only if SIS is NOT disabled)
+      if (speakers.length === 0 && !isSISDisabled) {
+        const defaultLabel = 'speaker_0';
+        const namesSource = isEditing ? editedSpeakerNames : speakerNames;
+        const name = namesSource[defaultLabel] || 'Talare 1';
+        
+        speakers.push({
+          label: defaultLabel,
+          name,
+          confidence: 0,
+          learned: false,
+          email: undefined,
+          isIdentified: false,
+        });
+      }
     }
 
     return speakers;
@@ -1466,8 +1537,8 @@ const MeetingDetail = () => {
                   )}
                 </div>
 
-                {/* Speakers Section - Only show when SIS/LYRA is enabled */}
-                {uniqueSpeakers.length > 0 && !isSISDisabled && (
+                {/* Speakers Section - Show when we have speakers (from SIS/Lyra or segments) */}
+                {uniqueSpeakers.length > 0 && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1486,9 +1557,11 @@ const MeetingDetail = () => {
                           <span className="font-medium text-sm">Talare</span>
                           <p className="text-xs text-muted-foreground">
                             {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'}
-                            {uniqueSpeakers.some(s => s.isIdentified) 
-                              ? ' • Röstidentifiering via Lyra'
-                              : uniqueSpeakers.length > 0 && ' • Namnge för att lära Lyra'
+                            {isSISDisabled 
+                              ? ' • Redigera namn för protokollet'
+                              : uniqueSpeakers.some(s => s.isIdentified) 
+                                ? ' • Röstidentifiering via Lyra'
+                                : ' • Namnge för att lära Lyra'
                             }
                           </p>
                         </div>
@@ -1824,6 +1897,18 @@ const MeetingDetail = () => {
         confirmText={canGenerateMoreProtocols ? "Ersätt" : "OK"}
         onConfirm={canGenerateMoreProtocols ? handleReplaceProtocol : () => setShowReplaceProtocolConfirm(false)}
         variant={canGenerateMoreProtocols ? "destructive" : "default"}
+      />
+
+      {/* Speaker Name Confirmation Dialog */}
+      <ConfirmDialog
+        open={showSpeakerNameConfirm}
+        onOpenChange={setShowSpeakerNameConfirm}
+        title="Talarnamn saknas"
+        description="Några talare har fortfarande generiska namn (t.ex. 'Talare 1'). För bästa resultat i protokollet, redigera mötet och namnge talarna först. Vill du fortsätta ändå?"
+        confirmText="Fortsätt ändå"
+        cancelText="Redigera namn"
+        onConfirm={handleConfirmProtocolWithGenericNames}
+        variant="default"
       />
 
       {/* Protocol Viewer Dialog */}
