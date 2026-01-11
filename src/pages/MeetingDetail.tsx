@@ -643,67 +643,69 @@ const MeetingDetail = () => {
     }
 
     // Check if speakers have generic names - show confirmation if so
-    // Check transcriptSegments, reconstructedSegments, transcript labels, and speakerNames for any generic labels
-    const hasGenericNames = (() => {
-      const allSpeakerLabels = new Set<string>();
+    // SKIP this check entirely when SIS is disabled (no speaker segmentation = no speaker names to warn about)
+    if (!isSISDisabled) {
+      const hasGenericNames = (() => {
+        const allSpeakerLabels = new Set<string>();
 
-      // SIS/LYRA-derived labels (when available)
-      lyraMatches.forEach((m) => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
-      lyraSpeakers.forEach((s) => s.label && allSpeakerLabels.add(s.label));
+        // SIS/LYRA-derived labels (when available)
+        lyraMatches.forEach((m) => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
+        lyraSpeakers.forEach((s) => s.label && allSpeakerLabels.add(s.label));
 
-      // transcriptSegments speaker IDs
-      if (transcriptSegments && transcriptSegments.length > 0) {
-        transcriptSegments.forEach((seg) => {
-          if (seg.speakerId) allSpeakerLabels.add(seg.speakerId);
-        });
+        // transcriptSegments speaker IDs
+        if (transcriptSegments && transcriptSegments.length > 0) {
+          transcriptSegments.forEach((seg) => {
+            if (seg.speakerId) allSpeakerLabels.add(seg.speakerId);
+          });
+        }
+
+        // reconstructedSegments speaker IDs
+        if (reconstructedSegments && reconstructedSegments.length > 0) {
+          reconstructedSegments.forEach((seg) => {
+            if (seg.speaker) allSpeakerLabels.add(seg.speaker);
+          });
+        }
+
+        // Transcript-embedded labels, e.g. "Talare 1:", "speaker_0:", "[Talare 1]:"
+        const transcriptText = transcript ?? "";
+        const transcriptLabelPattern =
+          /(^|\n)\s*(\[(?:talare|speaker)[_\s-]?\d+\]|\b(?:talare|speaker)[_\s-]?\d+)\s*[:\-]/gi;
+
+        let match: RegExpExecArray | null;
+        while ((match = transcriptLabelPattern.exec(transcriptText)) !== null) {
+          const raw = match[2] ?? "";
+          const label = raw.replace(/[\[\]]/g, "").trim();
+          if (label) allSpeakerLabels.add(label);
+        }
+
+        // If no speaker labels found at all, no generic names to warn about
+        if (allSpeakerLabels.size === 0) return false;
+
+        const genericPatterns = [
+          /^(?:speaker|talare)[_\s-]?\d+$/i,
+          /^unknown$/i,
+          /^okänd$/i,
+        ];
+
+        const getCustomName = (label: string) =>
+          speakerNames[label] ??
+          speakerNames[label.toLowerCase()] ??
+          speakerNames[label.replace(/\s+/g, "_").toLowerCase()];
+
+        for (const label of allSpeakerLabels) {
+          const customName = getCustomName(label);
+          const nameToCheck = (customName ?? label).trim();
+          const isGeneric = genericPatterns.some((p) => p.test(nameToCheck));
+          if (isGeneric) return true;
+        }
+
+        return false;
+      })();
+
+      if (hasGenericNames) {
+        setShowSpeakerNameConfirm(true);
+        return;
       }
-
-      // reconstructedSegments speaker IDs
-      if (reconstructedSegments && reconstructedSegments.length > 0) {
-        reconstructedSegments.forEach((seg) => {
-          if (seg.speaker) allSpeakerLabels.add(seg.speaker);
-        });
-      }
-
-      // Transcript-embedded labels, e.g. "Talare 1:", "speaker_0:", "[Talare 1]:"
-      const transcriptText = transcript ?? "";
-      const transcriptLabelPattern =
-        /(^|\n)\s*(\[(?:talare|speaker)[_\s-]?\d+\]|\b(?:talare|speaker)[_\s-]?\d+)\s*[:\-]/gi;
-
-      let match: RegExpExecArray | null;
-      while ((match = transcriptLabelPattern.exec(transcriptText)) !== null) {
-        const raw = match[2] ?? "";
-        const label = raw.replace(/[\[\]]/g, "").trim();
-        if (label) allSpeakerLabels.add(label);
-      }
-
-      // If no speaker labels found at all, no generic names to warn about
-      if (allSpeakerLabels.size === 0) return false;
-
-      const genericPatterns = [
-        /^(?:speaker|talare)[_\s-]?\d+$/i,
-        /^unknown$/i,
-        /^okänd$/i,
-      ];
-
-      const getCustomName = (label: string) =>
-        speakerNames[label] ??
-        speakerNames[label.toLowerCase()] ??
-        speakerNames[label.replace(/\s+/g, "_").toLowerCase()];
-
-      for (const label of allSpeakerLabels) {
-        const customName = getCustomName(label);
-        const nameToCheck = (customName ?? label).trim();
-        const isGeneric = genericPatterns.some((p) => p.test(nameToCheck));
-        if (isGeneric) return true;
-      }
-
-      return false;
-    })();
-
-    if (hasGenericNames) {
-      setShowSpeakerNameConfirm(true);
-      return;
     }
 
     await proceedWithProtocolGeneration();
