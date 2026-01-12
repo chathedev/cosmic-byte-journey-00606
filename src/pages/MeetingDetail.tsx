@@ -2055,7 +2055,6 @@ const MeetingDetail = () => {
                           <span className="font-medium text-sm">Protokoll</span>
                           <p className="text-xs text-muted-foreground">
                             Sparat {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')}
-                            {protocolCountUsed > 0 && ` • ${protocolCountUsed}/${maxProtocolGenerations} använda`}
                           </p>
                         </div>
                       </div>
