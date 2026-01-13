@@ -159,6 +159,17 @@ export interface QueueMetadata {
   maxConcurrent?: number;  // Max parallel jobs per instance
 }
 
+// Audio backup metadata for failsafe downloads
+// This ensures users can always download their original recording even if transcription fails
+export interface AudioBackup {
+  available: boolean;
+  sizeBytes?: number;
+  mimeType?: string;
+  originalName?: string;
+  savedAt?: string;
+  downloadPath?: string;
+}
+
 export interface ASRStatus {
   meetingId?: string;
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
@@ -180,6 +191,9 @@ export interface ASRStatus {
   wavDurationSec?: number;
   metadata?: QueueMetadata;
   updatedAt?: string;
+  // Audio backup failsafe - server-side copy of original recording
+  audioBackup?: AudioBackup;
+  audioDownloadPath?: string;
   // Legacy SIS fields (still used by backend)
   sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];
@@ -380,6 +394,9 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       wavDurationSec: data.wavDurationSec,
       metadata: data.metadata,
       updatedAt: data.updatedAt,
+      // Audio backup failsafe - server-side copy of original recording
+      audioBackup: data.audioBackup,
+      audioDownloadPath: data.audioDownloadPath || data.audioBackup?.downloadPath,
       // Legacy SIS fields
       sisStatus: data.sisStatus || data.lyraStatus,
       sisMatches: data.sisMatches || data.lyraMatches || [],
@@ -776,6 +793,71 @@ export async function transcribeAndSave(
 }
 
 // pollSISStatus is now defined above with enhanced docs support
+
+/**
+ * Download audio backup for a meeting
+ * Uses the audioDownloadPath from ASR status to fetch the original recording
+ */
+export async function downloadAudioBackup(meetingId: string, downloadPath?: string): Promise<void> {
+  const token = localStorage.getItem('authToken');
+  
+  // If no downloadPath provided, fetch it from status
+  let audioPath = downloadPath;
+  if (!audioPath) {
+    const status = await pollASRStatus(meetingId);
+    audioPath = status.audioDownloadPath || status.audioBackup?.downloadPath;
+  }
+  
+  if (!audioPath) {
+    throw new Error('Ingen ljudfil tillgänglig för nedladdning');
+  }
+  
+  // Ensure the path is absolute
+  const BACKEND_API_URL = 'https://api.tivly.se';
+  const fullUrl = audioPath.startsWith('http') 
+    ? audioPath 
+    : `${BACKEND_API_URL}${audioPath.startsWith('/') ? '' : '/'}${audioPath}`;
+  
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const response = await fetch(fullUrl, { headers });
+    
+    if (!response.ok) {
+      throw new Error(`Nedladdning misslyckades: ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    
+    // Get filename from Content-Disposition header or generate one
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `inspelning-${meetingId.slice(0, 8)}.wav`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        filename = match[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // Trigger download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    debugLog('✅ Audio backup downloaded:', filename);
+  } catch (error) {
+    debugError('❌ Audio backup download failed:', error);
+    throw error;
+  }
+}
 
 // Legacy exports for backwards compatibility
 export const submitASRJob = uploadAudioForTranscription;
