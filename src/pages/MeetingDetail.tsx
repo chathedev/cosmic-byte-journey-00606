@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown, Eye, Download, RefreshCw, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown, Eye, Download, RefreshCw, Lock, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
 import { pollASRStatus, downloadAudioBackup, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment, type QueueMetadata, type AudioBackup } from "@/lib/asrService";
+import { AudioBackupCard } from "@/components/AudioBackupCard";
+import { retryTranscriptionFromBackup } from "@/lib/audioRetry";
 import { QueueProgressWidget } from "@/components/QueueProgressWidget";
 import { apiClient } from "@/lib/api";
 import { backendApi } from "@/lib/backendApi";
@@ -106,6 +108,7 @@ const MeetingDetail = () => {
   // Audio backup failsafe state - server-side copy of original recording
   const [audioBackup, setAudioBackup] = useState<AudioBackup | null>(null);
   const [isDownloadingAudio, setIsDownloadingAudio] = useState(false);
+  const [isRetryingTranscription, setIsRetryingTranscription] = useState(false);
 
   // Speaker identification UX thresholds (per docs)
   const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
@@ -234,6 +237,11 @@ const MeetingDetail = () => {
               setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
               setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
               setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+              
+              // Capture audio backup failsafe info - available even for completed meetings
+              if (asrStatus.audioBackup?.available) {
+                setAudioBackup(asrStatus.audioBackup);
+              }
 
               // Only hydrate segmentation when transcript is NOT manually edited and SIS is not disabled
               if (!isManualTranscript && !sisDisabled) {
@@ -533,6 +541,36 @@ const MeetingDetail = () => {
       });
     } finally {
       setIsDownloadingAudio(false);
+    }
+  };
+
+  // Retry transcription using server-side audio backup
+  const handleRetryTranscription = async () => {
+    if (!id) return;
+    setIsRetryingTranscription(true);
+    try {
+      const result = await retryTranscriptionFromBackup(id, audioBackup?.downloadPath);
+      if (result.success) {
+        toast({
+          title: 'Transkribering startad',
+          description: 'Din inspelning transkriberas på nytt.',
+        });
+        // Reset status to trigger polling again
+        setStatus('processing');
+        setStage('transcribing');
+        transcriptionDoneRef.current = false;
+        pollingRef.current = true;
+      } else {
+        throw new Error(result.error || 'Kunde inte starta om transkribering');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Kunde inte starta om',
+        description: error?.message || 'Försök igen om en stund.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRetryingTranscription(false);
     }
   };
 
@@ -1768,22 +1806,28 @@ const MeetingDetail = () => {
                     Längre möten kan ta några minuter
                   </Badge>
                   
-                  {/* Audio backup download - visible during processing */}
+                  {/* Audio backup indicator - visible during processing */}
                   {audioBackup?.available && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleDownloadAudioBackup}
-                      disabled={isDownloadingAudio}
-                      className="gap-2 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      {isDownloadingAudio ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Download className="w-3.5 h-3.5" />
-                      )}
-                      Ladda ner inspelning
-                    </Button>
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card/50 border border-border/30">
+                      <Badge variant="outline" className="gap-1 text-green-600 border-green-500/30 bg-green-500/5 text-xs">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Ljud säkrat
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDownloadAudioBackup}
+                        disabled={isDownloadingAudio}
+                        className="gap-1.5 h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+                      >
+                        {isDownloadingAudio ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Download className="w-3 h-3" />
+                        )}
+                        Ladda ner
+                      </Button>
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -1801,40 +1845,70 @@ const MeetingDetail = () => {
                   <h2 className="text-xl font-semibold text-destructive">Transkribering misslyckades</h2>
                   <p className="text-sm text-muted-foreground">
                     {audioBackup?.available 
-                      ? 'Din inspelning är säkrad och kan laddas ner nedan'
+                      ? 'Din inspelning är säkrad – ladda ner eller försök transkribera igen'
                       : 'Försök ladda upp filen igen'
                     }
                   </p>
                 </div>
                 
-                {/* Audio backup download - critical for failed transcriptions */}
+                {/* Audio backup card with download and retry options */}
                 {audioBackup?.available && (
-                  <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 max-w-sm w-full">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Mic className="w-5 h-5 text-primary" />
+                  <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 max-w-md w-full">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                        <HardDrive className="w-6 h-6 text-primary" />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Ljudinspelning säkrad</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm">Ljudinspelning säkrad</p>
+                          <Badge variant="outline" className="gap-1 text-green-600 border-green-500/30 bg-green-500/5 text-xs">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Säkrad
+                          </Badge>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {audioBackup.originalName || 'inspelning.wav'}
                           {audioBackup.sizeBytes && ` • ${(audioBackup.sizeBytes / 1024 / 1024).toFixed(1)} MB`}
                         </p>
+                        {audioBackup.savedAt && (
+                          <p className="text-xs text-muted-foreground/70 mt-0.5">
+                            Sparad {new Date(audioBackup.savedAt).toLocaleString('sv-SE')}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <Button
-                      onClick={handleDownloadAudioBackup}
-                      disabled={isDownloadingAudio}
-                      className="w-full gap-2"
-                      variant="outline"
-                    >
-                      {isDownloadingAudio ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                      Ladda ner inspelning
-                    </Button>
+                    
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button
+                        onClick={handleDownloadAudioBackup}
+                        disabled={isDownloadingAudio}
+                        className="flex-1 gap-2"
+                        variant="outline"
+                      >
+                        {isDownloadingAudio ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Ladda ner inspelning
+                      </Button>
+                      <Button
+                        onClick={handleRetryTranscription}
+                        disabled={isRetryingTranscription}
+                        className="flex-1 gap-2"
+                      >
+                        {isRetryingTranscription ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                        Transkribera igen
+                      </Button>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground text-center mt-4">
+                      Du kan ladda ner din inspelning eller försöka transkribera igen
+                    </p>
                   </div>
                 )}
                 
@@ -1927,22 +2001,28 @@ const MeetingDetail = () => {
                       {meeting.source === 'live' ? 'Live-inspelning' : 'Uppladdad'}
                     </Badge>
                   )}
-                  {/* Audio backup download for completed meetings */}
+                  {/* Audio backup indicator and download for completed meetings */}
                   {audioBackup?.available && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleDownloadAudioBackup}
-                      disabled={isDownloadingAudio}
-                      className="gap-1.5 h-6 text-xs px-2 text-muted-foreground hover:text-foreground"
-                    >
-                      {isDownloadingAudio ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Download className="w-3 h-3" />
-                      )}
-                      Ladda ner ljud
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className="gap-1 text-green-600 border-green-500/30 bg-green-500/5 text-xs h-6">
+                        <HardDrive className="w-3 h-3" />
+                        Ljud säkrat
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDownloadAudioBackup}
+                        disabled={isDownloadingAudio}
+                        className="gap-1 h-6 text-xs px-2 text-muted-foreground hover:text-foreground"
+                      >
+                        {isDownloadingAudio ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Download className="w-3 h-3" />
+                        )}
+                        Ladda ner
+                      </Button>
+                    </div>
                   )}
                   {!isSISDisabled && lyraLearning.some(l => l.updated) && (
                     <Badge variant="outline" className="gap-1.5 text-purple-600 border-purple-500/30 bg-purple-500/5">
