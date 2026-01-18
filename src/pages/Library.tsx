@@ -342,9 +342,12 @@ const Library = () => {
             m.id === currentPendingId ? { ...m, transcriptionStatus: 'failed' as const } : m
           ));
           
+          const errorMsg = asrStatus.error 
+            ? (typeof asrStatus.error === 'string' ? asrStatus.error : ((asrStatus.error as any)?.message || 'Försök igen.'))
+            : 'Försök igen.';
           toast({
             title: 'Transkribering misslyckades',
-            description: asrStatus.error || 'Försök igen.',
+            description: errorMsg,
             variant: 'destructive',
           });
           return;
