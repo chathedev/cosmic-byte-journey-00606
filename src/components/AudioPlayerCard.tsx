@@ -32,43 +32,60 @@ export function AudioPlayerCard({
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
-  // Build the audio URL with auth token
+  // Fetch audio as a blob (so we can attach auth headers) and use it for playback.
+  // Note: HTMLAudioElement cannot send custom headers, so we must create an object URL.
+  const objectUrlRef = useRef<string | null>(null);
+
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const downloadPath = audioBackup.downloadPath;
-    
+
     if (!downloadPath) {
       setError('Ingen ljudfil tillgänglig');
       return;
     }
 
     // Build full URL
-    const fullUrl = downloadPath.startsWith('http') 
-      ? downloadPath 
+    const fullUrl = downloadPath.startsWith('http')
+      ? downloadPath
       : `${BACKEND_API_URL}${downloadPath.startsWith('/') ? '' : '/'}${downloadPath}`;
-    
-    // For authenticated requests, we need to fetch the blob first
+
     const fetchAudio = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const headers: HeadersInit = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const response = await fetch(fullUrl, { headers });
-        
         if (!response.ok) {
           throw new Error(`Kunde inte ladda ljud: ${response.status}`);
         }
-        
+
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+          // Some backends return JSON error payloads with 200s in edge cases (auth, etc.)
+          const data: any = await response.json().catch(() => ({}));
+          const raw = data?.error || data?.message || data;
+          const msg = typeof raw === 'string' ? raw : (raw?.message || 'Kunde inte ladda ljudfilen');
+          throw new Error(msg);
+        }
+
         const blob = await response.blob();
+
+        // Revoke previous object URL (if any)
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+        }
+
         const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
         setAudioUrl(url);
       } catch (err: any) {
-        setError(err?.message || 'Kunde inte ladda ljudfilen');
+        const msg = typeof err?.message === 'string' ? err.message : 'Kunde inte ladda ljudfilen';
+        setError(msg);
+        setAudioUrl(null);
       } finally {
         setIsLoading(false);
       }
@@ -77,8 +94,9 @@ export function AudioPlayerCard({
     fetchAudio();
 
     return () => {
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
     };
   }, [audioBackup.downloadPath]);
@@ -92,13 +110,30 @@ export function AudioPlayerCard({
   };
 
   // Handle play/pause
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
+  const togglePlay = async () => {
+    const el = audioRef.current;
+    if (!el) return;
+
+    setError(null);
+
+    try {
+      if (isPlaying) {
+        el.pause();
+        return;
+      }
+
+      // Optimistically flip state so the user sees feedback immediately.
+      setIsPlaying(true);
+
+      const maybePromise = el.play();
+      // In modern browsers, play() returns a Promise that can reject (autoplay policy, decode errors, etc.)
+      if (maybePromise && typeof (maybePromise as any).catch === 'function') {
+        await (maybePromise as Promise<void>);
+      }
+    } catch (err: any) {
+      const msg = typeof err?.message === 'string' ? err.message : 'Kunde inte starta uppspelning';
+      setError(msg);
+      setIsPlaying(false);
     }
   };
 
@@ -144,9 +179,6 @@ export function AudioPlayerCard({
     setIsPlaying(false);
   };
 
-  // Calculate progress percentage
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-
   if (error && !audioUrl) {
     return (
       <div className={cn("text-xs text-muted-foreground", className)}>
@@ -158,7 +190,7 @@ export function AudioPlayerCard({
   // Compact variant - inline player
   if (variant === 'compact') {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn("space-y-2", className)}>
         {audioUrl && (
           <audio
             ref={audioRef}
@@ -172,55 +204,62 @@ export function AudioPlayerCard({
             preload="metadata"
           />
         )}
-        
-        {isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-        ) : (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={togglePlay}
-              disabled={!audioUrl}
-              className="h-8 w-8 rounded-full"
-            >
-              {isPlaying ? (
-                <Pause className="w-4 h-4" />
-              ) : (
-                <Play className="w-4 h-4 ml-0.5" />
-              )}
-            </Button>
-            
-            <div className="flex-1 flex items-center gap-2 min-w-0">
-              <span className="text-xs text-muted-foreground tabular-nums w-10 shrink-0">
-                {formatTime(currentTime)}
-              </span>
-              <Slider
-                value={[currentTime]}
-                max={duration || 100}
-                step={0.1}
-                onValueChange={handleSeek}
-                disabled={!audioUrl || duration === 0}
-                className="flex-1"
-              />
-              <span className="text-xs text-muted-foreground tabular-nums w-10 shrink-0">
-                {formatTime(duration)}
-              </span>
-            </div>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleMute}
-              className="h-8 w-8 rounded-full"
-            >
-              {isMuted ? (
-                <VolumeX className="w-4 h-4" />
-              ) : (
-                <Volume2 className="w-4 h-4" />
-              )}
-            </Button>
-          </>
+
+        <div className="flex items-center gap-2">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={togglePlay}
+                disabled={!audioUrl}
+                className="h-8 w-8 rounded-full"
+              >
+                {isPlaying ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4 ml-0.5" />
+                )}
+              </Button>
+
+              <div className="flex-1 flex items-center gap-2 min-w-0">
+                <span className="text-xs text-muted-foreground tabular-nums w-10 shrink-0">
+                  {formatTime(currentTime)}
+                </span>
+                <Slider
+                  value={[currentTime]}
+                  max={duration || 100}
+                  step={0.1}
+                  onValueChange={handleSeek}
+                  disabled={!audioUrl || duration === 0}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground tabular-nums w-10 shrink-0">
+                  {formatTime(duration)}
+                </span>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMute}
+                className="h-8 w-8 rounded-full"
+                disabled={!audioUrl}
+              >
+                {isMuted ? (
+                  <VolumeX className="w-4 h-4" />
+                ) : (
+                  <Volume2 className="w-4 h-4" />
+                )}
+              </Button>
+            </>
+          )}
+        </div>
+
+        {error && (
+          <p className="text-xs text-destructive">{error}</p>
         )}
       </div>
     );
