@@ -206,7 +206,11 @@ async function parseResponse(
     let errorMsg = `Uppladdning misslyckades (${response.status})`;
     try {
       const parsed = JSON.parse(text);
-      errorMsg = parsed.error || parsed.message || errorMsg;
+      // Ensure error is always a string (backend might return {message, code} objects)
+      const rawError = parsed.error || parsed.message;
+      if (rawError) {
+        errorMsg = typeof rawError === 'string' ? rawError : (rawError.message || JSON.stringify(rawError));
+      }
     } catch { /* not JSON */ }
     return { success: false, error: errorMsg };
   }

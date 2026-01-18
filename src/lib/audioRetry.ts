@@ -38,7 +38,12 @@ export async function retryTranscriptionFromBackup(
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.error || errorData.message || `Retry failed: ${response.status}`;
+      // Ensure error is always a string (backend might return {message, code} objects)
+      const rawError = errorData.error || errorData.message;
+      let errorMessage = `Retry failed: ${response.status}`;
+      if (rawError) {
+        errorMessage = typeof rawError === 'string' ? rawError : (rawError.message || JSON.stringify(rawError));
+      }
       debugError('❌ Retry request failed:', errorMessage);
       return { success: false, error: errorMessage };
     }
