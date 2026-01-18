@@ -385,7 +385,13 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       transcriptSegments: data.transcriptSegments,
       reconstructedSegments: reconstructedSegments.length > 0 ? reconstructedSegments : undefined,
       words: data.words,
-      error: data.error || data.sisError || data.lyraError,
+      // Ensure error is always a string (backend might return {message, code} objects)
+      error: (() => {
+        const rawError = data.error || data.sisError || data.lyraError;
+        if (!rawError) return undefined;
+        if (typeof rawError === 'string') return rawError;
+        return rawError.message || JSON.stringify(rawError);
+      })(),
       duration: data.duration,
       // Backend metadata
       engine: data.engine,
