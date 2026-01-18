@@ -12,6 +12,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
 import { pollASRStatus, downloadAudioBackup, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment, type QueueMetadata, type AudioBackup } from "@/lib/asrService";
 import { AudioBackupCard } from "@/components/AudioBackupCard";
+import { AudioPlayerCard } from "@/components/AudioPlayerCard";
 import { retryTranscriptionFromBackup } from "@/lib/audioRetry";
 import { QueueProgressWidget } from "@/components/QueueProgressWidget";
 import { apiClient } from "@/lib/api";
@@ -1881,6 +1882,18 @@ const MeetingDetail = () => {
                       </div>
                     </div>
                     
+                    {/* Audio Player for failed state */}
+                    {audioBackup.downloadPath && (
+                      <div className="mb-4">
+                        <AudioPlayerCard
+                          meetingId={id || ''}
+                          audioBackup={audioBackup}
+                          variant="compact"
+                          className="bg-background/50 rounded-xl p-3"
+                        />
+                      </div>
+                    )}
+                    
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Button
                         onClick={handleDownloadAudioBackup}
@@ -2034,6 +2047,22 @@ const MeetingDetail = () => {
                     </Badge>
                   )}
                 </div>
+
+                {/* Audio Player - Listen to meeting recording */}
+                {audioBackup?.available && audioBackup.downloadPath && !isEditing && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 }}
+                  >
+                    <AudioPlayerCard
+                      meetingId={meeting.id}
+                      audioBackup={audioBackup}
+                      variant="compact"
+                      className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4"
+                    />
+                  </motion.div>
+                )}
 
                 {/* Speakers Section - Only show when SIS is enabled and editing */}
                 {!isSISDisabled && uniqueSpeakers.length > 0 && isEditing && (
