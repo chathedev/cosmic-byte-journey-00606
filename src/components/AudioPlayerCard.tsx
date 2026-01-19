@@ -25,7 +25,7 @@ async function getAuthToken(): Promise<string | null> {
   if (localToken && localToken.trim().length > 0) {
     return localToken;
   }
-  
+
   // Fall back to Supabase session
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -33,6 +33,22 @@ async function getAuthToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// Some browsers are picky about MIME types on Blob URLs.
+// E.g. "audio/x-m4a" often needs to be presented as "audio/mp4" for playback.
+function normalizeAudioMimeType(mime?: string | null): string | null {
+  if (!mime) return null;
+
+  const m = mime.toLowerCase().trim();
+
+  // M4A (AAC in MP4 container)
+  if (m.includes('audio/x-m4a') || m.includes('audio/m4a')) return 'audio/mp4';
+
+  // Common aliases
+  if (m.includes('audio/x-wav')) return 'audio/wav';
+
+  return mime;
 }
 
 export function AudioPlayerCard({
@@ -49,6 +65,7 @@ export function AudioPlayerCard({
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
 
   // Fetch audio as a blob (so we can attach auth headers) and use it for playback.
   // Note: HTMLAudioElement cannot send custom headers, so we must create an object URL.
@@ -109,13 +126,22 @@ export function AudioPlayerCard({
           throw new Error('Tom ljudfil mottagen');
         }
 
+        const rawMime = audioBackup.mimeType || contentType || blob.type;
+        const normalizedMime = normalizeAudioMimeType(rawMime) || rawMime || blob.type;
+        const canPlay = normalizedMime ? document.createElement('audio').canPlayType(normalizedMime) : '';
+        console.log('[AudioPlayer] MIME normalize:', { rawMime, normalizedMime, canPlay });
+
+        const playableBlob =
+          normalizedMime && normalizedMime !== blob.type ? new Blob([blob], { type: normalizedMime }) : blob;
+
         // Revoke previous object URL (if any)
         if (objectUrlRef.current) {
           URL.revokeObjectURL(objectUrlRef.current);
         }
 
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(playableBlob);
         objectUrlRef.current = url;
+        setAudioMimeType(normalizedMime || blob.type || null);
         setAudioUrl(url);
         console.log('[AudioPlayer] Audio URL created successfully');
       } catch (err: any) {
@@ -137,6 +163,23 @@ export function AudioPlayerCard({
       }
     };
   }, [audioBackup.downloadPath, meetingId]);
+
+  // Make sure the element re-loads when a new blob URL (or MIME) is set.
+  useEffect(() => {
+    if (!audioUrl) return;
+
+    const t = window.setTimeout(() => {
+      const el = audioRef.current;
+      if (!el) return;
+      try {
+        el.load();
+      } catch {
+        // ignore
+      }
+    }, 0);
+
+    return () => window.clearTimeout(t);
+  }, [audioUrl, audioMimeType]);
 
   // Format time as mm:ss
   const formatTime = (time: number): string => {
@@ -230,8 +273,8 @@ export function AudioPlayerCard({
       <div className={cn("space-y-2", className)}>
         {audioUrl && (
           <audio
+            key={audioUrl}
             ref={audioRef}
-            src={audioUrl}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
             onPlay={handlePlay}
@@ -239,7 +282,9 @@ export function AudioPlayerCard({
             onEnded={handleEnded}
             onError={handleError}
             preload="metadata"
-          />
+          >
+            <source src={audioUrl} type={audioMimeType || undefined} />
+          </audio>
         )}
 
         <div className="flex items-center gap-2">
@@ -310,8 +355,8 @@ export function AudioPlayerCard({
     )}>
       {audioUrl && (
         <audio
+          key={audioUrl}
           ref={audioRef}
-          src={audioUrl}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onPlay={handlePlay}
@@ -319,7 +364,9 @@ export function AudioPlayerCard({
           onEnded={handleEnded}
           onError={handleError}
           preload="metadata"
-        />
+        >
+          <source src={audioUrl} type={audioMimeType || undefined} />
+        </audio>
       )}
       
       <div className="flex items-center gap-3 mb-4">
