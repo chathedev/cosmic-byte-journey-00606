@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { type AudioBackup } from "@/lib/asrService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AudioPlayerCardProps {
   meetingId: string;
@@ -16,6 +17,23 @@ interface AudioPlayerCardProps {
 }
 
 const BACKEND_API_URL = 'https://api.tivly.se';
+
+// Get auth token with fallback to Supabase session
+async function getAuthToken(): Promise<string | null> {
+  // Check localStorage first (api.tivly.se auth)
+  const localToken = localStorage.getItem('authToken');
+  if (localToken && localToken.trim().length > 0) {
+    return localToken;
+  }
+  
+  // Fall back to Supabase session
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  } catch {
+    return null;
+  }
+}
 
 export function AudioPlayerCard({
   meetingId,
@@ -37,10 +55,12 @@ export function AudioPlayerCard({
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
     const downloadPath = audioBackup.downloadPath;
 
+    console.log('[AudioPlayer] Init:', { meetingId, downloadPath, audioBackup });
+
     if (!downloadPath) {
+      console.log('[AudioPlayer] No downloadPath available');
       setError('Ingen ljudfil tillgänglig');
       return;
     }
@@ -50,29 +70,44 @@ export function AudioPlayerCard({
       ? downloadPath
       : `${BACKEND_API_URL}${downloadPath.startsWith('/') ? '' : '/'}${downloadPath}`;
 
+    console.log('[AudioPlayer] Fetching audio from:', fullUrl);
+
     const fetchAudio = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
+        const token = await getAuthToken();
+        console.log('[AudioPlayer] Auth token available:', !!token);
+
         const headers: HeadersInit = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const response = await fetch(fullUrl, { headers });
+        console.log('[AudioPlayer] Response:', { status: response.status, ok: response.ok });
+
         if (!response.ok) {
           throw new Error(`Kunde inte ladda ljud: ${response.status}`);
         }
 
         const contentType = response.headers.get('Content-Type') || '';
+        console.log('[AudioPlayer] Content-Type:', contentType);
+
         if (contentType.includes('application/json')) {
           // Some backends return JSON error payloads with 200s in edge cases (auth, etc.)
           const data: any = await response.json().catch(() => ({}));
+          console.log('[AudioPlayer] JSON response (error):', data);
           const raw = data?.error || data?.message || data;
           const msg = typeof raw === 'string' ? raw : (raw?.message || 'Kunde inte ladda ljudfilen');
           throw new Error(msg);
         }
 
         const blob = await response.blob();
+        console.log('[AudioPlayer] Blob received:', { size: blob.size, type: blob.type });
+
+        if (blob.size === 0) {
+          throw new Error('Tom ljudfil mottagen');
+        }
 
         // Revoke previous object URL (if any)
         if (objectUrlRef.current) {
@@ -82,7 +117,9 @@ export function AudioPlayerCard({
         const url = URL.createObjectURL(blob);
         objectUrlRef.current = url;
         setAudioUrl(url);
+        console.log('[AudioPlayer] Audio URL created successfully');
       } catch (err: any) {
+        console.error('[AudioPlayer] Error:', err);
         const msg = typeof err?.message === 'string' ? err.message : 'Kunde inte ladda ljudfilen';
         setError(msg);
         setAudioUrl(null);
@@ -99,7 +136,7 @@ export function AudioPlayerCard({
         objectUrlRef.current = null;
       }
     };
-  }, [audioBackup.downloadPath]);
+  }, [audioBackup.downloadPath, meetingId]);
 
   // Format time as mm:ss
   const formatTime = (time: number): string => {
