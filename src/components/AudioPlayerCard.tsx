@@ -60,12 +60,16 @@ export function AudioPlayerCard({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStartingPlayback, setIsStartingPlayback] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
+
+  // Prevent double-click races (play() promise pending -> pause() called -> Chrome warns)
+  const playRequestRef = useRef<Promise<void> | null>(null);
 
   // Fetch audio as a blob (so we can attach auth headers) and use it for playback.
   // Note: HTMLAudioElement cannot send custom headers, so we must create an object URL.
@@ -165,18 +169,25 @@ export function AudioPlayerCard({
   }, [audioBackup.downloadPath, meetingId]);
 
   // Make sure the element re-loads when a new blob URL (or MIME) is set.
+  // (But avoid calling load() while a play() request is in-flight.)
   useEffect(() => {
     if (!audioUrl) return;
 
     const t = window.setTimeout(() => {
+      // If user already clicked play, don't interrupt it.
+      if (playRequestRef.current) return;
+
       const el = audioRef.current;
       if (!el) return;
+      // Only reload while paused to avoid aborting playback.
+      if (!el.paused) return;
+
       try {
         el.load();
       } catch {
         // ignore
       }
-    }, 0);
+    }, 50);
 
     return () => window.clearTimeout(t);
   }, [audioUrl, audioMimeType]);
@@ -192,28 +203,42 @@ export function AudioPlayerCard({
   // Handle play/pause
   const togglePlay = async () => {
     const el = audioRef.current;
-    if (!el) return;
+    if (!el || !audioUrl) return;
 
     setError(null);
 
+    // If a play() is in-flight, ignore clicks to avoid play/pause race warnings.
+    if (playRequestRef.current) return;
+
+    // Use the element's real state (more reliable than React state during async play())
+    if (!el.paused) {
+      el.pause();
+      return;
+    }
+
     try {
-      if (isPlaying) {
-        el.pause();
-        return;
+      setIsStartingPlayback(true);
+
+      // Ensure we have latest source parsed
+      if (el.readyState === 0) {
+        try { el.load(); } catch { /* ignore */ }
       }
 
-      // Optimistically flip state so the user sees feedback immediately.
-      setIsPlaying(true);
-
-      const maybePromise = el.play();
-      // In modern browsers, play() returns a Promise that can reject (autoplay policy, decode errors, etc.)
-      if (maybePromise && typeof (maybePromise as any).catch === 'function') {
-        await (maybePromise as Promise<void>);
+      const p = el.play();
+      if (p && typeof (p as any).then === 'function') {
+        playRequestRef.current = p as Promise<void>;
+        await playRequestRef.current;
       }
     } catch (err: any) {
       const msg = typeof err?.message === 'string' ? err.message : 'Kunde inte starta uppspelning';
-      setError(msg);
-      setIsPlaying(false);
+
+      // Chrome logs this when a play() is interrupted (often by rapid user clicks).
+      if (!msg.toLowerCase().includes('interrupted by a call to pause')) {
+        setError(msg);
+      }
+    } finally {
+      playRequestRef.current = null;
+      setIsStartingPlayback(false);
     }
   };
 
@@ -296,10 +321,12 @@ export function AudioPlayerCard({
                 variant="ghost"
                 size="icon"
                 onClick={togglePlay}
-                disabled={!audioUrl}
+                disabled={!audioUrl || isStartingPlayback}
                 className="h-8 w-8 rounded-full"
               >
-                {isPlaying ? (
+                {isStartingPlayback ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isPlaying ? (
                   <Pause className="w-4 h-4" />
                 ) : (
                   <Play className="w-4 h-4 ml-0.5" />
@@ -422,10 +449,12 @@ export function AudioPlayerCard({
               variant="default"
               size="icon"
               onClick={togglePlay}
-              disabled={!audioUrl}
+              disabled={!audioUrl || isStartingPlayback}
               className="h-12 w-12 rounded-full"
             >
-              {isPlaying ? (
+              {isStartingPlayback ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isPlaying ? (
                 <Pause className="w-5 h-5" />
               ) : (
                 <Play className="w-5 h-5 ml-0.5" />
