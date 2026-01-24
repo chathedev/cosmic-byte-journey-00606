@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mic, AlertCircle, FileText, Loader2, Upload } from "lucide-react";
+import { Mic, AlertCircle, FileText, Loader2, Upload, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TranscriptPreview } from "./TranscriptPreview";
@@ -7,13 +7,13 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
 import { TrustpilotDialog } from "./TrustpilotDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
+import { TextPasteDialog } from "./TextPasteDialog";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { meetingStorage } from "@/utils/meetingStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-
 type View = "welcome" | "analyzing" | "transcript-preview";
 
 interface AIActionItem {
@@ -49,7 +49,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [selectedLanguage, setSelectedLanguage] = useState<'sv-SE' | 'en-US'>('sv-SE');
   const navigate = useNavigate();
   const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
-
+  const [showTextPasteDialog, setShowTextPasteDialog] = useState(false);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
@@ -147,6 +147,20 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const handleOpenDigitalMeeting = async () => {
     // Dialog handles plan restrictions and shows upgrade prompt for free users
     setShowDigitalMeetingDialog(true);
+  };
+
+  const handleTextPaste = async (text: string) => {
+    // Navigate directly to protocol generation with the pasted text
+    const token = `protocol-${Date.now()}`;
+    const payload = {
+      transcript: text,
+      meetingName: 'Inklistrad text',
+      meetingId: '', // No meeting ID for pasted text
+      token,
+    };
+    sessionStorage.setItem('protocol_generation_token', token);
+    sessionStorage.setItem('pending_protocol_payload', JSON.stringify(payload));
+    navigate('/generate-protocol', { state: payload });
   };
 
   // Check if user has Pro or Enterprise plan (for upload access)
@@ -336,6 +350,17 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               <Upload className="w-5 h-5" />
               Ladda upp fil
             </Button>
+
+            {/* Secondary option: Paste text */}
+            <Button 
+              onClick={() => setShowTextPasteDialog(true)}
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground hover:text-foreground gap-2"
+            >
+              <ClipboardPaste className="w-4 h-4" />
+              Klistra in text
+            </Button>
           </div>
 
           {/* Features */}
@@ -381,6 +406,12 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         onOpenChange={setShowDigitalMeetingDialog}
         onTranscriptReady={handleDigitalMeetingUpload}
         selectedLanguage={selectedLanguage}
+      />
+
+      <TextPasteDialog
+        open={showTextPasteDialog}
+        onOpenChange={setShowTextPasteDialog}
+        onTextReady={handleTextPaste}
       />
     </div>
   );
