@@ -392,10 +392,11 @@ function validateSegmentsAgainstTranscript(
   };
 
   const normalize = (text: string): string => {
+    if (!text || typeof text !== 'string') return '';
     return stripSpeakerLabels(text).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
   };
 
-  const segmentText = normalize(segments.map((s) => s.text).join(' '));
+  const segmentText = normalize(segments.map((s) => String(s.text || '')).join(' '));
   const fullText = normalize(transcript);
 
   if (!segmentText || !fullText) return false;
