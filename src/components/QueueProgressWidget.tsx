@@ -9,6 +9,10 @@ interface QueueMetadata {
   queueDepth?: number;
   activeCount?: number;
   maxConcurrent?: number;
+  // Chunk-level progress for long meetings
+  chunkIndex?: number;
+  totalChunks?: number;
+  stage?: string;
 }
 
 interface QueueProgressWidgetProps {
@@ -255,11 +259,15 @@ export const QueueProgressWidget = ({
             </AnimatePresence>
           )}
           
-          {/* Processing info */}
+          {/* Processing info - show chunk progress for long meetings */}
           {(status === 'processing' || stage === 'transcribing') && (
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3" />
-              Bearbetar audio
+              {queueMetadata?.totalChunks && queueMetadata.totalChunks > 1 ? (
+                `Del ${queueMetadata.chunkIndex || 1}/${queueMetadata.totalChunks}`
+              ) : (
+                'Bearbetar audio'
+              )}
             </span>
           )}
           
