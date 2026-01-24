@@ -66,9 +66,13 @@ const decodeBase64 = (value: string): Uint8Array => {
       cleaned += '=';
     }
     
-    // Validate base64 format (standard base64 with optional padding)
-    if (!/^[A-Za-z0-9+/]*={0,3}$/.test(cleaned)) {
-      throw new Error('Invalid base64 format');
+    // More permissive base64 validation - allow up to 2 padding chars
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned)) {
+      // If still invalid, try one more cleanup pass
+      cleaned = cleaned.replace(/[^A-Za-z0-9+/=]/g, '');
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned) || cleaned.length < 10) {
+        throw new Error('Invalid base64 format after cleanup');
+      }
     }
     
     // Use safer decoding approach

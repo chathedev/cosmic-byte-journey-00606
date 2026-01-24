@@ -1541,7 +1541,10 @@ const MeetingDetail = () => {
 
         const timings = merged.map((s) => ({
           speakerId: s.speaker,
-          speakerName: uniqueSpeakers.find((u) => u.label.toLowerCase() === s.speaker.toLowerCase())?.name,
+          speakerName: uniqueSpeakers.find((u) => 
+            u.label && s.speaker && 
+            String(u.label).toLowerCase() === String(s.speaker).toLowerCase()
+          )?.name,
           start: s.start,
           end: s.end,
         }));
@@ -1579,7 +1582,7 @@ const MeetingDetail = () => {
     const nonUnknown = Array.from(
       new Set(
         groupedSegments
-          .map((s) => String(s.speakerId))
+          .map((s) => String(s.speakerId || ''))
           .filter((s) => s && s.toLowerCase() !== 'unknown')
       )
     );
