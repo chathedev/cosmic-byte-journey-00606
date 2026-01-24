@@ -376,11 +376,14 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     }
     
     // Return both SIS and Lyra mirror fields for compatibility
+    // Backend may send progressPercent (0-100) OR progress - normalize to 0-100
+    const progressValue = data.progressPercent ?? data.progress;
+    
     return {
       meetingId: data.meetingId,
       status: data.status || 'queued',
       stage: data.stage as ASRStage | undefined,
-      progress: data.progress,
+      progress: typeof progressValue === 'number' ? progressValue : undefined,
       transcript: data.transcript,
       transcriptSegments: data.transcriptSegments,
       reconstructedSegments: reconstructedSegments.length > 0 ? reconstructedSegments : undefined,
