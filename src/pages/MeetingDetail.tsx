@@ -68,7 +68,8 @@ const MeetingDetail = () => {
   const selectedLanguage = locationState?.selectedLanguage || 'sv-SE';
 
   // Determine if user has ASR access (Enterprise or Admin)
-  const useAsrMode = isAdmin || (userPlan?.plan?.toLowerCase() === 'enterprise');
+  // NOTE: plan can be non-string at runtime; coerce defensively.
+  const useAsrMode = isAdmin || (String((userPlan as any)?.plan ?? '').toLowerCase() === 'enterprise');
 
   const [meeting, setMeeting] = useState<MeetingSession | null>(null);
   const [isLoading, setIsLoading] = useState(!isRecordingMode); // Skip loading if starting in recording mode
@@ -782,20 +783,22 @@ const MeetingDetail = () => {
         const allSpeakerLabels = new Set<string>();
 
         // SIS/LYRA-derived labels (when available)
-        lyraMatches.forEach((m) => m.speakerLabel && allSpeakerLabels.add(m.speakerLabel));
-        lyraSpeakers.forEach((s) => s.label && allSpeakerLabels.add(s.label));
+        lyraMatches.forEach((m) => (m as any)?.speakerLabel != null && allSpeakerLabels.add(String((m as any).speakerLabel)));
+        lyraSpeakers.forEach((s) => (s as any)?.label != null && allSpeakerLabels.add(String((s as any).label)));
 
         // transcriptSegments speaker IDs
         if (transcriptSegments && transcriptSegments.length > 0) {
           transcriptSegments.forEach((seg) => {
-            if (seg.speakerId) allSpeakerLabels.add(seg.speakerId);
+            const raw = (seg as any)?.speakerId;
+            if (raw != null) allSpeakerLabels.add(String(raw));
           });
         }
 
         // reconstructedSegments speaker IDs
         if (reconstructedSegments && reconstructedSegments.length > 0) {
           reconstructedSegments.forEach((seg) => {
-            if (seg.speaker) allSpeakerLabels.add(seg.speaker);
+            const raw = (seg as any)?.speaker;
+            if (raw != null) allSpeakerLabels.add(String(raw));
           });
         }
 
@@ -816,10 +819,12 @@ const MeetingDetail = () => {
 
         const genericPatterns = [/^(?:speaker|talare)[_\s-]?\d+$/i, /^unknown$/i, /^okänd$/i];
 
-        const getCustomName = (label: string) =>
-          speakerNames[label] ??
-          speakerNames[label.toLowerCase()] ??
-          speakerNames[label.replace(/\s+/g, "_").toLowerCase()];
+        const getCustomName = (label: string) => {
+          const labelStr = String((label as any) ?? '');
+          const lower = labelStr.toLowerCase();
+          const underscored = labelStr.replace(/\s+/g, "_").toLowerCase();
+          return speakerNames[labelStr] ?? speakerNames[lower] ?? speakerNames[underscored];
+        };
 
         for (const label of allSpeakerLabels) {
           const customName = getCustomName(label);
@@ -1012,87 +1017,108 @@ const MeetingDetail = () => {
   };
 
   // Get speaker display name - always returns a name (never null or "Okänd talare")
+  // NOTE: speakerId can be non-string at runtime (backend may return numbers/objects).
   const getSpeakerDisplayName = useCallback((speakerId: string, index?: number): string => {
     const fallbackName = `Talare ${(index ?? 0) + 1}`;
-    
-    if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') {
+
+    const speakerIdStr = String((speakerId as any) ?? '');
+    const speakerIdLower = speakerIdStr.toLowerCase().trim();
+
+    if (!speakerIdStr || speakerIdLower === 'unknown') {
       return fallbackName;
     }
-    
+
     const namesSource = isEditing ? editedSpeakerNames : speakerNames;
-    
-    if (namesSource[speakerId]) {
-      return namesSource[speakerId];
+
+    if (namesSource[speakerIdStr]) {
+      return namesSource[speakerIdStr];
     }
-    
-    const match = lyraMatches.find(m => 
-      m.speakerLabel === speakerId || m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
-    );
-    if (match && match.confidencePercent >= SIS_DISPLAY_THRESHOLD_PERCENT) {
+
+    const match = lyraMatches.find((m) => {
+      const labelStr = String((m as any)?.speakerLabel ?? '');
+      return labelStr === speakerIdStr || labelStr.toLowerCase() === speakerIdLower;
+    });
+    if (match && (match.confidencePercent ?? 0) >= SIS_DISPLAY_THRESHOLD_PERCENT) {
       if (match.speakerName) return match.speakerName;
       if (match.sampleOwnerEmail) return match.sampleOwnerEmail.split('@')[0];
     }
-    
-    const speaker = lyraSpeakers.find(s => 
-      s.label === speakerId || s.label?.toLowerCase() === speakerId.toLowerCase()
-    );
+
+    const speaker = lyraSpeakers.find((s) => {
+      const labelStr = String((s as any)?.label ?? '');
+      return labelStr === speakerIdStr || labelStr.toLowerCase() === speakerIdLower;
+    });
     const speakerConfidencePercent = speaker?.similarity != null ? Math.round(speaker.similarity * 100) : 0;
     if (speaker?.bestMatchEmail && speakerConfidencePercent >= SIS_DISPLAY_THRESHOLD_PERCENT) {
-      if (speaker.speakerName) return speaker.speakerName;
+      if ((speaker as any).speakerName) return (speaker as any).speakerName;
       return speaker.bestMatchEmail.split('@')[0];
     }
-    
-    const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
+
+    const numMatch = speakerIdStr.match(/(?:speaker_?|talare_?)(\d+)/i);
     if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
-    
-    if (/^[A-Z]$/i.test(speakerId)) {
-      return `Talare ${speakerId.toUpperCase()}`;
+
+    if (/^[A-Z]$/i.test(speakerIdStr)) {
+      return `Talare ${speakerIdStr.toUpperCase()}`;
     }
-    
+
     return fallbackName;
   }, [speakerNames, editedSpeakerNames, lyraMatches, lyraSpeakers, isEditing]);
 
   // Get confidence percent
   const getSpeakerConfidence = useCallback((speakerId: string): number | null => {
-    const match = lyraMatches.find(m => 
-      m.speakerLabel === speakerId || m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()
-    );
+    const speakerIdStr = String((speakerId as any) ?? '');
+    const speakerIdLower = speakerIdStr.toLowerCase().trim();
+
+    const match = lyraMatches.find((m) => {
+      const labelStr = String((m as any)?.speakerLabel ?? '');
+      return labelStr === speakerIdStr || labelStr.toLowerCase() === speakerIdLower;
+    });
     if (match?.confidencePercent) return match.confidencePercent;
-    
-    const speaker = lyraSpeakers.find(s => 
-      s.label === speakerId || s.label?.toLowerCase() === speakerId.toLowerCase()
-    );
+
+    const speaker = lyraSpeakers.find((s) => {
+      const labelStr = String((s as any)?.label ?? '');
+      return labelStr === speakerIdStr || labelStr.toLowerCase() === speakerIdLower;
+    });
     if (speaker?.similarity != null) return Math.round(speaker.similarity * 100);
-    
+
     return null;
   }, [lyraMatches, lyraSpeakers]);
 
   // Check if speaker is identified
   const isSpeakerIdentified = useCallback((speakerId: string): boolean => {
+    const speakerIdStr = String((speakerId as any) ?? '');
+    const speakerIdLower = speakerIdStr.toLowerCase().trim();
     const ownerEmail = user?.email?.toLowerCase();
 
     if (ownerEmail) {
       if (lyraMatches.length === 1) {
         const m = lyraMatches[0];
-        if ((m.speakerLabel || '').toLowerCase() === speakerId.toLowerCase() && (m.sampleOwnerEmail || '').toLowerCase() === ownerEmail) {
+        const labelLower = String((m as any)?.speakerLabel ?? '').toLowerCase().trim();
+        const ownerLower = String((m as any)?.sampleOwnerEmail ?? '').toLowerCase();
+        if (labelLower === speakerIdLower && ownerLower === ownerEmail) {
           return true;
         }
       }
       if (lyraSpeakers.length === 1) {
         const s = lyraSpeakers[0];
-        if ((s.label || '').toLowerCase() === speakerId.toLowerCase() && (s.bestMatchEmail || '').toLowerCase() === ownerEmail) {
+        const labelLower = String((s as any)?.label ?? '').toLowerCase().trim();
+        const ownerLower = String((s as any)?.bestMatchEmail ?? '').toLowerCase();
+        if (labelLower === speakerIdLower && ownerLower === ownerEmail) {
           return true;
         }
       }
     }
 
-    return lyraMatches.some(m => 
-      (m.speakerLabel === speakerId || m.speakerLabel?.toLowerCase() === speakerId.toLowerCase()) &&
-      (m.confidencePercent ?? 0) >= SIS_DISPLAY_THRESHOLD_PERCENT
-    ) || lyraSpeakers.some(s => {
-      const p = s.similarity != null ? Math.round(s.similarity * 100) : 0;
-      return (s.label === speakerId || s.label?.toLowerCase() === speakerId.toLowerCase()) && !!s.bestMatchEmail && p >= SIS_DISPLAY_THRESHOLD_PERCENT;
-    });
+    return (
+      lyraMatches.some((m) => {
+        const labelStr = String((m as any)?.speakerLabel ?? '');
+        return (labelStr === speakerIdStr || labelStr.toLowerCase() === speakerIdLower) && (m.confidencePercent ?? 0) >= SIS_DISPLAY_THRESHOLD_PERCENT;
+      }) ||
+      lyraSpeakers.some((s) => {
+        const p = s.similarity != null ? Math.round(s.similarity * 100) : 0;
+        const labelStr = String((s as any)?.label ?? '');
+        return (labelStr === speakerIdStr || labelStr.toLowerCase() === speakerIdLower) && !!s.bestMatchEmail && p >= SIS_DISPLAY_THRESHOLD_PERCENT;
+      })
+    );
   }, [lyraMatches, lyraSpeakers, user?.email]);
 
   // If showing protocol generator
@@ -1113,12 +1139,14 @@ const MeetingDetail = () => {
 
   // Helper to get a nice speaker label like "Talare 1", "Talare 2"
   const getSpeakerFallbackName = (speakerId: string, index: number): string => {
-    if (!speakerId || speakerId === 'unknown' || speakerId.toLowerCase() === 'unknown') {
+    const speakerIdStr = String((speakerId as any) ?? '');
+    const speakerIdLower = speakerIdStr.toLowerCase().trim();
+    if (!speakerIdStr || speakerIdLower === 'unknown') {
       return `Talare ${index + 1}`;
     }
-    const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
+    const numMatch = speakerIdStr.match(/(?:speaker_?|talare_?)(\d+)/i);
     if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
-    if (/^[A-Z]$/i.test(speakerId)) return `Talare ${speakerId.toUpperCase()}`;
+    if (/^[A-Z]$/i.test(speakerIdStr)) return `Talare ${speakerIdStr.toUpperCase()}`;
     return `Talare ${index + 1}`;
   };
 
@@ -1138,17 +1166,18 @@ const MeetingDetail = () => {
 
     // Helper for case-insensitive name lookup
     const getNameFromSource = (label: string, namesSource: Record<string, string>): string | undefined => {
+      const labelStr = String((label as any) ?? '');
       // Direct match first
-      if (namesSource[label]) return namesSource[label];
+      if (namesSource[labelStr]) return namesSource[labelStr];
       // Case-insensitive match
-      const lowerLabel = label.toLowerCase();
+      const lowerLabel = labelStr.toLowerCase();
       const matchKey = Object.keys(namesSource).find(k => k.toLowerCase() === lowerLabel);
       return matchKey ? namesSource[matchKey] : undefined;
     };
 
     // First add from lyraMatches (high confidence)
     for (const match of lyraMatches) {
-      const label = match.speakerLabel || '';
+      const label = String((match as any)?.speakerLabel ?? '');
       if (!label || processedLabels.has(label)) continue;
       
       const namesSource = isEditing ? editedSpeakerNames : speakerNames;
@@ -1172,25 +1201,26 @@ const MeetingDetail = () => {
 
     // Then add from lyraSpeakers
     for (const speaker of lyraSpeakers) {
-      if (processedLabels.has(speaker.label)) continue;
+      const label = String((speaker as any)?.label ?? '');
+      if (!label || processedLabels.has(label)) continue;
       
       const namesSource = isEditing ? editedSpeakerNames : speakerNames;
-      const fallbackName = getSpeakerFallbackName(speaker.label, speakerIndex);
-      const customName = getNameFromSource(speaker.label, namesSource);
-      const name = customName || speaker.speakerName || (speaker.bestMatchEmail ? speaker.bestMatchEmail.split('@')[0] : fallbackName);
+      const fallbackName = getSpeakerFallbackName(label, speakerIndex);
+      const customName = getNameFromSource(label, namesSource);
+      const name = customName || (speaker as any).speakerName || (speaker.bestMatchEmail ? speaker.bestMatchEmail.split('@')[0] : fallbackName);
       const confidence = speaker.similarity != null ? Math.round(speaker.similarity * 100) : 0;
       const learningEntry = lyraLearning.find(l => l.email === speaker.bestMatchEmail);
       const isIdentified = !!speaker.bestMatchEmail && confidence >= SIS_DISPLAY_THRESHOLD_PERCENT;
       
       speakers.push({
-        label: speaker.label,
+        label,
         name,
         confidence,
         learned: learningEntry?.updated || false,
         email: speaker.bestMatchEmail,
         isIdentified,
       });
-      processedLabels.add(speaker.label);
+      processedLabels.add(label);
       speakerIndex++;
     }
 
@@ -1198,7 +1228,7 @@ const MeetingDetail = () => {
     if (transcriptSegments) {
       const segmentLabels = new Set<string>();
       for (const seg of transcriptSegments) {
-        const rawId = (seg as any).speakerId || (seg as any).speaker || 'unknown';
+        const rawId = String((seg as any)?.speakerId ?? (seg as any)?.speaker ?? 'unknown');
         if (rawId && rawId.toLowerCase() !== 'unknown' && !processedLabels.has(rawId) && !segmentLabels.has(rawId)) {
           segmentLabels.add(rawId);
           const namesSource = isEditing ? editedSpeakerNames : speakerNames;
@@ -1228,7 +1258,7 @@ const MeetingDetail = () => {
       if (transcriptSegments && transcriptSegments.length > 0) {
         const segmentLabels = new Set<string>();
         for (const seg of transcriptSegments) {
-          const rawId = (seg as any).speakerId || (seg as any).speaker;
+          const rawId = String((seg as any)?.speakerId ?? (seg as any)?.speaker ?? '');
           if (rawId && rawId.toLowerCase() !== 'unknown') {
             segmentLabels.add(rawId);
           }
@@ -1601,8 +1631,9 @@ const MeetingDetail = () => {
 
   // Get display name for a speaker in segments
   const getSegmentSpeakerName = (speakerId: string): string => {
+    const speakerIdStr = String((speakerId as any) ?? '');
     // Normalize the speaker ID for comparison
-    const normalizedId = (speakerId || '').toLowerCase().trim();
+    const normalizedId = speakerIdStr.toLowerCase().trim();
     
     if (!speakerId || normalizedId === 'unknown') {
       // If there's only 1 speaker and they're identified, use their name even for "unknown" segments
@@ -1619,7 +1650,7 @@ const MeetingDetail = () => {
     // First check uniqueSpeakers - this already has all the resolved names including context verification
     // Use case-insensitive matching
     const resolvedSpeaker = uniqueSpeakers.find(s => 
-      s.label.toLowerCase() === normalizedId
+      String((s as any).label ?? '').toLowerCase() === normalizedId
     );
     if (resolvedSpeaker) {
       return resolvedSpeaker.name;
@@ -1634,7 +1665,7 @@ const MeetingDetail = () => {
     
     // Check lyraMatches for identified name (case-insensitive)
     const match = lyraMatches.find(m => 
-      (m.speakerLabel || '').toLowerCase() === normalizedId
+      String((m as any)?.speakerLabel ?? '').toLowerCase() === normalizedId
     );
     if (match?.speakerName) {
       return match.speakerName;
@@ -1645,7 +1676,7 @@ const MeetingDetail = () => {
     
     // Check lyraSpeakers (case-insensitive)
     const speaker = lyraSpeakers.find(s => 
-      (s.label || '').toLowerCase() === normalizedId
+      String((s as any)?.label ?? '').toLowerCase() === normalizedId
     );
     if (speaker?.speakerName) {
       return speaker.speakerName;
@@ -1660,12 +1691,12 @@ const MeetingDetail = () => {
     }
     
     // Fallback to "Talare X"
-    const numMatch = speakerId.match(/(?:speaker_?|talare_?)(\d+)/i);
+    const numMatch = speakerIdStr.match(/(?:speaker_?|talare_?)(\d+)/i);
     if (numMatch) return `Talare ${parseInt(numMatch[1], 10) + 1}`;
-    if (/^[A-Z]$/i.test(speakerId)) return `Talare ${speakerId.toUpperCase()}`;
+    if (/^[A-Z]$/i.test(speakerIdStr)) return `Talare ${speakerIdStr.toUpperCase()}`;
     
     // Find index in unique speakers
-    const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
+    const idx = uniqueSpeakers.findIndex(s => String((s as any).label ?? '').toLowerCase() === normalizedId);
     return `Talare ${idx >= 0 ? idx + 1 : 1}`;
   };
 
@@ -1680,13 +1711,13 @@ const MeetingDetail = () => {
       'border-l-cyan-500 text-cyan-600 dark:text-cyan-400',
     ];
     
-    const normalizedId = (speakerId || '').toLowerCase().trim();
+    const normalizedId = String((speakerId as any) ?? '').toLowerCase().trim();
     
     if (!speakerId || normalizedId === 'unknown') {
       return 'border-l-muted-foreground/30 text-muted-foreground';
     }
     
-    const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
+    const idx = uniqueSpeakers.findIndex(s => String((s as any).label ?? '').toLowerCase() === normalizedId);
     return colors[idx >= 0 ? idx % colors.length : 0];
   };
 
@@ -1701,13 +1732,13 @@ const MeetingDetail = () => {
       'bg-cyan-500',
     ];
     
-    const normalizedId = (speakerId || '').toLowerCase().trim();
+    const normalizedId = String((speakerId as any) ?? '').toLowerCase().trim();
     
     if (!speakerId || normalizedId === 'unknown') {
       return 'bg-muted-foreground/50';
     }
     
-    const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
+    const idx = uniqueSpeakers.findIndex(s => String((s as any).label ?? '').toLowerCase() === normalizedId);
     return dots[idx >= 0 ? idx % dots.length : 0];
   };
 
@@ -1722,13 +1753,13 @@ const MeetingDetail = () => {
       'text-cyan-600 dark:text-cyan-400',
     ];
     
-    const normalizedId = (speakerId || '').toLowerCase().trim();
+    const normalizedId = String((speakerId as any) ?? '').toLowerCase().trim();
     
     if (!speakerId || normalizedId === 'unknown') {
       return 'text-muted-foreground';
     }
     
-    const idx = uniqueSpeakers.findIndex(s => s.label.toLowerCase() === normalizedId);
+    const idx = uniqueSpeakers.findIndex(s => String((s as any).label ?? '').toLowerCase() === normalizedId);
     return textColors[idx >= 0 ? idx % textColors.length : 0];
   };
 
