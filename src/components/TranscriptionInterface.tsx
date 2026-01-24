@@ -80,13 +80,55 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
-    navigate('/recording', { 
-      state: { 
-        continuedMeeting: null,
-        isFreeTrialMode,
-        selectedLanguage 
-      } 
-    });
+    setIsStartingRecording(true);
+
+    try {
+      // Meeting-First Flow: Create meeting on backend FIRST
+      const now = new Date().toISOString();
+      const result = await apiClient.createMeeting({
+        title: 'Namnlöst möte',
+        createdAt: now,
+        meetingStartedAt: now,
+        transcript: '',
+        transcriptionStatus: 'recording',
+      });
+
+      const meetingId = result.meeting?.id;
+      if (!meetingId) {
+        throw new Error('Inget mötesid returnerades');
+      }
+
+      console.log('✅ Meeting created for recording:', meetingId);
+
+      // Store pending meeting in sessionStorage for immediate display
+      const pendingMeeting = {
+        id: meetingId,
+        title: 'Namnlöst möte',
+        createdAt: now,
+        transcript: '',
+        transcriptionStatus: 'recording',
+        userId: user?.uid || '',
+      };
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
+
+      // Navigate to meeting page with recording=true flag
+      navigate(`/meetings/${meetingId}`, {
+        state: { 
+          startRecording: true,
+          isFreeTrialMode,
+          selectedLanguage,
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to create meeting for recording:', error);
+      toast({
+        title: 'Kunde inte starta inspelning',
+        description: error.message || 'Försök igen',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStartingRecording(false);
+    }
   };
 
 
@@ -274,10 +316,15 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             <Button 
               onClick={handleStartRecording}
               size="lg"
+              disabled={isStartingRecording}
               className="w-full h-14 text-base gap-3 shadow-lg shadow-primary/20"
             >
-              <Mic className="w-5 h-5" />
-              Spela in live
+              {isStartingRecording ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+              {isStartingRecording ? 'Startar...' : 'Spela in live'}
             </Button>
 
             <Button 
