@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Loader2, FileText, Trash2, MessageCircle, Calendar, CheckCircle2, AlertCircle, Mic, Upload, Users, UserCheck, Sparkles, Clock, Save, RotateCcw, Edit3, X, ChevronDown, Eye, Download, RefreshCw, Lock, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackend
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
+import { MeetingRecorder } from "@/components/MeetingRecorder";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
@@ -55,13 +56,23 @@ interface MeetingDataForDialog {
 const MeetingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userPlan, incrementMeetingCount } = useSubscription();
+  const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
+
+  // Check if we're starting in recording mode (from navigation state)
+  const locationState = location.state as { startRecording?: boolean; isFreeTrialMode?: boolean; selectedLanguage?: 'sv-SE' | 'en-US' } | null;
+  const [isRecordingMode, setIsRecordingMode] = useState(locationState?.startRecording === true);
+  const isFreeTrialMode = locationState?.isFreeTrialMode || false;
+  const selectedLanguage = locationState?.selectedLanguage || 'sv-SE';
+
+  // Determine if user has ASR access (Enterprise or Admin)
+  const useAsrMode = isAdmin || (userPlan?.plan?.toLowerCase() === 'enterprise');
 
   const [meeting, setMeeting] = useState<MeetingSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState<'uploading' | 'queued' | 'processing' | 'done' | 'failed' | null>(null);
+  const [isLoading, setIsLoading] = useState(!isRecordingMode); // Skip loading if starting in recording mode
+  const [status, setStatus] = useState<'uploading' | 'queued' | 'processing' | 'done' | 'failed' | 'recording' | null>(isRecordingMode ? 'recording' : null);
   const [stage, setStage] = useState<'uploading' | 'queued' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
@@ -71,6 +82,9 @@ const MeetingDetail = () => {
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
   const [isSISDisabled, setIsSISDisabled] = useState(false);
+  
+  // Meeting title state (for editing in recording mode)
+  const [meetingTitle, setMeetingTitle] = useState('Namnlöst möte');
   
   // Queue and upload progress state
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -130,6 +144,44 @@ const MeetingDetail = () => {
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
 
+  // Recording mode handlers - defined early to satisfy hooks rules
+  const handleRecordingComplete = useCallback(() => {
+    setIsRecordingMode(false);
+    setStatus('processing');
+    setIsLoading(false);
+    
+    // Reload meeting data to start polling
+    if (id) {
+      const loadAfterRecording = async () => {
+        try {
+          const fetchedMeeting = await meetingStorage.getMeeting(id);
+          if (fetchedMeeting) {
+            setMeeting(fetchedMeeting);
+            setMeetingTitle(fetchedMeeting.title);
+          }
+        } catch (e) {
+          console.warn('Could not reload meeting after recording:', e);
+        }
+      };
+      loadAfterRecording();
+    }
+  }, [id]);
+
+  const handleRecordingCancel = useCallback(() => {
+    // Delete the pre-created meeting and go back
+    if (id) {
+      meetingStorage.deleteMeeting(id).catch(console.warn);
+    }
+    navigate('/');
+  }, [id, navigate]);
+
+  const handleRecordingTitleChange = useCallback((newTitle: string) => {
+    setMeetingTitle(newTitle);
+    if (meeting) {
+      setMeeting({ ...meeting, title: newTitle });
+    }
+  }, [meeting]);
+
   // Simple stage-based status text
   const getStageInfo = () => {
     if (stage === 'transcribing') return { title: 'Transkriberar...', subtitle: 'Konverterar ljud till text' };
@@ -157,9 +209,9 @@ const MeetingDetail = () => {
     }).format(date);
   };
 
-  // Load meeting data
+  // Load meeting data (skip if in recording mode - data not needed yet)
   useEffect(() => {
-    if (!id || !user) return;
+    if (!id || !user || isRecordingMode) return;
 
     const loadMeeting = async () => {
       setIsLoading(true);
@@ -1689,6 +1741,23 @@ const MeetingDetail = () => {
     groupedSegments.length > 0 &&
     groupedSegments.some((s) => (s as any)?.text && String((s as any).text).trim().length > 0);
 
+  // Recording mode view - full-screen recorder
+  if (isRecordingMode && id) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+        <MeetingRecorder
+          meetingId={id}
+          meetingTitle={meetingTitle}
+          onTitleChange={handleRecordingTitleChange}
+          onRecordingComplete={handleRecordingComplete}
+          onCancel={handleRecordingCancel}
+          useAsrMode={useAsrMode}
+          language={selectedLanguage === 'en-US' ? 'en' : 'sv'}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       {/* Floating Header */}
@@ -1708,7 +1777,7 @@ const MeetingDetail = () => {
           </Button>
           
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-base truncate">{meeting?.title || 'Laddar...'}</h1>
+            <h1 className="font-semibold text-base truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
             {meeting && (
               <p className="text-xs text-muted-foreground">
                 {formatDate(meeting.createdAt)} • {formatTime(meeting.createdAt)}
