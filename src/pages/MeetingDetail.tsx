@@ -106,6 +106,8 @@ const MeetingDetail = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSpeakers, setShowSpeakers] = useState(true);
   const [hasManualTranscript, setHasManualTranscript] = useState(false);
+  // Prevent initial polling/toasts from firing before we have resolved meeting + ASR state on first load.
+  const [initialStatusResolved, setInitialStatusResolved] = useState(false);
 
   // Protocol management state
   const [protocolData, setProtocolData] = useState<{
@@ -213,6 +215,9 @@ const MeetingDetail = () => {
   // Load meeting data (skip if in recording mode - data not needed yet)
   useEffect(() => {
     if (!id || !user || isRecordingMode) return;
+
+    // Reset gate on mount / meeting id change
+    setInitialStatusResolved(false);
 
     const loadMeeting = async () => {
       setIsLoading(true);
@@ -334,6 +339,9 @@ const MeetingDetail = () => {
               if (asrStatus.status === 'error' || asrStatus.status === 'failed') {
                 // Transcription failed - show failed state, don't start polling
                 console.log('📛 Meeting has failed transcription - showing failed state');
+                // Mark failure toast as already handled for this meeting so navigating/reloading doesn't show it again.
+                localStorage.setItem(`transcription_fail_toast_shown_${id}`,'true');
+                localStorage.setItem(`transcription_fail_toast_shown_${resolvedId}`,'true');
                 setStatus('failed');
                 setStage('error');
                 transcriptionDoneRef.current = true; // Prevent polling from starting
@@ -390,6 +398,7 @@ const MeetingDetail = () => {
         navigate('/library');
       } finally {
         setIsLoading(false);
+        setInitialStatusResolved(true);
       }
     };
 
@@ -462,7 +471,7 @@ const MeetingDetail = () => {
 
   // Poll for transcription status
   useEffect(() => {
-    if (!id || !user || transcriptionDoneRef.current) return;
+    if (!id || !user || !initialStatusResolved || transcriptionDoneRef.current) return;
     if (status === 'done' || status === 'failed') return;
 
     pollingRef.current = true;
@@ -578,10 +587,15 @@ const MeetingDetail = () => {
           pollingRef.current = false;
           setStatus('failed');
           
-          // Only show failure toast once per meeting (like success toast)
-          const failToastKey = `transcription_fail_toast_shown_${id}`;
-          if (!localStorage.getItem(failToastKey)) {
-            localStorage.setItem(failToastKey, 'true');
+          // Only show failure toast once per meeting (like success toast).
+          // Use both route ID and any resolved backend ID to avoid duplicate toasts when aliases are involved.
+          const resolvedForToast = resolveBackendMeetingId(id);
+          const failToastKeyA = `transcription_fail_toast_shown_${id}`;
+          const failToastKeyB = `transcription_fail_toast_shown_${resolvedForToast}`;
+          const alreadyShown = Boolean(localStorage.getItem(failToastKeyA) || localStorage.getItem(failToastKeyB));
+          if (!alreadyShown) {
+            localStorage.setItem(failToastKeyA, 'true');
+            localStorage.setItem(failToastKeyB, 'true');
             const errorMsg = asrStatus.error 
               ? (typeof asrStatus.error === 'string' ? asrStatus.error : ((asrStatus.error as any)?.message || 'Försök igen.'))
               : 'Försök igen.';
@@ -611,7 +625,7 @@ const MeetingDetail = () => {
     return () => {
       pollingRef.current = false;
     };
-  }, [id, user, status, meeting, toast, incrementMeetingCount]);
+  }, [id, user, status, meeting, toast, incrementMeetingCount, initialStatusResolved]);
 
   // Handle delete
   const handleDelete = async () => {
