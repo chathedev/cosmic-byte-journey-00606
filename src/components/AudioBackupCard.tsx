@@ -2,7 +2,7 @@
 // Shows when audio backup is available from server, regardless of transcription status
 
 import { useState } from "react";
-import { Download, RefreshCw, Mic, Loader2, Upload, CheckCircle2, HardDrive } from "lucide-react";
+import { Download, RefreshCw, Loader2, Upload, CheckCircle2, HardDrive, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ interface AudioBackupCardProps {
   audioBackup: AudioBackup;
   transcriptionStatus: 'uploading' | 'queued' | 'processing' | 'done' | 'failed' | null;
   onRetryStarted?: () => void;
+  onReuploadNeeded?: () => void;
   className?: string;
   variant?: 'compact' | 'full';
 }
@@ -23,12 +24,14 @@ export function AudioBackupCard({
   audioBackup,
   transcriptionStatus,
   onRetryStarted,
+  onReuploadNeeded,
   className = '',
   variant = 'full'
 }: AudioBackupCardProps) {
   const { toast } = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [encryptionError, setEncryptionError] = useState(false);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -51,6 +54,7 @@ export function AudioBackupCard({
 
   const handleRetry = async () => {
     setIsRetrying(true);
+    setEncryptionError(false);
     try {
       const result = await retryTranscriptionFromBackup(meetingId, audioBackup.downloadPath);
       if (result.success) {
@@ -60,7 +64,17 @@ export function AudioBackupCard({
         });
         onRetryStarted?.();
       } else {
-        throw new Error(result.error || 'Kunde inte starta om transkribering');
+        // Check for encryption metadata error - suggest re-upload
+        if (result.errorCode === 'audio_encryption_metadata_missing') {
+          setEncryptionError(true);
+          toast({
+            title: 'Ljudfilen kunde inte dekrypteras',
+            description: 'Ladda upp originalfilen igen för att transkribera på nytt.',
+            variant: 'destructive',
+          });
+        } else {
+          throw new Error(result.error || 'Kunde inte starta om transkribering');
+        }
       }
     } catch (error: any) {
       toast({
@@ -77,7 +91,8 @@ export function AudioBackupCard({
     ? (audioBackup.sizeBytes / 1024 / 1024).toFixed(1) 
     : null;
 
-  const showRetryButton = transcriptionStatus === 'failed';
+  const showRetryButton = transcriptionStatus === 'failed' && !encryptionError;
+  const showReuploadButton = encryptionError && onReuploadNeeded;
 
   // Compact variant - just buttons
   if (variant === 'compact') {
@@ -113,6 +128,17 @@ export function AudioBackupCard({
             Försök igen
           </Button>
         )}
+        {showReuploadButton && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onReuploadNeeded}
+            className="gap-1.5 h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+          >
+            <Upload className="w-3 h-3" />
+            Ladda upp igen
+          </Button>
+        )}
       </div>
     );
   }
@@ -127,7 +153,7 @@ export function AudioBackupCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <p className="font-medium text-sm">Ljudinspelning säkrad</p>
-            <Badge variant="outline" className="gap-1 text-green-600 border-green-500/30 bg-green-500/5 text-xs">
+            <Badge variant="outline" className="gap-1 text-xs border-accent/30 bg-accent/5 text-accent-foreground">
               <CheckCircle2 className="w-3 h-3" />
               Säkrad
             </Badge>
@@ -144,6 +170,21 @@ export function AudioBackupCard({
           )}
         </div>
       </div>
+
+      {/* Encryption error warning */}
+      {encryptionError && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Dekryptering misslyckades</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ljudfilen på servern kunde inte dekrypteras. Ladda upp originalfilen igen för att transkribera.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Button
@@ -175,9 +216,20 @@ export function AudioBackupCard({
             Transkribera igen
           </Button>
         )}
+
+        {showReuploadButton && (
+          <Button
+            onClick={onReuploadNeeded}
+            className="flex-1 gap-2"
+            variant="default"
+          >
+            <Upload className="w-4 h-4" />
+            Ladda upp originalfil
+          </Button>
+        )}
       </div>
 
-      {transcriptionStatus === 'failed' && (
+      {transcriptionStatus === 'failed' && !encryptionError && (
         <p className="text-xs text-muted-foreground text-center mt-3">
           Du kan ladda ner din inspelning eller försöka transkribera igen
         </p>

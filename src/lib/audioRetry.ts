@@ -9,6 +9,7 @@ interface RetryResult {
   success: boolean;
   meetingId?: string;
   error?: string;
+  errorCode?: string;
 }
 
 /**
@@ -38,14 +39,31 @@ export async function retryTranscriptionFromBackup(
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      // Ensure error is always a string (backend might return {message, code} objects)
-      const rawError = errorData.error || errorData.message;
-      let errorMessage = `Retry failed: ${response.status}`;
-      if (rawError) {
-        errorMessage = typeof rawError === 'string' ? rawError : (rawError.message || JSON.stringify(rawError));
+      const errorCode = errorData.error;
+      const errorMsg = errorData.message;
+      
+      debugError('❌ Retry request failed:', { errorCode, errorMsg, status: response.status });
+      
+      // Handle specific backend error codes with user-friendly messages
+      if (errorCode === 'audio_encryption_metadata_missing') {
+        return { 
+          success: false, 
+          error: 'Ljudfilen kunde inte dekrypteras. Ladda upp originalfilen igen för att transkribera på nytt.',
+          errorCode: 'audio_encryption_metadata_missing'
+        };
       }
-      debugError('❌ Retry request failed:', errorMessage);
-      return { success: false, error: errorMessage };
+      
+      if (errorCode === 'audio_not_found' || errorCode === 'backup_not_found') {
+        return { 
+          success: false, 
+          error: 'Ljudinspelningen hittades inte på servern. Ladda upp originalfilen igen.',
+          errorCode
+        };
+      }
+      
+      // Generic error fallback
+      let errorMessage = errorMsg || `Återförsök misslyckades (${response.status})`;
+      return { success: false, error: errorMessage, errorCode };
     }
     
     const data = await response.json();
