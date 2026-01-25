@@ -32,6 +32,12 @@ interface TranscriptSegment {
   end: number;
 }
 
+interface SpeakerBlock {
+  speakerId: string;
+  speakerName: string | null;
+  text: string;
+}
+
 interface LocationState {
   transcript: string;
   meetingName: string;
@@ -43,6 +49,7 @@ interface LocationState {
   sisSpeakers?: SISSpeaker[];
   sisMatches?: SISMatch[];
   speakerNames?: Record<string, string>;
+  speakerBlocksCleaned?: SpeakerBlock[];
 }
 
 export default function GenerateProtocol() {
@@ -246,6 +253,7 @@ export default function GenerateProtocol() {
           sisSpeakers={pageState.sisSpeakers}
           sisMatches={pageState.sisMatches}
           speakerNames={pageState.speakerNames}
+          speakerBlocksCleaned={pageState.speakerBlocksCleaned}
         />
       )}
     </div>

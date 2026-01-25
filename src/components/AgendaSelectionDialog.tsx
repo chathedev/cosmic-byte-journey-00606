@@ -31,6 +31,12 @@ interface TranscriptSegment {
   end: number;
 }
 
+interface SpeakerBlock {
+  speakerId: string;
+  speakerName: string | null;
+  text: string;
+}
+
 interface AgendaSelectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +49,7 @@ interface AgendaSelectionDialogProps {
     sisSpeakers?: SISSpeaker[];
     sisMatches?: SISMatch[];
     speakerNames?: Record<string, string>;
+    speakerBlocksCleaned?: SpeakerBlock[];
   };
 }
 
@@ -124,6 +131,7 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
           sisSpeakers: meetingData.sisSpeakers,
           sisMatches: meetingData.sisMatches,
           speakerNames: meetingData.speakerNames,
+          speakerBlocksCleaned: meetingData.speakerBlocksCleaned,
         }
       });
       
