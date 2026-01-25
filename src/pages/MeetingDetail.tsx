@@ -320,7 +320,57 @@ const MeetingDetail = () => {
               console.log('Could not fetch speaker names:', e);
             }
           } else {
-            setStatus('processing');
+            // No transcript yet - check ASR status to determine if failed or still processing
+            // CRITICAL: This prevents restart of transcription polling on page refresh for failed meetings
+            try {
+              const asrStatus = await pollASRStatus(id);
+              console.log('📊 Initial ASR status check (no transcript):', asrStatus.status, asrStatus.stage);
+              
+              // Capture audio backup failsafe info - available even for failed meetings
+              if (asrStatus.audioBackup?.available) {
+                setAudioBackup(asrStatus.audioBackup);
+              }
+              
+              if (asrStatus.status === 'error' || asrStatus.status === 'failed') {
+                // Transcription failed - show failed state, don't start polling
+                console.log('📛 Meeting has failed transcription - showing failed state');
+                setStatus('failed');
+                setStage('error');
+                transcriptionDoneRef.current = true; // Prevent polling from starting
+              } else if (asrStatus.status === 'completed' || asrStatus.status === 'done') {
+                // Actually completed but meeting object didn't have transcript - update it
+                if (asrStatus.transcript) {
+                  setTranscript(asrStatus.transcript);
+                  setTranscriptSegments(asrStatus.transcriptSegments || null);
+                  setReconstructedSegments(asrStatus.reconstructedSegments || null);
+                  setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
+                  setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
+                  setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+                  setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+                  setStatus('done');
+                  transcriptionDoneRef.current = true;
+                } else {
+                  // Edge case: marked done but no transcript
+                  setStatus('failed');
+                  transcriptionDoneRef.current = true;
+                }
+              } else {
+                // Still processing - allow polling to continue
+                setStatus('processing');
+                if (asrStatus.stage) {
+                  setStage(asrStatus.stage);
+                }
+                if (typeof asrStatus.progress === 'number') {
+                  setBackendProgress(asrStatus.progress);
+                }
+                if (asrStatus.metadata) {
+                  setQueueMetadata(asrStatus.metadata);
+                }
+              }
+            } catch (e) {
+              console.log('Could not fetch initial ASR status, defaulting to processing:', e);
+              setStatus('processing');
+            }
           }
         } else {
           toast({
