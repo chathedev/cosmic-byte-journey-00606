@@ -14,7 +14,7 @@ import { pollASRStatus, downloadAudioBackup, type SISMatch, type SISSpeaker, typ
 import { AudioBackupCard } from "@/components/AudioBackupCard";
 import { AudioPlayerCard } from "@/components/AudioPlayerCard";
 import { retryTranscriptionFromBackup } from "@/lib/audioRetry";
-import { QueueProgressWidget } from "@/components/QueueProgressWidget";
+import { ProcessingStatusMessage } from "@/components/ProcessingStatusMessage";
 import { apiClient } from "@/lib/api";
 import { backendApi } from "@/lib/backendApi";
 import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackendAlias } from "@/lib/backgroundUploader";
@@ -1965,25 +1965,11 @@ const MeetingDetail = () => {
                   />
                 </div>
                 
-                {/* Queue Progress Widget */}
-                <div className="w-full max-w-md px-4">
-                  <QueueProgressWidget
-                    status={status === 'queued' ? 'queued' : status === 'uploading' ? 'uploading' : 'processing'}
-                    stage={stage || undefined}
-                    uploadProgress={uploadProgress}
-                    backendProgress={backendProgress}
-                    queueMetadata={queueMetadata}
-                    fileSize={fileSize}
-                    className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6"
-                  />
-                </div>
+                {/* Simple processing message */}
+                <ProcessingStatusMessage />
                 
-                {/* Additional info + Audio backup failsafe */}
+                {/* Audio backup failsafe */}
                 <div className="flex flex-col items-center gap-3">
-                  <Badge variant="secondary" className="gap-2">
-                    <Clock className="w-3 h-3" />
-                    Längre möten kan ta några minuter
-                  </Badge>
                   
                   {/* Audio backup indicator - visible during processing */}
                   {audioBackup?.available && (

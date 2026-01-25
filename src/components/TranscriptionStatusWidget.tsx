@@ -51,18 +51,16 @@ export const TranscriptionStatusWidget = ({
     );
   }
 
-  // Simple stage-based status text
+  // Simple status with email notification hint
   const getStatusText = () => {
-    if (stage === 'transcribing') return 'Transkriberar...';
-    if (stage === 'sis_processing') return 'Identifierar talare...';
-    if (stage === 'uploading') return 'Laddar upp...';
-    if (status === 'uploading') return 'Laddar upp...';
-    return 'Bearbetar...';
+    if (stage === 'uploading' || status === 'uploading') return 'Laddar upp...';
+    return 'Bearbetar – mejl skickas när klart';
   };
 
   return (
-    <span className="text-xs text-muted-foreground">
-      {getStatusText()}
-    </span>
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+      <span className="text-xs">{getStatusText()}</span>
+    </div>
   );
 };
