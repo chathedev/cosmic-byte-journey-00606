@@ -1,11 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Check, Edit2, X, FileText, ToggleLeft, ToggleRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ToggleLeft, ToggleRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from 'sonner';
-import { backendApi } from '@/lib/backendApi';
 
 interface SpeakerBlock {
   speakerId: string;
@@ -15,12 +11,10 @@ interface SpeakerBlock {
 
 interface TranscriptBlockViewProps {
   meetingId: string;
-  transcript: string;
   transcriptRaw?: string | null;
   speakerBlocksCleaned?: SpeakerBlock[] | null;
   speakerBlocksRaw?: SpeakerBlock[] | null;
-  speakerNames: Record<string, string>;
-  onSpeakerNamesUpdated?: (names: Record<string, string>) => void;
+  speakerNames?: Record<string, string>;
   className?: string;
 }
 
@@ -36,38 +30,39 @@ const SPEAKER_COLORS = [
 
 export const TranscriptBlockView: React.FC<TranscriptBlockViewProps> = ({
   meetingId,
-  transcript,
   transcriptRaw,
   speakerBlocksCleaned,
   speakerBlocksRaw,
-  speakerNames: initialSpeakerNames,
-  onSpeakerNamesUpdated,
+  speakerNames = {},
   className,
 }) => {
   const [showRaw, setShowRaw] = useState(false);
-  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
-  const [editedName, setEditedName] = useState('');
-  const [savingName, setSavingName] = useState(false);
-  const [localSpeakerNames, setLocalSpeakerNames] = useState<Record<string, string>>({});
 
-  const speakerNames = { ...initialSpeakerNames, ...localSpeakerNames };
-
-  // Determine which blocks to display
+  // Determine which blocks to display - ALWAYS use speakerBlocksCleaned by default
   const blocks = useMemo(() => {
-    const sourceBlocks = showRaw ? speakerBlocksRaw : speakerBlocksCleaned;
-    
-    if (sourceBlocks && sourceBlocks.length > 0) {
-      return sourceBlocks;
+    if (showRaw) {
+      // Show raw version
+      if (speakerBlocksRaw && speakerBlocksRaw.length > 0) {
+        return speakerBlocksRaw;
+      }
+      // Fallback to raw transcript as single block
+      if (transcriptRaw) {
+        return [{
+          speakerId: 'speaker_1',
+          speakerName: null,
+          text: transcriptRaw,
+        }];
+      }
     }
     
-    // Fallback: wrap entire transcript as single speaker block
-    const displayText = showRaw ? (transcriptRaw || transcript) : transcript;
-    return [{
-      speakerId: 'speaker_1',
-      speakerName: null,
-      text: displayText,
-    }];
-  }, [showRaw, speakerBlocksCleaned, speakerBlocksRaw, transcript, transcriptRaw]);
+    // Default: show cleaned version from speakerBlocksCleaned
+    if (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) {
+      return speakerBlocksCleaned;
+    }
+    
+    // No blocks available
+    return [];
+  }, [showRaw, speakerBlocksCleaned, speakerBlocksRaw, transcriptRaw]);
 
   // Get unique speakers from blocks
   const uniqueSpeakers = useMemo(() => {
@@ -88,121 +83,53 @@ export const TranscriptBlockView: React.FC<TranscriptBlockViewProps> = ({
     return map;
   }, [uniqueSpeakers]);
 
-  const getSpeakerDisplayName = useCallback((speakerId: string, blockSpeakerName: string | null) => {
-    // Priority: user-edited names > block speakerName > speakerId
-    return speakerNames[speakerId] || blockSpeakerName || speakerId;
-  }, [speakerNames]);
-
-  const handleEditSpeaker = (speakerId: string, currentName: string) => {
-    setEditingSpeaker(speakerId);
-    setEditedName(currentName);
+  const getSpeakerDisplayName = (speakerId: string, blockSpeakerName: string | null): string => {
+    // Priority: speakerNames map > block speakerName > formatted speakerId
+    if (speakerNames[speakerId]) {
+      return speakerNames[speakerId];
+    }
+    if (blockSpeakerName) {
+      return blockSpeakerName;
+    }
+    // Format speaker_1 -> Talare 1
+    const match = speakerId.match(/speaker[_-]?(\d+)/i);
+    if (match) {
+      return `Talare ${match[1]}`;
+    }
+    return speakerId;
   };
 
-  const handleSaveSpeakerName = async () => {
-    if (!editingSpeaker || !meetingId) return;
-
-    const speakerId = editingSpeaker;
-    const newName = editedName.trim();
-    
-    if (!newName) {
-      setEditingSpeaker(null);
-      return;
-    }
-
-    setSavingName(true);
-    
-    try {
-      const updatedNames = { ...speakerNames, [speakerId]: newName };
-      setLocalSpeakerNames(prev => ({ ...prev, [speakerId]: newName }));
-      
-      const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
-      onSpeakerNamesUpdated?.(saveResult.speakerNames);
-      
-      toast.success('Talarnamn sparat');
-    } catch (error) {
-      console.error('Error saving speaker name:', error);
-      toast.error('Kunde inte spara namn');
-    } finally {
-      setSavingName(false);
-      setEditingSpeaker(null);
-    }
-  };
-
-  const hasRawTranscript = !!transcriptRaw && transcriptRaw !== transcript;
+  // Check if we have raw transcript available for toggle
+  const hasRawAvailable = !!(transcriptRaw || (speakerBlocksRaw && speakerBlocksRaw.length > 0));
   const hasMultipleSpeakers = uniqueSpeakers.length > 1;
+
+  // If no blocks at all, show nothing
+  if (blocks.length === 0) {
+    return null;
+  }
 
   return (
     <div className={cn("space-y-4", className)}>
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Transkription</span>
-            {hasMultipleSpeakers && (
-              <span className="text-xs text-muted-foreground/60">• {uniqueSpeakers.length} talare</span>
-            )}
-          </div>
-          
-          {/* Speaker chips for quick edit */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
           {hasMultipleSpeakers && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex items-center gap-1.5">
               {uniqueSpeakers.map(speakerId => {
                 const colors = speakerColorMap[speakerId];
                 const block = blocks.find(b => b.speakerId === speakerId);
                 const displayName = getSpeakerDisplayName(speakerId, block?.speakerName || null);
-                const isEditing = editingSpeaker === speakerId;
-
-                if (isEditing) {
-                  return (
-                    <div key={speakerId} className="flex items-center gap-1 bg-muted rounded-md px-2 py-1">
-                      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", colors?.dot)} />
-                      <Input
-                        value={editedName}
-                        onChange={(e) => setEditedName(e.target.value)}
-                        className="h-5 w-28 text-xs px-1 py-0 border-0 bg-transparent focus-visible:ring-0"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveSpeakerName();
-                          if (e.key === 'Escape') setEditingSpeaker(null);
-                        }}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleSaveSpeakerName}
-                        disabled={savingName}
-                        className="h-5 w-5 p-0"
-                      >
-                        <Check className="h-3 w-3 text-emerald-500" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingSpeaker(null)}
-                        className="h-5 w-5 p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  );
-                }
 
                 return (
-                  <button
+                  <div
                     key={speakerId}
-                    onClick={() => handleEditSpeaker(speakerId, displayName)}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs px-2 py-1 rounded-md",
-                      "bg-muted/50 hover:bg-muted border border-transparent hover:border-border/50",
-                      "transition-all duration-150"
-                    )}
+                    className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-muted/50"
                   >
                     <div className={cn("w-2 h-2 rounded-full", colors?.dot)} />
                     <span className={cn("font-medium", colors?.text)}>
                       {displayName}
                     </span>
-                    <Edit2 className="h-2.5 w-2.5 opacity-30" />
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -210,7 +137,7 @@ export const TranscriptBlockView: React.FC<TranscriptBlockViewProps> = ({
         </div>
 
         {/* Raw/Clean toggle */}
-        {hasRawTranscript && (
+        {hasRawAvailable && (
           <button
             onClick={() => setShowRaw(!showRaw)}
             className={cn(
