@@ -2015,66 +2015,53 @@ const MeetingDetail = () => {
                 key="failed"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-24 gap-6"
+                className="flex flex-col items-center justify-center py-16 sm:py-24"
               >
-                <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <AlertCircle className="w-10 h-10 text-destructive" />
-                </div>
-                <div className="text-center space-y-2">
-                  <h2 className="text-xl font-semibold text-destructive">Transkribering misslyckades</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {audioBackup?.available 
-                      ? 'Din inspelning är säkrad – ladda ner eller försök transkribera igen'
-                      : 'Försök ladda upp filen igen'
-                    }
-                  </p>
-                </div>
-                
-                {/* Audio backup card with download and retry options */}
-                {audioBackup?.available && (
-                  <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 max-w-md w-full">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <HardDrive className="w-6 h-6 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm">Ljudinspelning säkrad</p>
-                          <Badge variant="outline" className="gap-1 text-green-600 border-green-500/30 bg-green-500/5 text-xs">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Säkrad
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {audioBackup.originalName || 'inspelning.wav'}
-                          {audioBackup.sizeBytes && ` • ${(audioBackup.sizeBytes / 1024 / 1024).toFixed(1)} MB`}
-                        </p>
-                        {audioBackup.savedAt && (
-                          <p className="text-xs text-muted-foreground/70 mt-0.5">
-                            Sparad {new Date(audioBackup.savedAt).toLocaleString('sv-SE')}
-                          </p>
-                        )}
-                      </div>
+                {/* Minimal failed state */}
+                <div className="w-full max-w-sm space-y-8">
+                  {/* Icon and status */}
+                  <div className="text-center space-y-3">
+                    <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+                      <AlertCircle className="w-7 h-7 text-destructive" />
                     </div>
-                    
-                    {/* Audio Player for failed state */}
-                    {audioBackup.downloadPath && (
-                      <div className="mb-4">
-                        <AudioPlayerCard
-                          meetingId={id || ''}
-                          audioBackup={audioBackup}
-                          variant="compact"
-                          className="bg-background/50 rounded-xl p-3"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div>
+                      <h2 className="text-lg font-medium">Transkribering misslyckades</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {audioBackup?.available 
+                          ? 'Din inspelning är säkrad'
+                          : 'Ladda upp filen igen'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Action buttons - primary focus on retry */}
+                  {audioBackup?.available && (
+                    <div className="space-y-3">
+                      <Button
+                        onClick={handleRetryTranscription}
+                        disabled={isRetryingTranscription}
+                        className="w-full h-12 gap-2 rounded-xl"
+                        size="lg"
+                      >
+                        {isRetryingTranscription ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Startar...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Försök igen
+                          </>
+                        )}
+                      </Button>
+                      
                       <Button
                         onClick={handleDownloadAudioBackup}
                         disabled={isDownloadingAudio}
-                        className="flex-1 gap-2"
-                        variant="outline"
+                        variant="ghost"
+                        className="w-full gap-2 text-muted-foreground"
                       >
                         {isDownloadingAudio ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -2083,29 +2070,30 @@ const MeetingDetail = () => {
                         )}
                         Ladda ner inspelning
                       </Button>
-                      <Button
-                        onClick={handleRetryTranscription}
-                        disabled={isRetryingTranscription}
-                        className="flex-1 gap-2"
-                      >
-                        {isRetryingTranscription ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4" />
-                        )}
-                        Transkribera igen
-                      </Button>
                     </div>
-                    
-                    <p className="text-xs text-muted-foreground text-center mt-4">
-                      Du kan ladda ner din inspelning eller försöka transkribera igen
-                    </p>
+                  )}
+                  
+                  {/* File info - subtle */}
+                  {audioBackup?.available && (
+                    <div className="text-center text-xs text-muted-foreground/60 space-y-0.5">
+                      <p>{audioBackup.originalName || 'inspelning.wav'}</p>
+                      {audioBackup.sizeBytes && (
+                        <p>{(audioBackup.sizeBytes / 1024 / 1024).toFixed(1)} MB</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Back link */}
+                  <div className="text-center pt-4">
+                    <Button 
+                      onClick={() => navigate('/library')} 
+                      variant="link" 
+                      className="text-muted-foreground text-sm"
+                    >
+                      ← Tillbaka till biblioteket
+                    </Button>
                   </div>
-                )}
-                
-                <Button onClick={() => navigate('/')} variant="outline" className="rounded-full">
-                  Tillbaka till start
-                </Button>
+                </div>
               </motion.div>
             ) : hasTranscript ? (
               <motion.div
