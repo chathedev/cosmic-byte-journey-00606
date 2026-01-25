@@ -61,6 +61,22 @@ export async function retryTranscriptionFromBackup(
         };
       }
       
+      if (errorCode === 'invalid_asr_input') {
+        return { 
+          success: false, 
+          error: 'Ljudfilen kunde inte valideras för transkribering. Filen kan vara skadad eller i fel format. Ladda upp originalfilen igen.',
+          errorCode: 'invalid_asr_input'
+        };
+      }
+      
+      if (errorCode === 'audio_validation_failed' || errorCode === 'audio_corrupt') {
+        return { 
+          success: false, 
+          error: 'Ljudfilen verkar vara skadad. Ladda upp originalfilen igen för att transkribera.',
+          errorCode
+        };
+      }
+      
       // Generic error fallback
       let errorMessage = errorMsg || `Återförsök misslyckades (${response.status})`;
       return { success: false, error: errorMessage, errorCode };

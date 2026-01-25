@@ -31,7 +31,7 @@ export function AudioBackupCard({
   const { toast } = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [encryptionError, setEncryptionError] = useState(false);
+  const [audioError, setAudioError] = useState<'encryption' | 'invalid' | 'corrupt' | null>(null);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -54,7 +54,7 @@ export function AudioBackupCard({
 
   const handleRetry = async () => {
     setIsRetrying(true);
-    setEncryptionError(false);
+    setAudioError(null);
     try {
       const result = await retryTranscriptionFromBackup(meetingId, audioBackup.downloadPath);
       if (result.success) {
@@ -64,12 +64,26 @@ export function AudioBackupCard({
         });
         onRetryStarted?.();
       } else {
-        // Check for encryption metadata error - suggest re-upload
+        // Check for specific audio errors that require re-upload
         if (result.errorCode === 'audio_encryption_metadata_missing') {
-          setEncryptionError(true);
+          setAudioError('encryption');
           toast({
             title: 'Ljudfilen kunde inte dekrypteras',
             description: 'Ladda upp originalfilen igen för att transkribera på nytt.',
+            variant: 'destructive',
+          });
+        } else if (result.errorCode === 'invalid_asr_input') {
+          setAudioError('invalid');
+          toast({
+            title: 'Ljudfilen kunde inte valideras',
+            description: 'Filen kan vara skadad eller i fel format. Ladda upp originalfilen igen.',
+            variant: 'destructive',
+          });
+        } else if (result.errorCode === 'audio_validation_failed' || result.errorCode === 'audio_corrupt') {
+          setAudioError('corrupt');
+          toast({
+            title: 'Ljudfilen verkar vara skadad',
+            description: 'Ladda upp originalfilen igen för att transkribera.',
             variant: 'destructive',
           });
         } else {
@@ -91,8 +105,9 @@ export function AudioBackupCard({
     ? (audioBackup.sizeBytes / 1024 / 1024).toFixed(1) 
     : null;
 
-  const showRetryButton = transcriptionStatus === 'failed' && !encryptionError;
-  const showReuploadButton = encryptionError && onReuploadNeeded;
+  const hasAudioError = audioError !== null;
+  const showRetryButton = transcriptionStatus === 'failed' && !hasAudioError;
+  const showReuploadButton = hasAudioError && onReuploadNeeded;
 
   // Compact variant - just buttons
   if (variant === 'compact') {
@@ -171,15 +186,21 @@ export function AudioBackupCard({
         </div>
       </div>
 
-      {/* Encryption error warning */}
-      {encryptionError && (
+      {/* Audio error warning (encryption, invalid, or corrupt) */}
+      {hasAudioError && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-destructive">Dekryptering misslyckades</p>
+              <p className="text-sm font-medium text-destructive">
+                {audioError === 'encryption' && 'Dekryptering misslyckades'}
+                {audioError === 'invalid' && 'Ljudfilen kunde inte valideras'}
+                {audioError === 'corrupt' && 'Ljudfilen verkar vara skadad'}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Ljudfilen på servern kunde inte dekrypteras. Ladda upp originalfilen igen för att transkribera.
+                {audioError === 'encryption' && 'Ljudfilen på servern kunde inte dekrypteras. Ladda upp originalfilen igen för att transkribera.'}
+                {audioError === 'invalid' && 'Filen kan vara i fel format eller skadad. Ladda upp originalfilen igen.'}
+                {audioError === 'corrupt' && 'Filen på servern verkar vara skadad. Ladda upp originalfilen igen.'}
               </p>
             </div>
           </div>
@@ -229,7 +250,7 @@ export function AudioBackupCard({
         )}
       </div>
 
-      {transcriptionStatus === 'failed' && !encryptionError && (
+      {transcriptionStatus === 'failed' && !hasAudioError && (
         <p className="text-xs text-muted-foreground text-center mt-3">
           Du kan ladda ner din inspelning eller försöka transkribera igen
         </p>
