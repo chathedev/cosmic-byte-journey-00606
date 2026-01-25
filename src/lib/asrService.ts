@@ -391,6 +391,14 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
     // Backend may send progressPercent (0-100) OR progress - normalize to 0-100
     const progressValue = data.progressPercent ?? data.progress;
     
+    // Extract transcript cleanup fields from nested metadata if present
+    // Backend returns these inside metadata: { speakerBlocksCleaned, speakerBlocksRaw, transcriptRaw, transcriptCleaned }
+    const metadata = data.metadata || {};
+    const transcriptRaw = data.transcriptRaw || metadata.transcriptRaw;
+    const transcriptCleaned = data.transcriptCleaned || metadata.transcriptCleaned;
+    const speakerBlocksCleaned = data.speakerBlocksCleaned || metadata.speakerBlocksCleaned;
+    const speakerBlocksRaw = data.speakerBlocksRaw || metadata.speakerBlocksRaw;
+    
     return {
       meetingId: data.meetingId,
       status: data.status || 'queued',
@@ -418,6 +426,11 @@ export async function pollASRStatus(meetingId: string): Promise<ASRStatus> {
       // Audio backup failsafe - server-side copy of original recording
       audioBackup: data.audioBackup,
       audioDownloadPath: data.audioDownloadPath || data.audioBackup?.downloadPath,
+      // Transcript cleanup fields - extract from metadata if nested
+      transcriptRaw,
+      transcriptCleaned,
+      speakerBlocksCleaned,
+      speakerBlocksRaw,
       // Legacy SIS fields
       sisStatus: data.sisStatus || data.lyraStatus,
       sisMatches: data.sisMatches || data.lyraMatches || [],
