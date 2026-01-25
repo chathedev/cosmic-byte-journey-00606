@@ -2417,12 +2417,10 @@ const MeetingDetail = () => {
                       // Speaker blocks view - for any meeting with cleanup data (SIS disabled or enabled)
                       <TranscriptBlockView
                         meetingId={id || ''}
-                        transcript={transcript || ''}
                         transcriptRaw={transcriptRaw}
                         speakerBlocksCleaned={speakerBlocksCleaned}
                         speakerBlocksRaw={speakerBlocksRaw}
                         speakerNames={speakerNames}
-                        onSpeakerNamesUpdated={(names) => setSpeakerNames(prev => ({ ...prev, ...names }))}
                       />
                     ) : (
                       // Plain text view - clean fallback
