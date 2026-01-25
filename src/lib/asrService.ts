@@ -170,6 +170,13 @@ export interface AudioBackup {
   downloadPath?: string;
 }
 
+// Speaker block structure from transcript cleanup
+export interface SpeakerBlock {
+  speakerId: string;
+  speakerName: string | null;
+  text: string;
+}
+
 export interface ASRStatus {
   meetingId?: string;
   status: 'queued' | 'processing' | 'completed' | 'done' | 'error' | 'failed';
@@ -194,6 +201,11 @@ export interface ASRStatus {
   // Audio backup failsafe - server-side copy of original recording
   audioBackup?: AudioBackup;
   audioDownloadPath?: string;
+  // Transcript cleanup fields (cleaned vs raw)
+  transcriptRaw?: string;
+  transcriptCleaned?: string;
+  speakerBlocksCleaned?: SpeakerBlock[];
+  speakerBlocksRaw?: SpeakerBlock[];
   // Legacy SIS fields (still used by backend)
   sisStatus?: SISStatusType;
   sisMatches?: SISMatch[];

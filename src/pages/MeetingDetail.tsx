@@ -25,6 +25,7 @@ import { MeetingRecorder } from "@/components/MeetingRecorder";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
+import { TranscriptBlockView } from "@/components/TranscriptBlockView";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
 interface AgendaLyraSpeaker {
@@ -76,8 +77,11 @@ const MeetingDetail = () => {
   const [status, setStatus] = useState<'uploading' | 'queued' | 'processing' | 'done' | 'failed' | 'recording' | null>(isRecordingMode ? 'recording' : null);
   const [stage, setStage] = useState<'uploading' | 'queued' | 'transcribing' | 'sis_processing' | 'done' | 'error' | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
+  const [transcriptRaw, setTranscriptRaw] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
   const [reconstructedSegments, setReconstructedSegments] = useState<ReconstructedSegment[] | null>(null);
+  const [speakerBlocksCleaned, setSpeakerBlocksCleaned] = useState<Array<{ speakerId: string; speakerName: string | null; text: string }> | null>(null);
+  const [speakerBlocksRaw, setSpeakerBlocksRaw] = useState<Array<{ speakerId: string; speakerName: string | null; text: string }> | null>(null);
   const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
   const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
@@ -296,6 +300,17 @@ const MeetingDetail = () => {
               setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
               setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
               setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+              
+              // Capture transcript cleanup fields (raw/cleaned + speaker blocks)
+              if (asrStatus.transcriptRaw) {
+                setTranscriptRaw(asrStatus.transcriptRaw);
+              }
+              if (asrStatus.speakerBlocksCleaned) {
+                setSpeakerBlocksCleaned(asrStatus.speakerBlocksCleaned);
+              }
+              if (asrStatus.speakerBlocksRaw) {
+                setSpeakerBlocksRaw(asrStatus.speakerBlocksRaw);
+              }
               
               // Capture audio backup failsafe info - available even for completed meetings
               if (asrStatus.audioBackup?.available) {
@@ -532,9 +547,12 @@ const MeetingDetail = () => {
 
           const newTranscript = asrStatus.transcript || '';
           setTranscript(newTranscript);
+          setTranscriptRaw(asrStatus.transcriptRaw || null);
           setTranscriptSegments(asrStatus.transcriptSegments || null);
           // Use reconstructed segments as the source of truth for speaker turns
           setReconstructedSegments(asrStatus.reconstructedSegments || null);
+          setSpeakerBlocksCleaned(asrStatus.speakerBlocksCleaned || null);
+          setSpeakerBlocksRaw(asrStatus.speakerBlocksRaw || null);
           setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
           setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
           setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
@@ -2323,7 +2341,12 @@ const MeetingDetail = () => {
                             {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • {groupedSegments.length} segment
                           </p>
                         )}
-                        {isSISDisabled && !isEditing && (
+                        {isSISDisabled && !isEditing && speakerBlocksCleaned && speakerBlocksCleaned.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            AI-föreslagna talare
+                          </p>
+                        )}
+                        {isSISDisabled && !isEditing && (!speakerBlocksCleaned || speakerBlocksCleaned.length === 0) && (
                           <p className="text-xs text-muted-foreground">
                             Ren textvisning
                           </p>
@@ -2385,8 +2408,19 @@ const MeetingDetail = () => {
                           );
                         })}
                       </div>
+                    ) : isSISDisabled && (speakerBlocksCleaned || speakerBlocksRaw || transcriptRaw) ? (
+                      // Speaker blocks view for SIS-disabled companies with cleanup data
+                      <TranscriptBlockView
+                        meetingId={id || ''}
+                        transcript={transcript || ''}
+                        transcriptRaw={transcriptRaw}
+                        speakerBlocksCleaned={speakerBlocksCleaned}
+                        speakerBlocksRaw={speakerBlocksRaw}
+                        speakerNames={speakerNames}
+                        onSpeakerNamesUpdated={(names) => setSpeakerNames(prev => ({ ...prev, ...names }))}
+                      />
                     ) : (
-                      // Plain text view - clean for companies without SIS
+                      // Plain text view - clean for companies without SIS or cleanup data
                       <div className="max-h-[60vh] overflow-y-auto">
                         <div className="text-[15px] leading-[1.85] text-foreground selection:bg-primary/20">
                           {displayTranscript
