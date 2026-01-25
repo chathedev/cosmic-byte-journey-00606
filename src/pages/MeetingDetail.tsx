@@ -577,14 +577,20 @@ const MeetingDetail = () => {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
           setStatus('failed');
-          const errorMsg = asrStatus.error 
-            ? (typeof asrStatus.error === 'string' ? asrStatus.error : ((asrStatus.error as any)?.message || 'Försök igen.'))
-            : 'Försök igen.';
-          toast({
-            title: 'Transkribering misslyckades',
-            description: errorMsg,
-            variant: 'destructive',
-          });
+          
+          // Only show failure toast once per meeting (like success toast)
+          const failToastKey = `transcription_fail_toast_shown_${id}`;
+          if (!localStorage.getItem(failToastKey)) {
+            localStorage.setItem(failToastKey, 'true');
+            const errorMsg = asrStatus.error 
+              ? (typeof asrStatus.error === 'string' ? asrStatus.error : ((asrStatus.error as any)?.message || 'Försök igen.'))
+              : 'Försök igen.';
+            toast({
+              title: 'Transkribering misslyckades',
+              description: errorMsg,
+              variant: 'destructive',
+            });
+          }
           return;
         }
 
@@ -662,6 +668,8 @@ const MeetingDetail = () => {
           title: 'Transkribering startad',
           description: 'Din inspelning transkriberas på nytt.',
         });
+        // Clear fail toast flag so it shows again if retry also fails
+        localStorage.removeItem(`transcription_fail_toast_shown_${id}`);
         // Reset status to trigger polling again
         setStatus('processing');
         setStage('transcribing');
