@@ -52,6 +52,7 @@ interface MeetingDataForDialog {
   sisSpeakers?: AgendaLyraSpeaker[];
   sisMatches?: AgendaLyraMatch[];
   speakerNames?: Record<string, string>;
+  speakerBlocksCleaned?: Array<{ speakerId: string; speakerName: string | null; text: string }>;
 }
 
 const MeetingDetail = () => {
@@ -989,6 +990,7 @@ const MeetingDetail = () => {
       sisSpeakers: fetchedLyraSpeakers.length > 0 ? fetchedLyraSpeakers : undefined,
       sisMatches: fetchedLyraMatches.length > 0 ? fetchedLyraMatches : undefined,
       speakerNames: Object.keys(speakerNames).length > 0 ? speakerNames : undefined,
+      speakerBlocksCleaned: speakerBlocksCleaned && speakerBlocksCleaned.length > 0 ? speakerBlocksCleaned : undefined,
     });
     setShowAgendaDialog(true);
   };
@@ -2336,17 +2338,20 @@ const MeetingDetail = () => {
                       </div>
                       <div>
                         <span className="font-medium text-sm">Transkription</span>
-                        {hasSegments && !isEditing && !isSISDisabled && (
+                        {hasSegments && !isEditing && (
                           <p className="text-xs text-muted-foreground">
                             {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • {groupedSegments.length} segment
                           </p>
                         )}
-                        {isSISDisabled && !isEditing && speakerBlocksCleaned && speakerBlocksCleaned.length > 0 && (
+                        {!hasSegments && !isEditing && speakerBlocksCleaned && speakerBlocksCleaned.length > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            AI-föreslagna talare
+                            {(() => {
+                              const uniqueBlockSpeakers = new Set(speakerBlocksCleaned.map(b => b.speakerId));
+                              return `${uniqueBlockSpeakers.size} ${uniqueBlockSpeakers.size === 1 ? 'talare' : 'talare'}`;
+                            })()}
                           </p>
                         )}
-                        {isSISDisabled && !isEditing && (!speakerBlocksCleaned || speakerBlocksCleaned.length === 0) && (
+                        {!hasSegments && !isEditing && (!speakerBlocksCleaned || speakerBlocksCleaned.length === 0) && !transcriptRaw && (
                           <p className="text-xs text-muted-foreground">
                             Ren textvisning
                           </p>
@@ -2378,7 +2383,7 @@ const MeetingDetail = () => {
                         placeholder="Redigera transkriptionen..."
                       />
                     ) : hasSegments ? (
-                      // Speaker-segmented view (always show segments if available)
+                      // Speaker-segmented view (SIS enabled with segments)
                       <div className="space-y-0 max-h-[60vh] overflow-y-auto">
                         {groupedSegments.map((segment, idx) => {
                           const speakerName = getSegmentSpeakerName(segment.speakerId);
@@ -2408,8 +2413,8 @@ const MeetingDetail = () => {
                           );
                         })}
                       </div>
-                    ) : isSISDisabled && (speakerBlocksCleaned || speakerBlocksRaw || transcriptRaw) ? (
-                      // Speaker blocks view for SIS-disabled companies with cleanup data
+                    ) : (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) || transcriptRaw ? (
+                      // Speaker blocks view - for any meeting with cleanup data (SIS disabled or enabled)
                       <TranscriptBlockView
                         meetingId={id || ''}
                         transcript={transcript || ''}
@@ -2420,7 +2425,7 @@ const MeetingDetail = () => {
                         onSpeakerNamesUpdated={(names) => setSpeakerNames(prev => ({ ...prev, ...names }))}
                       />
                     ) : (
-                      // Plain text view - clean for companies without SIS or cleanup data
+                      // Plain text view - clean fallback
                       <div className="max-h-[60vh] overflow-y-auto">
                         <div className="text-[15px] leading-[1.85] text-foreground selection:bg-primary/20">
                           {displayTranscript

@@ -58,6 +58,12 @@ interface TranscriptSegment {
   end: number;
 }
 
+interface SpeakerBlock {
+  speakerId: string;
+  speakerName: string | null;
+  text: string;
+}
+
 interface AutoProtocolGeneratorProps {
   transcript: string;
   aiProtocol: AIProtocol | null;
@@ -73,6 +79,7 @@ interface AutoProtocolGeneratorProps {
   sisSpeakers?: SISSpeaker[];
   sisMatches?: SISMatch[];
   speakerNames?: Record<string, string>;
+  speakerBlocksCleaned?: SpeakerBlock[];
 }
 
 export const AutoProtocolGenerator = ({
@@ -90,6 +97,7 @@ export const AutoProtocolGenerator = ({
   sisSpeakers,
   sisMatches,
   speakerNames: propSpeakerNames,
+  speakerBlocksCleaned,
 }: AutoProtocolGeneratorProps) => {
   const [generatedProtocol, setGeneratedProtocol] = useState<AIProtocol | null>(aiProtocol);
   const [isGenerating, setIsGenerating] = useState(!aiProtocol);
@@ -166,6 +174,7 @@ export const AutoProtocolGenerator = ({
         let formattedTranscript = transcript;
         let speakerInfo: { name: string; segments: number }[] = [];
         
+        // Priority: Use transcriptSegments with SIS data if available
         if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers || propSpeakerNames)) {
           // 70%+ confidence required for reliable speaker identification
           const SIS_CONFIDENCE_THRESHOLD = 70; // Percent
@@ -275,6 +284,75 @@ export const AutoProtocolGenerator = ({
           } else {
             // No real speaker names identified - use plain transcript without generic labels
             console.log('ℹ️ No real speaker names identified, using plain transcript');
+          }
+        } else if (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) {
+          // Fallback: Use speakerBlocksCleaned (for SIS-disabled companies or when segments unavailable)
+          // This provides AI-suggested speaker names from transcript cleanup
+          const genericPatterns = [
+            /^speaker[_\s]?\d+$/i,
+            /^talare[_\s]?\d+$/i,
+            /^unknown$/i,
+            /^okänd$/i,
+          ];
+          
+          // Build speaker name map from propSpeakerNames (user edits) + block speakerNames
+          const speakerNameMap = new Map<string, string>();
+          
+          // Priority 1: User-assigned names from propSpeakerNames
+          if (propSpeakerNames && Object.keys(propSpeakerNames).length > 0) {
+            Object.entries(propSpeakerNames).forEach(([label, name]) => {
+              if (name && name.trim()) {
+                const isGeneric = genericPatterns.some(p => p.test(name.trim()));
+                if (!isGeneric) {
+                  speakerNameMap.set(label, name);
+                  console.log(`🎤 Using propSpeakerNames for block: ${label} -> ${name}`);
+                }
+              }
+            });
+          }
+          
+          // Priority 2: Block's embedded speakerName
+          speakerBlocksCleaned.forEach(block => {
+            if (!speakerNameMap.has(block.speakerId) && block.speakerName && block.speakerName.trim()) {
+              const isGeneric = genericPatterns.some(p => p.test(block.speakerName!.trim()));
+              if (!isGeneric) {
+                speakerNameMap.set(block.speakerId, block.speakerName);
+                console.log(`🎤 Using block speakerName: ${block.speakerId} -> ${block.speakerName}`);
+              }
+            }
+          });
+          
+          // Format transcript with speaker names if we have real names
+          if (speakerNameMap.size > 0) {
+            const formattedBlocks = speakerBlocksCleaned
+              .filter(block => block && block.text)
+              .map(block => {
+                const speakerName = speakerNameMap.get(block.speakerId);
+                if (speakerName) {
+                  return `[${speakerName}]: ${block.text}`;
+                }
+                return block.text;
+              });
+            
+            formattedTranscript = formattedBlocks.join('\n\n');
+            
+            // Collect speaker info
+            const speakerCounts = new Map<string, number>();
+            speakerBlocksCleaned
+              .filter(block => speakerNameMap.has(block.speakerId))
+              .forEach(block => {
+                const name = speakerNameMap.get(block.speakerId)!;
+                speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
+              });
+            speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
+            
+            console.log('🎤 Speaker-attributed transcript from speakerBlocksCleaned:', {
+              speakersIdentified: speakerNameMap.size,
+              speakerInfo,
+              formattedTranscriptPreview: formattedTranscript.substring(0, 300)
+            });
+          } else {
+            console.log('ℹ️ No real speaker names in blocks, using cleaned transcript');
           }
         }
         
