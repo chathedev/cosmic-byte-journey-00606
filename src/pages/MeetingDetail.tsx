@@ -1911,44 +1911,6 @@ const MeetingDetail = () => {
             )}
           </div>
 
-          {hasTranscript && !isEditing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={enterEditMode}
-              className="gap-2 rounded-full"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Redigera</span>
-            </Button>
-          )}
-
-          {isEditing && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={cancelEditMode}
-                className="rounded-full"
-              >
-                <X className="w-4 h-4 sm:mr-1" />
-                <span className="hidden sm:inline">Avbryt</span>
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSaveAll}
-                disabled={isSaving || !hasUnsavedChanges}
-                className="gap-2 rounded-full bg-primary"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Spara</span>
-              </Button>
-            </div>
-          )}
         </div>
       </motion.header>
 
