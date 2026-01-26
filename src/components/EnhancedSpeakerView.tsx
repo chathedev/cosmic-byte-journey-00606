@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, Edit2, Copy, X, Users, Clock, ChevronDown, ChevronUp, MessageSquare, Timer } from 'lucide-react';
+import { Check, Edit2, Copy, X, Users, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { backendApi } from '@/lib/backendApi';
@@ -26,61 +26,55 @@ interface EnhancedSpeakerViewProps {
   className?: string;
 }
 
-// Beautiful gradient-based speaker styles
+// Clean, professional speaker colors with full styling
 const SPEAKER_STYLES = [
   { 
-    gradient: 'from-blue-500/10 to-blue-500/5',
     border: 'border-l-blue-500', 
-    dot: 'bg-gradient-to-br from-blue-400 to-blue-600', 
+    dot: 'bg-blue-500', 
     text: 'text-blue-600 dark:text-blue-400',
-    badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-    avatar: 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg shadow-blue-500/25',
-    ring: 'ring-blue-500/30',
+    bg: 'bg-blue-500/5 hover:bg-blue-500/10',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    avatar: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   },
   { 
-    gradient: 'from-emerald-500/10 to-emerald-500/5',
     border: 'border-l-emerald-500', 
-    dot: 'bg-gradient-to-br from-emerald-400 to-emerald-600', 
+    dot: 'bg-emerald-500', 
     text: 'text-emerald-600 dark:text-emerald-400',
-    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-    avatar: 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25',
-    ring: 'ring-emerald-500/30',
+    bg: 'bg-emerald-500/5 hover:bg-emerald-500/10',
+    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    avatar: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
   },
   { 
-    gradient: 'from-violet-500/10 to-violet-500/5',
-    border: 'border-l-violet-500', 
-    dot: 'bg-gradient-to-br from-violet-400 to-violet-600', 
-    text: 'text-violet-600 dark:text-violet-400',
-    badge: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
-    avatar: 'bg-gradient-to-br from-violet-400 to-violet-600 text-white shadow-lg shadow-violet-500/25',
-    ring: 'ring-violet-500/30',
+    border: 'border-l-purple-500', 
+    dot: 'bg-purple-500', 
+    text: 'text-purple-600 dark:text-purple-400',
+    bg: 'bg-purple-500/5 hover:bg-purple-500/10',
+    badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    avatar: 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
   },
   { 
-    gradient: 'from-amber-500/10 to-amber-500/5',
     border: 'border-l-amber-500', 
-    dot: 'bg-gradient-to-br from-amber-400 to-amber-600', 
+    dot: 'bg-amber-500', 
     text: 'text-amber-600 dark:text-amber-400',
-    badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-    avatar: 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-500/25',
-    ring: 'ring-amber-500/30',
+    bg: 'bg-amber-500/5 hover:bg-amber-500/10',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    avatar: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
   },
   { 
-    gradient: 'from-rose-500/10 to-rose-500/5',
     border: 'border-l-rose-500', 
-    dot: 'bg-gradient-to-br from-rose-400 to-rose-600', 
+    dot: 'bg-rose-500', 
     text: 'text-rose-600 dark:text-rose-400',
-    badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-    avatar: 'bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-lg shadow-rose-500/25',
-    ring: 'ring-rose-500/30',
+    bg: 'bg-rose-500/5 hover:bg-rose-500/10',
+    badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    avatar: 'bg-rose-500/20 text-rose-600 dark:text-rose-400',
   },
   { 
-    gradient: 'from-cyan-500/10 to-cyan-500/5',
     border: 'border-l-cyan-500', 
-    dot: 'bg-gradient-to-br from-cyan-400 to-cyan-600', 
+    dot: 'bg-cyan-500', 
     text: 'text-cyan-600 dark:text-cyan-400',
-    badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
-    avatar: 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white shadow-lg shadow-cyan-500/25',
-    ring: 'ring-cyan-500/30',
+    bg: 'bg-cyan-500/5 hover:bg-cyan-500/10',
+    badge: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+    avatar: 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400',
   },
 ];
 
@@ -98,6 +92,7 @@ const formatDuration = (seconds: number): string => {
   return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 };
 
+// Extract speaker number from ID (e.g., "speaker_0" -> 0, "speaker_1" -> 1)
 const getSpeakerNumber = (speakerId: string): number => {
   const match = speakerId.match(/speaker[_\s-]?(\d+)/i);
   return match ? parseInt(match[1], 10) : 0;
@@ -116,9 +111,10 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   const [localSpeakerNames, setLocalSpeakerNames] = useState<Record<string, string>>({});
   const [showSpeakerPanel, setShowSpeakerPanel] = useState(true);
 
+  // Merge speaker names
   const speakerNames = { ...initialSpeakerNames, ...localSpeakerNames };
 
-  // Speaker stats
+  // Get unique speakers with stats
   const speakerStats = useMemo(() => {
     const stats: Record<string, { 
       count: number; 
@@ -150,11 +146,13 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     return stats;
   }, [speakerBlocks]);
 
+  // Get sorted unique speakers (by first appearance)
   const uniqueSpeakers = useMemo(() => {
     const ids = Object.keys(speakerStats);
     return ids.sort((a, b) => speakerStats[a].firstAppearance - speakerStats[b].firstAppearance);
   }, [speakerStats]);
 
+  // Create stable color map based on speaker order
   const speakerStyleMap = useMemo(() => {
     const map: Record<string, typeof SPEAKER_STYLES[0]> = {};
     uniqueSpeakers.forEach((id, index) => {
@@ -163,16 +161,18 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     return map;
   }, [uniqueSpeakers]);
 
+  // Get display name for a speaker
   const getSpeakerDisplayName = useCallback((speakerId: string): string => {
     if (speakerNames[speakerId]) return speakerNames[speakerId];
     const num = getSpeakerNumber(speakerId);
     return `Talare ${num + 1}`;
   }, [speakerNames]);
 
+  // Get initials for avatar
   const getSpeakerInitials = useCallback((speakerId: string): string => {
     const name = getSpeakerDisplayName(speakerId);
     if (name.startsWith('Talare ')) {
-      return `T${name.replace('Talare ', '')}`;
+      return name.replace('Talare ', 'T');
     }
     const parts = name.split(/\s+/);
     if (parts.length >= 2) {
@@ -181,11 +181,13 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     return name.slice(0, 2).toUpperCase();
   }, [getSpeakerDisplayName]);
 
+  // Handle edit speaker
   const handleEditSpeaker = (speakerId: string) => {
     setEditingSpeaker(speakerId);
     setEditedName(getSpeakerDisplayName(speakerId));
   };
 
+  // Save speaker name
   const handleSaveSpeakerName = async () => {
     if (!editingSpeaker || !meetingId) return;
 
@@ -216,6 +218,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     }
   };
 
+  // Copy transcript
   const handleCopyTranscript = useCallback(() => {
     const text = speakerBlocks
       .map(block => {
@@ -228,15 +231,12 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     toast.success('Transkription kopierad');
   }, [speakerBlocks, getSpeakerDisplayName]);
 
+  // Calculate total duration
   const totalDuration = useMemo(() => {
     if (speakerBlocks.length === 0) return 0;
     const lastBlock = speakerBlocks[speakerBlocks.length - 1];
     return lastBlock.end ?? 0;
   }, [speakerBlocks]);
-
-  const totalWords = useMemo(() => {
-    return Object.values(speakerStats).reduce((sum, s) => sum + s.wordCount, 0);
-  }, [speakerStats]);
 
   if (!speakerBlocks || speakerBlocks.length === 0) {
     return (
@@ -247,208 +247,151 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   }
 
   return (
-    <div className={cn("space-y-5", className)}>
-      {/* Beautiful Header Stats */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border/50">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="secondary" className="gap-1.5 h-7 px-3 font-medium">
-            <Users className="w-3.5 h-3.5" />
-            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'}
-          </Badge>
+    <div className={cn("space-y-4", className)}>
+      {/* Header with stats */}
+      <div className="flex items-center justify-between gap-4 pb-3 border-b border-border/50">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="w-4 h-4" />
+            <span>{uniqueSpeakers.length} talare</span>
+          </div>
           {totalDuration > 0 && (
-            <Badge variant="secondary" className="gap-1.5 h-7 px-3 font-medium">
-              <Timer className="w-3.5 h-3.5" />
-              {formatDuration(totalDuration)}
-            </Badge>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>{formatDuration(totalDuration)}</span>
+            </div>
           )}
-          <Badge variant="secondary" className="gap-1.5 h-7 px-3 font-medium">
-            <MessageSquare className="w-3.5 h-3.5" />
-            {totalWords.toLocaleString()} ord
-          </Badge>
         </div>
         
         <Button
           variant="outline"
           size="sm"
           onClick={handleCopyTranscript}
-          className="h-8 gap-1.5 text-xs font-medium"
+          className="h-8 gap-1.5 text-xs"
         >
           <Copy className="h-3.5 w-3.5" />
-          Kopiera allt
+          Kopiera
         </Button>
       </div>
 
-      {/* Speaker Cards Panel */}
+      {/* Collapsible speaker panel */}
       <Collapsible open={showSpeakerPanel} onOpenChange={setShowSpeakerPanel}>
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center justify-between py-2 px-1 text-left group">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {uniqueSpeakers.slice(0, 4).map(speakerId => {
-                  const styles = speakerStyleMap[speakerId];
-                  const initials = getSpeakerInitials(speakerId);
-                  return (
-                    <div
-                      key={speakerId}
-                      className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-background",
-                        styles?.avatar
-                      )}
-                    >
-                      {initials}
-                    </div>
-                  );
-                })}
-                {uniqueSpeakers.length > 4 && (
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold bg-muted text-muted-foreground ring-2 ring-background">
-                    +{uniqueSpeakers.length - 4}
-                  </div>
-                )}
-              </div>
-              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                Talardetaljer
-              </span>
-            </div>
-            <motion.div
-              animate={{ rotate: showSpeakerPanel ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-between h-auto py-2 px-3 hover:bg-muted/50"
+          >
+            <span className="text-xs font-medium text-muted-foreground">Talare & statistik</span>
+            {showSpeakerPanel ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </motion.div>
-          </button>
+            )}
+          </Button>
         </CollapsibleTrigger>
         
         <CollapsibleContent>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-3"
-          >
+          <div className="grid gap-2 pt-2">
             {uniqueSpeakers.map(speakerId => {
               const styles = speakerStyleMap[speakerId];
               const stats = speakerStats[speakerId];
               const isEditing = editingSpeaker === speakerId;
               const displayName = getSpeakerDisplayName(speakerId);
               const initials = getSpeakerInitials(speakerId);
-              const percentage = totalWords > 0 
-                ? Math.round((stats.wordCount / totalWords) * 100) 
-                : 0;
 
               return (
                 <motion.div
                   key={speakerId}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
                   className={cn(
-                    "relative overflow-hidden rounded-2xl border border-border/50 p-4 transition-all hover:border-border hover:shadow-sm",
-                    `bg-gradient-to-br ${styles?.gradient || 'from-muted/50 to-muted/30'}`
+                    "flex items-center gap-3 p-3 rounded-xl border border-border/50 transition-all",
+                    styles?.bg || "bg-muted/30"
                   )}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div className={cn(
-                      "w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
-                      styles?.avatar || "bg-muted text-muted-foreground"
-                    )}>
-                      {initials}
-                    </div>
+                  {/* Avatar */}
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0",
+                    styles?.avatar || "bg-muted text-muted-foreground"
+                  )}>
+                    {initials}
+                  </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      {isEditing ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={editedName}
-                            onChange={(e) => setEditedName(e.target.value)}
-                            className="h-8 text-sm"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveSpeakerName();
-                              if (e.key === 'Escape') setEditingSpeaker(null);
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleSaveSpeakerName}
-                            disabled={savingName}
-                            className="h-8 w-8 p-0 shrink-0"
-                          >
-                            <Check className="h-4 w-4 text-emerald-500" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingSpeaker(null)}
-                            className="h-8 w-8 p-0 shrink-0"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleEditSpeaker(speakerId)}
-                          className="w-full text-left group/name"
+                  {/* Name & Stats */}
+                  <div className="flex-1 min-w-0">
+                    {isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          className="h-8 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveSpeakerName();
+                            if (e.key === 'Escape') setEditingSpeaker(null);
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSaveSpeakerName}
+                          disabled={savingName}
+                          className="h-8 w-8 p-0"
                         >
-                          <div className="flex items-center gap-2">
-                            <span className={cn("font-semibold text-sm truncate", styles?.text)}>
-                              {displayName}
-                            </span>
-                            <Edit2 className="h-3 w-3 opacity-0 group-hover/name:opacity-60 transition-opacity shrink-0" />
-                          </div>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <span className="text-xs text-muted-foreground">
-                              {stats.wordCount} ord
-                            </span>
-                            <span className="text-muted-foreground/50">•</span>
-                            <span className="text-xs text-muted-foreground">
-                              {stats.count} inlägg
-                            </span>
-                          </div>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Percentage badge */}
-                    {!isEditing && (
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "text-[10px] h-5 px-1.5 font-semibold shrink-0",
-                          styles?.badge
-                        )}
+                          <Check className="h-4 w-4 text-emerald-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingSpeaker(null)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEditSpeaker(speakerId)}
+                        className="w-full text-left group"
                       >
-                        {percentage}%
-                      </Badge>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("font-medium text-sm", styles?.text)}>
+                            {displayName}
+                          </span>
+                          <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                          <span>{stats.count} inlägg</span>
+                          <span>•</span>
+                          <span>{stats.wordCount} ord</span>
+                          {stats.totalDuration > 0 && (
+                            <>
+                              <span>•</span>
+                              <span>{formatDuration(stats.totalDuration)}</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
                     )}
                   </div>
 
-                  {/* Progress bar */}
-                  {!isEditing && (
-                    <div className="mt-3 h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percentage}%` }}
-                        transition={{ duration: 0.5, delay: 0.2 }}
-                        className={cn("h-full rounded-full", styles?.dot)}
-                      />
-                    </div>
-                  )}
+                  {/* Color dot indicator */}
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", styles?.dot)} />
                 </motion.div>
               );
             })}
-          </motion.div>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Transcript content with enhanced styling */}
+      {/* Transcript content */}
       <ScrollArea className="max-h-[55vh]">
-        <div className="space-y-1 pr-2">
-          <AnimatePresence mode="sync">
+        <div className="space-y-0 pr-2">
+          <AnimatePresence mode="wait">
             {speakerBlocks.map((block, index) => {
               const styles = speakerStyleMap[block.speakerId];
               const displayName = getSpeakerDisplayName(block.speakerId);
-              const initials = getSpeakerInitials(block.speakerId);
               const prevBlock = index > 0 ? speakerBlocks[index - 1] : null;
               const showDivider = prevBlock && prevBlock.speakerId !== block.speakerId;
               const timestamp = formatTime(block.start);
@@ -456,52 +399,42 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
               return (
                 <motion.div
                   key={index}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(index * 0.015, 0.4) }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: Math.min(index * 0.02, 0.5) }}
                 >
-                  {/* Speaker change divider */}
+                  {/* Divider between different speakers */}
                   {showDivider && (
-                    <div className="flex items-center gap-3 py-3">
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                    <div className="flex items-center gap-3 py-2.5">
+                      <div className="flex-1 h-px bg-border/40" />
                     </div>
                   )}
 
-                  {/* Message bubble */}
-                  <div className="flex gap-3 py-2 group">
-                    {/* Mini avatar */}
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5",
-                      styles?.avatar || "bg-muted text-muted-foreground"
-                    )}>
-                      {initials}
+                  {/* Speaker block */}
+                  <div
+                    className={cn(
+                      "relative pl-4 py-2.5 border-l-2 rounded-r-lg transition-colors",
+                      styles?.border || "border-l-muted-foreground/30",
+                      styles?.bg || "hover:bg-muted/20"
+                    )}
+                  >
+                    {/* Speaker header */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className={cn("w-2 h-2 rounded-full", styles?.dot || "bg-muted-foreground/50")} />
+                      <span className={cn("text-sm font-semibold", styles?.text || "text-muted-foreground")}>
+                        {displayName}
+                      </span>
+                      {timestamp && (
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground/70 border-border/50">
+                          {timestamp}
+                        </Badge>
+                      )}
                     </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      {/* Header */}
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={cn("text-sm font-semibold", styles?.text || "text-foreground")}>
-                          {displayName}
-                        </span>
-                        {timestamp && (
-                          <span className="text-[11px] text-muted-foreground/60 tabular-nums">
-                            {timestamp}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Text bubble */}
-                      <div className={cn(
-                        "rounded-2xl rounded-tl-md px-4 py-2.5 transition-colors",
-                        `bg-gradient-to-br ${styles?.gradient || 'from-muted/50 to-muted/30'}`,
-                        "border border-border/30"
-                      )}>
-                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                          {block.text}
-                        </p>
-                      </div>
-                    </div>
+                    {/* Text content */}
+                    <p className="text-sm leading-relaxed text-foreground pl-4 whitespace-pre-wrap">
+                      {block.text}
+                    </p>
                   </div>
                 </motion.div>
               );

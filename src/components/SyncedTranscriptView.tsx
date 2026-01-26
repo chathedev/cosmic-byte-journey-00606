@@ -2,10 +2,10 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Copy, Users, Clock, ChevronDown, Play, MessageSquare, Timer, Volume2 } from 'lucide-react';
+import { Copy, Users, Clock, ChevronDown, ChevronUp, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Word-level timing data from ASR
@@ -32,67 +32,55 @@ interface SyncedTranscriptViewProps {
   words: TranscriptWord[];
   speakerBlocks?: SpeakerBlock[];
   speakerNames?: Record<string, string>;
-  currentTime: number;
+  currentTime: number; // Audio playback time in seconds
   isPlaying: boolean;
   onSeek?: (time: number) => void;
   className?: string;
 }
 
-// Beautiful gradient-based speaker styles
+// Speaker color styles
 const SPEAKER_STYLES = [
   { 
-    gradient: 'from-blue-500/10 to-blue-500/5',
     border: 'border-l-blue-500', 
-    dot: 'bg-gradient-to-br from-blue-400 to-blue-600', 
+    dot: 'bg-blue-500', 
     text: 'text-blue-600 dark:text-blue-400',
-    highlight: 'bg-blue-500/25 ring-1 ring-blue-500/40',
-    avatar: 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg shadow-blue-500/25',
-    badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+    bg: 'bg-blue-500/5',
+    highlight: 'bg-blue-500/20',
   },
   { 
-    gradient: 'from-emerald-500/10 to-emerald-500/5',
     border: 'border-l-emerald-500', 
-    dot: 'bg-gradient-to-br from-emerald-400 to-emerald-600', 
+    dot: 'bg-emerald-500', 
     text: 'text-emerald-600 dark:text-emerald-400',
-    highlight: 'bg-emerald-500/25 ring-1 ring-emerald-500/40',
-    avatar: 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25',
-    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    bg: 'bg-emerald-500/5',
+    highlight: 'bg-emerald-500/20',
   },
   { 
-    gradient: 'from-violet-500/10 to-violet-500/5',
-    border: 'border-l-violet-500', 
-    dot: 'bg-gradient-to-br from-violet-400 to-violet-600', 
-    text: 'text-violet-600 dark:text-violet-400',
-    highlight: 'bg-violet-500/25 ring-1 ring-violet-500/40',
-    avatar: 'bg-gradient-to-br from-violet-400 to-violet-600 text-white shadow-lg shadow-violet-500/25',
-    badge: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
+    border: 'border-l-purple-500', 
+    dot: 'bg-purple-500', 
+    text: 'text-purple-600 dark:text-purple-400',
+    bg: 'bg-purple-500/5',
+    highlight: 'bg-purple-500/20',
   },
   { 
-    gradient: 'from-amber-500/10 to-amber-500/5',
     border: 'border-l-amber-500', 
-    dot: 'bg-gradient-to-br from-amber-400 to-amber-600', 
+    dot: 'bg-amber-500', 
     text: 'text-amber-600 dark:text-amber-400',
-    highlight: 'bg-amber-500/25 ring-1 ring-amber-500/40',
-    avatar: 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-500/25',
-    badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    bg: 'bg-amber-500/5',
+    highlight: 'bg-amber-500/20',
   },
   { 
-    gradient: 'from-rose-500/10 to-rose-500/5',
     border: 'border-l-rose-500', 
-    dot: 'bg-gradient-to-br from-rose-400 to-rose-600', 
+    dot: 'bg-rose-500', 
     text: 'text-rose-600 dark:text-rose-400',
-    highlight: 'bg-rose-500/25 ring-1 ring-rose-500/40',
-    avatar: 'bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-lg shadow-rose-500/25',
-    badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+    bg: 'bg-rose-500/5',
+    highlight: 'bg-rose-500/20',
   },
   { 
-    gradient: 'from-cyan-500/10 to-cyan-500/5',
     border: 'border-l-cyan-500', 
-    dot: 'bg-gradient-to-br from-cyan-400 to-cyan-600', 
+    dot: 'bg-cyan-500', 
     text: 'text-cyan-600 dark:text-cyan-400',
-    highlight: 'bg-cyan-500/25 ring-1 ring-cyan-500/40',
-    avatar: 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white shadow-lg shadow-cyan-500/25',
-    badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
+    bg: 'bg-cyan-500/5',
+    highlight: 'bg-cyan-500/20',
   },
 ];
 
@@ -194,28 +182,18 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return `Talare ${num + 1}`;
   }, [speakerNames]);
 
-  const getSpeakerInitials = useCallback((speakerId: string): string => {
-    const name = getSpeakerDisplayName(speakerId);
-    if (name.startsWith('Talare ')) {
-      return `T${name.replace('Talare ', '')}`;
-    }
-    const parts = name.split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  }, [getSpeakerDisplayName]);
-
   // Find current word index
   const currentWordIndex = useMemo(() => {
     for (let i = 0; i < words.length; i++) {
       if (currentTime >= words[i].start && currentTime <= words[i].end) {
         return i;
       }
+      // Find word that hasn't started yet (for between-word states)
       if (i > 0 && currentTime > words[i - 1].end && currentTime < words[i].start) {
         return i - 1;
       }
     }
+    // If past all words, return last
     if (words.length > 0 && currentTime > words[words.length - 1].end) {
       return words.length - 1;
     }
@@ -231,9 +209,10 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       const containerRect = container.getBoundingClientRect();
       const wordRect = activeWord.getBoundingClientRect();
       
+      // Check if word is outside visible area
       const isOutOfView = 
-        wordRect.top < containerRect.top + 60 || 
-        wordRect.bottom > containerRect.bottom - 60;
+        wordRect.top < containerRect.top + 50 || 
+        wordRect.bottom > containerRect.bottom - 50;
       
       if (isOutOfView) {
         activeWord.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -260,13 +239,11 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     onSeek?.(time);
   }, [onSeek]);
 
-  // Total duration and words
+  // Total duration
   const totalDuration = useMemo(() => {
     if (words.length === 0) return 0;
     return words[words.length - 1].end;
   }, [words]);
-
-  const totalWords = words.length;
 
   if (!words || words.length === 0) {
     return (
@@ -279,27 +256,23 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   let globalWordIndex = 0;
 
   return (
-    <div className={cn("space-y-5", className)}>
-      {/* Header Stats */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border/50">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="secondary" className="gap-1.5 h-7 px-3 font-medium">
-            <Users className="w-3.5 h-3.5" />
-            {uniqueSpeakers.length} talare
-          </Badge>
+    <div className={cn("space-y-4", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 pb-3 border-b border-border/50">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="w-4 h-4" />
+            <span>{uniqueSpeakers.length} talare</span>
+          </div>
           {totalDuration > 0 && (
-            <Badge variant="secondary" className="gap-1.5 h-7 px-3 font-medium">
-              <Timer className="w-3.5 h-3.5" />
-              {formatDuration(totalDuration)}
-            </Badge>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>{formatDuration(totalDuration)}</span>
+            </div>
           )}
-          <Badge variant="secondary" className="gap-1.5 h-7 px-3 font-medium">
-            <MessageSquare className="w-3.5 h-3.5" />
-            {totalWords.toLocaleString()} ord
-          </Badge>
           {isPlaying && (
-            <Badge className="gap-1.5 h-7 px-3 font-medium bg-primary/10 text-primary border-primary/20 animate-pulse">
-              <Volume2 className="w-3.5 h-3.5" />
+            <Badge variant="secondary" className="gap-1 text-xs animate-pulse">
+              <Play className="w-3 h-3" />
               Spelar
             </Badge>
           )}
@@ -309,46 +282,28 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
           variant="outline"
           size="sm"
           onClick={handleCopyTranscript}
-          className="h-8 gap-1.5 text-xs font-medium"
+          className="h-8 gap-1.5 text-xs"
         >
           <Copy className="h-3.5 w-3.5" />
-          Kopiera allt
+          Kopiera
         </Button>
       </div>
 
-      {/* Speaker Panel */}
+      {/* Speaker Panel (collapsed by default) */}
       <Collapsible open={showSpeakerPanel} onOpenChange={setShowSpeakerPanel}>
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center justify-between py-2 px-1 text-left group">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {uniqueSpeakers.slice(0, 4).map(speakerId => {
-                  const styles = speakerStyleMap[speakerId];
-                  const initials = getSpeakerInitials(speakerId);
-                  return (
-                    <div
-                      key={speakerId}
-                      className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-background",
-                        styles?.avatar
-                      )}
-                    >
-                      {initials}
-                    </div>
-                  );
-                })}
-              </div>
-              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                Talardetaljer
-              </span>
-            </div>
-            <motion.div
-              animate={{ rotate: showSpeakerPanel ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-between h-auto py-2 px-3 hover:bg-muted/50"
+          >
+            <span className="text-xs font-medium text-muted-foreground">Talare & statistik</span>
+            {showSpeakerPanel ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </motion.div>
-          </button>
+            )}
+          </Button>
         </CollapsibleTrigger>
         
         <CollapsibleContent>
@@ -357,31 +312,22 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
               const styles = speakerStyleMap[speakerId];
               const stats = speakerStats[speakerId];
               const displayName = getSpeakerDisplayName(speakerId);
-              const initials = getSpeakerInitials(speakerId);
-              const percentage = totalWords > 0 
-                ? Math.round((stats?.wordCount || 0) / totalWords * 100) 
-                : 0;
 
               return (
                 <div
                   key={speakerId}
                   className={cn(
                     "flex items-center gap-3 p-3 rounded-xl border border-border/50 transition-all",
-                    `bg-gradient-to-br ${styles?.gradient || 'from-muted/50 to-muted/30'}`
+                    styles?.bg || "bg-muted/30"
                   )}
                 >
-                  <div className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                    styles?.avatar
-                  )}>
-                    {initials}
-                  </div>
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", styles?.dot)} />
                   <div className="flex-1 min-w-0">
-                    <span className={cn("font-semibold text-sm", styles?.text)}>
+                    <span className={cn("font-medium text-sm", styles?.text)}>
                       {displayName}
                     </span>
                     <div className="text-xs text-muted-foreground">
-                      {stats?.wordCount || 0} ord ({percentage}%)
+                      {stats?.wordCount || 0} ord
                     </div>
                   </div>
                 </div>
@@ -393,11 +339,10 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
       {/* Synced Transcript */}
       <ScrollArea className="max-h-[55vh]">
-        <div ref={scrollContainerRef} className="space-y-1 pr-2">
+        <div ref={scrollContainerRef} className="space-y-4 pr-2">
           {wordsBySpeaker.map((group, groupIdx) => {
             const styles = speakerStyleMap[group.speakerId];
             const displayName = getSpeakerDisplayName(group.speakerId);
-            const initials = getSpeakerInitials(group.speakerId);
             const timestamp = formatTime(group.start);
             const prevGroup = groupIdx > 0 ? wordsBySpeaker[groupIdx - 1] : null;
             const showDivider = prevGroup && prevGroup.speakerId !== group.speakerId;
@@ -406,79 +351,69 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
             return (
               <motion.div
                 key={groupIdx}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ delay: Math.min(groupIdx * 0.02, 0.3) }}
               >
                 {showDivider && (
-                  <div className="flex items-center gap-3 py-3">
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="flex-1 h-px bg-border/40" />
                   </div>
                 )}
 
-                {/* Message bubble */}
-                <div className="flex gap-3 py-2 group">
-                  {/* Mini avatar */}
-                  <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5",
-                    styles?.avatar || "bg-muted text-muted-foreground"
-                  )}>
-                    {initials}
+                <div
+                  className={cn(
+                    "relative pl-4 py-3 border-l-2 rounded-r-lg transition-colors",
+                    styles?.border || "border-l-muted-foreground/30",
+                    styles?.bg || "bg-muted/10"
+                  )}
+                >
+                  {/* Speaker header */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={cn("w-2 h-2 rounded-full", styles?.dot || "bg-muted-foreground/50")} />
+                    <span className={cn("text-sm font-semibold", styles?.text || "text-muted-foreground")}>
+                      {displayName}
+                    </span>
+                    {timestamp && (
+                      <Badge 
+                        variant="outline" 
+                        className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground/70 border-border/50 cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleWordClick(group.start)}
+                      >
+                        {timestamp}
+                      </Badge>
+                    )}
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    {/* Header */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={cn("text-sm font-semibold", styles?.text || "text-foreground")}>
-                        {displayName}
-                      </span>
-                      {timestamp && (
-                        <button
-                          onClick={() => handleWordClick(group.start)}
-                          className="text-[11px] text-muted-foreground/60 tabular-nums hover:text-primary transition-colors"
+                  {/* Word-by-word text with highlighting */}
+                  <p className="text-sm leading-relaxed text-foreground pl-4">
+                    {group.words.map((word, wordIdx) => {
+                      const absoluteIndex = groupStartIndex + wordIdx;
+                      const isActive = absoluteIndex === currentWordIndex;
+                      const isPast = absoluteIndex < currentWordIndex;
+                      globalWordIndex++;
+
+                      return (
+                        <span
+                          key={wordIdx}
+                          ref={isActive ? activeWordRef : null}
+                          onClick={() => handleWordClick(word.start)}
+                          className={cn(
+                            "cursor-pointer transition-all duration-150 rounded px-0.5 -mx-0.5",
+                            isActive && cn(
+                              "font-semibold scale-105 inline-block",
+                              styles?.highlight || "bg-primary/20"
+                            ),
+                            isPast && "text-muted-foreground/70",
+                            !isActive && !isPast && "hover:bg-muted/50"
+                          )}
                         >
-                          {timestamp}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Text bubble with word highlighting */}
-                    <div className={cn(
-                      "rounded-2xl rounded-tl-md px-4 py-2.5 transition-colors",
-                      `bg-gradient-to-br ${styles?.gradient || 'from-muted/50 to-muted/30'}`,
-                      "border border-border/30"
-                    )}>
-                      <p className="text-sm leading-relaxed text-foreground">
-                        {group.words.map((word, wordIdx) => {
-                          const absoluteIndex = groupStartIndex + wordIdx;
-                          const isActive = absoluteIndex === currentWordIndex;
-                          const isPast = absoluteIndex < currentWordIndex;
-                          globalWordIndex++;
-
-                          return (
-                            <span
-                              key={wordIdx}
-                              ref={isActive ? activeWordRef : null}
-                              onClick={() => handleWordClick(word.start)}
-                              className={cn(
-                                "cursor-pointer transition-all duration-100 rounded-sm px-0.5 -mx-0.5 inline-block",
-                                isActive && cn(
-                                  "font-semibold scale-[1.02]",
-                                  styles?.highlight || "bg-primary/20"
-                                ),
-                                isPast && isPlaying && "text-muted-foreground/60",
-                                !isActive && !isPast && "hover:bg-muted/60"
-                              )}
-                            >
-                              {word.word || word.text}
-                              {wordIdx < group.words.length - 1 ? ' ' : ''}
-                            </span>
-                          );
-                        })}
-                      </p>
-                    </div>
-                  </div>
+                          {word.word || word.text}
+                          {wordIdx < group.words.length - 1 ? ' ' : ''}
+                        </span>
+                      );
+                    })}
+                  </p>
                 </div>
               </motion.div>
             );
@@ -486,17 +421,13 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
         </div>
       </ScrollArea>
 
-      {/* Playback info bar */}
-      {(isPlaying || currentTime > 0) && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-center gap-3 text-xs text-muted-foreground pt-3 border-t border-border/30"
-        >
-          <span className="tabular-nums font-medium">{formatTime(currentTime)}</span>
-          <span className="text-muted-foreground/40">•</span>
+      {/* Current time indicator */}
+      {isPlaying && (
+        <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border/30">
+          <span className="tabular-nums">{formatTime(currentTime)}</span>
+          <span className="mx-2">•</span>
           <span>Klicka på ett ord för att hoppa dit</span>
-        </motion.div>
+        </div>
       )}
     </div>
   );
