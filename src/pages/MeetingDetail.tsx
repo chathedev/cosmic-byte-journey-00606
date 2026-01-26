@@ -25,7 +25,7 @@ import { MeetingRecorder } from "@/components/MeetingRecorder";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
-import { TranscriptBlockView } from "@/components/TranscriptBlockView";
+import { TranscriptTextView } from "@/components/TranscriptTextView";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
 interface AgendaLyraSpeaker {
@@ -2300,38 +2300,7 @@ const MeetingDetail = () => {
                       </div>
                       <div>
                         <span className="font-medium text-sm">Transkription</span>
-                        {hasSegments && !isEditing && (
-                          <p className="text-xs text-muted-foreground">
-                            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • {groupedSegments.length} segment
-                          </p>
-                        )}
-                        {!hasSegments && !isEditing && speakerBlocksCleaned && speakerBlocksCleaned.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {(() => {
-                              const uniqueBlockSpeakers = new Set(speakerBlocksCleaned.map(b => b.speakerId));
-                              return `${uniqueBlockSpeakers.size} ${uniqueBlockSpeakers.size === 1 ? 'talare' : 'talare'}`;
-                            })()}
-                          </p>
-                        )}
-                        {!hasSegments && !isEditing && (!speakerBlocksCleaned || speakerBlocksCleaned.length === 0) && !transcriptRaw && (
-                          <p className="text-xs text-muted-foreground">
-                            Ren textvisning
-                          </p>
-                        )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isEditing && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleResetFromASR}
-                          className="gap-1.5 text-xs h-8"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          Återställ
-                        </Button>
-                      )}
                     </div>
                   </div>
 
@@ -2375,29 +2344,13 @@ const MeetingDetail = () => {
                           );
                         })}
                       </div>
-                    ) : (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) || transcriptRaw ? (
-                      // Speaker blocks view - for any meeting with cleanup data (SIS disabled or enabled)
-                      <TranscriptBlockView
+                    ) : (
+                      // Clean text view - uses speakerBlocksCleaned or transcriptRaw with expand/collapse
+                      <TranscriptTextView
                         meetingId={id || ''}
                         transcriptRaw={transcriptRaw}
                         speakerBlocksCleaned={speakerBlocksCleaned}
-                        speakerBlocksRaw={speakerBlocksRaw}
-                        speakerNames={speakerNames}
                       />
-                    ) : (
-                      // Plain text view - clean fallback
-                      <div className="max-h-[60vh] overflow-y-auto">
-                        <div className="text-[15px] leading-[1.85] text-foreground selection:bg-primary/20">
-                          {displayTranscript
-                            .split(/\n+/)
-                            .filter(p => p.trim())
-                            .map((paragraph, idx) => (
-                              <p key={idx} className="mb-4 last:mb-0">
-                                {paragraph.trim()}
-                              </p>
-                            ))}
-                        </div>
-                      </div>
                     )}
                   </div>
                 </div>
