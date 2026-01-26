@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { meetingStorage, type MeetingSession } from "@/utils/meetingStorage";
-import { pollASRStatus, downloadAudioBackup, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment, type QueueMetadata, type AudioBackup } from "@/lib/asrService";
+import { pollASRStatus, downloadAudioBackup, type SISMatch, type SISSpeaker, type TranscriptSegment as ASRTranscriptSegment, type LyraLearningEntry, type ReconstructedSegment, type QueueMetadata, type AudioBackup, type TranscriptWord } from "@/lib/asrService";
 import { AudioBackupCard } from "@/components/AudioBackupCard";
 import { AudioPlayerCard } from "@/components/AudioPlayerCard";
 import { retryTranscriptionFromBackup } from "@/lib/audioRetry";
@@ -27,6 +27,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { TranscriptTextView } from "@/components/TranscriptTextView";
 import { EnhancedSpeakerView } from "@/components/EnhancedSpeakerView";
+import { SyncedTranscriptView } from "@/components/SyncedTranscriptView";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
 interface AgendaLyraSpeaker {
@@ -133,6 +134,12 @@ const MeetingDetail = () => {
   const [audioBackup, setAudioBackup] = useState<AudioBackup | null>(null);
   const [isDownloadingAudio, setIsDownloadingAudio] = useState(false);
   const [isRetryingTranscription, setIsRetryingTranscription] = useState(false);
+
+  // Word-level timing for synced transcript view
+  const [transcriptWords, setTranscriptWords] = useState<TranscriptWord[]>([]);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioIsPlaying, setAudioIsPlaying] = useState(false);
+  const [audioSeekTo, setAudioSeekTo] = useState<number | undefined>(undefined);
 
   // Speaker identification UX thresholds (per docs)
   const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
@@ -327,6 +334,11 @@ const MeetingDetail = () => {
                 if (asrStatus.reconstructedSegments && asrStatus.reconstructedSegments.length > 0) {
                   setReconstructedSegments(asrStatus.reconstructedSegments);
                 }
+              }
+              
+              // Capture word-level timing for synced playback
+              if (asrStatus.words && asrStatus.words.length > 0) {
+                setTranscriptWords(asrStatus.words);
               }
             } catch (e) {
               console.log('Could not fetch ASR data for completed meeting:', e);
@@ -560,6 +572,12 @@ const MeetingDetail = () => {
           setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setIsSISDisabled(sisDisabled);
+          
+          // Capture word-level timing for synced playback
+          if (asrStatus.words && asrStatus.words.length > 0) {
+            setTranscriptWords(asrStatus.words);
+          }
+          
           setStatus('done');
           setStage('done');
 
@@ -2199,6 +2217,9 @@ const MeetingDetail = () => {
                       audioBackup={audioBackup}
                       variant="compact"
                       className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4"
+                      onTimeUpdate={setAudioCurrentTime}
+                      onPlayStateChange={setAudioIsPlaying}
+                      seekTo={audioSeekTo}
                     />
                   </motion.div>
                 )}
@@ -2320,6 +2341,17 @@ const MeetingDetail = () => {
                         onChange={(e) => handleTranscriptChange(e.target.value)}
                         className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
                         placeholder="Redigera transkriptionen..."
+                      />
+                    ) : transcriptWords.length > 0 && audioBackup?.available ? (
+                      // Synced transcript view with word-by-word highlighting during audio playback
+                      <SyncedTranscriptView
+                        meetingId={id || ''}
+                        words={transcriptWords}
+                        speakerBlocks={speakerBlocksCleaned || speakerBlocksRaw || []}
+                        speakerNames={speakerNames}
+                        currentTime={audioCurrentTime}
+                        isPlaying={audioIsPlaying}
+                        onSeek={(time) => setAudioSeekTo(time)}
                       />
                     ) : hasSpeakerBlocks ? (
                       // Enhanced speaker view with speakerBlocksCleaned/Raw data

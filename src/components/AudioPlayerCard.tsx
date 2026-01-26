@@ -14,6 +14,10 @@ interface AudioPlayerCardProps {
   audioBackup: AudioBackup;
   className?: string;
   variant?: 'compact' | 'full';
+  onTimeUpdate?: (currentTime: number) => void;
+  onPlayStateChange?: (isPlaying: boolean) => void;
+  onSeek?: (time: number) => void;
+  seekTo?: number; // External seek control
 }
 
 const BACKEND_API_URL = 'https://api.tivly.se';
@@ -55,7 +59,11 @@ export function AudioPlayerCard({
   meetingId,
   audioBackup,
   className = '',
-  variant = 'compact'
+  variant = 'compact',
+  onTimeUpdate,
+  onPlayStateChange,
+  onSeek,
+  seekTo,
 }: AudioPlayerCardProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -74,6 +82,14 @@ export function AudioPlayerCard({
   // Fetch audio as a blob (so we can attach auth headers) and use it for playback.
   // Note: HTMLAudioElement cannot send custom headers, so we must create an object URL.
   const objectUrlRef = useRef<string | null>(null);
+
+  // Handle external seek requests
+  useEffect(() => {
+    if (seekTo !== undefined && audioRef.current && isFinite(seekTo)) {
+      audioRef.current.currentTime = seekTo;
+      setCurrentTime(seekTo);
+    }
+  }, [seekTo]);
 
   useEffect(() => {
     const downloadPath = audioBackup.downloadPath;
@@ -265,7 +281,9 @@ export function AudioPlayerCard({
   // Audio event handlers
   const handleTimeUpdate = () => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
+      const time = audioRef.current.currentTime;
+      setCurrentTime(time);
+      onTimeUpdate?.(time);
     }
   };
 
@@ -275,8 +293,15 @@ export function AudioPlayerCard({
     }
   };
 
-  const handlePlay = () => setIsPlaying(true);
-  const handlePause = () => setIsPlaying(false);
+  const handlePlay = () => {
+    setIsPlaying(true);
+    onPlayStateChange?.(true);
+  };
+  
+  const handlePause = () => {
+    setIsPlaying(false);
+    onPlayStateChange?.(false);
+  };
   const handleEnded = () => setIsPlaying(false);
 
   const handleError = () => {
