@@ -111,9 +111,7 @@ export interface HealthCheck {
     platform: string;
     arch: string;
     cpuCores: number;
-    loadAvg1m: number;
-    loadAvg5m: number;
-    loadAvg15m: number;
+    cpuUsagePercent?: number;
     uptimeSeconds: number;
     processUptimeSeconds: number;
     memory: {
