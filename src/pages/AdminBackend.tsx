@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers, Terminal, Search, Filter, X, Pause, Play, Cpu, Activity, Gauge, MemoryStick, Zap } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Download, Trash2, RefreshCw, Construction, Terminal, Search, Filter, X, Pause, Play, Cpu, Activity, MemoryStick, Zap, Monitor, Box, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import { backendApi, DashboardData, HealthCheck, ASRLogsResponse } from '@/lib/backendApi';
 import { apiClient, MaintenanceStatus } from '@/lib/api';
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,13 @@ const formatBytes = (bytes: number): string => {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+};
+
+const formatUptime = (seconds: number): { days: number; hours: number; minutes: number } => {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return { days, hours, minutes };
 };
 
 const formatProcessUptime = (seconds: number): string => {
@@ -111,7 +118,7 @@ const AdminBackend = () => {
 
   useEffect(() => {
     if (logsOpen && !logsPaused) {
-      fetchLogs(); // Fetch immediately
+      fetchLogs();
       logsIntervalRef.current = setInterval(fetchLogs, 1000);
     }
     
@@ -123,7 +130,6 @@ const AdminBackend = () => {
     };
   }, [logsOpen, logsPaused, logsLevel, logsKeyword]);
 
-  // Auto-scroll to bottom when logs update
   useEffect(() => {
     if (logsContainerRef.current && logsData?.lines?.length) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
@@ -224,408 +230,468 @@ const AdminBackend = () => {
   };
 
   const apiOnline = dashboard?.status === 'online';
-  const memoryPercentage = dashboard?.memory?.system?.usagePercent 
-    ?? (dashboard?.memory?.system 
-      ? (dashboard.memory.system.used.bytes / dashboard.memory.system.total.bytes) * 100 
-      : 0);
+  const cpuPercent = health?.system?.cpuUsagePercent ?? 0;
+  const memPercent = health?.system?.memory?.usedPercent ?? 0;
+  const uptime = health?.system ? formatUptime(health.system.uptimeSeconds) : null;
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse text-muted-foreground">Laddar...</div>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-muted-foreground">Laddar systemdata...</span>
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="min-h-screen bg-background overflow-x-hidden">
-        {/* Minimal Header */}
-        <div className="border-b border-border/50">
-          <div className="max-w-4xl mx-auto px-6 py-6">
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="border-b bg-card/50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-muted/50">
-                  <Layers className="w-5 h-5 text-muted-foreground" />
+                <div className="p-2.5 rounded-xl bg-primary/10">
+                  <Server className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-medium">Backend</h1>
-                  <p className="text-xs text-muted-foreground">
-                    {lastUpdate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                  <h1 className="text-xl font-semibold">Backend Dashboard</h1>
+                  <p className="text-sm text-muted-foreground">
+                    api.tivly.se • Uppdaterad {lastUpdate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Badge 
-                  variant={apiOnline ? 'default' : 'destructive'} 
-                  className="gap-1.5 font-normal"
+                  variant={health?.overall === 'healthy' ? 'default' : 'destructive'} 
+                  className="gap-1.5 px-3 py-1"
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${apiOnline ? 'bg-green-300 animate-pulse' : 'bg-red-300'}`} />
-                  {apiOnline ? 'Online' : 'Offline'}
+                  <span className={`w-2 h-2 rounded-full ${health?.overall === 'healthy' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                  {health?.overall === 'healthy' ? 'Alla system OK' : 'Problem upptäckt'}
                 </Badge>
+                <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Uppdatera
+                </Button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
           
-          {/* Status Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-0 bg-muted/30">
+          {/* Top Stats Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* CPU Card */}
+            <Card className="overflow-hidden">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Server className="w-3.5 h-3.5" />
-                  <span className="text-xs">API</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-blue-500/10">
+                      <Cpu className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <span className="text-sm font-medium">CPU</span>
+                  </div>
+                  <span className="text-2xl font-bold">{cpuPercent.toFixed(1)}%</span>
                 </div>
-                <p className="font-medium">{apiOnline ? 'Aktiv' : 'Nere'}</p>
+                <Progress 
+                  value={cpuPercent} 
+                  className="h-2"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  {health?.system?.cpuCores ?? 0} kärnor
+                </p>
               </CardContent>
             </Card>
-            
-            <Card className="border-0 bg-muted/30">
+
+            {/* Memory Card */}
+            <Card className="overflow-hidden">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Cloud className="w-3.5 h-3.5" />
-                  <span className="text-xs">Cloud</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-purple-500/10">
+                      <MemoryStick className="w-4 h-4 text-purple-500" />
+                    </div>
+                    <span className="text-sm font-medium">RAM</span>
+                  </div>
+                  <span className="text-2xl font-bold">{memPercent.toFixed(1)}%</span>
                 </div>
-                <p className="font-medium">Aktiv</p>
+                <Progress 
+                  value={memPercent} 
+                  className="h-2"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  {health?.system?.memory?.used ?? '0'} / {health?.system?.memory?.total ?? '0'}
+                </p>
               </CardContent>
             </Card>
-            
-            <Card className="border-0 bg-muted/30">
+
+            {/* Uptime Card */}
+            <Card className="overflow-hidden">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="text-xs">Uptime</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-emerald-500/10">
+                      <Clock className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <span className="text-sm font-medium">Uptime</span>
+                  </div>
                 </div>
-                <p className="font-medium">{dashboard?.uptime.formatted || '--'}</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold">{uptime?.days ?? 0}</span>
+                  <span className="text-sm text-muted-foreground">dagar</span>
+                  <span className="text-lg font-semibold ml-2">{uptime?.hours ?? 0}h</span>
+                  <span className="text-muted-foreground">{uptime?.minutes ?? 0}m</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Process: {health?.system ? formatProcessUptime(health.system.processUptimeSeconds) : '--'}
+                </p>
               </CardContent>
             </Card>
-            
-            <Card className="border-0 bg-muted/30">
+
+            {/* Status Card */}
+            <Card className="overflow-hidden">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <HardDrive className="w-3.5 h-3.5" />
-                  <span className="text-xs">RAM</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-amber-500/10">
+                      <Activity className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <span className="text-sm font-medium">Status</span>
+                  </div>
                 </div>
-                <p className="font-medium">{memoryPercentage.toFixed(0)}%</p>
+                <div className="flex items-center gap-2">
+                  {apiOnline ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-lg font-semibold">Online</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-5 h-5 text-destructive" />
+                      <span className="text-lg font-semibold">Offline</span>
+                    </>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {dashboard?.uptime?.formatted ?? '--'}
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Health */}
-          {health && (
-            <Card className="border-0 bg-muted/30">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    {health.overall === 'healthy' ? (
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-amber-500" />
-                    )}
-                    <span className="text-sm font-medium">Systemhälsa</span>
-                  </div>
-                  <Badge variant={health.overall === 'healthy' ? 'default' : 'secondary'} className="font-normal">
-                    {health.overall === 'healthy' ? 'OK' : 'Varning'}
-                  </Badge>
-                </div>
-                
-                {/* Health Checks Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  {health.checks.map((check) => (
-                    <div 
-                      key={check.name} 
-                      className="flex items-center gap-2 text-sm p-2 rounded-md bg-background/50"
-                      title={check.message}
-                    >
-                      {check.status === 'healthy' ? (
-                        <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                      )}
-                      <span className="text-muted-foreground truncate">{check.name}</span>
+          {/* System Info & Health Checks */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* System Information */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Monitor className="w-4 h-4" />
+                  Systeminformation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {health?.system && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Hostname</p>
+                        <p className="font-medium">{health.system.hostname}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Plattform</p>
+                        <p className="font-medium">{health.system.platform} ({health.system.arch})</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Node.js</p>
+                        <p className="font-medium">{health.system.process.nodeVersion}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Process ID</p>
+                        <p className="font-medium font-mono">{health.system.process.pid}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
 
-                {/* Extended System Info */}
-                {health.system && (
-                  <div className="pt-4 border-t border-border/50 space-y-4">
-                    {/* System Overview */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="p-3 rounded-md bg-background/50">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Server className="w-3 h-3" />
-                          <span className="text-xs">Värd</span>
-                        </div>
-                        <p className="text-sm font-medium truncate">{health.system.hostname}</p>
-                        <p className="text-xs text-muted-foreground">{health.system.platform} ({health.system.arch})</p>
-                      </div>
-                      
-                      <div className="p-3 rounded-md bg-background/50">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Cpu className="w-3 h-3" />
-                          <span className="text-xs">CPU</span>
-                        </div>
-                        <p className="text-sm font-medium">{health.system.cpuCores} kärnor</p>
-                        <p className="text-xs text-muted-foreground">
-                          Load: {health.system.loadAvg1m.toFixed(2)}
-                        </p>
-                      </div>
-                      
-                      <div className="p-3 rounded-md bg-background/50">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <MemoryStick className="w-3 h-3" />
-                          <span className="text-xs">RAM</span>
-                        </div>
-                        <p className="text-sm font-medium">{health.system.memory.usedPercent.toFixed(1)}%</p>
-                        <p className="text-xs text-muted-foreground">
-                          {health.system.memory.used} / {health.system.memory.total}
-                        </p>
-                      </div>
-                      
-                      <div className="p-3 rounded-md bg-background/50">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <Clock className="w-3 h-3" />
-                          <span className="text-xs">Uptime</span>
-                        </div>
-                        <p className="text-sm font-medium">
-                          {Math.floor(health.system.uptimeSeconds / 86400)}d {Math.floor((health.system.uptimeSeconds % 86400) / 3600)}h
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Process: {formatProcessUptime(health.system.processUptimeSeconds)}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Load Averages */}
-                    <div className="p-3 rounded-md bg-background/50">
-                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                        <Activity className="w-3 h-3" />
-                        <span className="text-xs font-medium">Systembelastning</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">1 min</p>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${
-                                  health.system.loadAvg1m / health.system.cpuCores > 0.8 
-                                    ? 'bg-destructive' 
-                                    : health.system.loadAvg1m / health.system.cpuCores > 0.5 
-                                      ? 'bg-amber-500' 
-                                      : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.min((health.system.loadAvg1m / health.system.cpuCores) * 100, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-mono">{health.system.loadAvg1m.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">5 min</p>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${
-                                  health.system.loadAvg5m / health.system.cpuCores > 0.8 
-                                    ? 'bg-destructive' 
-                                    : health.system.loadAvg5m / health.system.cpuCores > 0.5 
-                                      ? 'bg-amber-500' 
-                                      : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.min((health.system.loadAvg5m / health.system.cpuCores) * 100, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-mono">{health.system.loadAvg5m.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">15 min</p>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${
-                                  health.system.loadAvg15m / health.system.cpuCores > 0.8 
-                                    ? 'bg-destructive' 
-                                    : health.system.loadAvg15m / health.system.cpuCores > 0.5 
-                                      ? 'bg-amber-500' 
-                                      : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.min((health.system.loadAvg15m / health.system.cpuCores) * 100, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-mono">{health.system.loadAvg15m.toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
                     {/* Process Memory */}
-                    <div className="p-3 rounded-md bg-background/50">
-                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                        <Zap className="w-3 h-3" />
-                        <span className="text-xs font-medium">Node.js Process (PID: {health.system.process.pid})</span>
-                        <span className="text-xs ml-auto">{health.system.process.nodeVersion}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4 text-xs">
-                        <div>
-                          <p className="text-muted-foreground">RSS</p>
-                          <p className="font-medium font-mono">{formatBytes(health.system.process.rssBytes)}</p>
+                    <div className="pt-3 border-t">
+                      <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5" />
+                        Node.js Minne
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="p-3 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground">RSS</p>
+                          <p className="text-sm font-semibold font-mono">{formatBytes(health.system.process.rssBytes)}</p>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Heap Used</p>
-                          <p className="font-medium font-mono">{formatBytes(health.system.process.heapUsedBytes)}</p>
+                        <div className="p-3 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground">Heap Used</p>
+                          <p className="text-sm font-semibold font-mono">{formatBytes(health.system.process.heapUsedBytes)}</p>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Heap Total</p>
-                          <p className="font-medium font-mono">{formatBytes(health.system.process.heapTotalBytes)}</p>
+                        <div className="p-3 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground">Heap Total</p>
+                          <p className="text-sm font-semibold font-mono">{formatBytes(health.system.process.heapTotalBytes)}</p>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>
-          )}
 
-          {/* Maintenance Toggle */}
-          <Card className="border-0 bg-muted/30">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Construction className={`w-4 h-4 ${maintenance?.enabled ? 'text-yellow-500' : 'text-muted-foreground'}`} />
-                  <div>
-                    <p className="text-sm font-medium">Underhållsläge</p>
-                    <p className="text-xs text-muted-foreground">
-                      {maintenance?.enabled ? 'Användare ser underhållsmeddelande' : 'Appen fungerar normalt'}
-                    </p>
-                  </div>
+            {/* Health Checks */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Gauge className="w-4 h-4" />
+                  Hälsokontroller
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {health?.checks.map((check) => (
+                    <div 
+                      key={check.name} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        {check.status === 'healthy' ? (
+                          <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        ) : check.status === 'warning' ? (
+                          <AlertCircle className="w-4 h-4 text-amber-500" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-destructive" />
+                        )}
+                        <div>
+                          <p className="text-sm font-medium">{check.name}</p>
+                          <p className="text-xs text-muted-foreground">{check.message}</p>
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={check.status === 'healthy' ? 'default' : check.status === 'warning' ? 'secondary' : 'destructive'}
+                        className="capitalize"
+                      >
+                        {check.status === 'healthy' ? 'OK' : check.status}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  {maintenancePending && (
-                    <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" />
-                  )}
-                  <Switch
-                    checked={maintenance?.enabled ?? false}
-                    onCheckedChange={handleMaintenanceToggle}
-                    disabled={maintenancePending || isActionLoading !== null}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Services */}
-          {dashboard && (
-            <Card className="border-0 bg-muted/30">
-              <CardContent className="p-5">
-                <p className="text-sm font-medium mb-4">Tjänster</p>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between py-2">
+          {/* Services & Storage Row */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Services */}
+            {dashboard && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Box className="w-4 h-4" />
+                    Integrationer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                     <div className="flex items-center gap-3">
-                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <div className="p-2 rounded-lg bg-blue-500/10">
+                        <Mail className="w-4 h-4 text-blue-500" />
+                      </div>
                       <div>
-                        <p className="text-sm">Email (SMTP)</p>
-                        <p className="text-xs text-muted-foreground">{dashboard.services.smtp.host}</p>
+                        <p className="text-sm font-medium">Email (SMTP)</p>
+                        <p className="text-xs text-muted-foreground">{dashboard.services.smtp.host || 'Ej konfigurerad'}</p>
                       </div>
                     </div>
-                    <Badge variant={dashboard.services.smtp.configured ? 'default' : 'secondary'} className="font-normal">
-                      {dashboard.services.smtp.configured ? 'OK' : 'Ej konfigurerad'}
+                    <Badge variant={dashboard.services.smtp.configured ? 'default' : 'secondary'}>
+                      {dashboard.services.smtp.configured ? 'Aktiv' : 'Inaktiv'}
                     </Badge>
                   </div>
                   
-                  <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                     <div className="flex items-center gap-3">
-                      <CreditCard className="w-4 h-4 text-muted-foreground" />
+                      <div className="p-2 rounded-lg bg-purple-500/10">
+                        <CreditCard className="w-4 h-4 text-purple-500" />
+                      </div>
                       <div>
-                        <p className="text-sm">Stripe</p>
-                        <p className="text-xs text-muted-foreground capitalize">{dashboard.services.stripe.mode}</p>
+                        <p className="text-sm font-medium">Stripe</p>
+                        <p className="text-xs text-muted-foreground capitalize">{dashboard.services.stripe.mode || 'Ej konfigurerad'}</p>
                       </div>
                     </div>
-                    <Badge variant={dashboard.services.stripe.configured ? 'default' : 'secondary'} className="font-normal">
-                      {dashboard.services.stripe.configured ? 'OK' : 'Ej konfigurerad'}
+                    <Badge variant={dashboard.services.stripe.configured ? 'default' : 'secondary'}>
+                      {dashboard.services.stripe.configured ? 'Aktiv' : 'Inaktiv'}
                     </Badge>
                   </div>
                   
-                  <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                     <div className="flex items-center gap-3">
-                      <Database className="w-4 h-4 text-muted-foreground" />
+                      <div className="p-2 rounded-lg bg-emerald-500/10">
+                        <Database className="w-4 h-4 text-emerald-500" />
+                      </div>
                       <div>
-                        <p className="text-sm">Databas</p>
+                        <p className="text-sm font-medium">Databas</p>
                         <p className="text-xs text-muted-foreground">{dashboard.database.type}</p>
                       </div>
                     </div>
-                    <Badge variant="default" className="font-normal">
-                      {dashboard.database.collections.users} användare
-                    </Badge>
+                    <Badge variant="default">{dashboard.database.collections.users} användare</Badge>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Storage */}
-          {dashboard && (
-            <Card className="border-0 bg-muted/30">
+            {/* Storage */}
+            {dashboard && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <HardDrive className="w-4 h-4" />
+                      Lagring
+                    </CardTitle>
+                    <span className="text-sm font-semibold">{dashboard.storage.total.formatted}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <span className="text-sm">Användare</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{dashboard.storage.breakdown.users.formatted}</span>
+                      <Badge variant="outline" className="text-xs">{dashboard.storage.breakdown.users.count}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <span className="text-sm">Agendor</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{dashboard.storage.breakdown.agendas.formatted}</span>
+                      <Badge variant="outline" className="text-xs">{dashboard.storage.breakdown.agendas.count}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <span className="text-sm">Kampanjer</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{dashboard.storage.breakdown.campaigns.formatted}</span>
+                      <Badge variant="outline" className="text-xs">{dashboard.storage.breakdown.campaigns.count}</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Maintenance & Actions */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Maintenance Mode */}
+            <Card className={maintenance?.enabled ? 'border-yellow-500/50 bg-yellow-500/5' : ''}>
               <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm font-medium">Lagring</p>
-                  <span className="text-sm text-muted-foreground">{dashboard.storage.total.formatted}</span>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Användare</span>
-                    <span>{dashboard.storage.breakdown.users.formatted}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${maintenance?.enabled ? 'bg-yellow-500/20' : 'bg-muted'}`}>
+                      <Construction className={`w-5 h-5 ${maintenance?.enabled ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                    </div>
+                    <div>
+                      <p className="font-medium">Underhållsläge</p>
+                      <p className="text-sm text-muted-foreground">
+                        {maintenance?.enabled ? 'Användare ser underhållsmeddelande' : 'Appen fungerar normalt'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Agendor</span>
-                    <span>{dashboard.storage.breakdown.agendas.formatted}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Kampanjer</span>
-                    <span>{dashboard.storage.breakdown.campaigns.formatted}</span>
+                  <div className="flex items-center gap-3">
+                    {maintenancePending && (
+                      <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                    )}
+                    <Switch
+                      checked={maintenance?.enabled ?? false}
+                      onCheckedChange={handleMaintenanceToggle}
+                      disabled={maintenancePending || isActionLoading !== null}
+                    />
                   </div>
                 </div>
               </CardContent>
             </Card>
-          )}
+
+            {/* Quick Actions */}
+            <Card>
+              <CardContent className="p-5">
+                <p className="text-sm font-medium mb-3">Snabbåtgärder</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    onClick={handleBackup}
+                    disabled={isActionLoading !== null}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {isActionLoading === 'backup' ? (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Ladda ner backup
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => openConfirmDialog('cleanup')}
+                    disabled={isActionLoading !== null}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {isActionLoading === 'cleanup' ? (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    Rensa temp-filer
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => openConfirmDialog('restart')}
+                    disabled={isActionLoading !== null}
+                    variant="outline"
+                    className="gap-2 text-destructive hover:text-destructive"
+                  >
+                    {isActionLoading === 'restart' ? (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    Starta om server
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* ASR Logs Viewer */}
-          <Card className="border-0 bg-muted/30">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">ASR Loggar</span>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Terminal className="w-4 h-4" />
+                  ASR Loggar
                   {logsOpen && logsData && (
-                    <Badge variant="secondary" className="font-normal text-xs">
+                    <Badge variant="secondary" className="ml-2">
                       {logsData.showing}/{logsData.total}
                     </Badge>
                   )}
-                </div>
+                </CardTitle>
                 <div className="flex items-center gap-2">
                   {logsOpen && (
                     <>
                       <Button
-                        variant="ghost"
+                        variant={logsPaused ? "default" : "outline"}
                         size="sm"
                         onClick={() => setLogsPaused(!logsPaused)}
-                        className="h-7 w-7 p-0"
-                        title={logsPaused ? "Fortsätt" : "Pausa"}
+                        className="gap-1"
                       >
-                        {logsPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                        {logsPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                        {logsPaused ? 'Fortsätt' : 'Pausa'}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setLogsOpen(false)}
-                        className="h-7 w-7 p-0"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </Button>
                     </>
                   )}
@@ -634,143 +700,106 @@ const AdminBackend = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => setLogsOpen(true)}
-                      className="h-7 text-xs"
                     >
-                      Öppna
+                      Öppna loggar
                     </Button>
                   )}
                 </div>
               </div>
-              
-              {logsOpen && (
-                <>
-                  {/* Filters */}
-                  <div className="flex gap-2 mb-3">
-                    <Select value={logsLevel} onValueChange={setLogsLevel}>
-                      <SelectTrigger className="w-28 h-8 text-xs">
-                        <Filter className="w-3 h-3 mr-1" />
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alla</SelectItem>
-                        <SelectItem value="error">Error</SelectItem>
-                        <SelectItem value="warn">Warning</SelectItem>
-                        <SelectItem value="info">Info</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                      <Input
-                        placeholder="Sök (meeting ID, [asr], etc.)"
-                        value={logsKeyword}
-                        onChange={(e) => setLogsKeyword(e.target.value)}
-                        className="h-8 pl-7 text-xs"
-                      />
-                    </div>
+            </CardHeader>
+            
+            {logsOpen && (
+              <CardContent>
+                {/* Filters */}
+                <div className="flex gap-2 mb-4">
+                  <Select value={logsLevel} onValueChange={setLogsLevel}>
+                    <SelectTrigger className="w-32">
+                      <Filter className="w-3.5 h-3.5 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      <SelectItem value="all">Alla</SelectItem>
+                      <SelectItem value="error">Error</SelectItem>
+                      <SelectItem value="warn">Warning</SelectItem>
+                      <SelectItem value="info">Info</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Sök (meeting ID, [asr], etc.)"
+                      value={logsKeyword}
+                      onChange={(e) => setLogsKeyword(e.target.value)}
+                      className="pl-9"
+                    />
                   </div>
-                  
-                  {/* Log lines */}
-                  <div 
-                    ref={logsContainerRef}
-                    className="h-64 rounded border border-border/50 bg-background/50 overflow-y-auto"
-                  >
-                    <div className="p-2 font-mono text-xs space-y-0.5">
-                      {logsData?.lines && logsData.lines.length > 0 ? (
-                        logsData.lines.map((line, i) => {
-                          const isError = /error|fail|fatal/i.test(line);
-                          const isWarn = /warn/i.test(line);
-                          return (
-                            <div 
-                              key={i} 
-                              className={`px-1 py-0.5 rounded ${
-                                isError ? 'bg-red-500/10 text-red-400' : 
-                                isWarn ? 'bg-yellow-500/10 text-yellow-400' : 
-                                'text-muted-foreground'
-                              }`}
-                            >
-                              {line}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          {logsData?.message || 'Inga loggar hittades'}
-                        </div>
-                      )}
-                    </div>
+                </div>
+                
+                {/* Log lines */}
+                <div 
+                  ref={logsContainerRef}
+                  className="h-72 rounded-lg border bg-muted/30 overflow-y-auto"
+                >
+                  <div className="p-3 font-mono text-xs space-y-1">
+                    {logsData?.lines && logsData.lines.length > 0 ? (
+                      logsData.lines.map((line, i) => {
+                        const isError = /error|fail|fatal/i.test(line);
+                        const isWarn = /warn/i.test(line);
+                        return (
+                          <div 
+                            key={i} 
+                            className={`px-2 py-1 rounded ${
+                              isError ? 'bg-red-500/10 text-red-400' : 
+                              isWarn ? 'bg-yellow-500/10 text-yellow-400' : 
+                              'text-muted-foreground hover:bg-muted/50'
+                            }`}
+                          >
+                            {line}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <Terminal className="w-8 h-8 mb-2 opacity-50" />
+                        <span>{logsData?.message || 'Inga loggar hittades'}</span>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Status bar */}
-                  <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                    <span>
-                      {logsPaused ? (
-                        <span className="text-yellow-500">⏸ Pausad</span>
-                      ) : (
-                        <span className="text-green-500">● Live</span>
-                      )}
-                    </span>
-                    <span>Uppdateras varje sekund</span>
+                </div>
+                
+                {/* Status bar */}
+                <div className="flex items-center justify-between mt-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    {logsPaused ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <Pause className="w-3 h-3" />
+                        Pausad
+                      </Badge>
+                    ) : (
+                      <Badge variant="default" className="gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Live
+                      </Badge>
+                    )}
                   </div>
-                </>
-              )}
-            </CardContent>
+                  <span className="text-muted-foreground text-xs">Uppdateras varje sekund</span>
+                </div>
+              </CardContent>
+            )}
           </Card>
 
-          {/* Actions */}
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={handleBackup}
-              disabled={isActionLoading !== null}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              {isActionLoading === 'backup' ? (
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5" />
-              )}
-              Backup
-            </Button>
-            
-            <Button 
-              onClick={() => openConfirmDialog('cleanup')}
-              disabled={isActionLoading !== null}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              {isActionLoading === 'cleanup' ? (
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Trash2 className="w-3.5 h-3.5" />
-              )}
-              Rensa
-            </Button>
-            
-            <Button 
-              onClick={() => openConfirmDialog('restart')}
-              disabled={isActionLoading !== null}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              {isActionLoading === 'restart' ? (
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <RefreshCw className="w-3.5 h-3.5" />
-              )}
-              Starta om
-            </Button>
-          </div>
-
-          {/* Footer info */}
-          <div className="pt-4 border-t border-border/30">
-            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-              <span>api.tivly.se</span>
-              <span>Node {dashboard?.environment.nodeVersion}</span>
-              <span className="capitalize">{dashboard?.environment.platform}/{dashboard?.environment.arch}</span>
-              <span>{dashboard?.environment.cpus} cores</span>
+          {/* Footer */}
+          <div className="pt-4 border-t">
+            <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-4">
+                <span className="font-medium">api.tivly.se</span>
+                <span>Node {dashboard?.environment?.nodeVersion ?? '--'}</span>
+                <span className="capitalize">{dashboard?.environment?.platform ?? '--'}/{dashboard?.environment?.arch ?? '--'}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span>{dashboard?.environment?.cpus ?? 0} CPU-kärnor</span>
+                <span>PID: {health?.system?.process?.pid ?? '--'}</span>
+              </div>
             </div>
           </div>
         </div>
