@@ -209,15 +209,14 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       const wordRect = activeWord.getBoundingClientRect();
       
       // Check if word is outside visible area (with padding)
-      const isOutOfView = 
-        wordRect.top < containerRect.top + 80 || 
-        wordRect.bottom > containerRect.bottom - 80;
+      const isAboveView = wordRect.top < containerRect.top + 60;
+      const isBelowView = wordRect.bottom > containerRect.bottom - 60;
       
-      if (isOutOfView) {
-        // Calculate scroll position to center the word
-        const wordOffsetTop = activeWord.offsetTop;
+      if (isAboveView || isBelowView) {
+        // Calculate position relative to container's scroll
+        const wordTopRelativeToContainer = wordRect.top - containerRect.top + container.scrollTop;
         const containerHeight = container.clientHeight;
-        const scrollTo = wordOffsetTop - (containerHeight / 2) + (activeWord.clientHeight / 2);
+        const scrollTo = wordTopRelativeToContainer - (containerHeight / 2) + (wordRect.height / 2);
         
         container.scrollTo({
           top: Math.max(0, scrollTo),
