@@ -26,6 +26,7 @@ import { MeetingRecorder } from "@/components/MeetingRecorder";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
 import { TranscriptTextView } from "@/components/TranscriptTextView";
+import { EnhancedSpeakerView } from "@/components/EnhancedSpeakerView";
 import { hasPlusAccess } from "@/lib/accessCheck";
 
 interface AgendaLyraSpeaker {
@@ -52,7 +53,7 @@ interface MeetingDataForDialog {
   sisSpeakers?: AgendaLyraSpeaker[];
   sisMatches?: AgendaLyraMatch[];
   speakerNames?: Record<string, string>;
-  speakerBlocksCleaned?: Array<{ speakerId: string; speakerName: string | null; text: string }>;
+  speakerBlocksCleaned?: Array<{ speakerId: string; speakerName: string | null; text: string; start?: number; end?: number }>;
 }
 
 const MeetingDetail = () => {
@@ -81,8 +82,8 @@ const MeetingDetail = () => {
   const [transcriptRaw, setTranscriptRaw] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<ASRTranscriptSegment[] | null>(null);
   const [reconstructedSegments, setReconstructedSegments] = useState<ReconstructedSegment[] | null>(null);
-  const [speakerBlocksCleaned, setSpeakerBlocksCleaned] = useState<Array<{ speakerId: string; speakerName: string | null; text: string }> | null>(null);
-  const [speakerBlocksRaw, setSpeakerBlocksRaw] = useState<Array<{ speakerId: string; speakerName: string | null; text: string }> | null>(null);
+  const [speakerBlocksCleaned, setSpeakerBlocksCleaned] = useState<Array<{ speakerId: string; speakerName: string | null; text: string; start?: number; end?: number }> | null>(null);
+  const [speakerBlocksRaw, setSpeakerBlocksRaw] = useState<Array<{ speakerId: string; speakerName: string | null; text: string; start?: number; end?: number }> | null>(null);
   const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
   const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
@@ -1867,6 +1868,13 @@ const MeetingDetail = () => {
     groupedSegments.length > 0 &&
     groupedSegments.some((s) => (s as any)?.text && String((s as any).text).trim().length > 0);
 
+  // Check if we have enhanced speaker blocks from backend (new format with speakerId, text, start, end)
+  const hasSpeakerBlocks = 
+    !isEditing &&
+    !isSISDisabled &&
+    ((speakerBlocksCleaned && speakerBlocksCleaned.length > 0) || 
+     (speakerBlocksRaw && speakerBlocksRaw.length > 0));
+
   // Recording mode view - full-screen recorder
   if (isRecordingMode && id) {
     return (
@@ -2312,6 +2320,14 @@ const MeetingDetail = () => {
                         onChange={(e) => handleTranscriptChange(e.target.value)}
                         className="min-h-[400px] text-sm leading-relaxed resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
                         placeholder="Redigera transkriptionen..."
+                      />
+                    ) : hasSpeakerBlocks ? (
+                      // Enhanced speaker view with speakerBlocksCleaned/Raw data
+                      <EnhancedSpeakerView
+                        meetingId={id || ''}
+                        speakerBlocks={speakerBlocksCleaned || speakerBlocksRaw || []}
+                        speakerNames={speakerNames}
+                        onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSegments ? (
                       // Speaker-segmented view (SIS enabled with segments)
