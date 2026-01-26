@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers, Terminal, Search, Filter, X, Pause, Play } from "lucide-react";
+import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Globe, Download, Trash2, RefreshCw, Construction, Cloud, Layers, Terminal, Search, Filter, X, Pause, Play, Cpu, Activity, Gauge, MemoryStick, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
@@ -20,6 +20,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Helper functions
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+};
+
+const formatProcessUptime = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
+};
 
 const AdminBackend = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -304,9 +321,9 @@ const AdminBackend = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     {health.overall === 'healthy' ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
                     ) : (
-                      <AlertCircle className="w-4 h-4 text-yellow-500" />
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
                     )}
                     <span className="text-sm font-medium">Systemhälsa</span>
                   </div>
@@ -314,18 +331,163 @@ const AdminBackend = () => {
                     {health.overall === 'healthy' ? 'OK' : 'Varning'}
                   </Badge>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                
+                {/* Health Checks Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   {health.checks.map((check) => (
-                    <div key={check.name} className="flex items-center gap-2 text-sm">
+                    <div 
+                      key={check.name} 
+                      className="flex items-center gap-2 text-sm p-2 rounded-md bg-background/50"
+                      title={check.message}
+                    >
                       {check.status === 'healthy' ? (
-                        <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                        <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                       ) : (
-                        <AlertCircle className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+                        <AlertCircle className="w-3 h-3 text-amber-500 flex-shrink-0" />
                       )}
                       <span className="text-muted-foreground truncate">{check.name}</span>
                     </div>
                   ))}
                 </div>
+
+                {/* Extended System Info */}
+                {health.system && (
+                  <div className="pt-4 border-t border-border/50 space-y-4">
+                    {/* System Overview */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-3 rounded-md bg-background/50">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                          <Server className="w-3 h-3" />
+                          <span className="text-xs">Värd</span>
+                        </div>
+                        <p className="text-sm font-medium truncate">{health.system.hostname}</p>
+                        <p className="text-xs text-muted-foreground">{health.system.platform} ({health.system.arch})</p>
+                      </div>
+                      
+                      <div className="p-3 rounded-md bg-background/50">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                          <Cpu className="w-3 h-3" />
+                          <span className="text-xs">CPU</span>
+                        </div>
+                        <p className="text-sm font-medium">{health.system.cpuCores} kärnor</p>
+                        <p className="text-xs text-muted-foreground">
+                          Load: {health.system.loadAvg1m.toFixed(2)}
+                        </p>
+                      </div>
+                      
+                      <div className="p-3 rounded-md bg-background/50">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                          <MemoryStick className="w-3 h-3" />
+                          <span className="text-xs">RAM</span>
+                        </div>
+                        <p className="text-sm font-medium">{health.system.memory.usedPercent.toFixed(1)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          {health.system.memory.used} / {health.system.memory.total}
+                        </p>
+                      </div>
+                      
+                      <div className="p-3 rounded-md bg-background/50">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                          <Clock className="w-3 h-3" />
+                          <span className="text-xs">Uptime</span>
+                        </div>
+                        <p className="text-sm font-medium">
+                          {Math.floor(health.system.uptimeSeconds / 86400)}d {Math.floor((health.system.uptimeSeconds % 86400) / 3600)}h
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Process: {formatProcessUptime(health.system.processUptimeSeconds)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Load Averages */}
+                    <div className="p-3 rounded-md bg-background/50">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <Activity className="w-3 h-3" />
+                        <span className="text-xs font-medium">Systembelastning</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">1 min</p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  health.system.loadAvg1m / health.system.cpuCores > 0.8 
+                                    ? 'bg-destructive' 
+                                    : health.system.loadAvg1m / health.system.cpuCores > 0.5 
+                                      ? 'bg-amber-500' 
+                                      : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min((health.system.loadAvg1m / health.system.cpuCores) * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-mono">{health.system.loadAvg1m.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">5 min</p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  health.system.loadAvg5m / health.system.cpuCores > 0.8 
+                                    ? 'bg-destructive' 
+                                    : health.system.loadAvg5m / health.system.cpuCores > 0.5 
+                                      ? 'bg-amber-500' 
+                                      : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min((health.system.loadAvg5m / health.system.cpuCores) * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-mono">{health.system.loadAvg5m.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">15 min</p>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  health.system.loadAvg15m / health.system.cpuCores > 0.8 
+                                    ? 'bg-destructive' 
+                                    : health.system.loadAvg15m / health.system.cpuCores > 0.5 
+                                      ? 'bg-amber-500' 
+                                      : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min((health.system.loadAvg15m / health.system.cpuCores) * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-mono">{health.system.loadAvg15m.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Process Memory */}
+                    <div className="p-3 rounded-md bg-background/50">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <Zap className="w-3 h-3" />
+                        <span className="text-xs font-medium">Node.js Process (PID: {health.system.process.pid})</span>
+                        <span className="text-xs ml-auto">{health.system.process.nodeVersion}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">RSS</p>
+                          <p className="font-medium font-mono">{formatBytes(health.system.process.rssBytes)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Heap Used</p>
+                          <p className="font-medium font-mono">{formatBytes(health.system.process.heapUsedBytes)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Heap Total</p>
+                          <p className="font-medium font-mono">{formatBytes(health.system.process.heapTotalBytes)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

@@ -102,7 +102,39 @@ export interface HealthCheck {
     name: string;
     status: 'healthy' | 'unhealthy' | 'warning' | 'not configured';
     message: string;
+    details?: {
+      version?: string;
+    };
   }>;
+  system?: {
+    hostname: string;
+    platform: string;
+    arch: string;
+    cpuCores: number;
+    loadAvg1m: number;
+    loadAvg5m: number;
+    loadAvg15m: number;
+    uptimeSeconds: number;
+    processUptimeSeconds: number;
+    memory: {
+      totalBytes: number;
+      freeBytes: number;
+      usedBytes: number;
+      usedPercent: number;
+      total: string;
+      used: string;
+      free: string;
+    };
+    process: {
+      pid: number;
+      nodeVersion: string;
+      rssBytes: number;
+      heapTotalBytes: number;
+      heapUsedBytes: number;
+      externalBytes: number;
+      arrayBuffersBytes: number;
+    };
+  };
 }
 
 export interface StorageData {
