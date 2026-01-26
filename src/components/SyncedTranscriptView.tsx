@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Copy, Users, Clock, ChevronDown, ChevronUp, Play, Pause } from 'lucide-react';
+import { Copy, Users, Clock, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -209,13 +208,21 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       const containerRect = container.getBoundingClientRect();
       const wordRect = activeWord.getBoundingClientRect();
       
-      // Check if word is outside visible area
+      // Check if word is outside visible area (with padding)
       const isOutOfView = 
-        wordRect.top < containerRect.top + 50 || 
-        wordRect.bottom > containerRect.bottom - 50;
+        wordRect.top < containerRect.top + 80 || 
+        wordRect.bottom > containerRect.bottom - 80;
       
       if (isOutOfView) {
-        activeWord.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Calculate scroll position to center the word
+        const wordOffsetTop = activeWord.offsetTop;
+        const containerHeight = container.clientHeight;
+        const scrollTo = wordOffsetTop - (containerHeight / 2) + (activeWord.clientHeight / 2);
+        
+        container.scrollTo({
+          top: Math.max(0, scrollTo),
+          behavior: 'smooth'
+        });
       }
     }
   }, [currentWordIndex, isPlaying]);
@@ -338,8 +345,12 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       </Collapsible>
 
       {/* Synced Transcript */}
-      <ScrollArea className="max-h-[55vh]">
-        <div ref={scrollContainerRef} className="space-y-4 pr-2">
+      <div 
+        ref={scrollContainerRef}
+        className="max-h-[60vh] overflow-y-auto overscroll-contain scroll-smooth pr-2 pb-8"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
+      >
+        <div className="space-y-4">
           {wordsBySpeaker.map((group, groupIdx) => {
             const styles = speakerStyleMap[group.speakerId];
             const displayName = getSpeakerDisplayName(group.speakerId);
@@ -419,7 +430,9 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
             );
           })}
         </div>
-      </ScrollArea>
+        {/* Bottom spacer for full scrollability */}
+        <div className="h-4" />
+      </div>
 
       {/* Current time indicator */}
       {isPlaying && (
