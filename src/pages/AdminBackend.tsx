@@ -53,6 +53,8 @@ const AdminBackend = () => {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   const [maintenancePending, setMaintenancePending] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
   
   // ASR Logs state
   const [logsOpen, setLogsOpen] = useState(false);
@@ -96,11 +98,28 @@ const AdminBackend = () => {
     }
   };
 
+  // Initial fetch
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Auto-refresh every 2 seconds when enabled
+  useEffect(() => {
+    if (autoRefresh) {
+      autoRefreshRef.current = setInterval(fetchData, 2000);
+    } else {
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    }
+    return () => {
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    };
+  }, [autoRefresh]);
 
   // ASR Logs polling
   const fetchLogs = async () => {
@@ -272,8 +291,28 @@ const AdminBackend = () => {
                   <span className={`w-2 h-2 rounded-full ${health?.overall === 'healthy' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
                   {health?.overall === 'healthy' ? 'Alla system OK' : 'Problem upptäckt'}
                 </Badge>
+                
+                {/* Auto-refresh toggle */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
+                  <Switch 
+                    checked={autoRefresh} 
+                    onCheckedChange={setAutoRefresh}
+                    className="scale-90"
+                  />
+                  <span className="text-xs font-medium whitespace-nowrap">
+                    {autoRefresh ? (
+                      <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live 2s
+                      </span>
+                    ) : (
+                      'Auto'
+                    )}
+                  </span>
+                </div>
+                
                 <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
                   Uppdatera
                 </Button>
               </div>
