@@ -175,6 +175,8 @@ export interface SpeakerBlock {
   speakerId: string;
   speakerName: string | null;
   text: string;
+  start?: number;
+  end?: number;
 }
 
 export interface ASRStatus {
