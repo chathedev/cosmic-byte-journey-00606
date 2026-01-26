@@ -79,6 +79,28 @@ export function AudioPlayerCard({
   // Prevent double-click races (play() promise pending -> pause() called -> Chrome warns)
   const playRequestRef = useRef<Promise<void> | null>(null);
 
+  // Some browsers fire `timeupdate` quite sparsely; we supplement with a short ticker while playing
+  // so word-highlighting + auto-scroll feels responsive.
+  const timeTickerRef = useRef<number | null>(null);
+
+  const stopTimeTicker = () => {
+    if (timeTickerRef.current) {
+      window.clearInterval(timeTickerRef.current);
+      timeTickerRef.current = null;
+    }
+  };
+
+  const startTimeTicker = () => {
+    if (timeTickerRef.current) return;
+    timeTickerRef.current = window.setInterval(() => {
+      const el = audioRef.current;
+      if (!el || el.paused) return;
+      const t = el.currentTime;
+      setCurrentTime(t);
+      onTimeUpdate?.(t);
+    }, 120);
+  };
+
   // Fetch audio as a blob (so we can attach auth headers) and use it for playback.
   // Note: HTMLAudioElement cannot send custom headers, so we must create an object URL.
   const objectUrlRef = useRef<string | null>(null);
@@ -88,8 +110,16 @@ export function AudioPlayerCard({
     if (seekTo !== undefined && audioRef.current && isFinite(seekTo)) {
       audioRef.current.currentTime = seekTo;
       setCurrentTime(seekTo);
+      onTimeUpdate?.(seekTo);
     }
   }, [seekTo]);
+
+  // Cleanup ticker on unmount
+  useEffect(() => {
+    return () => {
+      stopTimeTicker();
+    };
+  }, []);
 
   useEffect(() => {
     const downloadPath = audioBackup.downloadPath;
@@ -263,6 +293,8 @@ export function AudioPlayerCard({
     if (!audioRef.current) return;
     audioRef.current.currentTime = value[0];
     setCurrentTime(value[0]);
+    onTimeUpdate?.(value[0]);
+    onSeek?.(value[0]);
   };
 
   // Handle skip backward 10s
@@ -296,17 +328,25 @@ export function AudioPlayerCard({
   const handlePlay = () => {
     setIsPlaying(true);
     onPlayStateChange?.(true);
+    startTimeTicker();
   };
   
   const handlePause = () => {
     setIsPlaying(false);
     onPlayStateChange?.(false);
+    stopTimeTicker();
   };
-  const handleEnded = () => setIsPlaying(false);
+  const handleEnded = () => {
+    setIsPlaying(false);
+    onPlayStateChange?.(false);
+    stopTimeTicker();
+  };
 
   const handleError = () => {
     setError('Kunde inte spela upp ljudfilen');
     setIsPlaying(false);
+    onPlayStateChange?.(false);
+    stopTimeTicker();
   };
 
   if (error && !audioUrl) {

@@ -116,6 +116,39 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
 
+  // Auto-scroll stability: avoid fighting the user's manual scrolling and throttle programmatic scroll.
+  const programmaticScrollRef = useRef(false);
+  const userScrollLockUntilRef = useRef(0);
+  const lastAutoScrollAtRef = useRef(0);
+  const prefersReducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    prefersReducedMotionRef.current =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+  }, []);
+
+  const lockAutoScrollForUser = useCallback(() => {
+    userScrollLockUntilRef.current = Date.now() + 1200;
+  }, []);
+
+  const handleContainerScroll = useCallback(() => {
+    if (programmaticScrollRef.current) return;
+    lockAutoScrollForUser();
+  }, [lockAutoScrollForUser]);
+
+  const handleContainerWheel = useCallback(() => {
+    lockAutoScrollForUser();
+  }, [lockAutoScrollForUser]);
+
+  const handleContainerTouch = useCallback(() => {
+    lockAutoScrollForUser();
+  }, [lockAutoScrollForUser]);
+
+  const handleContainerPointerDown = useCallback(() => {
+    lockAutoScrollForUser();
+  }, [lockAutoScrollForUser]);
+
   // Group words by speaker
   const wordsBySpeaker = useMemo(() => {
     const groups: { speakerId: string; words: TranscriptWord[]; start: number; end: number }[] = [];
@@ -201,30 +234,54 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
   // Auto-scroll to active word during playback
   useEffect(() => {
-    if (isPlaying && activeWordRef.current && scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      const activeWord = activeWordRef.current;
-      
-      const containerRect = container.getBoundingClientRect();
-      const wordRect = activeWord.getBoundingClientRect();
-      
-      // Check if word is outside visible area (with padding)
-      const isAboveView = wordRect.top < containerRect.top + 60;
-      const isBelowView = wordRect.bottom > containerRect.bottom - 60;
-      
-      if (isAboveView || isBelowView) {
-        // Calculate position relative to container's scroll
-        const wordTopRelativeToContainer = wordRect.top - containerRect.top + container.scrollTop;
-        const containerHeight = container.clientHeight;
-        const scrollTo = wordTopRelativeToContainer - (containerHeight / 2) + (wordRect.height / 2);
-        
-        container.scrollTo({
-          top: Math.max(0, scrollTo),
-          behavior: 'smooth'
-        });
-      }
-    }
+    if (!isPlaying) return;
+    if (!activeWordRef.current || !scrollContainerRef.current) return;
+
+    const now = Date.now();
+    if (now < userScrollLockUntilRef.current) return;
+    if (now - lastAutoScrollAtRef.current < 220) return;
+
+    const container = scrollContainerRef.current;
+    const activeWord = activeWordRef.current;
+
+    const containerRect = container.getBoundingClientRect();
+    const wordRect = activeWord.getBoundingClientRect();
+
+    // Keep the active word within a comfortable "focus band" to feel like it's following playback.
+    const upperBand = containerRect.top + containerRect.height * 0.25;
+    const lowerBand = containerRect.bottom - containerRect.height * 0.25;
+    const isAboveBand = wordRect.top < upperBand;
+    const isBelowBand = wordRect.bottom > lowerBand;
+
+    if (!isAboveBand && !isBelowBand) return;
+
+    const wordTopRelativeToContainer = wordRect.top - containerRect.top + container.scrollTop;
+    const targetTop = wordTopRelativeToContainer - container.clientHeight * 0.35 + wordRect.height / 2;
+
+    programmaticScrollRef.current = true;
+    lastAutoScrollAtRef.current = now;
+
+    container.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: prefersReducedMotionRef.current ? 'auto' : 'smooth',
+    });
+
+    window.setTimeout(() => {
+      programmaticScrollRef.current = false;
+    }, prefersReducedMotionRef.current ? 0 : 250);
   }, [currentWordIndex, isPlaying]);
+
+  // Dev-only trace for diagnosing "not following" reports.
+  useEffect(() => {
+    if (!import.meta.env?.DEV) return;
+    if (!isPlaying) return;
+    // eslint-disable-next-line no-console
+    console.debug('[SyncedTranscriptView] playback tick', {
+      currentTime,
+      currentWordIndex,
+      words: words.length,
+    });
+  }, [currentWordIndex, currentTime, isPlaying, words.length]);
 
   // Copy transcript
   const handleCopyTranscript = useCallback(() => {
@@ -346,7 +403,12 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       {/* Synced Transcript */}
       <div 
         ref={scrollContainerRef}
-        className="max-h-[60vh] overflow-y-auto overscroll-contain scroll-smooth pr-2 pb-8"
+        onScroll={handleContainerScroll}
+        onWheel={handleContainerWheel}
+        onTouchStart={handleContainerTouch}
+        onTouchMove={handleContainerTouch}
+        onPointerDown={handleContainerPointerDown}
+        className="max-h-[60vh] overflow-y-auto overscroll-contain pr-2 pb-8"
         style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
       >
         <div className="space-y-4">
