@@ -44,121 +44,134 @@ serve(async (req) => {
     const wordCount = transcript.trim().split(/\s+/).length;
     console.log('📊 Processing transcript:', { wordCount, chars: transcript.length });
     
-    // Determine protocol length based on transcript length - enhanced scaling
+    // Determine protocol length based on transcript length - QUALITY over QUANTITY
+    // Keep protocols focused and concise - never overwhelm with too many points
     let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
     
     if (wordCount < 100) {
       // Very short - minimal protocol
       summaryLength = "1-2 korta meningar";
-      mainPointsCount = "2-3";
+      mainPointsCount = "1-3";
       mainPointsDetail = "Mycket kort, en halv mening per punkt";
-      decisionsDetail = "Endast om explicit nämnt";
+      decisionsDetail = "Endast FAKTISKA beslut som explicit fattades";
       actionItemsCount = "0-1";
       actionItemsDetail = "Endast om tydligt nämnt med namn och uppgift";
       nextMeetingCount = "0-1";
     } else if (wordCount < 200) {
       // Short meeting
       summaryLength = "2-3 meningar med kortfattad översikt";
-      mainPointsCount = "3-4";
+      mainPointsCount = "2-4";
       mainPointsDetail = "En kort mening per punkt";
-      decisionsDetail = "Kort formulering om nämnt";
-      actionItemsCount = "1-2";
-      actionItemsDetail = "Kortfattad - titel och ansvarig om nämnt";
-      nextMeetingCount = "1-2";
+      decisionsDetail = "Endast FAKTISKA beslut - inte diskussioner eller förslag";
+      actionItemsCount = "0-2";
+      actionItemsDetail = "Kortfattad - titel och ansvarig om explicit nämnt";
+      nextMeetingCount = "0-2";
     } else if (wordCount < 500) {
       // Medium-short meeting
       summaryLength = "3-4 meningar med översikt";
-      mainPointsCount = "4-6";
+      mainPointsCount = "3-5";
       mainPointsDetail = "En till två meningar per punkt";
-      decisionsDetail = "Tydlig formulering";
-      actionItemsCount = "2-4";
+      decisionsDetail = "Endast KONKRETA beslut som fattades - inte idéer eller förslag";
+      actionItemsCount = "1-3";
       actionItemsDetail = "Beskrivning med viktiga detaljer";
-      nextMeetingCount = "2-3";
+      nextMeetingCount = "1-2";
     } else if (wordCount < 1000) {
       // Medium meeting
-      summaryLength = "4-6 meningar med detaljerad översikt";
-      mainPointsCount = "6-10";
+      summaryLength = "4-5 meningar med detaljerad översikt";
+      mainPointsCount = "4-7";
       mainPointsDetail = "Två meningar per punkt med detaljer";
-      decisionsDetail = "Utförlig formulering med kontext";
-      actionItemsCount = "3-6";
+      decisionsDetail = "Tydliga beslut med kontext - INTE diskussioner utan resultat";
+      actionItemsCount = "2-5";
       actionItemsDetail = "Detaljerad beskrivning med kontext";
-      nextMeetingCount = "3-4";
+      nextMeetingCount = "2-3";
     } else if (wordCount < 2000) {
       // Long meeting
-      summaryLength = "6-8 meningar med mycket detaljerad översikt";
-      mainPointsCount = "10-15";
-      mainPointsDetail = "Två till tre meningar per punkt med omfattande detaljer";
-      decisionsDetail = "Mycket utförlig formulering med bakgrund och konsekvenser";
-      actionItemsCount = "5-10";
-      actionItemsDetail = "Omfattande beskrivning med full kontext och plan";
-      nextMeetingCount = "4-5";
+      summaryLength = "5-7 meningar med detaljerad översikt";
+      mainPointsCount = "5-8";
+      mainPointsDetail = "Två till tre meningar per punkt med detaljer";
+      decisionsDetail = "Detaljerade beslut med bakgrund - ENDAST faktiska beslut";
+      actionItemsCount = "3-7";
+      actionItemsDetail = "Omfattande beskrivning med kontext och plan";
+      nextMeetingCount = "2-4";
     } else {
-      // Very long meeting
-      summaryLength = "8-12 meningar med extremt detaljerad översikt";
-      mainPointsCount = "15-25";
-      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer och insikter";
-      decisionsDetail = "Extremt detaljerad med fullständig bakgrund och långsiktiga konsekvenser";
-      actionItemsCount = "8-15";
-      actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext och genomförandeplan";
-      nextMeetingCount = "5-7";
+      // Very long meeting - still keep it focused, max 10 main points
+      summaryLength = "6-8 meningar med omfattande översikt";
+      mainPointsCount = "6-10";
+      mainPointsDetail = "Två till tre meningar per punkt med djupgående detaljer";
+      decisionsDetail = "Fullständiga beslut med bakgrund - ENDAST verifierbara beslut";
+      actionItemsCount = "5-10";
+      actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext";
+      nextMeetingCount = "3-5";
     }
     
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
     const agendaNote = agenda ? 'OBS: Använd mötesagendan ovan för att strukturera protokollet och säkerställ att alla agendapunkter täcks.' : '';
     const shortNote = wordCount < 50 ? 'OBS: Utskriften är mycket kort. Inkludera ett meddelande i sammanfattningen om att mötet innehöll begränsad information.' : '';
     
-    // Speaker attribution instructions
+    // Speaker attribution instructions - ALWAYS include names when available
     let speakerNote = '';
     if (hasSpeakerAttribution && speakers && speakers.length > 0) {
       const speakerList = speakers.map((s: { name: string; segments: number }) => s.name).join(', ');
       speakerNote = `
-🎤 TALARINFORMATION (använd naturligt, inte överdrivet):
+🎤 TALARINFORMATION - ANVÄND NAMN AKTIVT:
 Identifierade talare i mötet: ${speakerList}
 
-Du SKA subtilt och naturligt referera till talare i protokollet:
-- I sammanfattningen, nämn huvudtalare kort om relevant (t.ex. "Mötet leddes av Charlie som...")
-- I huvudpunkter, inkludera talarens namn när de hade en specifik åsikt eller förslag
-- I åtgärdspunkter, sätt talarens namn som "ansvarig" om de tog på sig uppgiften
-- I beslut, nämn om en specifik person föreslog det
+DU MÅSTE referera till talare med namn i protokollet:
+- I sammanfattningen, nämn vem som ledde mötet och viktiga bidrag (t.ex. "Mötet leddes av Charlie som presenterade...")
+- I huvudpunkter, inkludera talarens namn när de framförde något viktigt (t.ex. "Erik lyfte frågan om...")
+- I åtgärdspunkter, sätt ALLTID talarens namn som "ansvarig" om de tog på sig uppgiften
+- I beslut, nämn VEM som föreslog beslutet och vem som godkände
 
-VIKTIGT - Balans:
-- Använd INTE talarnamn på varje punkt - bara när det tillför värde
-- Skriv naturligt, t.ex. "Charlie föreslog..." eller "Enligt Erik bör..."
-- Om samma person säger allt, nämn dem bara 1-2 gånger, inte på varje punkt
-- Fokusera på INNEHÅLLET först, talarattribuering är sekundär
+NAMNANVÄNDNING:
+- Skriv naturligt: "Charlie föreslog att...", "Erik och Lisa diskuterade...", "Enligt Maria bör..."
+- Nämn namn på de som aktivt bidrog till diskussionen
+- Om en specifik person var ansvarig för ett ämne, nämn dem
+- I åtgärdspunkter MÅSTE ansvarig-fältet innehålla namn om någon nämndes
 `;
     }
 
-    const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett DETALJERAT protokoll som täcker det viktigaste från mötet.
+    const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett FOKUSERAT protokoll som täcker det viktigaste från mötet.
 
 🚫 ABSOLUT FÖRBJUDET:
 - Kopiera NÅGON mening direkt från utskriften
 - Klistra in fraser ordagrant från transkriptionen
 - Upprepa meningar eller stycken från originaltexten
 - Lista punkter som är direkta citat
+- Inkludera "beslut" som egentligen bara var diskussioner eller idéer
+- Skapa för många punkter - KVALITET över KVANTITET
 
 ✅ DU MÅSTE:
 - OMFORMULERA allt innehåll med egna ord
 - SYNTETISERA information från flera delar av mötet
 - SKRIVA professionella, välformulerade meningar
 - SAMMANFATTA och PARAFRASERA diskussionerna
-- INKLUDERA VIKTIGA DETALJER från mötet
+- INKLUDERA NAMN på deltagare som bidrog till diskussionen
+- BEGRÄNSA antal punkter - hellre färre och bättre än många och halvdana
+
+🎯 KRITISKA KRAV FÖR BESLUT:
+- Ett "beslut" är ENDAST något som gruppen faktiskt BESTÄMDE - inte bara diskuterade
+- INGA beslut = tom beslutslista. Hellre tom lista än felaktiga beslut.
+- Beslut måste vara KONKRETA: "Vi bestämde att...", "Det beslutades att..."
+- Om det bara var en diskussion utan slutsats = INTE ett beslut
+- Om någon bara föreslog något utan att det godkändes = INTE ett beslut
+
+🎯 KRITISKA KRAV FÖR NAMN:
+- NÄMN ALLTID personers namn när de bidrog till något
+- Skriv "Erik föreslog att..." istället för "Det föreslogs att..."
+- I åtgärdspunkter, sätt personens NAMN som ansvarig om de tog på sig uppgiften
+- Om ett namn nämndes i utskriften, ANVÄND DET i protokollet
 
 🎯 KRITISKA NOGGRANNHETSKRAV:
 - Inkludera ENDAST information som FAKTISKT diskuterades i mötet
 - Dra INGA slutsatser som inte EXPLICIT nämndes i utskriften
-- Om något är oklart, använd formuleringen "enligt diskussionen" eller "som nämndes"
 - GÖR INGA ANTAGANDEN om saker som inte sades i mötet
 - Vid osäkerhet, var KONSERVATIV - utelämna hellre information än att gissa
-- VERIFIERA att varje punkt du skriver faktiskt har stöd i utskriften
-- Om en person nämns, använd EXAKT det namn som används i utskriften
 - Om siffror eller data nämns, använd EXAKT de värden som nämndes
-- Lägg ALDRIG till extra kontext eller bakgrundsinformation som inte diskuterades
 - Om ingen ansvarig nämndes för en åtgärd, lämna fältet TOMT - gissa inte
-- Om inget beslut togs om något, inkludera det INTE i beslutslistan
 
 ⚠️ VARNING: Felaktiga protokoll med uppfinnad information är OACCEPTABELT.
 Korrekthet och faktabaserad dokumentation är VIKTIGARE än omfattande protokoll.
+HELLRE ETT KORT, KORREKT PROTOKOLL ÄN ETT LÅNGT MED PÅHITT.
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -170,31 +183,32 @@ VIKTIGT för "nästaMöteFörslag": Lista ENDAST diskussionsämnen och uppföljn
 
 VIKTIGT för åtgärdspunkter: Om inget specifikt datum nämndes för en deadline, lämna "deadline"-fältet HELT TOMT (tom sträng ""). Gissa INTE eller lägg INTE till dagens år automatiskt.
 
-Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
+VIKTIGT för beslut: Inkludera ENDAST faktiska beslut som fattades. Om mötet bara innehöll diskussioner utan konkreta beslut, returnera en TOM lista []. ALDRIG hitta på beslut.
+
+Skapa ett professionellt, FOKUSERAT protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
 
 {
   "protokoll": {
     "titel": "...",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "${summaryLength}. Inkludera kontext, viktiga diskussioner, beslut och resultat. Skriv professionellt.",
+    "sammanfattning": "${summaryLength}. Inkludera kontext, viktiga diskussioner och nämn deltagare vid namn. Skriv professionellt.",
     "huvudpunkter": [
-      "${mainPointsCount} totalt. ${mainPointsDetail}. Täck alla viktiga ämnen som diskuterades under mötet."
+      "MAX ${mainPointsCount} punkter. ${mainPointsDetail}. Nämn personers namn när relevant."
     ],
     "beslut": [
-      "${decisionsDetail}. Lista alla beslut som togs."
+      "ENDAST FAKTISKA BESLUT. ${decisionsDetail}. Om inga beslut fattades = tom lista []."
     ],
     "åtgärdspunkter": [
-      "VIKTIGT: Generera EXAKT ${actionItemsCount} åtgärdspunkter baserat på mötets längd.",
       {
         "titel": "Tydlig och konkret titel på uppgiften",
         "beskrivning": "${actionItemsDetail}",
-        "ansvarig": "Namn eller roll om nämnt i mötet, annars tom sträng",
+        "ansvarig": "Personens NAMN om de nämndes som ansvarig, annars tom sträng",
         "deadline": "YYYY-MM-DD endast om datum explicit nämndes, annars tom sträng",
         "prioritet": "critical | high | medium | low baserat på urgency i mötet"
       }
     ],
     "nästaMöteFörslag": [
-      "${nextMeetingCount} förslag. Beskriv varje diskussionsämne med tillräcklig kontext."
+      "MAX ${nextMeetingCount} förslag."
     ]
   }
 }
