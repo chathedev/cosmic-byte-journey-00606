@@ -324,6 +324,16 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     }, prefersReducedMotionRef.current ? 0 : 250);
   }, [currentWordIndex, isPlaying]);
 
+  // Normalize speaker label to backend format (speaker_0, speaker_1, etc.)
+  const normalizeSpeakerLabel = (label: string): string => {
+    if (/^speaker_\d+$/.test(label)) return label;
+    const match = label.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+    if (match) return `speaker_${match[1]}`;
+    const numMatch = label.match(/(\d+)/);
+    if (numMatch) return `speaker_${numMatch[1]}`;
+    return label.toLowerCase().replace(/\s+/g, '_');
+  };
+
   // Handle edit speaker
   const handleEditSpeaker = (speakerId: string) => {
     setEditingSpeaker(speakerId);
@@ -334,7 +344,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   const handleSaveSpeakerName = async () => {
     if (!editingSpeaker || !meetingId) return;
 
-    const speakerLabel = editingSpeaker;
+    // Normalize to backend format: speaker_0, speaker_1, etc.
+    const speakerLabel = normalizeSpeakerLabel(editingSpeaker);
     const newName = editedName.trim();
     
     if (!newName) {
@@ -346,8 +357,17 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     
     try {
       setLocalSpeakerNames(prev => ({ ...prev, [speakerLabel]: newName }));
-      const updatedNames = { ...speakerNames, [speakerLabel]: newName };
-      const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
+      
+      // Build normalized names map for backend
+      const normalizedNames: Record<string, string> = {};
+      Object.entries(speakerNames).forEach(([key, value]) => {
+        normalizedNames[normalizeSpeakerLabel(key)] = value;
+      });
+      normalizedNames[speakerLabel] = newName;
+      
+      console.log('[Speaker] Saving speaker names:', normalizedNames);
+      
+      const saveResult = await backendApi.saveSpeakerNames(meetingId, normalizedNames);
       onSpeakerNamesUpdated?.(saveResult.speakerNames);
       toast.success(`Namn sparat: ${newName}`);
     } catch (error) {
