@@ -56,7 +56,7 @@ export default function GenerateProtocol() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { incrementMeetingCount, refreshPlan, userPlan, enterpriseMembership } = useSubscription();
+  const { incrementMeetingCount, refreshPlan, userPlan, enterpriseMembership, isAdmin } = useSubscription();
   const { toast } = useToast();
   const [isValidated, setIsValidated] = useState(false);
   const hasCountedRef = useRef(false);
@@ -139,8 +139,9 @@ export default function GenerateProtocol() {
       }
 
       // 3) Check protocol count against limit when we have a real meetingId
-      // Pro = 1 protocol generation, Enterprise = 3 protocol generations
-      if (payload.meetingId) {
+      // Admins have UNLIMITED protocol generations
+      // Pro = 2 protocol generations, Enterprise = 3 protocol generations
+      if (payload.meetingId && !isAdmin) {
         try {
           // CRITICAL: Always fetch fresh count from backend endpoint, not stale meeting data
           const currentProtocolCount = await meetingStorage.getProtocolCount(payload.meetingId);
@@ -152,6 +153,7 @@ export default function GenerateProtocol() {
             currentProtocolCount, 
             maxProtocolCount, 
             isEnterprise,
+            isAdmin: false,
             remaining: maxProtocolCount - currentProtocolCount
           });
           
@@ -168,6 +170,8 @@ export default function GenerateProtocol() {
           console.error('Error checking protocol count:', error);
           // Continue anyway if check fails
         }
+      } else if (isAdmin) {
+        console.log('🔐 Protocol limit check BYPASSED - user is admin');
       }
 
       // Clear token from old flows; keep pending payload until generation begins
