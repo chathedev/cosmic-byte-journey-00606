@@ -2400,6 +2400,7 @@ const MeetingDetail = () => {
                         currentTime={audioCurrentTime}
                         isPlaying={audioIsPlaying}
                         onSeek={(time) => setAudioSeekTo(time)}
+                        onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSpeakerBlocks ? (
                       // Enhanced speaker view with speakerBlocksCleaned/Raw data
