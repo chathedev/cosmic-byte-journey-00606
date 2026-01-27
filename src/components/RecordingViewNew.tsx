@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -11,11 +11,13 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { VoiceNamePrompt } from "./VoiceNamePrompt";
+import { RecordingIndicator } from "./RecordingIndicator";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRecordingBackup } from "@/hooks/useRecordingBackup";
 
 interface RecordingViewNewProps {
   onBack: () => void;
@@ -88,6 +90,25 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
+
+  // Recording backup for reliability - auto-saves chunks to IndexedDB
+  const tempMeetingId = useRef(`temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
+  const {
+    addChunk,
+    saveBackup,
+    clearBackup,
+    startAutoSave,
+    stopAutoSave,
+    chunksSaved,
+    isBackupEnabled,
+  } = useRecordingBackup({
+    meetingId: sessionId || tempMeetingId.current,
+    enabled: true,
+    saveInterval: 15000, // Save every 15 seconds for safety
+    onBackupSaved: (count, bytes) => {
+      console.log(`🛡️ Auto-backup saved: ${count} chunks, ${bytes} bytes`);
+    },
+  });
 
   // Load folders
   useEffect(() => {
@@ -380,6 +401,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          // Add to backup system for recovery
+          addChunk(event.data, mediaRecorder.mimeType);
           console.log(`📦 Audio chunk received: ${event.data.size} bytes (total chunks: ${audioChunksRef.current.length})`);
         }
       };
@@ -387,6 +410,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
       
+      // Start auto-save backup for reliability
+      startAutoSave();
       setIsRecording(true);
       await requestWakeLock();
       
@@ -408,6 +433,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   };
 
   const stopMediaRecorder = () => {
+    stopAutoSave(); // Stop backup timer
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -432,6 +458,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       mediaRecorderRef.current.pause();
       setIsPaused(true);
       releaseWakeLock();
+      // Save backup when pausing for extra safety
+      saveBackup();
       // Pause speech recognition for Free/Pro
       if (!useAsrMode && recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch { /* ignore */ }
@@ -810,13 +838,23 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
   if (viewState === 'recording') {
     return (
       <div className="min-h-[100dvh] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col overflow-hidden">
+        {/* Always-on-screen Recording Indicator - Floating, persistent */}
+        <RecordingIndicator
+          isRecording={isRecording}
+          isPaused={isPaused}
+          durationSec={durationSec}
+          isBackupEnabled={isBackupEnabled}
+          chunksSaved={chunksSaved}
+          compact={true}
+        />
+
         {/* Header - Compact for mobile */}
         <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
           <div className="max-w-5xl mx-auto px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className={`w-2 h-2 flex-shrink-0 rounded-full transition-all ${
-                  !isPaused ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground/40'
+                <div className={`w-2.5 h-2.5 flex-shrink-0 rounded-full transition-all ${
+                  !isPaused ? 'bg-destructive animate-pulse shadow-lg shadow-destructive/50' : 'bg-muted-foreground/40'
                 }`} />
                 {isEditingName ? (
                   <div className="flex gap-1 items-center flex-1 min-w-0">
@@ -839,11 +877,20 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <Clock className="w-3 h-3 text-muted-foreground" />
-                <span className="font-mono text-[10px]">
-                  {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
-                </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Backup indicator in header */}
+                {isBackupEnabled && chunksSaved > 0 && (
+                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-medium hidden sm:inline">Säkrad</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-muted-foreground" />
+                  <span className="font-mono text-[10px]">
+                    {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
