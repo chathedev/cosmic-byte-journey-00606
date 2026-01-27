@@ -2447,6 +2447,7 @@ const MeetingDetail = () => {
                         meetingId={id || ''}
                         transcriptRaw={transcriptRaw}
                         speakerBlocksCleaned={speakerBlocksCleaned}
+                        speakerNames={speakerNames}
                       />
                     )}
                   </div>
