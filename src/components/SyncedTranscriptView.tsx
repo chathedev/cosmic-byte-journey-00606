@@ -105,11 +105,41 @@ const getSpeakerNumber = (speakerId: string): number => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
+// Normalize speaker ID to backend format (speaker_0, speaker_1, etc.)
+const normalizeSpeakerId = (id: string): string => {
+  if (/^speaker_\d+$/.test(id)) return id;
+  const match = id.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+  if (match) return `speaker_${match[1]}`;
+  const numMatch = id.match(/(\d+)/);
+  if (numMatch) return `speaker_${numMatch[1]}`;
+  return id.toLowerCase().replace(/\s+/g, '_');
+};
+
 // Check if a name is a generic placeholder
 const isGenericName = (name: string): boolean => {
   if (!name) return true;
   const lower = name.toLowerCase().trim();
   return /^(talare|speaker)[_\s-]?\d*$/i.test(lower) || lower === 'unknown' || lower === 'okänd';
+};
+
+// Helper to lookup speaker name with normalization fallback
+const lookupSpeakerName = (speakerNames: Record<string, string>, id: string): string | undefined => {
+  // Try exact match first
+  if (speakerNames[id] && !isGenericName(speakerNames[id])) {
+    return speakerNames[id];
+  }
+  // Try normalized version
+  const normalized = normalizeSpeakerId(id);
+  if (speakerNames[normalized] && !isGenericName(speakerNames[normalized])) {
+    return speakerNames[normalized];
+  }
+  // Try all keys with same normalized form
+  for (const [key, value] of Object.entries(speakerNames)) {
+    if (normalizeSpeakerId(key) === normalized && !isGenericName(value)) {
+      return value;
+    }
+  }
+  return undefined;
 };
 
 export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
@@ -244,17 +274,20 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
    * 3) Formatted label - "Talare X" fallback
    */
   const getSpeakerDisplayName = useCallback((speakerId: string): string => {
-    // 1) Check user-edited names first
-    if (speakerNames[speakerId] && !isGenericName(speakerNames[speakerId])) {
-      return speakerNames[speakerId];
+    // 1) Check user-edited names first (with normalization fallback)
+    const userName = lookupSpeakerName(speakerNames, speakerId);
+    if (userName) {
+      return userName;
     }
-    // 2) Check block-level suggested names from AI cleanup
-    if (blockSuggestedNames[speakerId]) {
-      return blockSuggestedNames[speakerId];
+    // 2) Check block-level suggested names from AI cleanup (with normalization)
+    const blockName = lookupSpeakerName(blockSuggestedNames, speakerId);
+    if (blockName) {
+      return blockName;
     }
     // 3) Check initial speaker names (may contain suggestions from backend)
-    if (initialSpeakerNames[speakerId] && !isGenericName(initialSpeakerNames[speakerId])) {
-      return initialSpeakerNames[speakerId];
+    const initialName = lookupSpeakerName(initialSpeakerNames, speakerId);
+    if (initialName) {
+      return initialName;
     }
     // 4) Fallback to formatted label
     const num = getSpeakerNumber(speakerId);
@@ -263,8 +296,9 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
   // Check if name is AI-suggested (not user-edited)
   const isAISuggested = useCallback((speakerId: string): boolean => {
-    if (localSpeakerNames[speakerId]) return false;
-    return !!blockSuggestedNames[speakerId];
+    const normalized = normalizeSpeakerId(speakerId);
+    if (localSpeakerNames[speakerId] || localSpeakerNames[normalized]) return false;
+    return !!lookupSpeakerName(blockSuggestedNames, speakerId);
   }, [localSpeakerNames, blockSuggestedNames]);
 
   // Find current word index
