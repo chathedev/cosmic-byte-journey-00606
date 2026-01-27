@@ -79,6 +79,8 @@ export async function uploadRecordingToAsr(options: RecordingUploadOptions): Pro
 
 /**
  * Standard multipart/form-data upload
+ * NOTE: Do NOT send custom headers like X-Meeting-Id - they cause CORS preflight failures.
+ * Send meetingId only in the FormData body.
  */
 async function attemptMultipartUpload(
   file: File,
@@ -90,6 +92,7 @@ async function attemptMultipartUpload(
   const formData = new FormData();
   formData.append('audio', file, file.name);
   formData.append('audioFile', file, file.name); // Also send as audioFile for compatibility
+  formData.append('file', file, file.name); // Also send as 'file' per backend docs
   // Send both keys for backend compatibility
   formData.append('meetingId', meetingId);
   formData.append('meeting_id', meetingId);
@@ -101,11 +104,12 @@ async function attemptMultipartUpload(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
 
+    // IMPORTANT: Only send Authorization header, NO custom X-Meeting-Id header
+    // The meetingId is already in the FormData body
     const response = await fetch(ASR_RECORDING_ENDPOINT, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'X-Meeting-Id': meetingId,
+        'Authorization': `Bearer ${token}`,
       },
       body: formData,
       signal: controller.signal,
@@ -126,7 +130,7 @@ async function attemptMultipartUpload(
 
 /**
  * Raw body fallback for HTTP/2 protocol errors.
- * Sends the file as request body with metadata in headers.
+ * Since we can't use custom headers due to CORS, fallback uses query params.
  */
 async function attemptRawBodyUpload(
   file: File,
@@ -141,21 +145,19 @@ async function attemptRawBodyUpload(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
 
-    const headers: Record<string, string> = {
-      'Content-Type': file.type || 'application/octet-stream',
-      'X-File-Name': encodeURIComponent(file.name),
-      'X-Meeting-Id': meetingId,
-      'X-MeetingId': meetingId,
-      'Authorization': `Bearer ${token}`,
-    };
-
-    if (language) headers['X-Language'] = language;
+    // Use query params instead of custom headers to avoid CORS issues
+    const url = new URL(ASR_RECORDING_ENDPOINT);
+    url.searchParams.set('meetingId', meetingId);
+    if (language) url.searchParams.set('language', language);
 
     console.log('[ASR Recording] Raw body upload starting...', { meetingId });
 
-    const response = await fetch(ASR_RECORDING_ENDPOINT, {
+    const response = await fetch(url.toString(), {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'Authorization': `Bearer ${token}`,
+      },
       body: file,
       signal: controller.signal,
     });

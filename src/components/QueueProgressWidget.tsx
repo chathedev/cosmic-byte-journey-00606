@@ -64,39 +64,45 @@ export const QueueProgressWidget = ({
       if (stage === 'done') return 100;
       if (stage === 'error') return currentProgress;
       
-      // Use backend progress if available and meaningful
+      // PRIORITY: Use backend progressPercent if available (0-100)
+      // This is the most accurate source from the ASR backend
       if (typeof backendProgress === 'number' && backendProgress > 0) {
-        // Backend provides 0-100, use it directly but cap at 98 until truly done
-        return Math.min(backendProgress, 98);
+        // Backend provides 0-100, cap at 99 until truly done to avoid premature completion
+        return Math.min(backendProgress, 99);
       }
       
-      // Uploading: use uploadProgress (0-100) mapped to 0-30% of total
+      // Uploading: use uploadProgress (0-100) mapped to 0-25% of total
       if (status === 'uploading' || stage === 'uploading') {
-        return Math.min(uploadProgress * 0.30, 30);
+        return Math.min(uploadProgress * 0.25, 25);
       }
       
-      // Queued: show 30-40% based on position
+      // Queued: show 25-35% based on position
       if (status === 'queued' || stage === 'queued') {
         if (queueDepth > 0 && queuePosition > 0) {
           const queueProgressPercent = 1 - (queuePosition / queueDepth);
-          return 30 + queueProgressPercent * 10; // 30-40%
+          return 25 + queueProgressPercent * 10; // 25-35%
         }
-        return 32; // Default when queued
+        return 28; // Default when queued
       }
       
-      // Transcribing: 40-85% with gradual increase
+      // Transcribing: 35-80% with gradual increase
       if (status === 'processing' || stage === 'transcribing') {
-        // Gradually increase from current to 85%
-        if (currentProgress < 85) {
-          return Math.min(currentProgress + 0.8, 85);
+        // Use chunk progress if available for more accurate indication
+        if (queueMetadata?.totalChunks && queueMetadata.totalChunks > 1 && queueMetadata.chunkIndex) {
+          const chunkProgress = (queueMetadata.chunkIndex / queueMetadata.totalChunks) * 45; // 0-45%
+          return 35 + chunkProgress; // 35-80%
+        }
+        // Gradually increase from current to 80%
+        if (currentProgress < 80) {
+          return Math.min(currentProgress + 0.5, 80);
         }
         return currentProgress;
       }
       
-      // SIS processing: 85-98%
+      // SIS processing: 80-99%
       if (stage === 'sis_processing') {
-        if (currentProgress < 98) {
-          return Math.min(currentProgress + 0.6, 98);
+        if (currentProgress < 99) {
+          return Math.min(currentProgress + 0.4, 99);
         }
         return currentProgress;
       }
