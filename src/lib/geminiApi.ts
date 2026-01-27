@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
-// Use Supabase edge function for AI calls
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+// All AI calls now go through the backend at api.tivly.se
+// No longer using Supabase edge functions for AI
 
 export type GeminiModel = 
   | "gemini-2.5-flash"
@@ -252,24 +252,40 @@ export async function generateWithGemini(
   // Note: temperature and maxOutputTokens are not supported by Vertex AI
   // They are ignored by the backend per API docs
 
-  // Get auth token for the edge function
+  // Get auth token
   const token = await getAuthToken();
   if (!token) {
     throw new Error("Inte inloggad");
   }
 
-  // Call via Supabase edge function
-  const { data, error } = await supabase.functions.invoke('ai-gemini', {
-    body: requestBody,
+  console.log('[generateWithGemini] Calling backend at api.tivly.se/ai/gemini');
+
+  // Call via backend at api.tivly.se (NOT Supabase edge function)
+  const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
+    body: JSON.stringify(requestBody),
   });
 
-  if (error) {
-    console.error('[generateWithGemini] Supabase function error:', error);
-    throw new Error(error.message || 'AI-fel');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('[generateWithGemini] Backend error:', response.status, errorData);
+    
+    if (response.status === 401) {
+      throw new Error("Inte inloggad");
+    }
+    if (response.status === 429) {
+      throw new Error("För många förfrågningar - vänta en stund");
+    }
+    
+    throw new Error(errorData.message || errorData.error || 'AI-fel');
   }
+
+  const data = await response.json();
 
   if (data?.error) {
     // Handle specific error codes per API docs
@@ -363,7 +379,7 @@ export async function streamChat({
   const model = isEnterprise ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 
   try {
-    // Build prompt for edge function
+    // Build prompt for backend
     const systemPrompt = `Du är en intelligent mötesassistent för Tivly. Svara på svenska.${transcript ? `\n\nMÖTESINNEHÅLL:\n${transcript}` : ''}`;
     const userPrompt = messages.map(m => `${m.role === 'user' ? 'Användare' : 'Assistent'}: ${m.content}`).join('\n\n');
 
@@ -377,23 +393,31 @@ export async function streamChat({
     // Calculate cost estimate for tracking
     const estimatedCost = MODEL_COSTS[model as GeminiModel] ?? 0.001;
 
-    // Call via Supabase edge function
-    const { data, error } = await supabase.functions.invoke('ai-gemini', {
-      body: {
+    console.log('[streamChat] Calling backend at api.tivly.se/ai/gemini');
+
+    // Call via backend at api.tivly.se (NOT Supabase edge function)
+    const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
         prompt: `${systemPrompt}\n\n${userPrompt}`,
         model,
-        costUsd: estimatedCost, // Always include cost for tracking
-      },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+        costUsd: estimatedCost,
+      }),
     });
 
-    if (error) {
-      console.error('[streamChat] Supabase function error:', error);
-      onError(new Error(error.message || 'AI-fel'));
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[streamChat] Backend error:', response.status, errorData);
+      onError(new Error(errorData.message || errorData.error || 'AI-fel'));
       return;
     }
+
+    const data = await response.json();
 
     if (data?.error) {
       onError(new Error(data.message || data.error || "API-fel"));
