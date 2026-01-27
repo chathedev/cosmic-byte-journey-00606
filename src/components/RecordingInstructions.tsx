@@ -83,6 +83,13 @@ export const RecordingInstructions = ({ isOpen, onClose }: RecordingInstructions
                   transition={{ delay: 0.3 }}
                   className="space-y-3"
                 >
+                  <div className="rounded-xl border border-border/50 bg-muted/40 p-3">
+                    <p className="text-xs text-foreground font-medium">För bättre namn på talare</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Låt varje person säga <span className="font-medium text-foreground">”Hej, jag heter …”</span> i början.
+                      Säg gärna en i taget.
+                    </p>
+                  </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                     <span>Placera telefonen nära talarna</span>

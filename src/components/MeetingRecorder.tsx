@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { RecordingInstructions } from "./RecordingInstructions";
+import { VoiceNamePrompt } from "./VoiceNamePrompt";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { uploadRecordingToAsr } from "@/lib/asrRecordingUpload";
 import { apiClient } from "@/lib/api";
@@ -574,6 +575,8 @@ export const MeetingRecorder = ({
             {isPaused ? 'Pausad' : 'Spelar in'}
           </p>
         </div>
+
+        <VoiceNamePrompt />
 
         {/* Live Transcript Display (Free/Pro only) */}
         {!useAsrMode && (liveTranscript || interimText) && (

@@ -175,7 +175,7 @@ export const AutoProtocolGenerator = ({
         let speakerInfo: { name: string; segments: number }[] = [];
         
         // Priority: Use transcriptSegments with SIS data if available
-        if (transcriptSegments && transcriptSegments.length > 0 && (sisMatches || sisSpeakers || propSpeakerNames)) {
+        if (transcriptSegments && transcriptSegments.length > 0) {
           // 70%+ confidence required for reliable speaker identification
           const SIS_CONFIDENCE_THRESHOLD = 70; // Percent
           
@@ -244,29 +244,46 @@ export const AutoProtocolGenerator = ({
             });
           }
           
-          // Only format with speaker names if we have REAL identified speakers
-          // Don't use generic "Talare 1/2/3" - it adds no value
+          // Viktigt: behåll alltid talarindelning i inputen till protokollgenerering.
+          // Om vi saknar riktiga namn använder vi stabila generiska etiketter (Talare 1/2/...).
+          const fallbackLabelMap = new Map<string, string>();
+          const getFallbackLabel = (rawId: unknown) => {
+            const id = String(rawId || 'unknown');
+            const existing = fallbackLabelMap.get(id);
+            if (existing) return existing;
+
+            const numMatch = id.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+            if (numMatch) {
+              const label = `Talare ${parseInt(numMatch[1], 10) + 1}`;
+              fallbackLabelMap.set(id, label);
+              return label;
+            }
+
+            if (/^[A-Z]$/i.test(id)) {
+              const label = `Talare ${id.toUpperCase()}`;
+              fallbackLabelMap.set(id, label);
+              return label;
+            }
+
+            const label = `Talare ${fallbackLabelMap.size + 1}`;
+            fallbackLabelMap.set(id, label);
+            return label;
+          };
+
+          const formattedSegments = transcriptSegments
+            .filter(segment => segment && segment.text)
+            .map(segment => {
+              const speakerId = String(segment.speakerId || 'unknown');
+              const label = speakerNameMap.get(speakerId) || speakerNameMap.get('meeting') || getFallbackLabel(speakerId);
+              return `[${label}]: ${segment.text || ''}`;
+            });
+
+          formattedTranscript = formattedSegments.length > 0
+            ? formattedSegments.join('\n\n')
+            : transcript;
+
+          // Collect speaker info for logging (only real names)
           if (speakerNameMap.size > 0) {
-            // Format transcript with real speaker names
-            const formattedSegments = transcriptSegments
-              .filter(segment => segment && segment.text)
-              .map(segment => {
-                const speakerId = segment.speakerId || 'unknown';
-                const speakerName = speakerNameMap.get(speakerId) || speakerNameMap.get('meeting');
-                
-                // Only add speaker label if we have a real name for this speaker
-                if (speakerName) {
-                  return `[${speakerName}]: ${segment.text || ''}`;
-                }
-                // No real name identified - just return the text without speaker label
-                return segment.text || '';
-              });
-            
-            formattedTranscript = formattedSegments.length > 0 
-              ? formattedSegments.join('\n\n') 
-              : transcript;
-            
-            // Collect speaker info for logging (only real names)
             const speakerCounts = new Map<string, number>();
             transcriptSegments
               .filter(segment => segment && segment.speakerId && speakerNameMap.has(segment.speakerId))
@@ -275,15 +292,14 @@ export const AutoProtocolGenerator = ({
                 speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
               });
             speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
-            
+
             console.log('🎤 Speaker-attributed transcript created with REAL names:', {
               speakersIdentified: speakerNameMap.size,
               speakerInfo,
               formattedTranscriptPreview: formattedTranscript.substring(0, 300)
             });
           } else {
-            // No real speaker names identified - use plain transcript without generic labels
-            console.log('ℹ️ No real speaker names identified, using plain transcript');
+            console.log('ℹ️ Inga riktiga talarnamn hittades – behåller talarindelning med generiska etiketter');
           }
         } else if (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) {
           // Fallback: Use speakerBlocksCleaned (for SIS-disabled companies or when segments unavailable)
@@ -322,21 +338,43 @@ export const AutoProtocolGenerator = ({
             }
           });
           
-          // Format transcript with speaker names if we have real names
+          // Behåll alltid talarindelning även när vi inte har riktiga namn.
+          const fallbackLabelMap = new Map<string, string>();
+          const getFallbackLabel = (rawId: unknown) => {
+            const id = String(rawId || 'unknown');
+            const existing = fallbackLabelMap.get(id);
+            if (existing) return existing;
+
+            const numMatch = id.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+            if (numMatch) {
+              const label = `Talare ${parseInt(numMatch[1], 10) + 1}`;
+              fallbackLabelMap.set(id, label);
+              return label;
+            }
+
+            if (/^[A-Z]$/i.test(id)) {
+              const label = `Talare ${id.toUpperCase()}`;
+              fallbackLabelMap.set(id, label);
+              return label;
+            }
+
+            const label = `Talare ${fallbackLabelMap.size + 1}`;
+            fallbackLabelMap.set(id, label);
+            return label;
+          };
+
+          const formattedBlocks = speakerBlocksCleaned
+            .filter(block => block && block.text)
+            .map(block => {
+              const speakerId = String(block.speakerId || 'unknown');
+              const label = speakerNameMap.get(speakerId) || getFallbackLabel(speakerId);
+              return `[${label}]: ${block.text}`;
+            });
+
+          formattedTranscript = formattedBlocks.length > 0 ? formattedBlocks.join('\n\n') : transcript;
+
+          // Collect speaker info (only real names)
           if (speakerNameMap.size > 0) {
-            const formattedBlocks = speakerBlocksCleaned
-              .filter(block => block && block.text)
-              .map(block => {
-                const speakerName = speakerNameMap.get(block.speakerId);
-                if (speakerName) {
-                  return `[${speakerName}]: ${block.text}`;
-                }
-                return block.text;
-              });
-            
-            formattedTranscript = formattedBlocks.join('\n\n');
-            
-            // Collect speaker info
             const speakerCounts = new Map<string, number>();
             speakerBlocksCleaned
               .filter(block => speakerNameMap.has(block.speakerId))
@@ -345,14 +383,14 @@ export const AutoProtocolGenerator = ({
                 speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
               });
             speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
-            
+
             console.log('🎤 Speaker-attributed transcript from speakerBlocksCleaned:', {
               speakersIdentified: speakerNameMap.size,
               speakerInfo,
               formattedTranscriptPreview: formattedTranscript.substring(0, 300)
             });
           } else {
-            console.log('ℹ️ No real speaker names in blocks, using cleaned transcript');
+            console.log('ℹ️ Inga riktiga talarnamn i block – behåller talarindelning med generiska etiketter');
           }
         }
         
