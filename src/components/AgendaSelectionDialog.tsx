@@ -56,7 +56,7 @@ interface AgendaSelectionDialogProps {
 export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: AgendaSelectionDialogProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canGenerateProtocol, incrementMeetingCount } = useSubscription();
+  const { canGenerateProtocol, incrementMeetingCount, isAdmin } = useSubscription();
   const [selectedAgendaId, setSelectedAgendaId] = useState<string | undefined>();
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -98,19 +98,24 @@ export function AgendaSelectionDialog({ open, onOpenChange, meetingData }: Agend
       }
 
       // Check protocol generation limits using the FINAL id
-      // CRITICAL: Always fetch fresh count from backend endpoint
-      const currentProtocolCount = await meetingStorage.getProtocolCount(finalId);
-      console.log('📊 AgendaDialog: Fresh protocol count from backend:', currentProtocolCount);
-      const { allowed, reason } = await canGenerateProtocol(finalId, currentProtocolCount);
-      
-      if (!allowed && reason !== 'Du har nått din gräns för AI-protokoll') {
-        toast({
-          title: "Protokollgräns nådd",
-          description: reason || "Du har nått din gräns för AI-protokoll",
-          variant: "destructive",
-        });
-        setIsGenerating(false);
-        return;
+      // Admins have UNLIMITED protocol generations - skip limit check entirely
+      if (!isAdmin) {
+        // CRITICAL: Always fetch fresh count from backend endpoint
+        const currentProtocolCount = await meetingStorage.getProtocolCount(finalId);
+        console.log('📊 AgendaDialog: Fresh protocol count from backend:', currentProtocolCount);
+        const { allowed, reason } = await canGenerateProtocol(finalId, currentProtocolCount);
+        
+        if (!allowed && reason !== 'Du har nått din gräns för AI-protokoll') {
+          toast({
+            title: "Protokollgräns nådd",
+            description: reason || "Du har nått din gräns för AI-protokoll",
+            variant: "destructive",
+          });
+          setIsGenerating(false);
+          return;
+        }
+      } else {
+        console.log('📊 AgendaDialog: Protocol limit check BYPASSED - user is admin');
       }
 
       // NOTE: Do NOT increment protocol count here; GenerateProtocol page will do it once
