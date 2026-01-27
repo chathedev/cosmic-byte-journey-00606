@@ -232,11 +232,29 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     setEditedName(getSpeakerDisplayName(speakerId));
   };
 
+  // Normalize speaker label to backend format (speaker_0, speaker_1, etc.)
+  const normalizeSpeakerLabel = (label: string): string => {
+    // Already in correct format
+    if (/^speaker_\d+$/.test(label)) return label;
+    // Convert "Speaker 1", "Talare 1", "speaker-1" etc. to "speaker_X"
+    const match = label.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+    if (match) {
+      return `speaker_${match[1]}`;
+    }
+    // Fallback: try to extract any number
+    const numMatch = label.match(/(\d+)/);
+    if (numMatch) {
+      return `speaker_${numMatch[1]}`;
+    }
+    return label.toLowerCase().replace(/\s+/g, '_');
+  };
+
   // Save speaker name to backend
   const handleSaveSpeakerName = async () => {
     if (!editingSpeaker || !meetingId) return;
 
-    const speakerLabel = editingSpeaker;
+    // Normalize to backend format: speaker_0, speaker_1, etc.
+    const speakerLabel = normalizeSpeakerLabel(editingSpeaker);
     const newName = editedName.trim();
     
     if (!newName) {
@@ -250,11 +268,17 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
       // Update local state immediately for responsive UI
       setLocalSpeakerNames(prev => ({ ...prev, [speakerLabel]: newName }));
       
-      // Build complete speaker names map for backend
-      const updatedNames = { ...speakerNames, [speakerLabel]: newName };
+      // Build complete speaker names map for backend with normalized keys
+      const normalizedNames: Record<string, string> = {};
+      Object.entries(speakerNames).forEach(([key, value]) => {
+        normalizedNames[normalizeSpeakerLabel(key)] = value;
+      });
+      normalizedNames[speakerLabel] = newName;
+      
+      console.log('[Speaker] Saving speaker names:', normalizedNames);
       
       // Call backend PUT /meetings/:id/speaker-names
-      const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
+      const saveResult = await backendApi.saveSpeakerNames(meetingId, normalizedNames);
       
       // Notify parent of updated names
       onSpeakerNamesUpdated?.(saveResult.speakerNames);
