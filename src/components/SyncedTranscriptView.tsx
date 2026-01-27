@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Users, Clock, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { Copy, Users, Clock, ChevronDown, ChevronUp, Play, Edit2, Check, X, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { backendApi } from '@/lib/backendApi';
 
 // Word-level timing data from ASR
 interface TranscriptWord {
@@ -34,6 +36,7 @@ interface SyncedTranscriptViewProps {
   currentTime: number; // Audio playback time in seconds
   isPlaying: boolean;
   onSeek?: (time: number) => void;
+  onSpeakerNamesUpdated?: (names: Record<string, string>) => void;
   className?: string;
 }
 
@@ -102,19 +105,46 @@ const getSpeakerNumber = (speakerId: string): number => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
+// Check if a name is a generic placeholder
+const isGenericName = (name: string): boolean => {
+  if (!name) return true;
+  const lower = name.toLowerCase().trim();
+  return /^(talare|speaker)[_\s-]?\d*$/i.test(lower) || lower === 'unknown' || lower === 'okänd';
+};
+
 export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   meetingId,
   words,
   speakerBlocks = [],
-  speakerNames = {},
+  speakerNames: initialSpeakerNames = {},
   currentTime,
   isPlaying,
   onSeek,
+  onSpeakerNamesUpdated,
   className,
 }) => {
   const [showSpeakerPanel, setShowSpeakerPanel] = useState(false);
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
+  const [editedName, setEditedName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [localSpeakerNames, setLocalSpeakerNames] = useState<Record<string, string>>({});
+  
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
+
+  // Merge speaker names with local edits taking priority
+  const speakerNames = { ...initialSpeakerNames, ...localSpeakerNames };
+
+  // Build a map of block-level suggested names
+  const blockSuggestedNames = useMemo(() => {
+    const suggestions: Record<string, string> = {};
+    speakerBlocks.forEach(block => {
+      if (block.speakerName && !isGenericName(block.speakerName) && !suggestions[block.speakerId]) {
+        suggestions[block.speakerId] = block.speakerName;
+      }
+    });
+    return suggestions;
+  }, [speakerBlocks]);
 
   // Auto-scroll stability: avoid fighting the user's manual scrolling and throttle programmatic scroll.
   const programmaticScrollRef = useRef(false);
@@ -207,12 +237,35 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return map;
   }, [uniqueSpeakers]);
 
-  // Get display name for speaker
+  /**
+   * Display name resolution priority (per backend docs):
+   * 1) speakerNames[label] - User-edited names (highest priority)
+   * 2) block.speakerName - AI-suggested from cleanup ("Hej, jag heter...")
+   * 3) Formatted label - "Talare X" fallback
+   */
   const getSpeakerDisplayName = useCallback((speakerId: string): string => {
-    if (speakerNames[speakerId]) return speakerNames[speakerId];
+    // 1) Check user-edited names first
+    if (speakerNames[speakerId] && !isGenericName(speakerNames[speakerId])) {
+      return speakerNames[speakerId];
+    }
+    // 2) Check block-level suggested names from AI cleanup
+    if (blockSuggestedNames[speakerId]) {
+      return blockSuggestedNames[speakerId];
+    }
+    // 3) Check initial speaker names (may contain suggestions from backend)
+    if (initialSpeakerNames[speakerId] && !isGenericName(initialSpeakerNames[speakerId])) {
+      return initialSpeakerNames[speakerId];
+    }
+    // 4) Fallback to formatted label
     const num = getSpeakerNumber(speakerId);
     return `Talare ${num + 1}`;
-  }, [speakerNames]);
+  }, [speakerNames, blockSuggestedNames, initialSpeakerNames]);
+
+  // Check if name is AI-suggested (not user-edited)
+  const isAISuggested = useCallback((speakerId: string): boolean => {
+    if (localSpeakerNames[speakerId]) return false;
+    return !!blockSuggestedNames[speakerId];
+  }, [localSpeakerNames, blockSuggestedNames]);
 
   // Find current word index
   const currentWordIndex = useMemo(() => {
@@ -271,17 +324,45 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     }, prefersReducedMotionRef.current ? 0 : 250);
   }, [currentWordIndex, isPlaying]);
 
-  // Dev-only trace for diagnosing "not following" reports.
-  useEffect(() => {
-    if (!import.meta.env?.DEV) return;
-    if (!isPlaying) return;
-    // eslint-disable-next-line no-console
-    console.debug('[SyncedTranscriptView] playback tick', {
-      currentTime,
-      currentWordIndex,
-      words: words.length,
-    });
-  }, [currentWordIndex, currentTime, isPlaying, words.length]);
+  // Handle edit speaker
+  const handleEditSpeaker = (speakerId: string) => {
+    setEditingSpeaker(speakerId);
+    setEditedName(getSpeakerDisplayName(speakerId));
+  };
+
+  // Save speaker name to backend
+  const handleSaveSpeakerName = async () => {
+    if (!editingSpeaker || !meetingId) return;
+
+    const speakerLabel = editingSpeaker;
+    const newName = editedName.trim();
+    
+    if (!newName) {
+      setEditingSpeaker(null);
+      return;
+    }
+
+    setSavingName(true);
+    
+    try {
+      setLocalSpeakerNames(prev => ({ ...prev, [speakerLabel]: newName }));
+      const updatedNames = { ...speakerNames, [speakerLabel]: newName };
+      const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
+      onSpeakerNamesUpdated?.(saveResult.speakerNames);
+      toast.success(`Namn sparat: ${newName}`);
+    } catch (error) {
+      console.error('Error saving speaker name:', error);
+      toast.error('Kunde inte spara namn');
+      setLocalSpeakerNames(prev => {
+        const reverted = { ...prev };
+        delete reverted[speakerLabel];
+        return reverted;
+      });
+    } finally {
+      setSavingName(false);
+      setEditingSpeaker(null);
+    }
+  };
 
   // Copy transcript
   const handleCopyTranscript = useCallback(() => {
@@ -352,7 +433,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
         </Button>
       </div>
 
-      {/* Speaker Panel (collapsed by default) */}
+      {/* Speaker Panel with inline editing */}
       <Collapsible open={showSpeakerPanel} onOpenChange={setShowSpeakerPanel}>
         <CollapsibleTrigger asChild>
           <Button 
@@ -360,7 +441,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
             size="sm" 
             className="w-full justify-between h-auto py-2 px-3 hover:bg-muted/50"
           >
-            <span className="text-xs font-medium text-muted-foreground">Talare & statistik</span>
+            <span className="text-xs font-medium text-muted-foreground">Talare • Klicka för att redigera namn</span>
             {showSpeakerPanel ? (
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
             ) : (
@@ -375,6 +456,9 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
               const styles = speakerStyleMap[speakerId];
               const stats = speakerStats[speakerId];
               const displayName = getSpeakerDisplayName(speakerId);
+              const isEditing = editingSpeaker === speakerId;
+              const isSuggested = isAISuggested(speakerId);
+              const hasRealName = !isGenericName(displayName);
 
               return (
                 <div
@@ -386,12 +470,59 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                 >
                   <div className={cn("w-2 h-2 rounded-full shrink-0", styles?.dot)} />
                   <div className="flex-1 min-w-0">
-                    <span className={cn("font-medium text-sm", styles?.text)}>
-                      {displayName}
-                    </span>
-                    <div className="text-xs text-muted-foreground">
-                      {stats?.wordCount || 0} ord
-                    </div>
+                    {isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          className="h-7 text-sm"
+                          autoFocus
+                          placeholder="Ange namn..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveSpeakerName();
+                            if (e.key === 'Escape') setEditingSpeaker(null);
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSaveSpeakerName}
+                          disabled={savingName}
+                          className="h-7 w-7 p-0"
+                        >
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingSpeaker(null)}
+                          className="h-7 w-7 p-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEditSpeaker(speakerId)}
+                        className="w-full text-left group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={cn("font-medium text-sm", styles?.text)}>
+                            {displayName}
+                          </span>
+                          {isSuggested && hasRealName && (
+                            <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5 text-amber-600 border-amber-500/30 bg-amber-500/5">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              Förslag
+                            </Badge>
+                          )}
+                          <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {stats?.wordCount || 0} ord
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -497,10 +628,10 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
       {/* Current time indicator */}
       {isPlaying && (
-        <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border/30">
-          <span className="tabular-nums">{formatTime(currentTime)}</span>
-          <span className="mx-2">•</span>
-          <span>Klicka på ett ord för att hoppa dit</span>
+        <div className="flex items-center justify-center pt-2 border-t border-border/30">
+          <Badge variant="outline" className="text-xs tabular-nums">
+            {formatTime(currentTime)}
+          </Badge>
         </div>
       )}
     </div>

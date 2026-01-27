@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, Edit2, Copy, X, Users, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Edit2, Copy, X, Users, Clock, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { backendApi } from '@/lib/backendApi';
@@ -98,6 +98,14 @@ const getSpeakerNumber = (speakerId: string): number => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
+// Check if a name is a generic placeholder
+const isGenericName = (name: string): boolean => {
+  if (!name) return true;
+  const lower = name.toLowerCase().trim();
+  // Match "Talare 1", "Speaker 0", "speaker_1", etc.
+  return /^(talare|speaker)[_\s-]?\d*$/i.test(lower) || lower === 'unknown' || lower === 'okänd';
+};
+
 export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   meetingId,
   speakerBlocks,
@@ -111,8 +119,20 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   const [localSpeakerNames, setLocalSpeakerNames] = useState<Record<string, string>>({});
   const [showSpeakerPanel, setShowSpeakerPanel] = useState(true);
 
-  // Merge speaker names
+  // Merge speaker names with local edits taking priority
   const speakerNames = { ...initialSpeakerNames, ...localSpeakerNames };
+
+  // Build a map of block-level suggested names (from speakerBlocksCleaned)
+  const blockSuggestedNames = useMemo(() => {
+    const suggestions: Record<string, string> = {};
+    speakerBlocks.forEach(block => {
+      // Only use block.speakerName if it's a real name (not generic)
+      if (block.speakerName && !isGenericName(block.speakerName) && !suggestions[block.speakerId]) {
+        suggestions[block.speakerId] = block.speakerName;
+      }
+    });
+    return suggestions;
+  }, [speakerBlocks]);
 
   // Get unique speakers with stats
   const speakerStats = useMemo(() => {
@@ -161,12 +181,37 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     return map;
   }, [uniqueSpeakers]);
 
-  // Get display name for a speaker
+  /**
+   * Display name resolution priority (per backend docs):
+   * 1) speakerNames[label] - User-edited names (highest priority)
+   * 2) block.speakerName - AI-suggested from cleanup ("Hej, jag heter...")
+   * 3) Formatted label - "Talare X" fallback
+   */
   const getSpeakerDisplayName = useCallback((speakerId: string): string => {
-    if (speakerNames[speakerId]) return speakerNames[speakerId];
+    // 1) Check user-edited names first
+    if (speakerNames[speakerId] && !isGenericName(speakerNames[speakerId])) {
+      return speakerNames[speakerId];
+    }
+    // 2) Check block-level suggested names from AI cleanup
+    if (blockSuggestedNames[speakerId]) {
+      return blockSuggestedNames[speakerId];
+    }
+    // 3) Check initial speaker names (may contain suggestions from backend)
+    if (initialSpeakerNames[speakerId] && !isGenericName(initialSpeakerNames[speakerId])) {
+      return initialSpeakerNames[speakerId];
+    }
+    // 4) Fallback to formatted label
     const num = getSpeakerNumber(speakerId);
     return `Talare ${num + 1}`;
-  }, [speakerNames]);
+  }, [speakerNames, blockSuggestedNames, initialSpeakerNames]);
+
+  // Check if name is AI-suggested (not user-edited)
+  const isAISuggested = useCallback((speakerId: string): boolean => {
+    // If user has edited this speaker, not AI suggested
+    if (localSpeakerNames[speakerId]) return false;
+    // Check if there's a block-level suggestion
+    return !!blockSuggestedNames[speakerId];
+  }, [localSpeakerNames, blockSuggestedNames]);
 
   // Get initials for avatar
   const getSpeakerInitials = useCallback((speakerId: string): string => {
@@ -187,7 +232,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     setEditedName(getSpeakerDisplayName(speakerId));
   };
 
-  // Save speaker name
+  // Save speaker name to backend
   const handleSaveSpeakerName = async () => {
     if (!editingSpeaker || !meetingId) return;
 
@@ -202,16 +247,28 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     setSavingName(true);
     
     try {
-      const updatedNames = { ...speakerNames, [speakerLabel]: newName };
+      // Update local state immediately for responsive UI
       setLocalSpeakerNames(prev => ({ ...prev, [speakerLabel]: newName }));
       
+      // Build complete speaker names map for backend
+      const updatedNames = { ...speakerNames, [speakerLabel]: newName };
+      
+      // Call backend PUT /meetings/:id/speaker-names
       const saveResult = await backendApi.saveSpeakerNames(meetingId, updatedNames);
+      
+      // Notify parent of updated names
       onSpeakerNamesUpdated?.(saveResult.speakerNames);
       
       toast.success(`Namn sparat: ${newName}`);
     } catch (error) {
       console.error('Error saving speaker name:', error);
       toast.error('Kunde inte spara namn');
+      // Revert local state on error
+      setLocalSpeakerNames(prev => {
+        const reverted = { ...prev };
+        delete reverted[speakerLabel];
+        return reverted;
+      });
     } finally {
       setSavingName(false);
       setEditingSpeaker(null);
@@ -274,7 +331,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
         </Button>
       </div>
 
-      {/* Collapsible speaker panel */}
+      {/* Collapsible speaker panel with inline editing */}
       <Collapsible open={showSpeakerPanel} onOpenChange={setShowSpeakerPanel}>
         <CollapsibleTrigger asChild>
           <Button 
@@ -282,7 +339,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
             size="sm" 
             className="w-full justify-between h-auto py-2 px-3 hover:bg-muted/50"
           >
-            <span className="text-xs font-medium text-muted-foreground">Talare & statistik</span>
+            <span className="text-xs font-medium text-muted-foreground">Talare • Klicka för att redigera namn</span>
             {showSpeakerPanel ? (
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
             ) : (
@@ -299,6 +356,8 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
               const isEditing = editingSpeaker === speakerId;
               const displayName = getSpeakerDisplayName(speakerId);
               const initials = getSpeakerInitials(speakerId);
+              const isSuggested = isAISuggested(speakerId);
+              const hasRealName = !isGenericName(displayName);
 
               return (
                 <motion.div
@@ -327,6 +386,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
                           onChange={(e) => setEditedName(e.target.value)}
                           className="h-8 text-sm"
                           autoFocus
+                          placeholder="Ange namn..."
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleSaveSpeakerName();
                             if (e.key === 'Escape') setEditingSpeaker(null);
@@ -359,6 +419,13 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
                           <span className={cn("font-medium text-sm", styles?.text)}>
                             {displayName}
                           </span>
+                          {/* AI suggestion indicator */}
+                          {isSuggested && hasRealName && (
+                            <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5 text-amber-600 border-amber-500/30 bg-amber-500/5">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              Förslag
+                            </Badge>
+                          )}
                           <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                         </div>
                         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
