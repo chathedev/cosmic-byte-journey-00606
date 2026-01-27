@@ -9,6 +9,13 @@ import { toast } from 'sonner';
 import { backendApi } from '@/lib/backendApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  computeSpeakerIndexOffset,
+  getBackendSpeakerKeyForTranscriptId,
+  isGenericSpeakerName,
+  lookupSpeakerNameRecord,
+  normalizeSpeakerBackendKey,
+} from '@/lib/speakerNameResolution';
 
 interface SpeakerBlock {
   speakerId: string;
@@ -98,43 +105,7 @@ const getSpeakerNumber = (speakerId: string): number => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
-// Normalize speaker ID to backend format (speaker_0, speaker_1, etc.)
-const normalizeSpeakerId = (id: string): string => {
-  if (/^speaker_\d+$/.test(id)) return id;
-  const match = id.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
-  if (match) return `speaker_${match[1]}`;
-  const numMatch = id.match(/(\d+)/);
-  if (numMatch) return `speaker_${numMatch[1]}`;
-  return id.toLowerCase().replace(/\s+/g, '_');
-};
-
-// Check if a name is a generic placeholder
-const isGenericName = (name: string): boolean => {
-  if (!name) return true;
-  const lower = name.toLowerCase().trim();
-  // Match "Talare 1", "Speaker 0", "speaker_1", etc.
-  return /^(talare|speaker)[_\s-]?\d*$/i.test(lower) || lower === 'unknown' || lower === 'okänd';
-};
-
-// Helper to lookup speaker name with normalization fallback
-const lookupSpeakerName = (speakerNames: Record<string, string>, id: string): string | undefined => {
-  // Try exact match first
-  if (speakerNames[id] && !isGenericName(speakerNames[id])) {
-    return speakerNames[id];
-  }
-  // Try normalized version
-  const normalized = normalizeSpeakerId(id);
-  if (speakerNames[normalized] && !isGenericName(speakerNames[normalized])) {
-    return speakerNames[normalized];
-  }
-  // Try all keys with same normalized form
-  for (const [key, value] of Object.entries(speakerNames)) {
-    if (normalizeSpeakerId(key) === normalized && !isGenericName(value)) {
-      return value;
-    }
-  }
-  return undefined;
-};
+// (Speaker name normalization/resolution lives in '@/lib/speakerNameResolution')
 
 export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   meetingId,
@@ -157,7 +128,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     const suggestions: Record<string, string> = {};
     speakerBlocks.forEach(block => {
       // Only use block.speakerName if it's a real name (not generic)
-      if (block.speakerName && !isGenericName(block.speakerName) && !suggestions[block.speakerId]) {
+      if (block.speakerName && !isGenericSpeakerName(block.speakerName) && !suggestions[block.speakerId]) {
         suggestions[block.speakerId] = block.speakerName;
       }
     });
@@ -202,6 +173,12 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     return ids.sort((a, b) => speakerStats[a].firstAppearance - speakerStats[b].firstAppearance);
   }, [speakerStats]);
 
+  // If backend stores aliases as speaker_1 but transcript uses speaker_0, detect that offset.
+  const speakerIndexOffset = useMemo(() => {
+    const source = Object.keys(initialSpeakerNames).length > 0 ? initialSpeakerNames : speakerNames;
+    return computeSpeakerIndexOffset(uniqueSpeakers, source);
+  }, [uniqueSpeakers, initialSpeakerNames, speakerNames]);
+
   // Create stable color map based on speaker order
   const speakerStyleMap = useMemo(() => {
     const map: Record<string, typeof SPEAKER_STYLES[0]> = {};
@@ -219,33 +196,33 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
    */
   const getSpeakerDisplayName = useCallback((speakerId: string): string => {
     // 1) Check user-edited names first (with normalization fallback)
-    const userName = lookupSpeakerName(speakerNames, speakerId);
+    const userName = lookupSpeakerNameRecord(speakerNames, speakerId, speakerIndexOffset);
     if (userName) {
       return userName;
     }
     // 2) Check block-level suggested names from AI cleanup (with normalization)
-    const blockName = lookupSpeakerName(blockSuggestedNames, speakerId);
+    const blockName = lookupSpeakerNameRecord(blockSuggestedNames, speakerId, 0);
     if (blockName) {
       return blockName;
     }
     // 3) Check initial speaker names (may contain suggestions from backend)
-    const initialName = lookupSpeakerName(initialSpeakerNames, speakerId);
+    const initialName = lookupSpeakerNameRecord(initialSpeakerNames, speakerId, speakerIndexOffset);
     if (initialName) {
       return initialName;
     }
     // 4) Fallback to formatted label
     const num = getSpeakerNumber(speakerId);
     return `Talare ${num + 1}`;
-  }, [speakerNames, blockSuggestedNames, initialSpeakerNames]);
+  }, [speakerNames, blockSuggestedNames, initialSpeakerNames, speakerIndexOffset]);
 
   // Check if name is AI-suggested (not user-edited)
   const isAISuggested = useCallback((speakerId: string): boolean => {
     // If user has edited this speaker, not AI suggested
-    const normalized = normalizeSpeakerId(speakerId);
-    if (localSpeakerNames[speakerId] || localSpeakerNames[normalized]) return false;
+    const backendKey = getBackendSpeakerKeyForTranscriptId(speakerId, speakerIndexOffset);
+    if (localSpeakerNames[backendKey] || localSpeakerNames[speakerId] || localSpeakerNames[normalizeSpeakerBackendKey(speakerId)]) return false;
     // Check if there's a block-level suggestion
-    return !!lookupSpeakerName(blockSuggestedNames, speakerId);
-  }, [localSpeakerNames, blockSuggestedNames]);
+    return !!lookupSpeakerNameRecord(blockSuggestedNames, speakerId, 0);
+  }, [localSpeakerNames, blockSuggestedNames, speakerIndexOffset]);
 
   // Get initials for avatar
   const getSpeakerInitials = useCallback((speakerId: string): string => {
@@ -288,7 +265,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     if (!editingSpeaker || !meetingId) return;
 
     // Normalize to backend format: speaker_0, speaker_1, etc.
-    const speakerLabel = normalizeSpeakerLabel(editingSpeaker);
+    const speakerLabel = getBackendSpeakerKeyForTranscriptId(editingSpeaker, speakerIndexOffset);
     const newName = editedName.trim();
     
     if (!newName) {
@@ -305,7 +282,8 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
       // Build complete speaker names map for backend with normalized keys
       const normalizedNames: Record<string, string> = {};
       Object.entries(speakerNames).forEach(([key, value]) => {
-        normalizedNames[normalizeSpeakerLabel(key)] = value;
+        const normalizedKey = normalizeSpeakerBackendKey(key);
+        if (normalizedKey) normalizedNames[normalizedKey] = value;
       });
       normalizedNames[speakerLabel] = newName;
       
@@ -415,7 +393,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
               const displayName = getSpeakerDisplayName(speakerId);
               const initials = getSpeakerInitials(speakerId);
               const isSuggested = isAISuggested(speakerId);
-              const hasRealName = !isGenericName(displayName);
+               const hasRealName = !isGenericSpeakerName(displayName);
 
               return (
                 <motion.div
