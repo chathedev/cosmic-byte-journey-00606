@@ -10,6 +10,7 @@ import { SubscribeDialog } from "./SubscribeDialog";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { RecordingInstructions } from "./RecordingInstructions";
+import { VoiceNamePrompt } from "./VoiceNamePrompt";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
@@ -868,6 +869,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
               {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
+
+          <VoiceNamePrompt />
 
           {/* Live Transcript Display (Free/Pro only) - Responsive height */}
           {!useAsrMode && (liveTranscript || interimText) && (
