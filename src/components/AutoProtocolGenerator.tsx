@@ -174,6 +174,30 @@ export const AutoProtocolGenerator = ({
         let formattedTranscript = transcript;
         let speakerInfo: { name: string; segments: number }[] = [];
         
+        // Helper to normalize speaker IDs to consistent format for lookup
+        const normalizeSpeakerId = (id: string): string => {
+          if (/^speaker_\d+$/.test(id)) return id;
+          const match = id.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+          if (match) return `speaker_${match[1]}`;
+          const numMatch = id.match(/(\d+)/);
+          if (numMatch) return `speaker_${numMatch[1]}`;
+          return id.toLowerCase().replace(/\s+/g, '_');
+        };
+        
+        // Helper to lookup speaker name with normalization fallback
+        const lookupSpeakerName = (speakerNameMap: Map<string, string>, id: string): string | undefined => {
+          // Try exact match first
+          if (speakerNameMap.has(id)) return speakerNameMap.get(id);
+          // Try normalized version
+          const normalized = normalizeSpeakerId(id);
+          if (speakerNameMap.has(normalized)) return speakerNameMap.get(normalized);
+          // Try all keys with same normalized form
+          for (const [key, value] of speakerNameMap.entries()) {
+            if (normalizeSpeakerId(key) === normalized) return value;
+          }
+          return undefined;
+        };
+        
         // Priority: Use transcriptSegments with SIS data if available
         if (transcriptSegments && transcriptSegments.length > 0) {
           // 70%+ confidence required for reliable speaker identification
@@ -182,22 +206,25 @@ export const AutoProtocolGenerator = ({
           // Build speaker name map from SIS data
           const speakerNameMap = new Map<string, string>();
           
+          // Helper to check if name is generic
+          const isGenericName = (name: string): boolean => {
+            const genericPatterns = [
+              /^speaker[_\s-]?\d+$/i,
+              /^talare[_\s-]?\d+$/i,
+              /^unknown$/i,
+              /^okänd$/i,
+            ];
+            return genericPatterns.some(p => p.test(name.trim()));
+          };
+          
           // Priority 0: Use passed speakerNames prop (user-assigned names)
           if (propSpeakerNames && Object.keys(propSpeakerNames).length > 0) {
             Object.entries(propSpeakerNames).forEach(([label, name]) => {
-              if (name && name.trim()) {
-                // Check if name is NOT a generic pattern
-                const genericPatterns = [
-                  /^speaker[_\s]?\d+$/i,
-                  /^talare[_\s]?\d+$/i,
-                  /^unknown$/i,
-                  /^okänd$/i,
-                ];
-                const isGeneric = genericPatterns.some(p => p.test(name.trim()));
-                if (!isGeneric) {
-                  speakerNameMap.set(label, name);
-                  console.log(`🎤 Using propSpeakerNames: ${label} -> ${name}`);
-                }
+              if (name && name.trim() && !isGenericName(name)) {
+                // Store both original and normalized key for maximum compatibility
+                speakerNameMap.set(label, name);
+                speakerNameMap.set(normalizeSpeakerId(label), name);
+                console.log(`🎤 Using propSpeakerNames: ${label} (${normalizeSpeakerId(label)}) -> ${name}`);
               }
             });
           }
@@ -205,10 +232,11 @@ export const AutoProtocolGenerator = ({
           // Priority 1: Use sisSpeakers with speakerName if confidence >= 70%
           if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
-              if (speakerNameMap.has(speaker.label)) return; // Already set by prop
+              if (lookupSpeakerName(speakerNameMap, speaker.label)) return; // Already set by prop
               const confidencePercent = (speaker.similarity || 0) * 100;
-              if (speaker.speakerName && speaker.speakerName.trim() && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
+              if (speaker.speakerName && speaker.speakerName.trim() && !isGenericName(speaker.speakerName) && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                 speakerNameMap.set(speaker.label, speaker.speakerName);
+                speakerNameMap.set(normalizeSpeakerId(speaker.label), speaker.speakerName);
                 console.log(`🎤 Using speakerName (${confidencePercent.toFixed(0)}% confidence): ${speaker.label} -> ${speaker.speakerName}`);
               } else if (speaker.speakerName) {
                 console.log(`⚠️ Skipping low-confidence speaker (${confidencePercent.toFixed(0)}%): ${speaker.label} -> ${speaker.speakerName}`);
@@ -219,9 +247,10 @@ export const AutoProtocolGenerator = ({
           // Priority 2: Use sisMatches with speakerName if confidence >= 70%
           if (sisMatches && sisMatches.length > 0) {
             sisMatches.forEach(match => {
-              if (!speakerNameMap.has(match.speakerLabel) && match.speakerName && match.speakerName.trim()) {
+              if (!lookupSpeakerName(speakerNameMap, match.speakerLabel) && match.speakerName && match.speakerName.trim() && !isGenericName(match.speakerName)) {
                 if (match.confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                   speakerNameMap.set(match.speakerLabel, match.speakerName);
+                  speakerNameMap.set(normalizeSpeakerId(match.speakerLabel), match.speakerName);
                   console.log(`🎤 Using sisMatch (${match.confidencePercent}% confidence): ${match.speakerLabel} -> ${match.speakerName}`);
                 } else {
                   console.log(`⚠️ Skipping low-confidence sisMatch (${match.confidencePercent}%): ${match.speakerLabel} -> ${match.speakerName}`);
@@ -233,12 +262,13 @@ export const AutoProtocolGenerator = ({
           // Priority 3: Fallback to email-based name if similarity >= 70%
           if (sisSpeakers && sisSpeakers.length > 0) {
             sisSpeakers.forEach(speaker => {
-              if (speakerNameMap.has(speaker.label)) return; // Already set
+              if (lookupSpeakerName(speakerNameMap, speaker.label)) return; // Already set
               const confidencePercent = (speaker.similarity || 0) * 100;
               if (speaker.bestMatchEmail && confidencePercent >= SIS_CONFIDENCE_THRESHOLD) {
                 const namePart = speaker.bestMatchEmail.split('@')[0];
                 const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
                 speakerNameMap.set(speaker.label, formattedName);
+                speakerNameMap.set(normalizeSpeakerId(speaker.label), formattedName);
                 console.log(`🎤 Using email-derived name (${confidencePercent.toFixed(0)}% confidence): ${speaker.label} -> ${formattedName}`);
               }
             });
@@ -274,7 +304,8 @@ export const AutoProtocolGenerator = ({
             .filter(segment => segment && segment.text)
             .map(segment => {
               const speakerId = String(segment.speakerId || 'unknown');
-              const label = speakerNameMap.get(speakerId) || speakerNameMap.get('meeting') || getFallbackLabel(speakerId);
+              // Use lookup helper to find name with normalization fallback
+              const label = lookupSpeakerName(speakerNameMap, speakerId) || getFallbackLabel(speakerId);
               return `[${label}]: ${segment.text || ''}`;
             });
 
@@ -286,9 +317,9 @@ export const AutoProtocolGenerator = ({
           if (speakerNameMap.size > 0) {
             const speakerCounts = new Map<string, number>();
             transcriptSegments
-              .filter(segment => segment && segment.speakerId && speakerNameMap.has(segment.speakerId))
+              .filter(segment => segment && segment.speakerId && lookupSpeakerName(speakerNameMap, segment.speakerId))
               .forEach(segment => {
-                const name = speakerNameMap.get(segment.speakerId!)!;
+                const name = lookupSpeakerName(speakerNameMap, segment.speakerId!)!;
                 speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
               });
             speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));
@@ -304,12 +335,17 @@ export const AutoProtocolGenerator = ({
         } else if (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) {
           // Fallback: Use speakerBlocksCleaned (for SIS-disabled companies or when segments unavailable)
           // This provides AI-suggested speaker names from transcript cleanup
-          const genericPatterns = [
-            /^speaker[_\s]?\d+$/i,
-            /^talare[_\s]?\d+$/i,
-            /^unknown$/i,
-            /^okänd$/i,
-          ];
+          
+          // Helper to check if name is generic (reuse from above scope if needed)
+          const isGenericNameBlock = (name: string): boolean => {
+            const genericPatterns = [
+              /^speaker[_\s-]?\d+$/i,
+              /^talare[_\s-]?\d+$/i,
+              /^unknown$/i,
+              /^okänd$/i,
+            ];
+            return genericPatterns.some(p => p.test(name.trim()));
+          };
           
           // Build speaker name map from propSpeakerNames (user edits) + block speakerNames
           const speakerNameMap = new Map<string, string>();
@@ -317,24 +353,21 @@ export const AutoProtocolGenerator = ({
           // Priority 1: User-assigned names from propSpeakerNames
           if (propSpeakerNames && Object.keys(propSpeakerNames).length > 0) {
             Object.entries(propSpeakerNames).forEach(([label, name]) => {
-              if (name && name.trim()) {
-                const isGeneric = genericPatterns.some(p => p.test(name.trim()));
-                if (!isGeneric) {
-                  speakerNameMap.set(label, name);
-                  console.log(`🎤 Using propSpeakerNames for block: ${label} -> ${name}`);
-                }
+              if (name && name.trim() && !isGenericNameBlock(name)) {
+                // Store both original and normalized key
+                speakerNameMap.set(label, name);
+                speakerNameMap.set(normalizeSpeakerId(label), name);
+                console.log(`🎤 Using propSpeakerNames for block: ${label} (${normalizeSpeakerId(label)}) -> ${name}`);
               }
             });
           }
           
           // Priority 2: Block's embedded speakerName
           speakerBlocksCleaned.forEach(block => {
-            if (!speakerNameMap.has(block.speakerId) && block.speakerName && block.speakerName.trim()) {
-              const isGeneric = genericPatterns.some(p => p.test(block.speakerName!.trim()));
-              if (!isGeneric) {
-                speakerNameMap.set(block.speakerId, block.speakerName);
-                console.log(`🎤 Using block speakerName: ${block.speakerId} -> ${block.speakerName}`);
-              }
+            if (!lookupSpeakerName(speakerNameMap, block.speakerId) && block.speakerName && block.speakerName.trim() && !isGenericNameBlock(block.speakerName)) {
+              speakerNameMap.set(block.speakerId, block.speakerName);
+              speakerNameMap.set(normalizeSpeakerId(block.speakerId), block.speakerName);
+              console.log(`🎤 Using block speakerName: ${block.speakerId} -> ${block.speakerName}`);
             }
           });
           
@@ -367,7 +400,8 @@ export const AutoProtocolGenerator = ({
             .filter(block => block && block.text)
             .map(block => {
               const speakerId = String(block.speakerId || 'unknown');
-              const label = speakerNameMap.get(speakerId) || getFallbackLabel(speakerId);
+              // Use lookup helper for consistent name resolution
+              const label = lookupSpeakerName(speakerNameMap, speakerId) || getFallbackLabel(speakerId);
               return `[${label}]: ${block.text}`;
             });
 
@@ -377,9 +411,9 @@ export const AutoProtocolGenerator = ({
           if (speakerNameMap.size > 0) {
             const speakerCounts = new Map<string, number>();
             speakerBlocksCleaned
-              .filter(block => speakerNameMap.has(block.speakerId))
+              .filter(block => lookupSpeakerName(speakerNameMap, block.speakerId))
               .forEach(block => {
-                const name = speakerNameMap.get(block.speakerId)!;
+                const name = lookupSpeakerName(speakerNameMap, block.speakerId)!;
                 speakerCounts.set(name, (speakerCounts.get(name) || 0) + 1);
               });
             speakerInfo = Array.from(speakerCounts.entries()).map(([name, segments]) => ({ name, segments }));

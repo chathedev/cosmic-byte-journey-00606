@@ -14,15 +14,34 @@ interface TranscriptTextViewProps {
   meetingId: string;
   transcriptRaw?: string | null;
   speakerBlocksCleaned?: SpeakerBlock[] | null;
+  speakerNames?: Record<string, string>; // User-edited speaker names
   className?: string;
 }
 
 const COLLAPSED_HEIGHT = 400; // pixels before showing "expand" button
 
+// Helper to normalize speaker IDs to consistent format for lookup
+const normalizeSpeakerId = (id: string): string => {
+  if (/^speaker_\d+$/.test(id)) return id;
+  const match = id.match(/(?:speaker|talare)[_\s-]?(\d+)/i);
+  if (match) return `speaker_${match[1]}`;
+  const numMatch = id.match(/(\d+)/);
+  if (numMatch) return `speaker_${numMatch[1]}`;
+  return id.toLowerCase().replace(/\s+/g, '_');
+};
+
+// Check if a name is a generic placeholder
+const isGenericName = (name: string): boolean => {
+  if (!name) return true;
+  const lower = name.toLowerCase().trim();
+  return /^(talare|speaker)[_\s-]?\d*$/i.test(lower) || lower === 'unknown' || lower === 'okänd';
+};
+
 export const TranscriptTextView: React.FC<TranscriptTextViewProps> = ({
   meetingId,
   transcriptRaw,
   speakerBlocksCleaned,
+  speakerNames = {},
   className,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -30,17 +49,73 @@ export const TranscriptTextView: React.FC<TranscriptTextViewProps> = ({
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [needsExpander, setNeedsExpander] = useState(false);
 
+  // Helper to lookup speaker name with normalization fallback
+  const getSpeakerDisplayName = (speakerId: string, blockSpeakerName?: string | null): string | null => {
+    // Priority 1: User-edited names from speakerNames prop
+    if (speakerNames[speakerId] && !isGenericName(speakerNames[speakerId])) {
+      return speakerNames[speakerId];
+    }
+    // Try normalized version
+    const normalized = normalizeSpeakerId(speakerId);
+    if (speakerNames[normalized] && !isGenericName(speakerNames[normalized])) {
+      return speakerNames[normalized];
+    }
+    // Try all keys with same normalized form
+    for (const [key, value] of Object.entries(speakerNames)) {
+      if (normalizeSpeakerId(key) === normalized && !isGenericName(value)) {
+        return value;
+      }
+    }
+    // Priority 2: Block's embedded speakerName
+    if (blockSpeakerName && !isGenericName(blockSpeakerName)) {
+      return blockSpeakerName;
+    }
+    return null;
+  };
+
   // Combine all text from speakerBlocksCleaned, or fall back to transcriptRaw
+  // Apply speaker names to replace generic "Talare X" labels in text
   const fullText = useMemo(() => {
     if (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) {
       // Join all blocks' text with double newlines for paragraph separation
       return speakerBlocksCleaned
-        .map(block => block.text.trim())
+        .map(block => {
+          let text = block.text.trim();
+          // Replace any embedded speaker labels in the text (e.g., "[Talare 1]:" or "Talare 1:")
+          const realName = getSpeakerDisplayName(block.speakerId, block.speakerName);
+          if (realName) {
+            // Replace patterns like "[Talare 1]:", "Talare 1:", "[Speaker 0]:", etc.
+            text = text.replace(/^\[?(talare|speaker)[_\s-]?\d+\]?:?\s*/i, `${realName}: `);
+          }
+          return text;
+        })
         .filter(text => text.length > 0)
         .join('\n\n');
     }
-    return transcriptRaw?.trim() || '';
-  }, [speakerBlocksCleaned, transcriptRaw]);
+    
+    // For raw transcript, try to replace speaker labels if speakerNames are available
+    let text = transcriptRaw?.trim() || '';
+    if (text && Object.keys(speakerNames).length > 0) {
+      // Replace patterns like "[Talare 1]:", "Talare 1:", "[speaker_0]:", etc.
+      Object.entries(speakerNames).forEach(([label, name]) => {
+        if (!isGenericName(name)) {
+          // Match various label formats
+          const patterns = [
+            new RegExp(`\\[${label}\\]:?\\s*`, 'gi'),
+            new RegExp(`\\[${normalizeSpeakerId(label)}\\]:?\\s*`, 'gi'),
+            new RegExp(`(?:^|\\n)${label}:?\\s*`, 'gi'),
+          ];
+          patterns.forEach(pattern => {
+            text = text.replace(pattern, (match) => {
+              const prefix = match.startsWith('\n') ? '\n' : '';
+              return `${prefix}${name}: `;
+            });
+          });
+        }
+      });
+    }
+    return text;
+  }, [speakerBlocksCleaned, transcriptRaw, speakerNames]);
 
   // Check if content needs expander
   React.useEffect(() => {
