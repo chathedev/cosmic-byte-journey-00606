@@ -2505,7 +2505,11 @@ const MeetingDetail = () => {
                         speakerNamesLoading={speakerNamesLoading}
                         currentTime={audioCurrentTime}
                         isPlaying={audioIsPlaying}
-                        onSeek={(time) => setAudioSeekTo(time)}
+                        onSeek={(time) => {
+                          // Update UI immediately so markering + scroll hänger med direkt vid klick.
+                          setAudioCurrentTime(time);
+                          setAudioSeekTo(time);
+                        }}
                         onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSpeakerBlocks ? (

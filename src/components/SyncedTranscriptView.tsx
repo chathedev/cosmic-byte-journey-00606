@@ -48,6 +48,47 @@ interface SyncedTranscriptViewProps {
   className?: string;
 }
 
+const RESET_BACKWARDS_THRESHOLD_SEC = 5; // treat big backwards jumps as a new chunk that reset to 0:00
+
+function normalizeWordTimeline(input: TranscriptWord[]): TranscriptWord[] {
+  if (!Array.isArray(input) || input.length === 0) return [];
+
+  let offset = 0;
+  let lastAbsStart = -Infinity;
+  let lastAbsEnd = -Infinity;
+
+  return input.map((w, idx) => {
+    const parsedStart = typeof w.start === 'number' ? w.start : Number.parseFloat(String(w.start));
+    const parsedEnd = typeof w.end === 'number' ? w.end : Number.parseFloat(String(w.end));
+
+    const rawStart = Number.isFinite(parsedStart) ? parsedStart : 0;
+    const rawEnd = Number.isFinite(parsedEnd) ? parsedEnd : rawStart;
+
+    let absStart = rawStart + offset;
+    let absEnd = rawEnd + offset;
+
+    // Detect timestamp reset (e.g. chunked ASR concatenation where the next chunk starts at 0:00)
+    if (idx > 0 && absStart < lastAbsStart - RESET_BACKWARDS_THRESHOLD_SEC) {
+      offset = Number.isFinite(lastAbsEnd) ? lastAbsEnd : offset;
+      absStart = rawStart + offset;
+      absEnd = rawEnd + offset;
+    }
+
+    // Stabilize small out-of-order glitches without reordering words (binary-search needs monotonic starts)
+    if (idx > 0 && absStart < lastAbsStart) {
+      absStart = lastAbsStart;
+      absEnd = Math.max(absEnd, absStart);
+    }
+
+    if (absEnd < absStart) absEnd = absStart;
+
+    lastAbsStart = absStart;
+    lastAbsEnd = Math.max(lastAbsEnd, absEnd);
+
+    return { ...w, start: absStart, end: absEnd };
+  });
+}
+
 // Speaker color styles
 const SPEAKER_STYLES = [
   { 
@@ -136,6 +177,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
 
+  const normalizedWords = useMemo(() => normalizeWordTimeline(words), [words]);
+
   // Merge speaker names with local edits taking priority
   const speakerNames = { ...initialSpeakerNames, ...localSpeakerNames };
 
@@ -158,6 +201,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   const lastUserInteractionRef = useRef(0);
   const isUserScrollingRef = useRef(false);
   const scrollIdleTimerRef = useRef<number | null>(null);
+  const forceAutoScrollRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -205,16 +249,12 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     lockAutoScrollForUser();
   }, [lockAutoScrollForUser]);
 
-  const handleContainerPointerDown = useCallback(() => {
-    lockAutoScrollForUser();
-  }, [lockAutoScrollForUser]);
-
   // Group words by speaker
   const wordsBySpeaker = useMemo(() => {
     const groups: { speakerId: string; words: TranscriptWord[]; start: number; end: number }[] = [];
     let currentGroup: { speakerId: string; words: TranscriptWord[]; start: number; end: number } | null = null;
 
-    words.forEach(word => {
+    normalizedWords.forEach(word => {
       const speakerId = word.speakerId || word.speaker || 'speaker_0';
       
       if (!currentGroup || currentGroup.speakerId !== speakerId) {
@@ -233,20 +273,20 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
     if (currentGroup) groups.push(currentGroup);
     return groups;
-  }, [words]);
+  }, [normalizedWords]);
 
   // Get unique speakers
   const uniqueSpeakers = useMemo(() => {
     const speakerSet = new Set<string>();
-    words.forEach(w => speakerSet.add(w.speakerId || w.speaker || 'speaker_0'));
+    normalizedWords.forEach(w => speakerSet.add(w.speakerId || w.speaker || 'speaker_0'));
     return Array.from(speakerSet).sort((a, b) => getSpeakerNumber(a) - getSpeakerNumber(b));
-  }, [words]);
+  }, [normalizedWords]);
 
   // Speaker stats
   const speakerStats = useMemo(() => {
     const stats: Record<string, { wordCount: number; duration: number }> = {};
     
-    words.forEach(word => {
+    normalizedWords.forEach(word => {
       const id = word.speakerId || word.speaker || 'speaker_0';
       if (!stats[id]) {
         stats[id] = { wordCount: 0, duration: 0 };
@@ -256,7 +296,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     });
     
     return stats;
-  }, [words]);
+  }, [normalizedWords]);
 
   // Create stable color map
   const speakerStyleMap = useMemo(() => {
@@ -312,22 +352,22 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
   // Find current word index - improved algorithm for accurate word tracking
   const currentWordIndex = useMemo(() => {
-    if (words.length === 0) return -1;
+    if (normalizedWords.length === 0) return -1;
     if (currentTime < 0) return -1;
     
     // Before first word
-    if (currentTime < words[0].start) {
+    if (currentTime < normalizedWords[0].start) {
       return -1;
     }
     
     // Binary search for efficiency with long transcripts
     let left = 0;
-    let right = words.length - 1;
+    let right = normalizedWords.length - 1;
     let bestMatch = -1;
     
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
-      const word = words[mid];
+      const word = normalizedWords[mid];
       
       if (currentTime >= word.start && currentTime <= word.end) {
         // Exact match - word is currently being spoken
@@ -344,8 +384,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     }
     
     // Check if we're between words (in a gap)
-    if (bestMatch >= 0 && bestMatch < words.length - 1) {
-      const nextWord = words[bestMatch + 1];
+    if (bestMatch >= 0 && bestMatch < normalizedWords.length - 1) {
+      const nextWord = normalizedWords[bestMatch + 1];
       // If we're closer to the next word and within a small gap, prefer showing the previous word
       if (currentTime < nextWord.start) {
         return bestMatch;
@@ -353,27 +393,33 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     }
     
     // Past all words - return last word
-    if (bestMatch === -1 && words.length > 0 && currentTime >= words[words.length - 1].end) {
-      return words.length - 1;
+    if (bestMatch === -1 && normalizedWords.length > 0 && currentTime >= normalizedWords[normalizedWords.length - 1].end) {
+      return normalizedWords.length - 1;
     }
     
     return bestMatch;
-  }, [words, currentTime]);
+  }, [normalizedWords, currentTime]);
 
-  // Auto-scroll to active word during playback - centers the active word smoothly
-  // Also scrolls when seeking (clicking on a word)
+  // Auto-scroll to active word during playback.
+  // IMPORTANT: Do not auto-scroll on pause; only when playing or when a seek explicitly requested it.
   useEffect(() => {
     if (!activeWordRef.current || !scrollContainerRef.current) return;
     if (currentWordIndex < 0) return;
 
+    const force = forceAutoScrollRef.current;
+    const shouldAutoScroll = isPlaying || force;
+    if (!shouldAutoScroll) return;
+
     const now = Date.now();
     
-    // Skip if user is actively scrolling (but always allow seek-triggered scrolls)
-    if (isPlaying && isUserScrollingRef.current) return;
-    if (isPlaying && now < userScrollLockUntilRef.current) return;
+    // Skip if user is actively scrolling
+    if (!force) {
+      if (isPlaying && isUserScrollingRef.current) return;
+      if (isPlaying && now < userScrollLockUntilRef.current) return;
+    }
     
     // Throttle scroll updates during playback (every 200ms for smoother feel)
-    if (isPlaying && now - lastAutoScrollAtRef.current < 200) return;
+    if (!force && isPlaying && now - lastAutoScrollAtRef.current < 200) return;
 
     const container = scrollContainerRef.current;
     const activeWord = activeWordRef.current;
@@ -400,6 +446,10 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       top: Math.max(0, targetTop),
       behavior: prefersReducedMotionRef.current ? 'auto' : 'smooth',
     });
+
+    if (force) {
+      forceAutoScrollRef.current = false;
+    }
 
     window.setTimeout(() => {
       programmaticScrollRef.current = false;
@@ -483,14 +533,18 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
   // Handle word click to seek
   const handleWordClick = useCallback((time: number) => {
+    // Ensure a click/seek never gets treated as "manual scrolling" and that we re-center immediately.
+    forceAutoScrollRef.current = true;
+    isUserScrollingRef.current = false;
+    userScrollLockUntilRef.current = 0;
     onSeek?.(time);
   }, [onSeek]);
 
   // Total duration
   const totalDuration = useMemo(() => {
-    if (words.length === 0) return 0;
-    return words[words.length - 1].end;
-  }, [words]);
+    if (normalizedWords.length === 0) return 0;
+    return normalizedWords[normalizedWords.length - 1].end;
+  }, [normalizedWords]);
 
   // Build a map of absolute word indices for each group - computed once per render
   const groupWordIndices = useMemo(() => {
@@ -503,7 +557,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return indices;
   }, [wordsBySpeaker]);
 
-  if (!words || words.length === 0) {
+  if (!normalizedWords || normalizedWords.length === 0) {
     return (
       <div className={cn("text-sm text-muted-foreground", className)}>
         Ingen transkription med ordtidsstämplar tillgänglig.
@@ -657,7 +711,6 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
         onWheel={handleContainerWheel}
         onTouchStart={handleContainerTouch}
         onTouchMove={handleContainerTouch}
-        onPointerDown={handleContainerPointerDown}
         className="max-h-[60vh] overflow-y-auto overscroll-contain pr-2 pb-8"
         style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--border)) transparent' }}
       >
@@ -724,11 +777,9 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                             ref={isActive ? activeWordRef : null}
                             onClick={() => handleWordClick(word.start)}
                             className={cn(
-                              "cursor-pointer transition-colors duration-75 rounded px-0.5 inline",
-                              isActive && cn(
-                                "font-semibold text-primary-foreground py-px",
-                                styles?.dot ? styles.dot : "bg-primary"
-                              ),
+                              "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
+                              // Stable marker: no font-weight change (prevents layout shifts).
+                              isActive && "bg-primary/20 ring-1 ring-primary/30",
                               isPast && "text-muted-foreground/60",
                               !isActive && !isPast && "hover:bg-muted/50"
                             )}
