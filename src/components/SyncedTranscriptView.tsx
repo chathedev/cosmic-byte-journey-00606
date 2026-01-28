@@ -310,37 +310,70 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return !!lookupSpeakerNameRecord(blockSuggestedNames, speakerId, 0);
   }, [localSpeakerNames, blockSuggestedNames, speakerIndexOffset]);
 
-  // Find current word index
+  // Find current word index - improved algorithm for accurate word tracking
   const currentWordIndex = useMemo(() => {
-    for (let i = 0; i < words.length; i++) {
-      if (currentTime >= words[i].start && currentTime <= words[i].end) {
-        return i;
+    if (words.length === 0) return -1;
+    if (currentTime < 0) return -1;
+    
+    // Before first word
+    if (currentTime < words[0].start) {
+      return -1;
+    }
+    
+    // Binary search for efficiency with long transcripts
+    let left = 0;
+    let right = words.length - 1;
+    let bestMatch = -1;
+    
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const word = words[mid];
+      
+      if (currentTime >= word.start && currentTime <= word.end) {
+        // Exact match - word is currently being spoken
+        return mid;
       }
-      // Find word that hasn't started yet (for between-word states)
-      if (i > 0 && currentTime > words[i - 1].end && currentTime < words[i].start) {
-        return i - 1;
+      
+      if (currentTime < word.start) {
+        right = mid - 1;
+      } else {
+        // currentTime > word.end - this word has passed, but might be the best match
+        bestMatch = mid;
+        left = mid + 1;
       }
     }
-    // If past all words, return last
-    if (words.length > 0 && currentTime > words[words.length - 1].end) {
+    
+    // Check if we're between words (in a gap)
+    if (bestMatch >= 0 && bestMatch < words.length - 1) {
+      const nextWord = words[bestMatch + 1];
+      // If we're closer to the next word and within a small gap, prefer showing the previous word
+      if (currentTime < nextWord.start) {
+        return bestMatch;
+      }
+    }
+    
+    // Past all words - return last word
+    if (bestMatch === -1 && words.length > 0 && currentTime >= words[words.length - 1].end) {
       return words.length - 1;
     }
-    return -1;
+    
+    return bestMatch;
   }, [words, currentTime]);
 
   // Auto-scroll to active word during playback - centers the active word smoothly
+  // Also scrolls when seeking (clicking on a word)
   useEffect(() => {
-    if (!isPlaying) return;
     if (!activeWordRef.current || !scrollContainerRef.current) return;
+    if (currentWordIndex < 0) return;
 
     const now = Date.now();
     
-    // Skip if user is actively scrolling
-    if (isUserScrollingRef.current) return;
-    if (now < userScrollLockUntilRef.current) return;
+    // Skip if user is actively scrolling (but always allow seek-triggered scrolls)
+    if (isPlaying && isUserScrollingRef.current) return;
+    if (isPlaying && now < userScrollLockUntilRef.current) return;
     
-    // Throttle scroll updates (every 150ms for smoother feel)
-    if (now - lastAutoScrollAtRef.current < 150) return;
+    // Throttle scroll updates during playback (every 200ms for smoother feel)
+    if (isPlaying && now - lastAutoScrollAtRef.current < 200) return;
 
     const container = scrollContainerRef.current;
     const activeWord = activeWordRef.current;
@@ -353,8 +386,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     const wordCenter = wordRect.top + wordRect.height / 2;
     const distanceFromCenter = Math.abs(wordCenter - containerCenter);
 
-    // Only scroll if word is more than 20% away from center
-    const threshold = containerRect.height * 0.2;
+    // Only scroll if word is more than 15% away from center
+    const threshold = containerRect.height * 0.15;
     if (distanceFromCenter < threshold) return;
 
     const wordTopRelativeToContainer = wordRect.top - containerRect.top + container.scrollTop;
@@ -370,7 +403,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
     window.setTimeout(() => {
       programmaticScrollRef.current = false;
-    }, prefersReducedMotionRef.current ? 0 : 200);
+    }, prefersReducedMotionRef.current ? 0 : 250);
   }, [currentWordIndex, isPlaying]);
 
   // Normalize speaker label to backend format (speaker_0, speaker_1, etc.)
@@ -459,6 +492,17 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return words[words.length - 1].end;
   }, [words]);
 
+  // Build a map of absolute word indices for each group - computed once per render
+  const groupWordIndices = useMemo(() => {
+    const indices: number[] = [];
+    let runningIndex = 0;
+    wordsBySpeaker.forEach(group => {
+      indices.push(runningIndex);
+      runningIndex += group.words.length;
+    });
+    return indices;
+  }, [wordsBySpeaker]);
+
   if (!words || words.length === 0) {
     return (
       <div className={cn("text-sm text-muted-foreground", className)}>
@@ -466,8 +510,6 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       </div>
     );
   }
-
-  let globalWordIndex = 0;
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -626,7 +668,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
             const timestamp = formatTime(group.start);
             const prevGroup = groupIdx > 0 ? wordsBySpeaker[groupIdx - 1] : null;
             const showDivider = prevGroup && prevGroup.speakerId !== group.speakerId;
-            const groupStartIndex = globalWordIndex;
+            const groupStartIndex = groupWordIndices[groupIdx];
 
             return (
               <motion.div
@@ -675,26 +717,26 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                       const absoluteIndex = groupStartIndex + wordIdx;
                       const isActive = absoluteIndex === currentWordIndex;
                       const isPast = absoluteIndex < currentWordIndex;
-                      globalWordIndex++;
 
-                        return (
-                        <span
-                          key={wordIdx}
-                          ref={isActive ? activeWordRef : null}
-                          onClick={() => handleWordClick(word.start)}
-                          className={cn(
-                            "cursor-pointer transition-colors duration-100 rounded-sm",
-                            isActive && cn(
-                              "font-semibold text-primary-foreground px-1 py-0.5 -my-0.5",
-                              styles?.dot ? styles.dot.replace('bg-', 'bg-') : "bg-primary"
-                            ),
-                            isPast && "text-muted-foreground/60",
-                            !isActive && !isPast && "hover:bg-muted/40"
-                          )}
-                        >
-                          {word.word || word.text}
-                          {wordIdx < group.words.length - 1 ? ' ' : ''}
-                        </span>
+                      return (
+                        <React.Fragment key={wordIdx}>
+                          <span
+                            ref={isActive ? activeWordRef : null}
+                            onClick={() => handleWordClick(word.start)}
+                            className={cn(
+                              "cursor-pointer transition-colors duration-75 rounded px-0.5 inline",
+                              isActive && cn(
+                                "font-semibold text-primary-foreground py-px",
+                                styles?.dot ? styles.dot : "bg-primary"
+                              ),
+                              isPast && "text-muted-foreground/60",
+                              !isActive && !isPast && "hover:bg-muted/50"
+                            )}
+                          >
+                            {word.word || word.text}
+                          </span>
+                          {wordIdx < group.words.length - 1 && ' '}
+                        </React.Fragment>
                       );
                     })}
                   </p>
