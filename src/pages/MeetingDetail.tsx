@@ -89,6 +89,7 @@ const MeetingDetail = () => {
   const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
   const [lyraMatches, setLyraMatches] = useState<SISMatch[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [speakerNamesLoading, setSpeakerNamesLoading] = useState(false);
   const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
   const [isSISDisabled, setIsSISDisabled] = useState(false);
   
@@ -606,8 +607,21 @@ const MeetingDetail = () => {
           // Dedicated endpoint has user-edited names which should take priority
           const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
           
+          // Set initial ASR names immediately so transcript renders
+          setSpeakerNames(asrSpeakerNames);
+          
+          // Check if Lyra is still processing or if we should wait for name updates
+          const lyraActive = asrStatus.lyraStatus === 'processing' || asrStatus.lyraStatus === 'done';
+          const sisActive = asrStatus.sisStatus === 'processing' || asrStatus.sisStatus === 'done';
+          const shouldWaitForNames = lyraActive || sisActive;
+          
+          if (shouldWaitForNames) {
+            // Show loading indicator for speaker names
+            setSpeakerNamesLoading(true);
+          }
+          
           // Helper to fetch and merge speaker names
-          const fetchAndMergeSpeakerNames = async (logPrefix: string) => {
+          const fetchAndMergeSpeakerNames = async (logPrefix: string, isFinal: boolean = false): Promise<boolean> => {
             try {
               console.log(`🔄 [${logPrefix}] Fetching speaker names from dedicated endpoint...`);
               const namesData = await backendApi.getSpeakerNames(id);
@@ -615,28 +629,35 @@ const MeetingDetail = () => {
                 console.log(`✅ [${logPrefix}] Merging speaker names:`, { asr: asrSpeakerNames, dedicated: namesData.speakerNames });
                 // Merge: ASR names as base, dedicated endpoint overwrites
                 setSpeakerNames(prev => ({ ...asrSpeakerNames, ...prev, ...namesData.speakerNames }));
+                // If we got real names, stop showing loading
+                setSpeakerNamesLoading(false);
                 return true;
+              }
+              if (isFinal) {
+                // Last fetch attempt, stop loading regardless
+                setSpeakerNamesLoading(false);
               }
               return false;
             } catch (speakerNamesError) {
               console.log(`Could not fetch speaker names (${logPrefix}):`, speakerNamesError);
+              if (isFinal) {
+                setSpeakerNamesLoading(false);
+              }
               return false;
             }
           };
           
           // Initial fetch
-          const hadNames = await fetchAndMergeSpeakerNames('PollingComplete');
-          if (!hadNames) {
-            setSpeakerNames(asrSpeakerNames);
-          }
+          await fetchAndMergeSpeakerNames('PollingComplete');
           
-          // CRITICAL: Schedule delayed re-fetches to catch backend updates
+          // CRITICAL: Schedule delayed re-fetches to catch backend updates (every 1s)
           // Backend may still be processing speaker names after ASR completes
-          const delayedFetches = [3000, 8000, 15000]; // 3s, 8s, 15s after completion
+          const delayedFetches = [1000, 2000, 3000, 5000, 8000]; // 1s, 2s, 3s, 5s, 8s after completion
           delayedFetches.forEach((delay, idx) => {
+            const isFinal = idx === delayedFetches.length - 1;
             setTimeout(() => {
               console.log(`⏰ [DelayedRefetch ${idx + 1}] Re-fetching speaker names after ${delay}ms...`);
-              fetchAndMergeSpeakerNames(`DelayedRefetch-${delay}ms`);
+              fetchAndMergeSpeakerNames(`DelayedRefetch-${delay}ms`, isFinal);
             }, delay);
           });
           
@@ -716,8 +737,8 @@ const MeetingDetail = () => {
           return;
         }
 
-        // Fast polling during active processing (500ms first 30 polls, then 1s, then 2s)
-        const delay = pollCount < 30 ? 500 : pollCount < 60 ? 1000 : 2000;
+        // Consistent 1s polling for responsiveness (as requested)
+        const delay = 1000;
         if (pollingRef.current && !transcriptionDoneRef.current) {
           setTimeout(doPoll, delay);
         }
@@ -2466,6 +2487,7 @@ const MeetingDetail = () => {
                         words={transcriptWords}
                         speakerBlocks={speakerBlocksCleaned || speakerBlocksRaw || []}
                         speakerNames={speakerNames}
+                        speakerNamesLoading={speakerNamesLoading}
                         currentTime={audioCurrentTime}
                         isPlaying={audioIsPlaying}
                         onSeek={(time) => setAudioSeekTo(time)}
@@ -2477,6 +2499,7 @@ const MeetingDetail = () => {
                         meetingId={id || ''}
                         speakerBlocks={speakerBlocksCleaned || speakerBlocksRaw || []}
                         speakerNames={speakerNames}
+                        speakerNamesLoading={speakerNamesLoading}
                         onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSegments ? (
