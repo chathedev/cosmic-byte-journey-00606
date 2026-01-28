@@ -51,10 +51,10 @@ export const TranscriptionStatusWidget = ({
     );
   }
 
-  // Simple status with email notification hint
+  // Simple status with email notification hint and time estimate
   const getStatusText = () => {
     if (stage === 'uploading' || status === 'uploading') return 'Laddar upp...';
-    return 'Bearbetar – mejl skickas när klart';
+    return 'Bearbetar (upp till 10 min) – mejl skickas när klart';
   };
 
   return (

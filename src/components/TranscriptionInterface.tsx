@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
-import { Mic, AlertCircle, FileText, Loader2, Upload, ClipboardPaste } from "lucide-react";
+import { Mic, FileText, Loader2, Upload, ClipboardPaste, Sparkles, Shield, Zap, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
-import { TrustpilotDialog } from "./TrustpilotDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
+import { Badge } from "@/components/ui/badge";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -35,6 +34,25 @@ interface AIProtocol {
 interface TranscriptionInterfaceProps {
   isFreeTrialMode: boolean;
 }
+
+// Feature highlights for the homepage
+const FEATURES = [
+  {
+    icon: Zap,
+    title: "Realtidsanalys",
+    description: "Live-transkribering med AI",
+  },
+  {
+    icon: FileText,
+    title: "Smarta protokoll",
+    description: "Automatiskt genererade",
+  },
+  {
+    icon: Shield,
+    title: "Företagssäkert",
+    description: "GDPR-kompatibel lagring",
+  },
+];
 
 export const TranscriptionInterface = ({ isFreeTrialMode = false }: TranscriptionInterfaceProps) => {
   const [currentView, setCurrentView] = useState<View>("welcome");
@@ -262,15 +280,29 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   if (currentView === "analyzing") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-6">
-          <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto" />
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="text-center space-y-6 max-w-sm">
+          <div className="relative mx-auto w-20 h-20">
+            <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+            <div className="relative w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            </div>
+          </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-bold text-foreground">
               Analyserar möte...
             </h2>
             <p className="text-muted-foreground">
               Transkriberar och bearbetar din fil
+            </p>
+          </div>
+          <div className="pt-4 space-y-2">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>Upp till 10 minuter beroende på längd</span>
+            </div>
+            <p className="text-xs text-muted-foreground/70">
+              Vi levererar bästa möjliga transkriptionskvalitet
             </p>
           </div>
         </div>
@@ -308,30 +340,40 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
-        <div className="max-w-lg w-full space-y-10">
+        <div className="max-w-xl w-full space-y-10">
           
-          {/* Greeting & Hero */}
-          <div className="text-center space-y-3">
+          {/* Company badge */}
+          <div className="flex justify-center">
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-xs border-primary/30 bg-primary/5">
+              <Building2 className="w-3.5 h-3.5 text-primary" />
+              Företagsanpassad möteshantering
+            </Badge>
+          </div>
+
+          {/* Hero */}
+          <div className="text-center space-y-4">
             {displayName && (
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
               </p>
             )}
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
-              Mötesprotokoll på minuter
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight leading-tight">
+              Professionella protokoll
+              <br />
+              <span className="text-primary">på några minuter</span>
             </h1>
-            <p className="text-base text-muted-foreground max-w-sm mx-auto">
-              Spela in eller ladda upp dina möten. Vi transkriberar och genererar professionella protokoll med AI.
+            <p className="text-base md:text-lg text-muted-foreground max-w-md mx-auto">
+              Spela in eller ladda upp möten. Få AI-genererade protokoll med hög precision – snabbt och säkert.
             </p>
           </div>
 
           {/* Action buttons */}
-          <div className="space-y-3">
+          <div className="space-y-3 max-w-sm mx-auto w-full">
             <Button 
               onClick={handleStartRecording}
               size="lg"
               disabled={isStartingRecording}
-              className="w-full h-14 text-base gap-3 shadow-lg shadow-primary/20"
+              className="w-full h-14 text-base gap-3 shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-shadow"
             >
               {isStartingRecording ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -345,7 +387,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={handleOpenDigitalMeeting}
               variant="outline"
               size="lg"
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 border-border/80 hover:border-border hover:bg-muted/50"
             >
               <Upload className="w-5 h-5" />
               Ladda upp fil
@@ -363,34 +405,36 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </Button>
           </div>
 
-          {/* Features */}
-          <div className="grid grid-cols-3 gap-4 pt-2">
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <Mic className="w-5 h-5 text-primary" />
+          {/* Features grid - more enterprise focused */}
+          <div className="grid grid-cols-3 gap-6 pt-6 border-t border-border/30">
+            {FEATURES.map((feature, idx) => (
+              <div key={idx} className="text-center space-y-2.5">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10 flex items-center justify-center mx-auto">
+                  <feature.icon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{feature.title}</p>
+                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium">Realtid</p>
-                <p className="text-xs text-muted-foreground">Live-transkribering</p>
-              </div>
+            ))}
+          </div>
+
+          {/* Trust indicators */}
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-4 text-xs text-muted-foreground/70">
+            <div className="flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" />
+              <span>GDPR-kompatibel</span>
             </div>
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">AI-protokoll</p>
-                <p className="text-xs text-muted-foreground">Automatiskt genererat</p>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI-driven analys</span>
             </div>
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <span className="text-xs font-bold text-primary">SV/EN</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Flerspråkig</p>
-                <p className="text-xs text-muted-foreground">Svenska & engelska</p>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium">SV</span>
+              <span>/</span>
+              <span className="font-medium">EN</span>
+              <span>stöd</span>
             </div>
           </div>
         </div>

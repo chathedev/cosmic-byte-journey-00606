@@ -1,4 +1,4 @@
-import { Mail, Clock } from "lucide-react";
+import { Mail, Clock, Sparkles, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ export const ProcessingStatusMessage = ({
     return (
       <div className={cn("flex items-center gap-2 text-muted-foreground", className)}>
         <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-        <span className="text-xs">Bearbetar – du får mejl när det är klart</span>
+        <span className="text-xs">Bearbetar – du får mejl när det är klart (upp till 10 min)</span>
       </div>
     );
   }
@@ -49,19 +49,31 @@ export const ProcessingStatusMessage = ({
       </div>
 
       {/* Message */}
-      <div className="space-y-2 max-w-xs">
-        <h3 className="text-lg font-medium text-foreground">
+      <div className="space-y-3 max-w-sm">
+        <h3 className="text-lg font-semibold text-foreground">
           Transkribering pågår
         </h3>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Det kan ta några minuter. Du får ett mejl när det är klart – du behöver inte vänta här.
+          Det kan ta upp till <span className="font-medium text-foreground">10 minuter</span> beroende på längd. Du får ett mejl när det är klart – du behöver inte vänta här.
         </p>
       </div>
 
-      {/* Subtle time indicator */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
+      {/* Quality badges */}
+      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <span>Högsta kvalitet</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+          <Shield className="w-3.5 h-3.5 text-primary" />
+          <span>Säker bearbetning</span>
+        </div>
+      </div>
+
+      {/* Time indicator */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 pt-2">
         <Clock className="w-3.5 h-3.5" />
-        <span>Längre inspelningar tar längre tid</span>
+        <span>Längre möten tar längre tid – men vi levererar bästa möjliga resultat</span>
       </div>
     </motion.div>
   );
