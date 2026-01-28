@@ -536,6 +536,10 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
                       <span className={cn("text-sm font-semibold", styles?.text || "text-muted-foreground")}>
                         {displayName}
                       </span>
+                      {/* Loading indicator for generic names */}
+                      {speakerNamesLoading && isGenericSpeakerName(displayName) && (
+                        <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                      )}
                       {timestamp && (
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground/70 border-border/50">
                           {timestamp}

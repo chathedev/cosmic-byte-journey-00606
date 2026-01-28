@@ -610,15 +610,23 @@ const MeetingDetail = () => {
           // Set initial ASR names immediately so transcript renders
           setSpeakerNames(asrSpeakerNames);
           
-          // Check if Lyra is still processing or if we should wait for name updates
-          const lyraActive = asrStatus.lyraStatus === 'processing' || asrStatus.lyraStatus === 'done';
-          const sisActive = asrStatus.sisStatus === 'processing' || asrStatus.sisStatus === 'done';
-          const shouldWaitForNames = lyraActive || sisActive;
+          // ALWAYS show loading initially - we'll turn it off after confirming no updates
+          // This ensures "Talare 1" etc always shows loader while we check for real names
+          setSpeakerNamesLoading(true);
           
-          if (shouldWaitForNames) {
-            // Show loading indicator for speaker names
-            setSpeakerNamesLoading(true);
-          }
+          // Helper to check if we have generic speaker names that need resolving
+          const hasGenericNames = (names: Record<string, string>, blocks: any[] | null): boolean => {
+            // Check if any speakers in blocks are still generic
+            if (!blocks || blocks.length === 0) return false;
+            const uniqueSpeakers = new Set(blocks.map(b => b.speakerId));
+            for (const speakerId of uniqueSpeakers) {
+              const resolvedName = names[speakerId] || names[`speaker_${speakerId.match(/\d+/)?.[0]}`];
+              if (!resolvedName || /^(speaker|talare)/i.test(resolvedName)) {
+                return true;
+              }
+            }
+            return false;
+          };
           
           // Helper to fetch and merge speaker names
           const fetchAndMergeSpeakerNames = async (logPrefix: string, isFinal: boolean = false): Promise<boolean> => {
@@ -628,13 +636,20 @@ const MeetingDetail = () => {
               if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
                 console.log(`✅ [${logPrefix}] Merging speaker names:`, { asr: asrSpeakerNames, dedicated: namesData.speakerNames });
                 // Merge: ASR names as base, dedicated endpoint overwrites
-                setSpeakerNames(prev => ({ ...asrSpeakerNames, ...prev, ...namesData.speakerNames }));
-                // If we got real names, stop showing loading
-                setSpeakerNamesLoading(false);
+                const mergedNames = { ...asrSpeakerNames, ...namesData.speakerNames };
+                setSpeakerNames(prev => ({ ...prev, ...mergedNames }));
+                
+                // Check if we now have all real names - if so, stop loading
+                const stillHasGeneric = hasGenericNames(mergedNames, asrStatus.speakerBlocksCleaned || asrStatus.speakerBlocksRaw);
+                if (!stillHasGeneric) {
+                  console.log(`✅ [${logPrefix}] All speaker names resolved, stopping loader`);
+                  setSpeakerNamesLoading(false);
+                }
                 return true;
               }
               if (isFinal) {
                 // Last fetch attempt, stop loading regardless
+                console.log(`⏱️ [${logPrefix}] Final fetch, stopping loader`);
                 setSpeakerNamesLoading(false);
               }
               return false;
@@ -650,7 +665,7 @@ const MeetingDetail = () => {
           // Initial fetch
           await fetchAndMergeSpeakerNames('PollingComplete');
           
-          // CRITICAL: Schedule delayed re-fetches to catch backend updates (every 1s)
+          // CRITICAL: Schedule delayed re-fetches to catch backend updates
           // Backend may still be processing speaker names after ASR completes
           const delayedFetches = [1000, 2000, 3000, 5000, 8000]; // 1s, 2s, 3s, 5s, 8s after completion
           delayedFetches.forEach((delay, idx) => {
