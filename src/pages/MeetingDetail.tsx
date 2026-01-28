@@ -570,7 +570,24 @@ const MeetingDetail = () => {
           setSpeakerBlocksRaw(asrStatus.speakerBlocksRaw || null);
           setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
           setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
-          setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+          
+          // Set initial speaker names from ASR status
+          const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
+          setSpeakerNames(asrSpeakerNames);
+          
+          // CRITICAL: Fetch speaker names from dedicated endpoint to get latest mappings
+          // This ensures user-edited names are applied even if ASR status doesn't have them
+          try {
+            console.log('🔄 Fetching speaker names after transcription complete...');
+            const namesData = await backendApi.getSpeakerNames(id);
+            if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
+              console.log('✅ Speaker names fetched:', namesData.speakerNames);
+              // Merge with ASR names, backend endpoint takes priority
+              setSpeakerNames(prev => ({ ...prev, ...namesData.speakerNames }));
+            }
+          } catch (speakerNamesError) {
+            console.log('Could not fetch speaker names after completion:', speakerNamesError);
+          }
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setIsSISDisabled(sisDisabled);
           
