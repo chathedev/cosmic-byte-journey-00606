@@ -155,6 +155,9 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   const userScrollLockUntilRef = useRef(0);
   const lastAutoScrollAtRef = useRef(0);
   const prefersReducedMotionRef = useRef(false);
+  const lastUserInteractionRef = useRef(0);
+  const isUserScrollingRef = useRef(false);
+  const scrollIdleTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -162,8 +165,31 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
   }, []);
 
+  // Lock auto-scroll when user manually scrolls, resume after 2s of no interaction
   const lockAutoScrollForUser = useCallback(() => {
-    userScrollLockUntilRef.current = Date.now() + 1200;
+    userScrollLockUntilRef.current = Date.now() + 2000;
+    lastUserInteractionRef.current = Date.now();
+    isUserScrollingRef.current = true;
+    
+    // Clear existing idle timer
+    if (scrollIdleTimerRef.current) {
+      window.clearTimeout(scrollIdleTimerRef.current);
+    }
+    
+    // Set new idle timer to resume auto-scroll
+    scrollIdleTimerRef.current = window.setTimeout(() => {
+      isUserScrollingRef.current = false;
+      userScrollLockUntilRef.current = 0;
+    }, 2000);
+  }, []);
+
+  // Cleanup idle timer on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollIdleTimerRef.current) {
+        window.clearTimeout(scrollIdleTimerRef.current);
+      }
+    };
   }, []);
 
   const handleContainerScroll = useCallback(() => {
@@ -302,14 +328,19 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return -1;
   }, [words, currentTime]);
 
-  // Auto-scroll to active word during playback
+  // Auto-scroll to active word during playback - centers the active word smoothly
   useEffect(() => {
     if (!isPlaying) return;
     if (!activeWordRef.current || !scrollContainerRef.current) return;
 
     const now = Date.now();
+    
+    // Skip if user is actively scrolling
+    if (isUserScrollingRef.current) return;
     if (now < userScrollLockUntilRef.current) return;
-    if (now - lastAutoScrollAtRef.current < 220) return;
+    
+    // Throttle scroll updates (every 150ms for smoother feel)
+    if (now - lastAutoScrollAtRef.current < 150) return;
 
     const container = scrollContainerRef.current;
     const activeWord = activeWordRef.current;
@@ -317,16 +348,17 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     const containerRect = container.getBoundingClientRect();
     const wordRect = activeWord.getBoundingClientRect();
 
-    // Keep the active word within a comfortable "focus band" to feel like it's following playback.
-    const upperBand = containerRect.top + containerRect.height * 0.25;
-    const lowerBand = containerRect.bottom - containerRect.height * 0.25;
-    const isAboveBand = wordRect.top < upperBand;
-    const isBelowBand = wordRect.bottom > lowerBand;
+    // Center the active word vertically in the container
+    const containerCenter = containerRect.top + containerRect.height / 2;
+    const wordCenter = wordRect.top + wordRect.height / 2;
+    const distanceFromCenter = Math.abs(wordCenter - containerCenter);
 
-    if (!isAboveBand && !isBelowBand) return;
+    // Only scroll if word is more than 20% away from center
+    const threshold = containerRect.height * 0.2;
+    if (distanceFromCenter < threshold) return;
 
     const wordTopRelativeToContainer = wordRect.top - containerRect.top + container.scrollTop;
-    const targetTop = wordTopRelativeToContainer - container.clientHeight * 0.35 + wordRect.height / 2;
+    const targetTop = wordTopRelativeToContainer - container.clientHeight / 2 + wordRect.height / 2;
 
     programmaticScrollRef.current = true;
     lastAutoScrollAtRef.current = now;
@@ -338,7 +370,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
     window.setTimeout(() => {
       programmaticScrollRef.current = false;
-    }, prefersReducedMotionRef.current ? 0 : 250);
+    }, prefersReducedMotionRef.current ? 0 : 200);
   }, [currentWordIndex, isPlaying]);
 
   // Normalize speaker label to backend format (speaker_0, speaker_1, etc.)
@@ -645,19 +677,19 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                       const isPast = absoluteIndex < currentWordIndex;
                       globalWordIndex++;
 
-                      return (
+                        return (
                         <span
                           key={wordIdx}
                           ref={isActive ? activeWordRef : null}
                           onClick={() => handleWordClick(word.start)}
                           className={cn(
-                            "cursor-pointer transition-all duration-150 rounded px-0.5 -mx-0.5",
+                            "cursor-pointer transition-colors duration-100 rounded-sm",
                             isActive && cn(
-                              "font-semibold scale-105 inline-block",
-                              styles?.highlight || "bg-primary/20"
+                              "font-semibold text-primary-foreground px-1 py-0.5 -my-0.5",
+                              styles?.dot ? styles.dot.replace('bg-', 'bg-') : "bg-primary"
                             ),
-                            isPast && "text-muted-foreground/70",
-                            !isActive && !isPast && "hover:bg-muted/50"
+                            isPast && "text-muted-foreground/60",
+                            !isActive && !isPast && "hover:bg-muted/40"
                           )}
                         >
                           {word.word || word.text}
