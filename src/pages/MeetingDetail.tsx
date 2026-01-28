@@ -297,6 +297,20 @@ const MeetingDetail = () => {
             setTranscript(fetchedMeeting.transcript);
             setStatus('done');
             
+            // CRITICAL: Fetch speaker names from dedicated endpoint FIRST
+            // This ensures user-edited names are captured before ASR status overwrites them
+            let dedicatedSpeakerNames: Record<string, string> = {};
+            try {
+              console.log('🔄 [InitialLoad] Fetching speaker names from dedicated endpoint...');
+              const namesData = await backendApi.getSpeakerNames(id);
+              if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
+                console.log('✅ [InitialLoad] Dedicated speaker names:', namesData.speakerNames);
+                dedicatedSpeakerNames = namesData.speakerNames;
+              }
+            } catch (e) {
+              console.log('Could not fetch speaker names from dedicated endpoint:', e);
+            }
+            
             // ALWAYS fetch ASR/SIS status for completed meetings to check if SIS is disabled
             try {
               const asrStatus = await pollASRStatus(id);
@@ -308,7 +322,14 @@ const MeetingDetail = () => {
               // Always load speaker identification metadata (useful for UI and naming)
               setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
               setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
-              setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+              
+              // CRITICAL: Merge ASR speaker names with dedicated endpoint names
+              // Dedicated endpoint names take priority (user-edited)
+              const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
+              const mergedSpeakerNames = { ...asrSpeakerNames, ...dedicatedSpeakerNames };
+              console.log('🔀 [InitialLoad] Merged speaker names:', { asr: asrSpeakerNames, dedicated: dedicatedSpeakerNames, merged: mergedSpeakerNames });
+              setSpeakerNames(mergedSpeakerNames);
+              
               setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
               
               // Capture transcript cleanup fields (raw/cleaned + speaker blocks)
@@ -343,16 +364,10 @@ const MeetingDetail = () => {
               }
             } catch (e) {
               console.log('Could not fetch ASR data for completed meeting:', e);
-            }
-            
-            // Load speaker names from backend
-            try {
-              const namesData = await backendApi.getSpeakerNames(id);
-              if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
-                setSpeakerNames(prev => ({ ...prev, ...namesData.speakerNames }));
+              // Even if ASR fails, still apply dedicated speaker names
+              if (Object.keys(dedicatedSpeakerNames).length > 0) {
+                setSpeakerNames(dedicatedSpeakerNames);
               }
-            } catch (e) {
-              console.log('Could not fetch speaker names:', e);
             }
           } else {
             // No transcript yet - check ASR status to determine if failed or still processing
@@ -383,7 +398,23 @@ const MeetingDetail = () => {
                   setReconstructedSegments(asrStatus.reconstructedSegments || null);
                   setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
                   setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
-                  setSpeakerNames(asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {});
+                  
+                  // Fetch dedicated speaker names endpoint and merge with ASR names
+                  const fallbackAsrNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
+                  try {
+                    console.log('🔄 [FallbackLoad] Fetching speaker names from dedicated endpoint...');
+                    const fallbackNamesData = await backendApi.getSpeakerNames(id);
+                    if (fallbackNamesData.speakerNames && Object.keys(fallbackNamesData.speakerNames).length > 0) {
+                      console.log('✅ [FallbackLoad] Dedicated speaker names:', fallbackNamesData.speakerNames);
+                      setSpeakerNames({ ...fallbackAsrNames, ...fallbackNamesData.speakerNames });
+                    } else {
+                      setSpeakerNames(fallbackAsrNames);
+                    }
+                  } catch (fallbackSpeakerNamesError) {
+                    console.log('Could not fetch speaker names:', fallbackSpeakerNamesError);
+                    setSpeakerNames(fallbackAsrNames);
+                  }
+                  
                   setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
                   setStatus('done');
                   transcriptionDoneRef.current = true;
@@ -571,22 +602,22 @@ const MeetingDetail = () => {
           setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
           setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
           
-          // Set initial speaker names from ASR status
+          // CRITICAL: Fetch speaker names from dedicated endpoint FIRST, then merge with ASR names
+          // Dedicated endpoint has user-edited names which should take priority
           const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
-          setSpeakerNames(asrSpeakerNames);
-          
-          // CRITICAL: Fetch speaker names from dedicated endpoint to get latest mappings
-          // This ensures user-edited names are applied even if ASR status doesn't have them
           try {
-            console.log('🔄 Fetching speaker names after transcription complete...');
+            console.log('🔄 [PollingComplete] Fetching speaker names from dedicated endpoint...');
             const namesData = await backendApi.getSpeakerNames(id);
             if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
-              console.log('✅ Speaker names fetched:', namesData.speakerNames);
-              // Merge with ASR names, backend endpoint takes priority
-              setSpeakerNames(prev => ({ ...prev, ...namesData.speakerNames }));
+              console.log('✅ [PollingComplete] Merging speaker names:', { asr: asrSpeakerNames, dedicated: namesData.speakerNames });
+              // Merge: ASR names as base, dedicated endpoint overwrites
+              setSpeakerNames({ ...asrSpeakerNames, ...namesData.speakerNames });
+            } else {
+              setSpeakerNames(asrSpeakerNames);
             }
           } catch (speakerNamesError) {
             console.log('Could not fetch speaker names after completion:', speakerNamesError);
+            setSpeakerNames(asrSpeakerNames);
           }
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setIsSISDisabled(sisDisabled);
