@@ -605,20 +605,41 @@ const MeetingDetail = () => {
           // CRITICAL: Fetch speaker names from dedicated endpoint FIRST, then merge with ASR names
           // Dedicated endpoint has user-edited names which should take priority
           const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
-          try {
-            console.log('🔄 [PollingComplete] Fetching speaker names from dedicated endpoint...');
-            const namesData = await backendApi.getSpeakerNames(id);
-            if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
-              console.log('✅ [PollingComplete] Merging speaker names:', { asr: asrSpeakerNames, dedicated: namesData.speakerNames });
-              // Merge: ASR names as base, dedicated endpoint overwrites
-              setSpeakerNames({ ...asrSpeakerNames, ...namesData.speakerNames });
-            } else {
-              setSpeakerNames(asrSpeakerNames);
+          
+          // Helper to fetch and merge speaker names
+          const fetchAndMergeSpeakerNames = async (logPrefix: string) => {
+            try {
+              console.log(`🔄 [${logPrefix}] Fetching speaker names from dedicated endpoint...`);
+              const namesData = await backendApi.getSpeakerNames(id);
+              if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
+                console.log(`✅ [${logPrefix}] Merging speaker names:`, { asr: asrSpeakerNames, dedicated: namesData.speakerNames });
+                // Merge: ASR names as base, dedicated endpoint overwrites
+                setSpeakerNames(prev => ({ ...asrSpeakerNames, ...prev, ...namesData.speakerNames }));
+                return true;
+              }
+              return false;
+            } catch (speakerNamesError) {
+              console.log(`Could not fetch speaker names (${logPrefix}):`, speakerNamesError);
+              return false;
             }
-          } catch (speakerNamesError) {
-            console.log('Could not fetch speaker names after completion:', speakerNamesError);
+          };
+          
+          // Initial fetch
+          const hadNames = await fetchAndMergeSpeakerNames('PollingComplete');
+          if (!hadNames) {
             setSpeakerNames(asrSpeakerNames);
           }
+          
+          // CRITICAL: Schedule delayed re-fetches to catch backend updates
+          // Backend may still be processing speaker names after ASR completes
+          const delayedFetches = [3000, 8000, 15000]; // 3s, 8s, 15s after completion
+          delayedFetches.forEach((delay, idx) => {
+            setTimeout(() => {
+              console.log(`⏰ [DelayedRefetch ${idx + 1}] Re-fetching speaker names after ${delay}ms...`);
+              fetchAndMergeSpeakerNames(`DelayedRefetch-${delay}ms`);
+            }, delay);
+          });
+          
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setIsSISDisabled(sisDisabled);
           
