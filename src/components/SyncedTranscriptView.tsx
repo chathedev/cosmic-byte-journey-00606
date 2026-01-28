@@ -622,6 +622,10 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                     <span className={cn("text-sm font-semibold", styles?.text || "text-muted-foreground")}>
                       {displayName}
                     </span>
+                    {/* Loading indicator for generic names */}
+                    {speakerNamesLoading && isGenericSpeakerName(displayName) && (
+                      <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                    )}
                     {timestamp && (
                       <Badge 
                         variant="outline" 
