@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Users, Clock, ChevronDown, ChevronUp, Play, Edit2, Check, X, Sparkles } from 'lucide-react';
+import { Copy, Users, Clock, ChevronDown, ChevronUp, Play, Edit2, Check, X, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -40,6 +40,7 @@ interface SyncedTranscriptViewProps {
   words: TranscriptWord[];
   speakerBlocks?: SpeakerBlock[];
   speakerNames?: Record<string, string>;
+  speakerNamesLoading?: boolean;
   currentTime: number; // Audio playback time in seconds
   isPlaying: boolean;
   onSeek?: (time: number) => void;
@@ -119,6 +120,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   words,
   speakerBlocks = [],
   speakerNames: initialSpeakerNames = {},
+  speakerNamesLoading = false,
   currentTime,
   isPlaying,
   onSeek,
@@ -546,7 +548,14 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                           <span className={cn("font-medium text-sm", styles?.text)}>
                             {displayName}
                           </span>
-                          {isSuggested && hasRealName && (
+                          {/* Loading indicator for generic names while waiting for Lyra */}
+                          {speakerNamesLoading && !hasRealName && (
+                            <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5 text-muted-foreground border-border/50 bg-muted/30 animate-pulse">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              Hämtar...
+                            </Badge>
+                          )}
+                          {isSuggested && hasRealName && !speakerNamesLoading && (
                             <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5 text-amber-600 border-amber-500/30 bg-amber-500/5">
                               <Sparkles className="w-2.5 h-2.5" />
                               Förslag

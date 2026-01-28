@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, Edit2, Copy, X, Users, Clock, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Check, Edit2, Copy, X, Users, Clock, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { backendApi } from '@/lib/backendApi';
@@ -29,6 +29,7 @@ interface EnhancedSpeakerViewProps {
   meetingId: string;
   speakerBlocks: SpeakerBlock[];
   speakerNames?: Record<string, string>;
+  speakerNamesLoading?: boolean;
   onSpeakerNamesUpdated?: (names: Record<string, string>) => void;
   className?: string;
 }
@@ -111,6 +112,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   meetingId,
   speakerBlocks,
   speakerNames: initialSpeakerNames = {},
+  speakerNamesLoading = false,
   onSpeakerNamesUpdated,
   className,
 }) => {
@@ -455,8 +457,15 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
                           <span className={cn("font-medium text-sm", styles?.text)}>
                             {displayName}
                           </span>
+                          {/* Loading indicator for generic names while waiting for Lyra */}
+                          {speakerNamesLoading && !hasRealName && (
+                            <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5 text-muted-foreground border-border/50 bg-muted/30 animate-pulse">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              Hämtar...
+                            </Badge>
+                          )}
                           {/* AI suggestion indicator */}
-                          {isSuggested && hasRealName && (
+                          {isSuggested && hasRealName && !speakerNamesLoading && (
                             <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5 text-amber-600 border-amber-500/30 bg-amber-500/5">
                               <Sparkles className="w-2.5 h-2.5" />
                               Förslag
