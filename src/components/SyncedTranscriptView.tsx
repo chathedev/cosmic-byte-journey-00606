@@ -39,6 +39,7 @@ interface SyncedTranscriptViewProps {
   meetingId: string;
   words: TranscriptWord[];
   speakerBlocks?: SpeakerBlock[];
+  cleanedTranscript?: string; // AI-cleaned transcript text (preferred over raw words)
   speakerNames?: Record<string, string>;
   speakerNamesLoading?: boolean;
   currentTime: number; // Audio playback time in seconds
@@ -160,6 +161,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   meetingId,
   words,
   speakerBlocks = [],
+  cleanedTranscript,
   speakerNames: initialSpeakerNames = {},
   speakerNamesLoading = false,
   currentTime,
@@ -251,8 +253,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
   // Group words by speaker
   const wordsBySpeaker = useMemo(() => {
-    const groups: { speakerId: string; words: TranscriptWord[]; start: number; end: number }[] = [];
-    let currentGroup: { speakerId: string; words: TranscriptWord[]; start: number; end: number } | null = null;
+    const groups: { speakerId: string; words: TranscriptWord[]; start: number; end: number; cleanedText?: string }[] = [];
+    let currentGroup: { speakerId: string; words: TranscriptWord[]; start: number; end: number; cleanedText?: string } | null = null;
 
     normalizedWords.forEach(word => {
       const speakerId = word.speakerId || word.speaker || 'speaker_0';
@@ -272,8 +274,34 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     });
 
     if (currentGroup) groups.push(currentGroup);
+    
+    // Try to match groups with cleaned speaker blocks by timestamp overlap
+    // speakerBlocks have cleaned/AI-corrected text that should be preferred
+    if (speakerBlocks.length > 0) {
+      groups.forEach((group, idx) => {
+        // Find matching speaker block by timestamp or speaker ID
+        const matchingBlock = speakerBlocks.find(block => {
+          const blockStart = block.start ?? 0;
+          const blockEnd = block.end ?? Infinity;
+          const timeOverlap = group.start >= blockStart - 1 && group.start <= blockEnd + 1;
+          const speakerMatch = block.speakerId === group.speakerId || 
+            block.speakerId.replace('speaker_', '') === group.speakerId.replace('speaker_', '');
+          return speakerMatch || timeOverlap;
+        });
+        
+        if (matchingBlock?.text) {
+          group.cleanedText = matchingBlock.text;
+        }
+      });
+    }
+    
+    // Fallback: if we have a single cleaned transcript and single group, use it
+    if (groups.length === 1 && cleanedTranscript && !groups[0].cleanedText) {
+      groups[0].cleanedText = cleanedTranscript;
+    }
+    
     return groups;
-  }, [normalizedWords]);
+  }, [normalizedWords, speakerBlocks, cleanedTranscript]);
 
   // Get unique speakers
   const uniqueSpeakers = useMemo(() => {
@@ -517,13 +545,14 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     }
   };
 
-  // Copy transcript
+  // Copy transcript - prefer cleaned text
   const handleCopyTranscript = useCallback(() => {
     const text = wordsBySpeaker
       .map(group => {
         const name = getSpeakerDisplayName(group.speakerId);
         const time = formatTime(group.start);
-        const groupText = group.words.map(w => w.word || w.text).join(' ');
+        // Prefer cleaned text if available, otherwise join raw words
+        const groupText = group.cleanedText || group.words.map(w => w.word || w.text).join(' ');
         return time ? `[${time}] ${name}: ${groupText}` : `${name}: ${groupText}`;
       })
       .join('\n\n');
@@ -764,33 +793,46 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                     )}
                   </div>
 
-                  {/* Word-by-word text with highlighting */}
-                  <p className="text-sm leading-relaxed text-foreground pl-4">
-                    {group.words.map((word, wordIdx) => {
-                      const absoluteIndex = groupStartIndex + wordIdx;
-                      const isActive = absoluteIndex === currentWordIndex;
-                      const isPast = absoluteIndex < currentWordIndex;
+                  {/* Text content - prefer cleaned text, fallback to word-by-word */}
+                  <div className="text-sm leading-relaxed text-foreground pl-4">
+                    {group.cleanedText ? (
+                      // Display cleaned/AI-corrected text as a whole
+                      // Still clickable to seek to the group start
+                      <p 
+                        onClick={() => handleWordClick(group.start)}
+                        className="cursor-pointer hover:bg-muted/30 rounded px-1 -mx-1 py-0.5 transition-colors"
+                      >
+                        {group.cleanedText}
+                      </p>
+                    ) : (
+                      // Fallback: word-by-word with highlighting for synced playback
+                      <p>
+                        {group.words.map((word, wordIdx) => {
+                          const absoluteIndex = groupStartIndex + wordIdx;
+                          const isActive = absoluteIndex === currentWordIndex;
+                          const isPast = absoluteIndex < currentWordIndex;
 
-                      return (
-                        <React.Fragment key={wordIdx}>
-                          <span
-                            ref={isActive ? activeWordRef : null}
-                            onClick={() => handleWordClick(word.start)}
-                            className={cn(
-                              "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
-                              // Stable marker: no font-weight change (prevents layout shifts).
-                              isActive && "bg-primary/20 ring-1 ring-primary/30",
-                              isPast && "text-muted-foreground/60",
-                              !isActive && !isPast && "hover:bg-muted/50"
-                            )}
-                          >
-                            {word.word || word.text}
-                          </span>
-                          {wordIdx < group.words.length - 1 && ' '}
-                        </React.Fragment>
-                      );
-                    })}
-                  </p>
+                          return (
+                            <React.Fragment key={wordIdx}>
+                              <span
+                                ref={isActive ? activeWordRef : null}
+                                onClick={() => handleWordClick(word.start)}
+                                className={cn(
+                                  "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
+                                  isActive && "bg-primary/20 ring-1 ring-primary/30",
+                                  isPast && "text-muted-foreground/60",
+                                  !isActive && !isPast && "hover:bg-muted/50"
+                                )}
+                              >
+                                {word.word || word.text}
+                              </span>
+                              {wordIdx < group.words.length - 1 && ' '}
+                            </React.Fragment>
+                          );
+                        })}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             );

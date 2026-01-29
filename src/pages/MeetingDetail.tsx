@@ -2501,6 +2501,7 @@ const MeetingDetail = () => {
                         meetingId={id || ''}
                         words={transcriptWords}
                         speakerBlocks={speakerBlocksCleaned || speakerBlocksRaw || []}
+                        cleanedTranscript={transcript || undefined}
                         speakerNames={speakerNames}
                         speakerNamesLoading={speakerNamesLoading}
                         currentTime={audioCurrentTime}
