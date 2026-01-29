@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry, TranscriptWord, AudioBackup, SpeakerBlock } from '@/lib/asrService';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -13,9 +13,11 @@ export function useASRPolling(
   options: UseASRPollingOptions = {}
 ) {
   const [status, setStatus] = useState<ASRStatus['status'] | null>(null);
+  const [stage, setStage] = useState<ASRStage | null>(null);
   const [progress, setProgress] = useState<number | undefined>(undefined);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[] | null>(null);
+  const [words, setWords] = useState<TranscriptWord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [lyraStatus, setLyraStatus] = useState<SISStatusType | null>(null);
@@ -24,6 +26,13 @@ export function useASRPolling(
   const [lyraSpeakers, setLyraSpeakers] = useState<SISSpeaker[]>([]);
   const [lyraLearning, setLyraLearning] = useState<LyraLearningEntry[]>([]);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  // Enhanced metadata from backend
+  const [engine, setEngine] = useState<string | undefined>(undefined);
+  const [language, setLanguage] = useState<string | undefined>(undefined);
+  const [wavDurationSec, setWavDurationSec] = useState<number | undefined>(undefined);
+  const [audioBackup, setAudioBackup] = useState<AudioBackup | undefined>(undefined);
+  const [audioDownloadPath, setAudioDownloadPath] = useState<string | undefined>(undefined);
+  const [speakerBlocksCleaned, setSpeakerBlocksCleaned] = useState<SpeakerBlock[] | undefined>(undefined);
   
   const pollingRef = useRef(false);
   const meetingIdRef = useRef(meetingId);
@@ -49,6 +58,7 @@ export function useASRPolling(
         if (!pollingRef.current || meetingIdRef.current !== id) break;
         
         setStatus(result.status);
+        setStage(result.stage || null);
         setProgress(result.progress);
         
         // Check for full completion:
@@ -64,12 +74,21 @@ export function useASRPolling(
         if (isFullyDone) {
           setTranscript(result.transcript || null);
           setTranscriptSegments(result.transcriptSegments || null);
+          setWords(result.words || null);
           setLyraStatus(result.lyraStatus || result.sisStatus || null);
           setLyraMatches(result.lyraMatches || result.sisMatches || []);
           setLyraMatch(result.lyraMatches?.[0] || result.sisMatch || null);
           setLyraSpeakers(result.lyraSpeakers || result.sisSpeakers || []);
           setLyraLearning(result.lyraLearning || result.sisLearning || []);
           setSpeakerNames(result.lyraSpeakerNames || result.speakerNames || {});
+          // Enhanced metadata
+          setEngine(result.engine);
+          setLanguage(result.language);
+          setWavDurationSec(result.wavDurationSec);
+          setAudioBackup(result.audioBackup);
+          setAudioDownloadPath(result.audioDownloadPath);
+          setSpeakerBlocksCleaned(result.speakerBlocksCleaned);
+          stopPolling();
           stopPolling();
           
           // Log Lyra results
@@ -123,9 +142,11 @@ export function useASRPolling(
 
   return {
     status,
+    stage,
     progress,
     transcript,
     transcriptSegments,
+    words,
     error,
     isPolling,
     lyraStatus,
@@ -134,6 +155,13 @@ export function useASRPolling(
     lyraSpeakers,
     lyraLearning,
     speakerNames,
+    // Enhanced metadata
+    engine,
+    language,
+    wavDurationSec,
+    audioBackup,
+    audioDownloadPath,
+    speakerBlocksCleaned,
     stopPolling,
     startPolling,
     // Legacy aliases for backwards compatibility
