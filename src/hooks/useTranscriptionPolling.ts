@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry } from '@/lib/asrService';
+import { pollASRStatus, ASRStatus, ASRStage, SISMatch, SISSpeaker, SISStatusType, TranscriptSegment, LyraLearningEntry, TranscriptWord, AudioBackup, SpeakerBlock } from '@/lib/asrService';
 import { meetingStorage } from '@/utils/meetingStorage';
 
 const POLL_INTERVAL_MS = 4000; // Poll every 4 seconds
 const MAX_POLL_ATTEMPTS = 450; // Max ~30 minutes
 
 // Per docs: TranscriptionState holds both legacy SIS and Lyra mirror fields
+// Enhanced with words, speaker blocks, and audio backup from backend
 export interface TranscriptionState {
   status: 'idle' | 'uploading' | 'processing' | 'done' | 'failed';
   stage?: ASRStage; // More granular stage from backend
   progress: number;
   transcript: string | null;
   transcriptSegments: TranscriptSegment[] | null;
+  // Word-level timestamps for synced playback
+  words: TranscriptWord[] | null;
   error: string | null;
   // Legacy SIS fields (for backwards compatibility)
   sisStatus: SISStatusType | null;
@@ -25,6 +28,18 @@ export interface TranscriptionState {
   lyraLearning?: LyraLearningEntry[];
   // Per docs: speakerNames[label] is the preferred way to display speaker names
   speakerNames?: Record<string, string>;
+  // Enhanced metadata from backend
+  engine?: string;
+  language?: string;
+  wavDurationSec?: number;
+  // Audio backup for failsafe download
+  audioBackup?: AudioBackup;
+  audioDownloadPath?: string;
+  // Speaker block cleanup from AI post-processing
+  speakerBlocksCleaned?: SpeakerBlock[];
+  speakerBlocksRaw?: SpeakerBlock[];
+  transcriptRaw?: string;
+  transcriptCleaned?: string;
 }
 
 // Per docs: onComplete now includes Lyra learning and speakerNames
@@ -74,6 +89,7 @@ export function useTranscriptionPolling(
         progress: 10,
         transcript: null,
         transcriptSegments: null,
+        words: null,
         error: null,
         // Legacy SIS fields
         sisStatus: null,
@@ -86,6 +102,16 @@ export function useTranscriptionPolling(
         lyraSpeakers: [],
         lyraLearning: [],
         speakerNames: {},
+        // Enhanced metadata
+        engine: undefined,
+        language: undefined,
+        wavDurationSec: undefined,
+        audioBackup: undefined,
+        audioDownloadPath: undefined,
+        speakerBlocksCleaned: undefined,
+        speakerBlocksRaw: undefined,
+        transcriptRaw: undefined,
+        transcriptCleaned: undefined,
       }
     }));
 
@@ -150,6 +176,7 @@ export function useTranscriptionPolling(
               progress: 100,
               transcript: asrStatus.transcript!,
               transcriptSegments: asrStatus.transcriptSegments || null,
+              words: asrStatus.words || null,
               error: null,
               // Legacy SIS fields
               sisStatus: asrStatus.sisStatus || null,
@@ -162,6 +189,16 @@ export function useTranscriptionPolling(
               lyraSpeakers,
               lyraLearning,
               speakerNames,
+              // Enhanced metadata
+              engine: asrStatus.engine,
+              language: asrStatus.language,
+              wavDurationSec: asrStatus.wavDurationSec,
+              audioBackup: asrStatus.audioBackup,
+              audioDownloadPath: asrStatus.audioDownloadPath,
+              speakerBlocksCleaned: asrStatus.speakerBlocksCleaned,
+              speakerBlocksRaw: asrStatus.speakerBlocksRaw,
+              transcriptRaw: asrStatus.transcriptRaw,
+              transcriptCleaned: asrStatus.transcriptCleaned,
             }
           }));
           
@@ -188,6 +225,7 @@ export function useTranscriptionPolling(
               progress: 0,
               transcript: null,
               transcriptSegments: null,
+              words: null,
               error: asrStatus.error || 'Transkribering misslyckades',
               sisStatus: null,
               sisMatches: [],
@@ -240,6 +278,7 @@ export function useTranscriptionPolling(
               progress: 100,
               transcript: meeting.transcript,
               transcriptSegments: null,
+              words: asrStatus.words || null,
               error: null,
               sisStatus: asrStatus.sisStatus || null,
               sisMatches: asrStatus.sisMatches || [],
@@ -250,6 +289,14 @@ export function useTranscriptionPolling(
               lyraSpeakers,
               lyraLearning,
               speakerNames,
+              // Enhanced metadata
+              engine: asrStatus.engine,
+              language: asrStatus.language,
+              wavDurationSec: asrStatus.wavDurationSec,
+              audioBackup: asrStatus.audioBackup,
+              audioDownloadPath: asrStatus.audioDownloadPath,
+              speakerBlocksCleaned: asrStatus.speakerBlocksCleaned,
+              speakerBlocksRaw: asrStatus.speakerBlocksRaw,
             }
           }));
           
@@ -284,6 +331,7 @@ export function useTranscriptionPolling(
           progress: 0,
           transcript: null,
           transcriptSegments: null,
+          words: null,
           error: 'Tidsgränsen överskreds',
           sisStatus: null,
           sisMatches: [],
