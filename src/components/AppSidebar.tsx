@@ -26,7 +26,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useToast } from "@/hooks/use-toast";
 import { isUserAdmin, hasPlusAccess, hasUnlimitedAccess, isLibraryLocked } from "@/lib/accessCheck";
-import { SettingsDialog } from "@/components/SettingsDialog";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { AdminSupportPanel } from "@/components/AdminSupportPanel";
 import { isNativeApp } from "@/utils/capacitorDetection";
@@ -40,12 +39,10 @@ export function AppSidebar() {
   const [open, setOpen] = useState(() => !isMobileDevice());
   const [collapsed, setCollapsed] = useState(false);
   const [selected, setSelected] = useState("Hem");
-  const [showRequireNameDialog, setShowRequireNameDialog] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAdminSupport, setShowAdminSupport] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
-  const [hasCheckedName, setHasCheckedName] = useState(false);
   const isNative = isNativeApp();
   
   const scrollYRef = useRef(0);
@@ -106,31 +103,6 @@ export function AppSidebar() {
     };
     checkAdmin();
   }, [user]);
-
-  // Auto-open settings if user has no preferred name set (only check once)
-  useEffect(() => {
-    if (hasCheckedName) return;
-    if (!user) return;
-    if (planLoading) return;
-    
-    // Check if user has no preferred name
-    const preferredName = (user as any)?.preferredName;
-    if (!preferredName) {
-      // Small delay to ensure we're fully rendered
-      const timer = setTimeout(() => {
-        setShowRequireNameDialog(true);
-        setHasCheckedName(true);
-      }, 800);
-      return () => clearTimeout(timer);
-    } else {
-      setHasCheckedName(true);
-    }
-  }, [user, planLoading, hasCheckedName]);
-
-  // When name is saved and dialog closes, clear the require flag
-  const handleRequireNameDialogClose = (isOpen: boolean) => {
-    setShowRequireNameDialog(isOpen);
-  };
 
   useEffect(() => {
     const path = location.pathname;
@@ -569,7 +541,6 @@ export function AppSidebar() {
       )}
 
       {/* Dialogs */}
-      <SettingsDialog open={showRequireNameDialog} onOpenChange={handleRequireNameDialogClose} requireName={true} />
       <SubscribeDialog open={showSubscribe} onOpenChange={setShowSubscribe} />
       <AdminSupportPanel open={showAdminSupport} onOpenChange={setShowAdminSupport} />
     </>
