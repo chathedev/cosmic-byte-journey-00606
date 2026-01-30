@@ -793,45 +793,33 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                     )}
                   </div>
 
-                  {/* Text content - prefer cleaned text, fallback to word-by-word */}
+                  {/* Text content - always render word-by-word for click-to-seek and highlighting */}
                   <div className="text-sm leading-relaxed text-foreground pl-4">
-                    {group.cleanedText ? (
-                      // Display cleaned/AI-corrected text as a whole
-                      // Still clickable to seek to the group start
-                      <p 
-                        onClick={() => handleWordClick(group.start)}
-                        className="cursor-pointer hover:bg-muted/30 rounded px-1 -mx-1 py-0.5 transition-colors"
-                      >
-                        {group.cleanedText}
-                      </p>
-                    ) : (
-                      // Fallback: word-by-word with highlighting for synced playback
-                      <p>
-                        {group.words.map((word, wordIdx) => {
-                          const absoluteIndex = groupStartIndex + wordIdx;
-                          const isActive = absoluteIndex === currentWordIndex;
-                          const isPast = absoluteIndex < currentWordIndex;
+                    <p>
+                      {group.words.map((word, wordIdx) => {
+                        const absoluteIndex = groupStartIndex + wordIdx;
+                        const isActive = absoluteIndex === currentWordIndex;
+                        const isPast = absoluteIndex < currentWordIndex;
 
-                          return (
-                            <React.Fragment key={wordIdx}>
-                              <span
-                                ref={isActive ? activeWordRef : null}
-                                onClick={() => handleWordClick(word.start)}
-                                className={cn(
-                                  "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
-                                  isActive && "bg-primary/20 ring-1 ring-primary/30",
-                                  isPast && "text-muted-foreground/60",
-                                  !isActive && !isPast && "hover:bg-muted/50"
-                                )}
-                              >
-                                {word.word || word.text}
-                              </span>
-                              {wordIdx < group.words.length - 1 && ' '}
-                            </React.Fragment>
-                          );
-                        })}
-                      </p>
-                    )}
+                        return (
+                          <React.Fragment key={wordIdx}>
+                            <span
+                              ref={isActive ? activeWordRef : null}
+                              onClick={() => handleWordClick(word.start)}
+                              className={cn(
+                                "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
+                                isActive && "bg-primary/20 ring-1 ring-primary/30",
+                                isPast && "text-muted-foreground/60",
+                                !isActive && !isPast && "hover:bg-muted/50"
+                              )}
+                            >
+                              {word.word || word.text}
+                            </span>
+                            {wordIdx < group.words.length - 1 && ' '}
+                          </React.Fragment>
+                        );
+                      })}
+                    </p>
                   </div>
                 </div>
               </motion.div>
