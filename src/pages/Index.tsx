@@ -1,11 +1,29 @@
 import { TranscriptionInterface } from "@/components/TranscriptionInterface";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
+import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
 import { useSubscription } from "@/contexts/SubscriptionContext";
-import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect } from "react";
 
 const Index = () => {
   const { userPlan, isLoading } = useSubscription();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [showNameDialog, setShowNameDialog] = useState(false);
+
+  // Check if user needs to set their name
+  useEffect(() => {
+    if (!isAuthLoading && user) {
+      const hasName = !!(user.preferredName || user.displayName);
+      if (!hasName) {
+        setShowNameDialog(true);
+      }
+    }
+  }, [user, isAuthLoading]);
+
+  const handleNameComplete = () => {
+    setShowNameDialog(false);
+  };
 
   return (
     <>
@@ -20,6 +38,12 @@ const Index = () => {
         isFreeTrialMode={userPlan?.plan === 'free'}
       />
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
+      
+      {/* Welcome name prompt for users without a name */}
+      <WelcomeNameDialog 
+        open={showNameDialog} 
+        onComplete={handleNameComplete} 
+      />
     </>
   );
 };
