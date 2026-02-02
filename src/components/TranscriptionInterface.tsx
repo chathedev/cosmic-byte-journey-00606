@@ -152,7 +152,36 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const handleDigitalRecordingStart = async (streams: { systemStream?: MediaStream; micStream?: MediaStream }) => {
     setIsStartingRecording(true);
 
+    let mixedStream: MediaStream | undefined;
+    let preMixAudioContext: AudioContext | undefined;
+
     try {
+      // Mix system + mic into ONE stream while we still have a user gesture (button click)
+      // so AudioContext can reliably run. We store everything module-level.
+      try {
+        preMixAudioContext = new AudioContext();
+        if (preMixAudioContext.state === 'suspended') {
+          await preMixAudioContext.resume();
+        }
+        const destination = preMixAudioContext.createMediaStreamDestination();
+        if (streams.systemStream) {
+          preMixAudioContext.createMediaStreamSource(streams.systemStream).connect(destination);
+        }
+        if (streams.micStream) {
+          preMixAudioContext.createMediaStreamSource(streams.micStream).connect(destination);
+        }
+        mixedStream = destination.stream;
+      } catch (e) {
+        console.warn('Could not pre-mix digital streams, will fallback in recorder:', e);
+        try {
+          preMixAudioContext?.close();
+        } catch {
+          /* ignore */
+        }
+        preMixAudioContext = undefined;
+        mixedStream = undefined;
+      }
+
       const now = new Date().toISOString();
       const result = await apiClient.createMeeting({
         title: 'Digitalt möte',
@@ -180,7 +209,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
       // Store streams in module-level storage (MediaStream can't be serialized)
-      digitalRecordingStreams.set(streams);
+      digitalRecordingStreams.set({
+        ...streams,
+        combinedStream: mixedStream,
+        audioContext: preMixAudioContext,
+      });
 
       // Navigate with just a flag
       navigate(`/meetings/${meetingId}`, {
@@ -196,6 +229,10 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       // Stop streams on error
       streams.systemStream?.getTracks().forEach(t => t.stop());
       streams.micStream?.getTracks().forEach(t => t.stop());
+      // If we created a pre-mix AudioContext but never stored it, close it.
+      try { preMixAudioContext?.close(); } catch { /* ignore */ }
+      // Also clear any mixed stream / audio context
+      digitalRecordingStreams.clear();
       toast({
         title: 'Kunde inte starta inspelning',
         description: error.message || 'Försök igen',

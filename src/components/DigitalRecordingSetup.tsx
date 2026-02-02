@@ -29,17 +29,25 @@ export const DigitalRecordingSetup = ({
   
   const systemStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  // IMPORTANT: when the dialog closes because we're navigating into recording,
+  // we must NOT stop tracks (otherwise digital recording becomes silent).
+  const cleanupOnCloseRef = useRef(true);
 
   // Cleanup streams on close
   useEffect(() => {
     if (!open) {
-      systemStreamRef.current?.getTracks().forEach(t => t.stop());
-      micStreamRef.current?.getTracks().forEach(t => t.stop());
-      systemStreamRef.current = null;
-      micStreamRef.current = null;
-      setSystemAudioReady(false);
-      setMicAudioReady(false);
-      setError(null);
+      if (cleanupOnCloseRef.current) {
+        systemStreamRef.current?.getTracks().forEach(t => t.stop());
+        micStreamRef.current?.getTracks().forEach(t => t.stop());
+        systemStreamRef.current = null;
+        micStreamRef.current = null;
+        setSystemAudioReady(false);
+        setMicAudioReady(false);
+        setError(null);
+      }
+
+      // Reset for next open
+      cleanupOnCloseRef.current = true;
     }
   }, [open]);
 
@@ -143,6 +151,8 @@ export const DigitalRecordingSetup = ({
       }
 
       // All good, start recording
+      // Prevent the "dialog closed" cleanup from stopping tracks.
+      cleanupOnCloseRef.current = false;
       onStartRecording({
         systemStream: systemStreamRef.current || undefined,
         micStream: micStreamRef.current || undefined,
@@ -152,6 +162,7 @@ export const DigitalRecordingSetup = ({
     } catch (err) {
       console.error('Setup error:', err);
       setError("Ett fel uppstod. Försök igen.");
+      cleanupOnCloseRef.current = true;
     } finally {
       setIsSettingUp(false);
     }
