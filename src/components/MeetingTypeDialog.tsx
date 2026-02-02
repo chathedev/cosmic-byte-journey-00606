@@ -1,5 +1,5 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Users, Monitor, Mic, Volume2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -23,7 +23,10 @@ export const MeetingTypeDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50">
+      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Välj mötestyp</DialogTitle>
+        </VisuallyHidden>
         <div className="p-6 pb-4">
           <h2 className="text-xl font-semibold text-foreground text-center">
             Välj mötestyp

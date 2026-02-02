@@ -15,6 +15,7 @@ import { meetingStorage } from "@/utils/meetingStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { digitalRecordingStreams } from "@/lib/digitalRecordingStreams";
 type View = "welcome" | "analyzing" | "transcript-preview";
 
 interface AIActionItem {
@@ -178,15 +179,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Navigate with the streams
+      // Store streams in module-level storage (MediaStream can't be serialized)
+      digitalRecordingStreams.set(streams);
+
+      // Navigate with just a flag
       navigate(`/meetings/${meetingId}`, {
         state: { 
           startRecording: true,
           isFreeTrialMode,
           selectedLanguage,
           digitalRecording: true,
-          systemStream: streams.systemStream,
-          micStream: streams.micStream,
         },
       });
     } catch (error: any) {
