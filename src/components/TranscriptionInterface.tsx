@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Mic, FileText, Loader2, Upload, ClipboardPaste, Sparkles, Shield, Zap, Building2 } from "lucide-react";
+import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
-import { Badge } from "@/components/ui/badge";
+import { MeetingTypeDialog } from "./MeetingTypeDialog";
+import { DigitalRecordingSetup } from "./DigitalRecordingSetup";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -35,24 +37,6 @@ interface TranscriptionInterfaceProps {
   isFreeTrialMode: boolean;
 }
 
-// Feature highlights for the homepage
-const FEATURES = [
-  {
-    icon: Zap,
-    title: "Realtidsanalys",
-    description: "Live-transkribering med AI",
-  },
-  {
-    icon: FileText,
-    title: "Smarta protokoll",
-    description: "Automatiskt genererade",
-  },
-  {
-    icon: Shield,
-    title: "Företagssäkert",
-    description: "GDPR-kompatibel lagring",
-  },
-];
 
 export const TranscriptionInterface = ({ isFreeTrialMode = false }: TranscriptionInterfaceProps) => {
   const [currentView, setCurrentView] = useState<View>("welcome");
@@ -68,6 +52,10 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const navigate = useNavigate();
   const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
   const [showTextPasteDialog, setShowTextPasteDialog] = useState(false);
+  const [showMeetingTypeDialog, setShowMeetingTypeDialog] = useState(false);
+  const [showDigitalRecordingSetup, setShowDigitalRecordingSetup] = useState(false);
+  const isMobile = useIsMobile();
+  const isDesktop = !isMobile;
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
@@ -90,7 +78,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     })();
   }, [searchParams, currentView, navigate, isFreeTrialMode, selectedLanguage]);
 
-  const handleStartRecording = async () => {
+  // Handle "Spela in live" button click - show meeting type dialog on desktop, go straight to recording on mobile
+  const handleRecordLiveClick = async () => {
     const { allowed, reason } = await canCreateMeeting();
     if (!allowed) {
       setUpgradeReason(reason || 'Du har nått din gräns för möten');
@@ -98,10 +87,21 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
+    // On mobile/tablet, go straight to in-person recording
+    if (!isDesktop) {
+      await startInPersonRecording();
+      return;
+    }
+
+    // On desktop, show meeting type choice
+    setShowMeetingTypeDialog(true);
+  };
+
+  // Start in-person recording (current behavior)
+  const startInPersonRecording = async () => {
     setIsStartingRecording(true);
 
     try {
-      // Meeting-First Flow: Create meeting on backend FIRST
       const now = new Date().toISOString();
       const result = await apiClient.createMeeting({
         title: 'Namnlöst möte',
@@ -118,7 +118,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
       console.log('✅ Meeting created for recording:', meetingId);
 
-      // Store pending meeting in sessionStorage for immediate display
       const pendingMeeting = {
         id: meetingId,
         title: 'Namnlöst möte',
@@ -129,7 +128,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-      // Navigate to meeting page with recording=true flag
       navigate(`/meetings/${meetingId}`, {
         state: { 
           startRecording: true,
@@ -147,6 +145,74 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     } finally {
       setIsStartingRecording(false);
     }
+  };
+
+  // Handle digital recording with system/mic audio
+  const handleDigitalRecordingStart = async (streams: { systemStream?: MediaStream; micStream?: MediaStream }) => {
+    setIsStartingRecording(true);
+
+    try {
+      const now = new Date().toISOString();
+      const result = await apiClient.createMeeting({
+        title: 'Digitalt möte',
+        createdAt: now,
+        meetingStartedAt: now,
+        transcript: '',
+        transcriptionStatus: 'recording',
+      });
+
+      const meetingId = result.meeting?.id;
+      if (!meetingId) {
+        throw new Error('Inget mötesid returnerades');
+      }
+
+      console.log('✅ Meeting created for digital recording:', meetingId);
+
+      const pendingMeeting = {
+        id: meetingId,
+        title: 'Digitalt möte',
+        createdAt: now,
+        transcript: '',
+        transcriptionStatus: 'recording',
+        userId: user?.uid || '',
+      };
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
+
+      // Navigate with the streams
+      navigate(`/meetings/${meetingId}`, {
+        state: { 
+          startRecording: true,
+          isFreeTrialMode,
+          selectedLanguage,
+          digitalRecording: true,
+          systemStream: streams.systemStream,
+          micStream: streams.micStream,
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to create meeting for digital recording:', error);
+      // Stop streams on error
+      streams.systemStream?.getTracks().forEach(t => t.stop());
+      streams.micStream?.getTracks().forEach(t => t.stop());
+      toast({
+        title: 'Kunde inte starta inspelning',
+        description: error.message || 'Försök igen',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStartingRecording(false);
+    }
+  };
+
+  // Meeting type selection handlers
+  const handleSelectInPerson = () => {
+    setShowMeetingTypeDialog(false);
+    startInPersonRecording();
+  };
+
+  const handleSelectDigital = () => {
+    setShowMeetingTypeDialog(false);
+    setShowDigitalRecordingSetup(true);
   };
 
 
@@ -340,40 +406,30 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
-        <div className="max-w-xl w-full space-y-10">
+        <div className="max-w-md w-full space-y-8">
           
-          {/* Company badge */}
-          <div className="flex justify-center">
-            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-xs border-primary/30 bg-primary/5">
-              <Building2 className="w-3.5 h-3.5 text-primary" />
-              Företagsanpassad möteshantering
-            </Badge>
-          </div>
-
-          {/* Hero */}
-          <div className="text-center space-y-4">
+          {/* Hero - simplified */}
+          <div className="text-center space-y-3">
             {displayName && (
               <p className="text-muted-foreground text-sm">
                 {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
               </p>
             )}
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground tracking-tight leading-tight">
-              Professionella protokoll
-              <br />
-              <span className="text-primary">på några minuter</span>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+              Skapa protokoll
             </h1>
-            <p className="text-base md:text-lg text-muted-foreground max-w-md mx-auto">
-              Spela in eller ladda upp möten. Få AI-genererade protokoll med hög precision – snabbt och säkert.
+            <p className="text-sm text-muted-foreground">
+              Spela in, ladda upp eller klistra in text
             </p>
           </div>
 
-          {/* Action buttons */}
-          <div className="space-y-3 max-w-sm mx-auto w-full">
+          {/* Action buttons - clean and simple */}
+          <div className="space-y-3">
             <Button 
-              onClick={handleStartRecording}
+              onClick={handleRecordLiveClick}
               size="lg"
               disabled={isStartingRecording}
-              className="w-full h-14 text-base gap-3 shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-shadow"
+              className="w-full h-14 text-base gap-3"
             >
               {isStartingRecording ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -387,59 +443,42 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={handleOpenDigitalMeeting}
               variant="outline"
               size="lg"
-              className="w-full h-14 text-base gap-3 border-border/80 hover:border-border hover:bg-muted/50"
+              className="w-full h-14 text-base gap-3"
             >
               <Upload className="w-5 h-5" />
               Ladda upp fil
             </Button>
 
-            {/* Secondary option: Paste text */}
             <Button 
               onClick={() => setShowTextPasteDialog(true)}
-              variant="ghost"
-              size="sm"
-              className="w-full text-muted-foreground hover:text-foreground gap-2"
+              variant="outline"
+              size="lg"
+              className="w-full h-14 text-base gap-3"
             >
-              <ClipboardPaste className="w-4 h-4" />
+              <ClipboardPaste className="w-5 h-5" />
               Klistra in text
             </Button>
           </div>
 
-          {/* Features grid - more enterprise focused */}
-          <div className="grid grid-cols-3 gap-6 pt-6 border-t border-border/30">
-            {FEATURES.map((feature, idx) => (
-              <div key={idx} className="text-center space-y-2.5">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10 flex items-center justify-center mx-auto">
-                  <feature.icon className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{feature.title}</p>
-                  <p className="text-xs text-muted-foreground">{feature.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Trust indicators */}
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-4 text-xs text-muted-foreground/70">
+          {/* Minimal trust indicators */}
+          <div className="flex items-center justify-center gap-4 pt-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
-              <span>GDPR-kompatibel</span>
+              <span>GDPR</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>AI-driven analys</span>
+              <span>AI-driven</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-medium">SV</span>
-              <span>/</span>
-              <span className="font-medium">EN</span>
-              <span>stöd</span>
+              <FileText className="w-3.5 h-3.5" />
+              <span>SV / EN</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Dialogs */}
       <SubscribeDialog
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
@@ -456,6 +495,20 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         open={showTextPasteDialog}
         onOpenChange={setShowTextPasteDialog}
         onTextReady={handleTextPaste}
+      />
+
+      <MeetingTypeDialog
+        open={showMeetingTypeDialog}
+        onOpenChange={setShowMeetingTypeDialog}
+        onSelectInPerson={handleSelectInPerson}
+        onSelectDigital={handleSelectDigital}
+        isDesktop={isDesktop}
+      />
+
+      <DigitalRecordingSetup
+        open={showDigitalRecordingSetup}
+        onOpenChange={setShowDigitalRecordingSetup}
+        onStartRecording={handleDigitalRecordingStart}
       />
     </div>
   );
