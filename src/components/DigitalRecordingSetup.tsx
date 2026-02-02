@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Monitor, Mic, Volume2, Check, AlertCircle, Loader2, Play } from "lucide-react";
@@ -165,7 +166,10 @@ export const DigitalRecordingSetup = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden border-border/50">
+      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden border-border/50" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Digitalt möte</DialogTitle>
+        </VisuallyHidden>
         <div className="p-6 pb-4">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Monitor className="w-5 h-5 text-primary" />

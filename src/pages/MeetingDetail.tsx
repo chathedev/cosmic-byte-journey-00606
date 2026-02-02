@@ -67,10 +67,11 @@ const MeetingDetail = () => {
   const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
 
   // Check if we're starting in recording mode (from navigation state)
-  const locationState = location.state as { startRecording?: boolean; isFreeTrialMode?: boolean; selectedLanguage?: 'sv-SE' | 'en-US' } | null;
+  const locationState = location.state as { startRecording?: boolean; isFreeTrialMode?: boolean; selectedLanguage?: 'sv-SE' | 'en-US'; digitalRecording?: boolean } | null;
   const [isRecordingMode, setIsRecordingMode] = useState(locationState?.startRecording === true);
   const isFreeTrialMode = locationState?.isFreeTrialMode || false;
   const selectedLanguage = locationState?.selectedLanguage || 'sv-SE';
+  const isDigitalRecording = locationState?.digitalRecording === true;
 
   // Determine if user has ASR access (Enterprise or Admin)
   // NOTE: plan can be non-string at runtime; coerce defensively.
@@ -2011,6 +2012,7 @@ const MeetingDetail = () => {
           onCancel={handleRecordingCancel}
           useAsrMode={useAsrMode}
           language={selectedLanguage === 'en-US' ? 'en' : 'sv'}
+          isDigitalRecording={isDigitalRecording}
         />
       </div>
     );

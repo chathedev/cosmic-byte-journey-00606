@@ -2,7 +2,7 @@
 // Records audio directly on the meeting page, then uploads to /asr/recording-upload
 
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, AlertTriangle, Shield } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, Clock, AlertTriangle, Shield, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { isNativeApp } from "@/utils/capacitorDetection";
 import { uploadRecordingToAsr } from "@/lib/asrRecordingUpload";
 import { apiClient } from "@/lib/api";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
+import { digitalRecordingStreams } from "@/lib/digitalRecordingStreams";
 
 interface MeetingRecorderProps {
   meetingId: string;
@@ -25,6 +26,7 @@ interface MeetingRecorderProps {
   onCancel: () => void;
   useAsrMode: boolean;
   language?: string;
+  isDigitalRecording?: boolean;
 }
 
 export const MeetingRecorder = ({
@@ -35,6 +37,7 @@ export const MeetingRecorder = ({
   onCancel,
   useAsrMode,
   language = 'sv',
+  isDigitalRecording = false,
 }: MeetingRecorderProps) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -240,18 +243,50 @@ export const MeetingRecorder = ({
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 1,
-        },
-      });
-      streamRef.current = stream;
+      let combinedStream: MediaStream;
 
-      stream.getAudioTracks().forEach(track => {
+      // If digital recording mode, use the pre-captured streams
+      if (isDigitalRecording) {
+        const { systemStream, micStream } = digitalRecordingStreams.get();
+        
+        if (!systemStream && !micStream) {
+          throw new Error('Inga ljudkällor hittades för digitalt möte');
+        }
+
+        // Combine streams using AudioContext
+        const audioContext = new AudioContext();
+        const destination = audioContext.createMediaStreamDestination();
+
+        if (systemStream) {
+          const systemSource = audioContext.createMediaStreamSource(systemStream);
+          systemSource.connect(destination);
+          console.log('🔊 System audio connected');
+        }
+
+        if (micStream) {
+          const micSource = audioContext.createMediaStreamSource(micStream);
+          micSource.connect(destination);
+          console.log('🎤 Microphone audio connected');
+        }
+
+        combinedStream = destination.stream;
+        console.log('✅ Combined digital audio streams');
+      } else {
+        // Standard microphone recording
+        combinedStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+          },
+        });
+      }
+
+      streamRef.current = combinedStream;
+
+      combinedStream.getAudioTracks().forEach(track => {
         track.enabled = true;
         if ('contentHint' in track) {
           (track as any).contentHint = 'speech';
@@ -272,7 +307,7 @@ export const MeetingRecorder = ({
       console.log('🎤 MediaRecorder mimeType:', mimeType || 'browser default');
 
       const recorderOptions: MediaRecorderOptions = mimeType ? { mimeType } : {};
-      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
+      const mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
 
       audioChunksRef.current = [];
 
@@ -297,12 +332,16 @@ export const MeetingRecorder = ({
         startSpeechRecognition();
       }
 
-      console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)');
+      console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', isDigitalRecording ? '(Digital)' : '(In-person)');
     } catch (error) {
       console.error('Error starting recording:', error);
+      // Clean up digital streams on error
+      if (isDigitalRecording) {
+        digitalRecordingStreams.clear();
+      }
       toast({
         title: 'Behörighet nekad',
-        description: 'Tivly behöver tillstånd till mikrofon.',
+        description: isDigitalRecording ? 'Kunde inte starta digital inspelning.' : 'Tivly behöver tillstånd till mikrofon.',
         variant: 'destructive',
       });
       onCancel();
@@ -317,6 +356,10 @@ export const MeetingRecorder = ({
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+    }
+    // Clean up digital recording streams
+    if (isDigitalRecording) {
+      digitalRecordingStreams.clear();
     }
   };
 
@@ -585,6 +628,13 @@ export const MeetingRecorder = ({
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Digital recording indicator */}
+              {isDigitalRecording && (
+                <div className="flex items-center gap-1 text-primary">
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-medium hidden sm:inline">Digitalt</span>
+                </div>
+              )}
               {/* Backup indicator in header */}
               {isBackupEnabled && chunksSaved > 0 && (
                 <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
