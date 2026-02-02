@@ -247,30 +247,40 @@ export const MeetingRecorder = ({
 
       // If digital recording mode, use the pre-captured streams
       if (isDigitalRecording) {
-        const { systemStream, micStream } = digitalRecordingStreams.get();
+        const { systemStream, micStream, combinedStream: storedCombinedStream } = digitalRecordingStreams.get();
         
-        if (!systemStream && !micStream) {
+        if (storedCombinedStream) {
+          combinedStream = storedCombinedStream;
+          console.log('✅ Using pre-mixed digital audio stream');
+        } else if (!systemStream && !micStream) {
           throw new Error('Inga ljudkällor hittades för digitalt möte');
+        } else {
+          // Fallback: mix here (less reliable due to user-gesture restrictions)
+          const audioContext = new AudioContext();
+          try {
+            if (audioContext.state === 'suspended') {
+              await audioContext.resume();
+            }
+          } catch (e) {
+            console.warn('AudioContext resume failed (digital fallback mix):', e);
+          }
+          const destination = audioContext.createMediaStreamDestination();
+
+          if (systemStream) {
+            const systemSource = audioContext.createMediaStreamSource(systemStream);
+            systemSource.connect(destination);
+            console.log('🔊 System audio connected');
+          }
+
+          if (micStream) {
+            const micSource = audioContext.createMediaStreamSource(micStream);
+            micSource.connect(destination);
+            console.log('🎤 Microphone audio connected');
+          }
+
+          combinedStream = destination.stream;
+          console.log('✅ Combined digital audio streams (fallback)');
         }
-
-        // Combine streams using AudioContext
-        const audioContext = new AudioContext();
-        const destination = audioContext.createMediaStreamDestination();
-
-        if (systemStream) {
-          const systemSource = audioContext.createMediaStreamSource(systemStream);
-          systemSource.connect(destination);
-          console.log('🔊 System audio connected');
-        }
-
-        if (micStream) {
-          const micSource = audioContext.createMediaStreamSource(micStream);
-          micSource.connect(destination);
-          console.log('🎤 Microphone audio connected');
-        }
-
-        combinedStream = destination.stream;
-        console.log('✅ Combined digital audio streams');
       } else {
         // Standard microphone recording
         combinedStream = await navigator.mediaDevices.getUserMedia({
@@ -463,7 +473,9 @@ export const MeetingRecorder = ({
       if (useAsrMode && blob.size < 50000) {
         toast({
           title: 'Ljudfilen är för liten',
-          description: 'Inspelningen verkar vara tom. Kontrollera mikrofonen.',
+          description: isDigitalRecording
+            ? 'Inspelningen verkar vara tom. Kontrollera att du valde en flik och aktiverade “Dela flikljud/systemljud”, samt att mötet faktiskt spelar upp ljud.'
+            : 'Inspelningen verkar vara tom. Kontrollera mikrofonen.',
           variant: 'destructive',
         });
         isSavingRef.current = false;

@@ -6,26 +6,47 @@
 
 let systemStream: MediaStream | null = null;
 let micStream: MediaStream | null = null;
+let combinedStream: MediaStream | null = null;
+let audioContext: AudioContext | null = null;
 
 export const digitalRecordingStreams = {
-  set(streams: { systemStream?: MediaStream; micStream?: MediaStream }) {
+  set(streams: {
+    systemStream?: MediaStream;
+    micStream?: MediaStream;
+    combinedStream?: MediaStream;
+    audioContext?: AudioContext;
+  }) {
     systemStream = streams.systemStream || null;
     micStream = streams.micStream || null;
+    combinedStream = streams.combinedStream || null;
+    audioContext = streams.audioContext || null;
   },
 
   get() {
-    return { systemStream, micStream };
+    return { systemStream, micStream, combinedStream, audioContext };
   },
 
   clear() {
     // Stop all tracks before clearing
     systemStream?.getTracks().forEach(t => t.stop());
     micStream?.getTracks().forEach(t => t.stop());
+    combinedStream?.getTracks().forEach(t => t.stop());
+
+    if (audioContext && audioContext.state !== 'closed') {
+      try {
+        audioContext.close();
+      } catch {
+        /* ignore */
+      }
+    }
+
     systemStream = null;
     micStream = null;
+    combinedStream = null;
+    audioContext = null;
   },
 
   hasStreams() {
-    return systemStream !== null || micStream !== null;
+    return systemStream !== null || micStream !== null || combinedStream !== null;
   },
 };
