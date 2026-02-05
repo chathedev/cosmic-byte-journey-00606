@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { Mic, Loader2, FileAudio, Sparkles, Shield, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
+import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
+import { TextPasteDialog } from "./TextPasteDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -46,8 +48,9 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const { toast } = useToast();
   const [selectedLanguage, setSelectedLanguage] = useState<'sv-SE' | 'en-US'>('sv-SE');
   const navigate = useNavigate();
+  const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
+  const [showTextPasteDialog, setShowTextPasteDialog] = useState(false);
   const isMobile = useIsMobile();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
@@ -138,25 +141,34 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setTranscript("");
   };
 
-  // Handle audio file upload button click
-  const handleUploadClick = async () => {
-    const { allowed, reason } = await canCreateMeeting();
-    if (!allowed) {
-      setUpgradeReason(reason || 'Du har nått din gräns för möten');
-      setShowUpgradeDialog(true);
-      return;
-    }
-    fileInputRef.current?.click();
+  const handleDigitalMeetingUpload = async (transcript: string) => {
+    // Just show the transcript preview - don't save yet
+    // User will save when they click "Spara till bibliotek" or "Generera protokoll"
+    setTranscript(transcript);
+    setCurrentView("transcript-preview");
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-    // Reset input so same file can be selected again
-    e.target.value = '';
+  const handleOpenDigitalMeeting = async () => {
+    // Dialog handles plan restrictions and shows upgrade prompt for free users
+    setShowDigitalMeetingDialog(true);
   };
+
+  const handleTextPaste = async (text: string) => {
+    // Navigate directly to protocol generation with the pasted text
+    const token = `protocol-${Date.now()}`;
+    const payload = {
+      transcript: text,
+      meetingName: 'Inklistrad text',
+      meetingId: '', // No meeting ID for pasted text
+      token,
+    };
+    sessionStorage.setItem('protocol_generation_token', token);
+    sessionStorage.setItem('pending_protocol_payload', JSON.stringify(payload));
+    navigate('/generate-protocol', { state: payload });
+  };
+
+  // Check if user has Pro or Enterprise plan (for upload access)
+  const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'enterprise');
 
 
   const handleFileUpload = async (file: File) => {
@@ -312,15 +324,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
-      {/* Hidden file input for audio upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac,.wma"
-        onChange={handleFileChange}
-        className="hidden"
-      />
-
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
         <div className="max-w-md w-full space-y-8">
@@ -336,7 +339,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               Skapa protokoll
             </h1>
             <p className="text-sm text-muted-foreground">
-              Spela in live eller ladda upp en ljudfil
+              Spela in, ladda upp eller klistra in text
             </p>
           </div>
 
@@ -353,27 +356,32 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               ) : (
                 <Mic className="w-5 h-5" />
               )}
-              {isStartingRecording ? 'Startar...' : 'Spela in möte'}
+              {isStartingRecording ? 'Startar...' : 'Spela in live'}
             </Button>
 
             <Button 
-              onClick={handleUploadClick}
+              onClick={handleOpenDigitalMeeting}
               variant="outline"
               size="lg"
               className="w-full h-14 text-base gap-3"
             >
-              <FileAudio className="w-5 h-5" />
-              Ladda upp ljudfil
+              <Upload className="w-5 h-5" />
+              Ladda upp fil
+            </Button>
+
+            <Button 
+              onClick={() => setShowTextPasteDialog(true)}
+              variant="outline"
+              size="lg"
+              className="w-full h-14 text-base gap-3"
+            >
+              <ClipboardPaste className="w-5 h-5" />
+              Klistra in text
             </Button>
           </div>
 
-          {/* Supported formats hint */}
-          <p className="text-center text-xs text-muted-foreground/70">
-            Stöder MP3, WAV, M4A, AAC och fler ljudformat
-          </p>
-
           {/* Minimal trust indicators */}
-          <div className="flex items-center justify-center gap-4 pt-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-4 pt-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
               <span>GDPR</span>
@@ -394,6 +402,19 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       <SubscribeDialog
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
+      />
+      
+      <DigitalMeetingDialog
+        open={showDigitalMeetingDialog}
+        onOpenChange={setShowDigitalMeetingDialog}
+        onTranscriptReady={handleDigitalMeetingUpload}
+        selectedLanguage={selectedLanguage}
+      />
+
+      <TextPasteDialog
+        open={showTextPasteDialog}
+        onOpenChange={setShowTextPasteDialog}
+        onTextReady={handleTextPaste}
       />
     </div>
   );
