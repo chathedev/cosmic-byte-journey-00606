@@ -275,27 +275,73 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
     if (currentGroup) groups.push(currentGroup);
     
-    // Try to match groups with cleaned speaker blocks by timestamp overlap
-    // speakerBlocks have cleaned/AI-corrected text that should be preferred
+    // Try to match groups with cleaned speaker blocks using timestamp alignment.
+    // IMPORTANT: Never match by speakerId alone (that would repeat the first block for every turn).
     if (speakerBlocks.length > 0) {
-      groups.forEach((group, idx) => {
-        // Find matching speaker block by timestamp or speaker ID
-        const matchingBlock = speakerBlocks.find(block => {
-          const blockStart = block.start ?? 0;
-          const blockEnd = block.end ?? Infinity;
-          const timeOverlap = group.start >= blockStart - 1 && group.start <= blockEnd + 1;
-          const speakerMatch = block.speakerId === group.speakerId || 
-            block.speakerId.replace('speaker_', '') === group.speakerId.replace('speaker_', '');
-          return speakerMatch || timeOverlap;
-        });
-        
+      const normalizeId = (id: string) => {
+        const m = String(id).match(/(\d+)/);
+        return m ? `speaker_${m[1]}` : String(id).toLowerCase().trim();
+      };
+
+      const blocksBySpeaker = new Map<string, SpeakerBlock[]>();
+      for (const block of speakerBlocks) {
+        const key = normalizeId(block.speakerId);
+        const arr = blocksBySpeaker.get(key) ?? [];
+        arr.push(block);
+        blocksBySpeaker.set(key, arr);
+      }
+      blocksBySpeaker.forEach((arr) => {
+        arr.sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
+      });
+
+      const nextIndexBySpeaker = new Map<string, number>();
+      const TOL = 1; // seconds
+
+      const pickBestBlock = (speakerId: string, start: number, end: number): SpeakerBlock | undefined => {
+        const key = normalizeId(speakerId);
+        const candidates = blocksBySpeaker.get(key) ?? [];
+        if (candidates.length === 0) return undefined;
+
+        const withTimes = candidates.filter(
+          (b) => typeof b.start === 'number' && typeof b.end === 'number'
+        );
+
+        // 1) Prefer a timestamp-overlapping block for the same speaker (with small tolerance)
+        if (withTimes.length > 0) {
+          const overlapping = withTimes.filter(
+            (b) => start <= (b.end as number) + TOL && end >= (b.start as number) - TOL
+          );
+          const pool = overlapping.length > 0 ? overlapping : withTimes;
+
+          let best = pool[0];
+          let bestScore = Math.abs(start - (best.start as number));
+          for (let i = 1; i < pool.length; i++) {
+            const b = pool[i];
+            const score = Math.abs(start - (b.start as number));
+            if (score < bestScore) {
+              best = b;
+              bestScore = score;
+            }
+          }
+          return best;
+        }
+
+        // 2) If blocks have no timestamps, map sequentially per speaker to avoid repetition.
+        const idx = nextIndexBySpeaker.get(key) ?? 0;
+        const picked = candidates[idx];
+        nextIndexBySpeaker.set(key, idx + 1);
+        return picked;
+      };
+
+      groups.forEach((group) => {
+        const matchingBlock = pickBestBlock(group.speakerId, group.start, group.end);
         if (matchingBlock?.text) {
           group.cleanedText = matchingBlock.text;
-          // Split cleaned text into words for display (preserving punctuation)
-          group.cleanedWords = matchingBlock.text.split(/\s+/).filter(w => w.length > 0);
+          group.cleanedWords = matchingBlock.text.split(/\s+/).filter((w) => w.length > 0);
         }
       });
     }
+
     
     // Fallback: if we have a single cleaned transcript and single group, use it
     if (groups.length === 1 && cleanedTranscript && !groups[0].cleanedText) {

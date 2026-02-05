@@ -546,52 +546,69 @@ const MeetingDetail = () => {
     if (status === 'done' || status === 'failed') return;
 
     pollingRef.current = true;
-    let pollCount = 0;
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    const schedule = (ms: number) => {
+      if (cancelled) return;
+      if (!pollingRef.current || transcriptionDoneRef.current) return;
+      if (timeoutId) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(doPoll, ms);
+    };
 
     const doPoll = async () => {
+      if (cancelled) return;
       if (!pollingRef.current || transcriptionDoneRef.current) return;
 
       try {
         const asrStatus = await pollASRStatus(id);
-        pollCount++;
 
         if (asrStatus.stage) {
           setStage(asrStatus.stage);
         }
-        
+
         // Update queue metadata from backend
         if (asrStatus.metadata) {
           setQueueMetadata(asrStatus.metadata);
         }
-        
+
         // Update backend progress if available
         if (typeof asrStatus.progress === 'number') {
           setBackendProgress(asrStatus.progress);
         }
-        
+
         // Capture audio backup failsafe info - available even during processing/error
         if (asrStatus.audioBackup?.available) {
           setAudioBackup(asrStatus.audioBackup);
         }
-        
+
         // Update status based on ASR response
         if (asrStatus.status === 'queued') {
           setStatus('queued');
-        } else if (asrStatus.status === 'processing' || asrStatus.stage === 'transcribing' || asrStatus.stage === 'sis_processing') {
+        } else if (
+          asrStatus.status === 'processing' ||
+          asrStatus.stage === 'transcribing' ||
+          asrStatus.stage === 'sis_processing'
+        ) {
           setStatus('processing');
         }
 
         const mainDone = asrStatus.status === 'completed' || asrStatus.status === 'done';
-        const lyraOrSisDone = asrStatus.lyraStatus === 'done' || asrStatus.sisStatus === 'done' || 
-                              asrStatus.lyraStatus === 'no_samples' || asrStatus.sisStatus === 'no_samples' ||
-                              asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
+        const lyraOrSisDone =
+          asrStatus.lyraStatus === 'done' ||
+          asrStatus.sisStatus === 'done' ||
+          asrStatus.lyraStatus === 'no_samples' ||
+          asrStatus.sisStatus === 'no_samples' ||
+          asrStatus.lyraStatus === 'disabled' ||
+          asrStatus.sisStatus === 'disabled';
         const stageDone = asrStatus.stage === 'done';
-        
+
         const isFullyDone = mainDone && asrStatus.transcript && (stageDone || lyraOrSisDone);
-        
+
         // Check if SIS/LYRA is explicitly disabled
         const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
-        
+
         if (isFullyDone) {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
@@ -611,23 +628,23 @@ const MeetingDetail = () => {
           setSpeakerBlocksRaw(asrStatus.speakerBlocksRaw || null);
           setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
           setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
-          
+
           // CRITICAL: Fetch speaker names from dedicated endpoint FIRST, then merge with ASR names
           // Dedicated endpoint has user-edited names which should take priority
           const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
-          
+
           // Set initial ASR names immediately so transcript renders
           setSpeakerNames(asrSpeakerNames);
-          
+
           // ALWAYS show loading initially - we'll turn it off after confirming no updates
           // This ensures "Talare 1" etc always shows loader while we check for real names
           setSpeakerNamesLoading(true);
-          
+
           // Helper to check if we have generic speaker names that need resolving
           const hasGenericNames = (names: Record<string, string>, blocks: any[] | null): boolean => {
             // Check if any speakers in blocks are still generic
             if (!blocks || blocks.length === 0) return false;
-            const uniqueSpeakers = new Set(blocks.map(b => b.speakerId));
+            const uniqueSpeakers = new Set(blocks.map((b) => b.speakerId));
             for (const speakerId of uniqueSpeakers) {
               const resolvedName = names[speakerId] || names[`speaker_${speakerId.match(/\d+/)?.[0]}`];
               if (!resolvedName || /^(speaker|talare)/i.test(resolvedName)) {
@@ -636,20 +653,29 @@ const MeetingDetail = () => {
             }
             return false;
           };
-          
+
           // Helper to fetch and merge speaker names
-          const fetchAndMergeSpeakerNames = async (logPrefix: string, isFinal: boolean = false): Promise<boolean> => {
+          const fetchAndMergeSpeakerNames = async (
+            logPrefix: string,
+            isFinal: boolean = false
+          ): Promise<boolean> => {
             try {
               console.log(`🔄 [${logPrefix}] Fetching speaker names from dedicated endpoint...`);
               const namesData = await backendApi.getSpeakerNames(id);
               if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
-                console.log(`✅ [${logPrefix}] Merging speaker names:`, { asr: asrSpeakerNames, dedicated: namesData.speakerNames });
+                console.log(`✅ [${logPrefix}] Merging speaker names:`, {
+                  asr: asrSpeakerNames,
+                  dedicated: namesData.speakerNames,
+                });
                 // Merge: ASR names as base, dedicated endpoint overwrites
                 const mergedNames = { ...asrSpeakerNames, ...namesData.speakerNames };
-                setSpeakerNames(prev => ({ ...prev, ...mergedNames }));
-                
+                setSpeakerNames((prev) => ({ ...prev, ...mergedNames }));
+
                 // Check if we now have all real names - if so, stop loading
-                const stillHasGeneric = hasGenericNames(mergedNames, asrStatus.speakerBlocksCleaned || asrStatus.speakerBlocksRaw);
+                const stillHasGeneric = hasGenericNames(
+                  mergedNames,
+                  asrStatus.speakerBlocksCleaned || asrStatus.speakerBlocksRaw
+                );
                 if (!stillHasGeneric) {
                   console.log(`✅ [${logPrefix}] All speaker names resolved, stopping loader`);
                   setSpeakerNamesLoading(false);
@@ -670,29 +696,31 @@ const MeetingDetail = () => {
               return false;
             }
           };
-          
+
           // Initial fetch
           await fetchAndMergeSpeakerNames('PollingComplete');
-          
+
           // CRITICAL: Schedule delayed re-fetches to catch backend updates
           // Backend may still be processing speaker names after ASR completes
           const delayedFetches = [1000, 2000, 3000, 5000, 8000]; // 1s, 2s, 3s, 5s, 8s after completion
           delayedFetches.forEach((delay, idx) => {
             const isFinal = idx === delayedFetches.length - 1;
             setTimeout(() => {
-              console.log(`⏰ [DelayedRefetch ${idx + 1}] Re-fetching speaker names after ${delay}ms...`);
+              console.log(
+                `⏰ [DelayedRefetch ${idx + 1}] Re-fetching speaker names after ${delay}ms...`
+              );
               fetchAndMergeSpeakerNames(`DelayedRefetch-${delay}ms`, isFinal);
             }, delay);
           });
-          
+
           setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
           setIsSISDisabled(sisDisabled);
-          
+
           // Capture word-level timing for synced playback
           if (asrStatus.words && asrStatus.words.length > 0) {
             setTranscriptWords(asrStatus.words);
           }
-          
+
           setStatus('done');
           setStage('done');
 
@@ -731,7 +759,9 @@ const MeetingDetail = () => {
             });
           }
 
-          setMeeting(prev => prev ? { ...prev, transcript: newTranscript, transcriptionStatus: 'done' } : null);
+          setMeeting((prev) =>
+            prev ? { ...prev, transcript: newTranscript, transcriptionStatus: 'done' } : null
+          );
           return;
         }
 
@@ -739,18 +769,22 @@ const MeetingDetail = () => {
           transcriptionDoneRef.current = true;
           pollingRef.current = false;
           setStatus('failed');
-          
+
           // Only show failure toast once per meeting (like success toast).
           // Use both route ID and any resolved backend ID to avoid duplicate toasts when aliases are involved.
           const resolvedForToast = resolveBackendMeetingId(id);
           const failToastKeyA = `transcription_fail_toast_shown_${id}`;
           const failToastKeyB = `transcription_fail_toast_shown_${resolvedForToast}`;
-          const alreadyShown = Boolean(localStorage.getItem(failToastKeyA) || localStorage.getItem(failToastKeyB));
+          const alreadyShown = Boolean(
+            localStorage.getItem(failToastKeyA) || localStorage.getItem(failToastKeyB)
+          );
           if (!alreadyShown) {
             localStorage.setItem(failToastKeyA, 'true');
             localStorage.setItem(failToastKeyB, 'true');
-            const errorMsg = asrStatus.error 
-              ? (typeof asrStatus.error === 'string' ? asrStatus.error : ((asrStatus.error as any)?.message || 'Försök igen.'))
+            const errorMsg = asrStatus.error
+              ? typeof asrStatus.error === 'string'
+                ? asrStatus.error
+                : (asrStatus.error as any)?.message || 'Försök igen.'
               : 'Försök igen.';
             toast({
               title: 'Transkribering misslyckades',
@@ -761,24 +795,22 @@ const MeetingDetail = () => {
           return;
         }
 
-        // Consistent 1s polling for responsiveness (as requested)
-        const delay = 1000;
-        if (pollingRef.current && !transcriptionDoneRef.current) {
-          setTimeout(doPoll, delay);
-        }
-      } catch (e) {
-        if (pollingRef.current && !transcriptionDoneRef.current) {
-          setTimeout(doPoll, 2000);
-        }
+        // Poll at a controlled pace (avoid overlapping loops)
+        schedule(1500);
+      } catch {
+        schedule(2500);
       }
     };
 
-    doPoll();
+    void doPoll();
 
     return () => {
+      cancelled = true;
       pollingRef.current = false;
+      if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [id, user, status, meeting, toast, incrementMeetingCount, initialStatusResolved]);
+
 
   // Handle delete
   const handleDelete = async () => {
