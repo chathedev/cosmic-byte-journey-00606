@@ -296,6 +296,7 @@ const MeetingDetail = () => {
           }
           
           if (fetchedMeeting.transcript && fetchedMeeting.transcript.trim().length > 0) {
+            // Use meeting transcript as fallback, but prefer ASR cleaned version
             setTranscript(fetchedMeeting.transcript);
             setStatus('done');
             
@@ -333,6 +334,13 @@ const MeetingDetail = () => {
               setSpeakerNames(mergedSpeakerNames);
               
               setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+              
+              // PRIORITY: Use ASR transcript field (AI-cleaned with corrections like "Tivly" not "Tivoli")
+              // This is the cleaned, corrected version from backend processing
+              if (asrStatus.transcript && asrStatus.transcript.trim().length > 0) {
+                console.log('✨ [InitialLoad] Using cleaned ASR transcript');
+                setTranscript(asrStatus.transcript);
+              }
               
               // Capture transcript cleanup fields (raw/cleaned + speaker blocks)
               if (asrStatus.transcriptRaw) {

@@ -769,22 +769,15 @@ const Library = () => {
     const latest = await meetingStorage.getMeeting(meeting.id);
     const effectiveMeeting = latest || meeting;
 
-    const wordCount = effectiveMeeting.transcript ? effectiveMeeting.transcript.trim().split(/\s+/).filter(w => w).length : 0;
-    if (!effectiveMeeting.transcript || wordCount < 20) {
-      toast({
-        title: "För kort transkription",
-        description: `Transkriptionen innehåller ${wordCount} ord. Minst 20 ord krävs för att skapa ett protokoll.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Fetch SIS data for speaker attribution in protocol
+    // Fetch SIS data and cleaned transcript for speaker attribution in protocol
     let sisSpeakers: SISSpeaker[] | undefined;
     let sisMatches: SISMatch[] | undefined;
     let transcriptSegments: TranscriptSegment[] | undefined;
     let speakerNames: Record<string, string> = {};
     let sisDisabled = false;
+    // PRIORITY: Use ASR cleaned transcript (has corrections like "Tivly" not "Tivoli")
+    let cleanedTranscript: string | null = null;
+    let speakerBlocksCleaned: any[] | undefined;
 
     try {
       const asrStatus = await pollASRStatus(meeting.id);
@@ -808,14 +801,40 @@ const Library = () => {
           speakerId: seg.speakerId,
         })) as any;
       }
+      
+      // PRIORITY: Use top-level transcript field (AI-cleaned with corrections)
+      if ((asrStatus as any)?.transcript && (asrStatus as any).transcript.trim().length > 0) {
+        cleanedTranscript = (asrStatus as any).transcript;
+        console.log('✨ Using cleaned ASR transcript for protocol');
+      }
+      
+      // Also capture cleaned speaker blocks for additional context
+      if ((asrStatus as any)?.speakerBlocksCleaned) {
+        speakerBlocksCleaned = (asrStatus as any).speakerBlocksCleaned;
+      }
+      
       console.log("🎤 Fetched SIS data for protocol:", {
         hasSisSpeakers: !!sisSpeakers?.length,
         hasSisMatches: !!sisMatches?.length,
         hasSegments: !!transcriptSegments?.length,
         sisDisabled,
+        hasCleanedTranscript: !!cleanedTranscript,
       });
     } catch (e) {
       console.warn("⚠️ Could not fetch SIS data for protocol:", e);
+    }
+
+    // Use cleaned transcript if available, fallback to meeting storage transcript
+    const transcriptToUse = cleanedTranscript || effectiveMeeting.transcript;
+
+    const wordCount = transcriptToUse ? transcriptToUse.trim().split(/\s+/).filter(w => w).length : 0;
+    if (!transcriptToUse || wordCount < 20) {
+      toast({
+        title: "För kort transkription",
+        description: `Transkriptionen innehåller ${wordCount} ord. Minst 20 ord krävs för att skapa ett protokoll.`,
+        variant: "destructive",
+      });
+      return;
     }
 
     // Check if speakers have generic names - show confirmation if so
@@ -869,13 +888,14 @@ const Library = () => {
       setPendingMeetingForSpeakerConfirm(effectiveMeeting);
       setPendingMeetingData({
         id: effectiveMeeting.id,
-        transcript: effectiveMeeting.transcript,
+        transcript: transcriptToUse,
         title: effectiveMeeting.title,
         createdAt: effectiveMeeting.createdAt,
         transcriptSegments,
         sisSpeakers,
         sisMatches,
         speakerNames: Object.keys(speakerNames).length > 0 ? speakerNames : undefined,
+        speakerBlocksCleaned,
       });
       setShowSpeakerNameConfirm(true);
       return;
@@ -883,13 +903,14 @@ const Library = () => {
 
     setPendingMeetingData({
       id: effectiveMeeting.id,
-      transcript: effectiveMeeting.transcript,
+      transcript: transcriptToUse,
       title: effectiveMeeting.title,
       createdAt: effectiveMeeting.createdAt,
       transcriptSegments,
       sisSpeakers,
       sisMatches,
       speakerNames: Object.keys(speakerNames).length > 0 ? speakerNames : undefined,
+      speakerBlocksCleaned,
     });
     setShowAgendaDialog(true);
   };
