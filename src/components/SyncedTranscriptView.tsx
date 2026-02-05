@@ -253,8 +253,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
 
   // Group words by speaker
   const wordsBySpeaker = useMemo(() => {
-    const groups: { speakerId: string; words: TranscriptWord[]; start: number; end: number; cleanedText?: string }[] = [];
-    let currentGroup: { speakerId: string; words: TranscriptWord[]; start: number; end: number; cleanedText?: string } | null = null;
+    const groups: { speakerId: string; words: TranscriptWord[]; start: number; end: number; cleanedText?: string; cleanedWords?: string[] }[] = [];
+    let currentGroup: { speakerId: string; words: TranscriptWord[]; start: number; end: number; cleanedText?: string; cleanedWords?: string[] } | null = null;
 
     normalizedWords.forEach(word => {
       const speakerId = word.speakerId || word.speaker || 'speaker_0';
@@ -291,6 +291,8 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
         
         if (matchingBlock?.text) {
           group.cleanedText = matchingBlock.text;
+          // Split cleaned text into words for display (preserving punctuation)
+          group.cleanedWords = matchingBlock.text.split(/\s+/).filter(w => w.length > 0);
         }
       });
     }
@@ -298,6 +300,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     // Fallback: if we have a single cleaned transcript and single group, use it
     if (groups.length === 1 && cleanedTranscript && !groups[0].cleanedText) {
       groups[0].cleanedText = cleanedTranscript;
+      groups[0].cleanedWords = cleanedTranscript.split(/\s+/).filter(w => w.length > 0);
     }
     
     return groups;
@@ -793,32 +796,67 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
                     )}
                   </div>
 
-                  {/* Text content - always render word-by-word for click-to-seek and highlighting */}
+                  {/* Text content - use cleaned words if available, with timing from raw words */}
                   <div className="text-sm leading-relaxed text-foreground pl-4">
                     <p>
-                      {group.words.map((word, wordIdx) => {
-                        const absoluteIndex = groupStartIndex + wordIdx;
-                        const isActive = absoluteIndex === currentWordIndex;
-                        const isPast = absoluteIndex < currentWordIndex;
+                      {group.cleanedWords && group.cleanedWords.length > 0 ? (
+                        // Use cleaned words for display, map timing from raw words
+                        group.cleanedWords.map((cleanedWord, wordIdx) => {
+                          // Map cleaned word index to raw word for timing
+                          // Words may not perfectly align, so use proportional mapping
+                          const rawWordIdx = Math.min(
+                            Math.floor((wordIdx / group.cleanedWords!.length) * group.words.length),
+                            group.words.length - 1
+                          );
+                          const rawWord = group.words[rawWordIdx];
+                          const absoluteIndex = groupStartIndex + rawWordIdx;
+                          const isActive = absoluteIndex === currentWordIndex;
+                          const isPast = absoluteIndex < currentWordIndex;
 
-                        return (
-                          <React.Fragment key={wordIdx}>
-                            <span
-                              ref={isActive ? activeWordRef : null}
-                              onClick={() => handleWordClick(word.start)}
-                              className={cn(
-                                "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
-                                isActive && "bg-primary/20 ring-1 ring-primary/30",
-                                isPast && "text-muted-foreground/60",
-                                !isActive && !isPast && "hover:bg-muted/50"
-                              )}
-                            >
-                              {word.word || word.text}
-                            </span>
-                            {wordIdx < group.words.length - 1 && ' '}
-                          </React.Fragment>
-                        );
-                      })}
+                          return (
+                            <React.Fragment key={wordIdx}>
+                              <span
+                                ref={isActive ? activeWordRef : null}
+                                onClick={() => handleWordClick(rawWord?.start ?? group.start)}
+                                className={cn(
+                                  "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
+                                  isActive && "bg-primary/20 ring-1 ring-primary/30",
+                                  isPast && "text-muted-foreground/60",
+                                  !isActive && !isPast && "hover:bg-muted/50"
+                                )}
+                              >
+                                {cleanedWord}
+                              </span>
+                              {wordIdx < group.cleanedWords!.length - 1 && ' '}
+                            </React.Fragment>
+                          );
+                        })
+                      ) : (
+                        // Fallback to raw words if no cleaned version
+                        group.words.map((word, wordIdx) => {
+                          const absoluteIndex = groupStartIndex + wordIdx;
+                          const isActive = absoluteIndex === currentWordIndex;
+                          const isPast = absoluteIndex < currentWordIndex;
+
+                          return (
+                            <React.Fragment key={wordIdx}>
+                              <span
+                                ref={isActive ? activeWordRef : null}
+                                onClick={() => handleWordClick(word.start)}
+                                className={cn(
+                                  "cursor-pointer rounded-sm px-0.5 -mx-0.5 inline-block align-baseline box-decoration-clone transition-[background-color,box-shadow] duration-75",
+                                  isActive && "bg-primary/20 ring-1 ring-primary/30",
+                                  isPast && "text-muted-foreground/60",
+                                  !isActive && !isPast && "hover:bg-muted/50"
+                                )}
+                              >
+                                {word.word || word.text}
+                              </span>
+                              {wordIdx < group.words.length - 1 && ' '}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
                     </p>
                   </div>
                 </div>
