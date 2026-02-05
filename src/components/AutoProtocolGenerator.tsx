@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee } from "lucide-react";
-import { Document, Paragraph, HeadingLevel, AlignmentType, Packer } from "docx";
+import { Document, Paragraph, HeadingLevel, AlignmentType, Packer, TextRun, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -720,6 +720,73 @@ export const AutoProtocolGenerator = ({
         )
       );
     }
+
+    // Add "Gjord av Tivly" branding footer
+    const currentDate = new Date().toLocaleDateString('sv-SE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    
+    documentChildren.push(
+      // Spacer before footer
+      new Paragraph({
+        text: "",
+        spacing: { before: 600 },
+      }),
+      // Decorative separator line
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "─".repeat(40),
+            color: "CCCCCC",
+            size: 16,
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+      }),
+      // Branding footer
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Gjord av ",
+            color: "888888",
+            size: 18,
+          }),
+          new TextRun({
+            text: "Tivly",
+            bold: true,
+            color: "4F46E5",
+            size: 20,
+          }),
+          new TextRun({
+            text: " – AI-driven möteshantering",
+            color: "888888",
+            size: 18,
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
+      }),
+      // Date and website
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `${currentDate} • `,
+            color: "AAAAAA",
+            size: 16,
+          }),
+          new TextRun({
+            text: "tivly.se",
+            color: "4F46E5",
+            size: 16,
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 100 },
+      })
+    );
 
     const doc = new Document({
       sections: [{
