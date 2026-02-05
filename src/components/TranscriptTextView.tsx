@@ -12,6 +12,7 @@ interface SpeakerBlock {
 
 interface TranscriptTextViewProps {
   meetingId: string;
+  transcript?: string | null; // Primary: cleaned transcript from top-level field
   transcriptRaw?: string | null;
   speakerBlocksCleaned?: SpeakerBlock[] | null;
   speakerNames?: Record<string, string>; // User-edited speaker names
@@ -39,6 +40,7 @@ const isGenericName = (name: string): boolean => {
 
 export const TranscriptTextView: React.FC<TranscriptTextViewProps> = ({
   meetingId,
+  transcript,
   transcriptRaw,
   speakerBlocksCleaned,
   speakerNames = {},
@@ -73,18 +75,42 @@ export const TranscriptTextView: React.FC<TranscriptTextViewProps> = ({
     return null;
   };
 
-  // Combine all text from speakerBlocksCleaned, or fall back to transcriptRaw
-  // Apply speaker names to replace generic "Talare X" labels in text
+  // Priority: 
+  // 1. Top-level `transcript` field (contains AI-cleaned text with corrections)
+  // 2. speakerBlocksCleaned combined text
+  // 3. transcriptRaw as fallback
   const fullText = useMemo(() => {
+    // PRIORITY 1: Use top-level transcript field (AI-cleaned, corrected text)
+    if (transcript && transcript.trim().length > 0) {
+      let text = transcript.trim();
+      // Apply speaker name replacements if available
+      if (Object.keys(speakerNames).length > 0) {
+        Object.entries(speakerNames).forEach(([label, name]) => {
+          if (!isGenericName(name)) {
+            const patterns = [
+              new RegExp(`\\[${label}\\]:?\\s*`, 'gi'),
+              new RegExp(`\\[${normalizeSpeakerId(label)}\\]:?\\s*`, 'gi'),
+              new RegExp(`(?:^|\\n)${label}:?\\s*`, 'gi'),
+            ];
+            patterns.forEach(pattern => {
+              text = text.replace(pattern, (match) => {
+                const prefix = match.startsWith('\n') ? '\n' : '';
+                return `${prefix}${name}: `;
+              });
+            });
+          }
+        });
+      }
+      return text;
+    }
+    
+    // PRIORITY 2: Use speakerBlocksCleaned if available
     if (speakerBlocksCleaned && speakerBlocksCleaned.length > 0) {
-      // Join all blocks' text with double newlines for paragraph separation
       return speakerBlocksCleaned
         .map(block => {
           let text = block.text.trim();
-          // Replace any embedded speaker labels in the text (e.g., "[Talare 1]:" or "Talare 1:")
           const realName = getSpeakerDisplayName(block.speakerId, block.speakerName);
           if (realName) {
-            // Replace patterns like "[Talare 1]:", "Talare 1:", "[Speaker 0]:", etc.
             text = text.replace(/^\[?(talare|speaker)[_\s-]?\d+\]?:?\s*/i, `${realName}: `);
           }
           return text;
@@ -93,13 +119,11 @@ export const TranscriptTextView: React.FC<TranscriptTextViewProps> = ({
         .join('\n\n');
     }
     
-    // For raw transcript, try to replace speaker labels if speakerNames are available
+    // PRIORITY 3: Fall back to transcriptRaw
     let text = transcriptRaw?.trim() || '';
     if (text && Object.keys(speakerNames).length > 0) {
-      // Replace patterns like "[Talare 1]:", "Talare 1:", "[speaker_0]:", etc.
       Object.entries(speakerNames).forEach(([label, name]) => {
         if (!isGenericName(name)) {
-          // Match various label formats
           const patterns = [
             new RegExp(`\\[${label}\\]:?\\s*`, 'gi'),
             new RegExp(`\\[${normalizeSpeakerId(label)}\\]:?\\s*`, 'gi'),
@@ -115,7 +139,7 @@ export const TranscriptTextView: React.FC<TranscriptTextViewProps> = ({
       });
     }
     return text;
-  }, [speakerBlocksCleaned, transcriptRaw, speakerNames]);
+  }, [transcript, speakerBlocksCleaned, transcriptRaw, speakerNames]);
 
   // Check if content needs expander
   React.useEffect(() => {
