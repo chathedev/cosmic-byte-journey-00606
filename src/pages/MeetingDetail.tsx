@@ -2556,9 +2556,10 @@ const MeetingDetail = () => {
                         })}
                       </div>
                     ) : (
-                      // Clean text view - uses speakerBlocksCleaned or transcriptRaw with expand/collapse
+                      // Clean text view - prioritizes transcript field (AI-cleaned), then speakerBlocksCleaned, then transcriptRaw
                       <TranscriptTextView
                         meetingId={id || ''}
+                        transcript={transcript}
                         transcriptRaw={transcriptRaw}
                         speakerBlocksCleaned={speakerBlocksCleaned}
                         speakerNames={speakerNames}
