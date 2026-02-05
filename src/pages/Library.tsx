@@ -540,7 +540,32 @@ const Library = () => {
       
       const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
       deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setMeetings(deduped);
+      
+      // Fetch cleaned transcripts from ASR status for completed meetings
+      const enhancedMeetings = await Promise.all(
+        deduped.map(async (meeting) => {
+          // Only fetch ASR status for meetings with a transcript (completed)
+          if (meeting.transcript && meeting.transcript.trim().length > 0) {
+            try {
+              const asrStatus = await pollASRStatus(meeting.id);
+              // Use the cleaned transcript from ASR if available
+              if (asrStatus.transcript && asrStatus.transcript.trim().length > 0) {
+                return {
+                  ...meeting,
+                  transcript: asrStatus.transcript,
+                  transcriptionStatus: 'done' as const,
+                };
+              }
+            } catch (err) {
+              // ASR status fetch failed - keep original transcript
+              console.log('Could not fetch ASR status for meeting:', meeting.id, err);
+            }
+          }
+          return meeting;
+        })
+      );
+      
+      setMeetings(enhancedMeetings);
       
       const allFolders = await meetingStorage.getFolders(user.uid);
       setFolders(allFolders.map(f => f.name));
