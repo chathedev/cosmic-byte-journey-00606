@@ -179,6 +179,7 @@ const Library = () => {
 
   // Track last reload time to debounce
   const lastReloadRef = useRef<number>(0);
+  const enhanceRunRef = useRef(0);
   const RELOAD_DEBOUNCE_MS = 2000; // Don't reload more than once every 2 seconds
 
   const reloadDataIfNeeded = useCallback(() => {
@@ -541,32 +542,56 @@ const Library = () => {
       const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
       deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      // Fetch cleaned transcripts from ASR status for completed meetings
-      const enhancedMeetings = await Promise.all(
-        deduped.map(async (meeting) => {
-          // Only fetch ASR status for meetings with a transcript (completed)
-          if (meeting.transcript && meeting.transcript.trim().length > 0) {
-            try {
-              const asrStatus = await pollASRStatus(meeting.id);
-              // Use the cleaned transcript from ASR if available
-              if (asrStatus.transcript && asrStatus.transcript.trim().length > 0) {
-                return {
-                  ...meeting,
-                  transcript: asrStatus.transcript,
-                  transcriptionStatus: 'done' as const,
-                };
+      setMeetings(deduped);
+
+      // Fetch cleaned transcripts in the background (fast UI + avoid spamming /asr/status)
+      const runId = ++enhanceRunRef.current;
+      const MAX_TO_ENHANCE = 20;
+      // Global pacing: ~1 request/second total (no concurrency) to keep backend load low.
+      const CONCURRENCY = 1;
+      const SPACING_MS = 1000;
+
+      const toEnhance = deduped
+        .filter((m) => m.transcript && m.transcript.trim().length > 0)
+        .slice(0, MAX_TO_ENHANCE);
+
+      if (toEnhance.length > 0) {
+        void (async () => {
+          let cursor = 0;
+          const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+          const worker = async () => {
+            while (cursor < toEnhance.length && enhanceRunRef.current === runId) {
+              const meeting = toEnhance[cursor++];
+              try {
+                const asrStatus = await pollASRStatus(meeting.id);
+                const bestTranscript =
+                  asrStatus.transcript && asrStatus.transcript.trim().length > 0
+                    ? asrStatus.transcript
+                    : asrStatus.transcriptCleaned && asrStatus.transcriptCleaned.trim().length > 0
+                      ? asrStatus.transcriptCleaned
+                      : null;
+
+                if (bestTranscript && enhanceRunRef.current === runId) {
+                  setMeetings((prev) =>
+                    prev.map((m) =>
+                      m.id === meeting.id
+                        ? { ...m, transcript: bestTranscript, transcriptionStatus: 'done' as const }
+                        : m
+                    )
+                  );
+                }
+              } catch {
+                // ignore
               }
-            } catch (err) {
-              // ASR status fetch failed - keep original transcript
-              console.log('Could not fetch ASR status for meeting:', meeting.id, err);
+              await sleep(SPACING_MS);
             }
-          }
-          return meeting;
-        })
-      );
-      
-      setMeetings(enhancedMeetings);
-      
+          };
+
+          await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+        })();
+      }
+
       const allFolders = await meetingStorage.getFolders(user.uid);
       setFolders(allFolders.map(f => f.name));
       
