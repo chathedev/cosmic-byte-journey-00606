@@ -6,8 +6,6 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
-import { MeetingTypeDialog } from "./MeetingTypeDialog";
-import { DigitalRecordingSetup } from "./DigitalRecordingSetup";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -15,7 +13,6 @@ import { meetingStorage } from "@/utils/meetingStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { digitalRecordingStreams } from "@/lib/digitalRecordingStreams";
 type View = "welcome" | "analyzing" | "transcript-preview";
 
 interface AIActionItem {
@@ -53,10 +50,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const navigate = useNavigate();
   const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
   const [showTextPasteDialog, setShowTextPasteDialog] = useState(false);
-  const [showMeetingTypeDialog, setShowMeetingTypeDialog] = useState(false);
-  const [showDigitalRecordingSetup, setShowDigitalRecordingSetup] = useState(false);
   const isMobile = useIsMobile();
-  const isDesktop = !isMobile;
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
@@ -79,7 +73,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     })();
   }, [searchParams, currentView, navigate, isFreeTrialMode, selectedLanguage]);
 
-  // Handle "Spela in live" button click - show meeting type dialog on desktop, go straight to recording on mobile
+   // Handle "Spela in live" button click - go straight to in-person recording
   const handleRecordLiveClick = async () => {
     const { allowed, reason } = await canCreateMeeting();
     if (!allowed) {
@@ -88,14 +82,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
-    // On mobile/tablet, go straight to in-person recording
-    if (!isDesktop) {
-      await startInPersonRecording();
-      return;
-    }
-
-    // On desktop, show meeting type choice
-    setShowMeetingTypeDialog(true);
+     await startInPersonRecording();
   };
 
   // Start in-person recording (current behavior)
@@ -146,112 +133,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     } finally {
       setIsStartingRecording(false);
     }
-  };
-
-  // Handle digital recording with system/mic audio
-  const handleDigitalRecordingStart = async (streams: { systemStream?: MediaStream; micStream?: MediaStream }) => {
-    setIsStartingRecording(true);
-
-    let mixedStream: MediaStream | undefined;
-    let preMixAudioContext: AudioContext | undefined;
-
-    try {
-      // Mix system + mic into ONE stream while we still have a user gesture (button click)
-      // so AudioContext can reliably run. We store everything module-level.
-      try {
-        preMixAudioContext = new AudioContext();
-        if (preMixAudioContext.state === 'suspended') {
-          await preMixAudioContext.resume();
-        }
-        const destination = preMixAudioContext.createMediaStreamDestination();
-        if (streams.systemStream) {
-          preMixAudioContext.createMediaStreamSource(streams.systemStream).connect(destination);
-        }
-        if (streams.micStream) {
-          preMixAudioContext.createMediaStreamSource(streams.micStream).connect(destination);
-        }
-        mixedStream = destination.stream;
-      } catch (e) {
-        console.warn('Could not pre-mix digital streams, will fallback in recorder:', e);
-        try {
-          preMixAudioContext?.close();
-        } catch {
-          /* ignore */
-        }
-        preMixAudioContext = undefined;
-        mixedStream = undefined;
-      }
-
-      const now = new Date().toISOString();
-      const result = await apiClient.createMeeting({
-        title: 'Digitalt möte',
-        createdAt: now,
-        meetingStartedAt: now,
-        transcript: '',
-        transcriptionStatus: 'recording',
-      });
-
-      const meetingId = result.meeting?.id;
-      if (!meetingId) {
-        throw new Error('Inget mötesid returnerades');
-      }
-
-      console.log('✅ Meeting created for digital recording:', meetingId);
-
-      const pendingMeeting = {
-        id: meetingId,
-        title: 'Digitalt möte',
-        createdAt: now,
-        transcript: '',
-        transcriptionStatus: 'recording',
-        userId: user?.uid || '',
-      };
-      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
-
-      // Store streams in module-level storage (MediaStream can't be serialized)
-      digitalRecordingStreams.set({
-        ...streams,
-        combinedStream: mixedStream,
-        audioContext: preMixAudioContext,
-      });
-
-      // Navigate with just a flag
-      navigate(`/meetings/${meetingId}`, {
-        state: { 
-          startRecording: true,
-          isFreeTrialMode,
-          selectedLanguage,
-          digitalRecording: true,
-        },
-      });
-    } catch (error: any) {
-      console.error('Failed to create meeting for digital recording:', error);
-      // Stop streams on error
-      streams.systemStream?.getTracks().forEach(t => t.stop());
-      streams.micStream?.getTracks().forEach(t => t.stop());
-      // If we created a pre-mix AudioContext but never stored it, close it.
-      try { preMixAudioContext?.close(); } catch { /* ignore */ }
-      // Also clear any mixed stream / audio context
-      digitalRecordingStreams.clear();
-      toast({
-        title: 'Kunde inte starta inspelning',
-        description: error.message || 'Försök igen',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsStartingRecording(false);
-    }
-  };
-
-  // Meeting type selection handlers
-  const handleSelectInPerson = () => {
-    setShowMeetingTypeDialog(false);
-    startInPersonRecording();
-  };
-
-  const handleSelectDigital = () => {
-    setShowMeetingTypeDialog(false);
-    setShowDigitalRecordingSetup(true);
   };
 
 
@@ -534,20 +415,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         open={showTextPasteDialog}
         onOpenChange={setShowTextPasteDialog}
         onTextReady={handleTextPaste}
-      />
-
-      <MeetingTypeDialog
-        open={showMeetingTypeDialog}
-        onOpenChange={setShowMeetingTypeDialog}
-        onSelectInPerson={handleSelectInPerson}
-        onSelectDigital={handleSelectDigital}
-        isDesktop={isDesktop}
-      />
-
-      <DigitalRecordingSetup
-        open={showDigitalRecordingSetup}
-        onOpenChange={setShowDigitalRecordingSetup}
-        onStartRecording={handleDigitalRecordingStart}
       />
     </div>
   );
