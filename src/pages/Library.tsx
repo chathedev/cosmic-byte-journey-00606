@@ -75,7 +75,7 @@ const TranscriptionCompleteMessage = ({ meetingId, status }: { meetingId: string
 
 const Library = () => {
   const { user } = useAuth();
-  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership } = useSubscription();
+  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership, isAdmin } = useSubscription();
   const [meetings, setMeetings] = useState<MeetingSession[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("Alla");
@@ -106,7 +106,9 @@ const Library = () => {
   const location = useLocation();
   const { toast } = useToast();
   const isEnterprise = enterpriseMembership?.isMember === true;
-  const maxProtocolsPerMeeting = isEnterprise ? 3 : 2; // 2 generations (1 initial + 1 replacement)
+  const hasSpecialPerk = enterpriseMembership?.company?.preferences?.specialPerkEnabled === true;
+  const hasUnlimitedProtocols = isAdmin || hasSpecialPerk;
+  const maxProtocolsPerMeeting = hasUnlimitedProtocols ? Infinity : (isEnterprise ? 3 : 2);
   const pendingMeetingIdRef = useRef<string | null>(null);
   
   // Check if this is a demo/test account

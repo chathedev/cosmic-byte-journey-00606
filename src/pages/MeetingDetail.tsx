@@ -64,7 +64,7 @@ const MeetingDetail = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userPlan, incrementMeetingCount, isAdmin } = useSubscription();
+  const { userPlan, incrementMeetingCount, isAdmin, enterpriseMembership } = useSubscription();
 
   // Check if we're starting in recording mode (from navigation state)
   const locationState = location.state as { startRecording?: boolean; isFreeTrialMode?: boolean; selectedLanguage?: 'sv-SE' | 'en-US'; digitalRecording?: boolean } | null;
@@ -153,12 +153,15 @@ const MeetingDetail = () => {
     return 'Okänd';
   };
 
-  // Protocol limits: 2 generations per meeting (1 initial + 1 replacement)
-  const maxProtocolGenerations = 2;
+  // Protocol limits: admins & special perk enterprise users = unlimited
+  const hasSpecialPerk = enterpriseMembership?.company?.preferences?.specialPerkEnabled === true;
+  const isEnterprise = enterpriseMembership?.isMember === true;
+  const hasUnlimitedProtocols = isAdmin || hasSpecialPerk;
+  const maxProtocolGenerations = hasUnlimitedProtocols ? Infinity : (isEnterprise ? 3 : 2);
   const [backendProtocolCount, setBackendProtocolCount] = useState<number>(0);
   const protocolCountUsed = backendProtocolCount;
-  const protocolCountRemaining = Math.max(0, maxProtocolGenerations - protocolCountUsed);
-  const canGenerateMoreProtocols = protocolCountUsed < maxProtocolGenerations;
+  const protocolCountRemaining = hasUnlimitedProtocols ? 999 : Math.max(0, maxProtocolGenerations - protocolCountUsed);
+  const canGenerateMoreProtocols = hasUnlimitedProtocols || protocolCountUsed < maxProtocolGenerations;
 
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
