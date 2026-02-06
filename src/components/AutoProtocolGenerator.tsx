@@ -504,14 +504,15 @@ export const AutoProtocolGenerator = ({
       } catch (error) {
         console.error("❌ Error generating protocol:", error);
         clearInterval(progressInterval);
+        setProgress(0);
+        hasGeneratedRef.current = false; // Allow retry
         const errorMessage = error instanceof Error ? error.message : "Kunde inte generera protokollet. Försök igen.";
         toast({
           title: "Fel vid generering",
           description: errorMessage,
           variant: "destructive",
-          duration: 4000,
+          duration: 8000,
         });
-        // Stanna kvar på sidan så användaren kan försöka igen
       } finally {
         setIsGenerating(false);
       }
@@ -985,7 +986,44 @@ export const AutoProtocolGenerator = ({
   }
 
   if (!generatedProtocol) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 space-y-6">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <FileText className="w-8 h-8 text-destructive" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Protokollet kunde inte genereras</h3>
+              <p className="text-sm text-muted-foreground">
+                Något gick fel. Tryck på knappen nedan för att försöka igen.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={() => {
+                hasGeneratedRef.current = false;
+                setIsGenerating(true);
+                setProgress(0);
+                // Force re-trigger the useEffect
+                setGeneratedProtocol(null);
+                // Manually re-run
+                window.location.reload();
+              }}
+              className="w-full"
+            >
+              <Loader2 className="mr-2 h-4 w-4" />
+              Försök igen
+            </Button>
+            <Button variant="outline" onClick={onBack} className="w-full">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Tillbaka
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (
