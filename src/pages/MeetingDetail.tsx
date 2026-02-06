@@ -679,8 +679,8 @@ const MeetingDetail = () => {
                   mergedNames,
                   asrStatus.speakerBlocksCleaned || asrStatus.speakerBlocksRaw
                 );
-                if (!stillHasGeneric) {
-                  console.log(`✅ [${logPrefix}] All speaker names resolved, stopping loader`);
+                if (!stillHasGeneric || isFinal) {
+                  console.log(`✅ [${logPrefix}] ${!stillHasGeneric ? 'All speaker names resolved' : 'Final fetch, accepting generic names'}, stopping loader`);
                   setSpeakerNamesLoading(false);
                 }
                 return true;
