@@ -136,6 +136,18 @@ export const AutoProtocolGenerator = ({
     }
   }, [isGenerating, isLargeTranscript]);
 
+  // Prevent accidental page close / navigation during protocol generation
+  useEffect(() => {
+    if (!isGenerating) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers show a generic message; returnValue is still required by spec.
+      e.returnValue = 'Protokollet genereras fortfarande. Är du säker på att du vill lämna?';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isGenerating]);
+
   useEffect(() => {
     if (aiProtocol || hasGeneratedRef.current) return;
     hasGeneratedRef.current = true;
