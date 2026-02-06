@@ -54,9 +54,8 @@ const Feedback = () => {
     if (!checkRateLimit()) {
       const timeLeft = getTimeUntilNextSubmission();
       toast({
-        title: "För många förfrågningar",
-        description: `Du kan skicka feedback igen om ${timeLeft}.`,
-        variant: "destructive",
+        title: "Tack, vi har din feedback!",
+        description: `Du kan skicka ny feedback igen om ${timeLeft}. Vi uppskattar din input! 🙏`,
       });
       return;
     }
@@ -127,14 +126,14 @@ const Feedback = () => {
 
               {/* Rate Limit Notice */}
               {!canSubmit && (
-                <Card className="border-destructive/50 bg-destructive/5">
+                <Card className="border-primary/30 bg-primary/5">
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-3">
-                      <Clock className="w-5 h-5 text-destructive mt-0.5" />
+                      <Clock className="w-5 h-5 text-primary mt-0.5" />
                       <div>
-                        <p className="font-medium text-destructive">För många förfrågningar</p>
+                        <p className="font-medium text-foreground">Tack för din feedback! 🎉</p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Du kan skicka feedback igen om <strong>{timeLeft}</strong>
+                          Du kan skicka ny feedback igen om <strong>{timeLeft}</strong>. Vi läser allt noggrant!
                         </p>
                       </div>
                     </div>
