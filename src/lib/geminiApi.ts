@@ -258,47 +258,102 @@ export async function generateWithGemini(
     throw new Error("Inte inloggad");
   }
 
-  console.log('[generateWithGemini] Calling backend at api.tivly.se/ai/gemini');
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for long meetings
 
-  // Call via backend at api.tivly.se (NOT Supabase edge function)
-  const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error('[generateWithGemini] Backend error:', response.status, errorData);
-    
-    if (response.status === 401) {
-      throw new Error("Inte inloggad");
+    try {
+      console.log(`[generateWithGemini] Attempt ${attempt}/${MAX_RETRIES} - calling api.tivly.se/ai/gemini`);
+
+      const response = await fetch(`${API_BASE_URL}/ai/gemini`, {
+        method: 'POST',
+        credentials: 'include',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`[generateWithGemini] Backend error (attempt ${attempt}):`, response.status, errorData);
+
+        if (response.status === 401) {
+          throw new Error("Inte inloggad");
+        }
+        if (response.status === 429) {
+          // Rate limited - wait and retry
+          if (attempt < MAX_RETRIES) {
+            const delay = Math.min(2000 * Math.pow(2, attempt - 1), 15000);
+            console.log(`[generateWithGemini] Rate limited, waiting ${delay}ms before retry`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          throw new Error("För många förfrågningar - vänta en stund");
+        }
+        // Server errors (500, 502, 503) - retry
+        if (response.status >= 500 && attempt < MAX_RETRIES) {
+          const delay = Math.min(3000 * Math.pow(2, attempt - 1), 20000);
+          console.log(`[generateWithGemini] Server error ${response.status}, waiting ${delay}ms before retry`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+
+        throw new Error(errorData.message || errorData.error || 'AI-fel');
+      }
+
+      const data = await response.json();
+
+      if (data?.error) {
+        if (data.error === "prompt_required") {
+          throw new Error("En prompt krävs");
+        }
+        if (data.error === "google_ai_failed") {
+          // Retry on AI failures
+          if (attempt < MAX_RETRIES) {
+            const delay = Math.min(3000 * Math.pow(2, attempt - 1), 20000);
+            console.log(`[generateWithGemini] AI failed, waiting ${delay}ms before retry`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          throw new Error(data.message || "Gemini API-fel - försök igen senare");
+        }
+        throw new Error(data.message || data.error || 'API-fel');
+      }
+
+      return data as GeminiResponse;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        console.warn(`[generateWithGemini] Request timed out (attempt ${attempt})`);
+        if (attempt < MAX_RETRIES) {
+          console.log(`[generateWithGemini] Retrying after timeout...`);
+          continue;
+        }
+        throw new Error("Förfrågan tog för lång tid. Försök igen - för långa möten kan ta extra tid.");
+      }
+      // Network errors - retry
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        if (attempt < MAX_RETRIES) {
+          const delay = Math.min(3000 * Math.pow(2, attempt - 1), 20000);
+          console.log(`[generateWithGemini] Network error, waiting ${delay}ms before retry`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
+      throw err;
     }
-    if (response.status === 429) {
-      throw new Error("För många förfrågningar - vänta en stund");
-    }
-    
-    throw new Error(errorData.message || errorData.error || 'AI-fel');
   }
 
-  const data = await response.json();
-
-  if (data?.error) {
-    // Handle specific error codes per API docs
-    if (data.error === "prompt_required") {
-      throw new Error("En prompt krävs");
-    }
-    if (data.error === "google_ai_failed") {
-      throw new Error(data.message || "Gemini API-fel - försök igen senare");
-    }
-    throw new Error(data.message || data.error || 'API-fel');
-  }
-
-  return data as GeminiResponse;
+  throw new Error('Kunde inte nå AI-tjänsten efter flera försök');
 }
 
 /**
@@ -711,7 +766,21 @@ export async function analyzeMeetingAI(
   const wordCount = transcript.trim().split(/\s+/).length;
   console.log('📊 Processing transcript via API:', { wordCount, chars: transcript.length });
 
-  const prompt = buildProtocolPrompt(transcript, meetingName, agenda, hasSpeakerAttribution, speakers);
+  // For very long transcripts (>8000 words / ~60min+), truncate intelligently
+  // to avoid token limits. Keep beginning + end for context.
+  let processedTranscript = transcript;
+  const MAX_WORDS = 12000;
+  if (wordCount > MAX_WORDS) {
+    const words = transcript.trim().split(/\s+/);
+    const keepStart = Math.floor(MAX_WORDS * 0.6); // 60% from start
+    const keepEnd = Math.floor(MAX_WORDS * 0.4);   // 40% from end
+    const startPart = words.slice(0, keepStart).join(' ');
+    const endPart = words.slice(-keepEnd).join(' ');
+    processedTranscript = `${startPart}\n\n[... mittendelen utelämnad för protokollgenerering (~${wordCount - keepStart - keepEnd} ord) ...]\n\n${endPart}`;
+    console.log(`📊 Transcript truncated: ${wordCount} -> ~${MAX_WORDS} words (start: ${keepStart}, end: ${keepEnd})`);
+  }
+
+  const prompt = buildProtocolPrompt(processedTranscript, meetingName, agenda, hasSpeakerAttribution, speakers);
 
   const response = await generateWithGemini({
     prompt,
