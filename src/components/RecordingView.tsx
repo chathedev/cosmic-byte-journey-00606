@@ -48,7 +48,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userPlan, canCreateMeeting, incrementMeetingCount, refreshPlan } = useSubscription();
+  const { userPlan, canCreateMeeting, incrementMeetingCount, refreshPlan, enterpriseMembership, isAdmin: isSubAdmin } = useSubscription();
   const isAtLimit = !!userPlan && userPlan.meetingsLimit !== null && userPlan.meetingsUsed >= userPlan.meetingsLimit;
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -1191,24 +1191,29 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
     }
     
     // Check protocol count BEFORE navigating
-    // Pro users can generate 1 protocol, Plus users can generate up to 5
-    try {
-      const meeting = await meetingStorage.getMeeting(savedId || sessionId);
-      const currentProtocolCount = meeting?.protocolCount || 0;
-      const maxProtocolCount = userPlan?.plan === 'plus' ? 5 : 1;
-      
-      if (currentProtocolCount >= maxProtocolCount) {
-        toast({
-          title: "Protokollgräns nådd",
-          description: `Du har nått gränsen för protokoll (${maxProtocolCount}). ${userPlan?.plan === 'plus' ? '' : 'Uppgradera för fler.'}`,
-          variant: "destructive",
-          duration: 2500,
-        });
-        return;
+    // Special perk enterprise users and admins have unlimited protocols
+    const hasSpecialPerk = enterpriseMembership?.company?.preferences?.specialPerkEnabled === true;
+    const hasUnlimitedProtocols = isAdmin || isSubAdmin || hasSpecialPerk;
+    
+    if (!hasUnlimitedProtocols) {
+      try {
+        const meeting = await meetingStorage.getMeeting(savedId || sessionId);
+        const currentProtocolCount = meeting?.protocolCount || 0;
+        const maxProtocolCount = userPlan?.plan === 'plus' ? 5 : 1;
+        
+        if (currentProtocolCount >= maxProtocolCount) {
+          toast({
+            title: "Protokollgräns nådd",
+            description: `Du har nått gränsen för protokoll (${maxProtocolCount}). ${userPlan?.plan === 'plus' ? '' : 'Uppgradera för fler.'}`,
+            variant: "destructive",
+            duration: 2500,
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking protocol count:', error);
+        // Continue anyway if check fails
       }
-    } catch (error) {
-      console.error('Error checking protocol count:', error);
-      // Continue anyway if check fails
     }
     
     // For free users, skip agenda selection and go directly to protocol generation

@@ -149,9 +149,14 @@ const AdminBackend = () => {
     };
   }, [logsOpen, logsPaused, logsLevel, logsKeyword]);
 
+  // Only auto-scroll if user is already near the bottom
   useEffect(() => {
-    if (logsContainerRef.current && logsData?.lines?.length) {
-      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    const el = logsContainerRef.current;
+    if (!el || !logsData?.lines?.length) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // Only auto-scroll if within 120px of the bottom (i.e. user hasn't scrolled up)
+    if (distanceFromBottom < 120) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [logsData]);
 

@@ -139,21 +139,22 @@ export default function GenerateProtocol() {
       }
 
       // 3) Check protocol count against limit when we have a real meetingId
-      // Admins have UNLIMITED protocol generations
-      // Pro = 2 protocol generations, Enterprise = 3 protocol generations
-      if (payload.meetingId && !isAdmin) {
+      // Admins and special perk enterprise users have UNLIMITED protocol generations
+      const hasSpecialPerk = enterpriseMembership?.company?.preferences?.specialPerkEnabled === true;
+      const hasUnlimitedProtocols = isAdmin || hasSpecialPerk;
+      
+      if (payload.meetingId && !hasUnlimitedProtocols) {
         try {
-          // CRITICAL: Always fetch fresh count from backend endpoint, not stale meeting data
           const currentProtocolCount = await meetingStorage.getProtocolCount(payload.meetingId);
           const isEnterprise = enterpriseMembership?.isMember === true;
-          const maxProtocolCount = isEnterprise ? 3 : 2; // 2 generations (1 initial + 1 replacement)
+          const maxProtocolCount = isEnterprise ? 3 : 2;
           
           console.log('🔐 Protocol limit check (fresh from backend)', { 
             meetingId: payload.meetingId, 
             currentProtocolCount, 
             maxProtocolCount, 
             isEnterprise,
-            isAdmin: false,
+            hasSpecialPerk: false,
             remaining: maxProtocolCount - currentProtocolCount
           });
           
@@ -168,10 +169,9 @@ export default function GenerateProtocol() {
           }
         } catch (error) {
           console.error('Error checking protocol count:', error);
-          // Continue anyway if check fails
         }
-      } else if (isAdmin) {
-        console.log('🔐 Protocol limit check BYPASSED - user is admin');
+      } else if (hasUnlimitedProtocols) {
+        console.log('🔐 Protocol limit check BYPASSED -', isAdmin ? 'admin' : 'special perk');
       }
 
       // Clear token from old flows; keep pending payload until generation begins
