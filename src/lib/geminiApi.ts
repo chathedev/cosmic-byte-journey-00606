@@ -757,16 +757,16 @@ export async function analyzeMeetingAI(
     isEnterprise?: boolean;
   }
 ): Promise<AIProtocol> {
-  const { agenda, hasSpeakerAttribution, speakers, isEnterprise = false } = options || {};
+  const { agenda, hasSpeakerAttribution, speakers } = options || {};
 
   if (!transcript || transcript.trim().length < 10) {
     throw new Error("Transkriptionen är för kort eller saknas");
   }
 
   const wordCount = transcript.trim().split(/\s+/).length;
-  console.log('📊 Processing transcript via API:', { wordCount, chars: transcript.length });
+  console.log('📊 Processing transcript for protocol:', { wordCount, chars: transcript.length });
 
-  // For very long transcripts (>8000 words / ~60min+), truncate intelligently
+  // For very long transcripts (>12000 words / ~90min+), truncate intelligently
   // to avoid token limits. Keep beginning + end for context.
   let processedTranscript = transcript;
   const MAX_WORDS = 12000;
@@ -780,92 +780,76 @@ export async function analyzeMeetingAI(
     console.log(`📊 Transcript truncated: ${wordCount} -> ~${MAX_WORDS} words (start: ${keepStart}, end: ${keepEnd})`);
   }
 
-  const prompt = buildProtocolPrompt(processedTranscript, meetingName, agenda, hasSpeakerAttribution, speakers);
-
-  const response = await generateWithGemini({
-    prompt,
-    temperature: 0.2,
-    maxOutputTokens: 8192,
-  }, isEnterprise);
-
-  const content = extractText(response);
+  // Call the analyze-meeting edge function DIRECTLY (bypasses api.tivly.se 30s timeout)
+  // This function has no timeout constraints and calls Gemini API directly.
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
   
-  // Parse and normalize the response
-  let cleanedContent = content.trim();
-  if (cleanedContent.startsWith('```json')) {
-    cleanedContent = cleanedContent.replace(/^```json\n/, '').replace(/\n```$/, '');
-  } else if (cleanedContent.startsWith('```')) {
-    cleanedContent = cleanedContent.replace(/^```\n/, '').replace(/\n```$/, '');
-  }
+  const MAX_RETRIES = 3;
 
-  // Extract JSON object
-  const firstBrace = cleanedContent.indexOf('{');
-  const lastBrace = cleanedContent.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleanedContent = cleanedContent.slice(firstBrace, lastBrace + 1);
-  }
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[analyzeMeetingAI] Attempt ${attempt}/${MAX_RETRIES} - calling analyze-meeting edge function directly`);
 
-  let parsed: any;
-  try {
-    parsed = JSON.parse(cleanedContent);
-  } catch (err) {
-    console.error('❌ JSON parse failed:', cleanedContent.substring(0, 200));
-    throw new Error('AI returnerade ogiltigt format');
-  }
+      const body: Record<string, unknown> = {
+        transcript: processedTranscript,
+        meetingName,
+      };
+      if (agenda) body.agenda = agenda;
+      if (hasSpeakerAttribution) body.hasSpeakerAttribution = true;
+      if (speakers && speakers.length > 0) body.speakers = speakers;
 
-  // Support both English and Swedish JSON structures
-  const protocol = parsed.protokoll || parsed.protocol || parsed;
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-  const title = protocol.title || protocol.titel || meetingName || 'Mötesprotokoll';
-  const summary = protocol.summary || protocol.sammanfattning || protocol.sammandrag || '';
-  
-  // Normalize main points
-  let mainPoints = protocol.mainPoints || protocol.huvudpunkter || protocol.punkter || [];
-  if (!Array.isArray(mainPoints)) mainPoints = [];
-  mainPoints = mainPoints.map((p: any) => (typeof p === 'string' ? p : '')).filter((p: string) => p.trim() !== '');
-  
-  // Normalize decisions
-  let decisions = protocol.decisions || protocol.beslut || [];
-  if (!Array.isArray(decisions)) decisions = [];
-  decisions = decisions.map((d: any) => (typeof d === 'string' ? d : '')).filter((d: string) => d.trim() !== '');
-  
-  // Normalize action items
-  const actionItemsRaw = protocol.actionItems || protocol.åtgärdspunkter || protocol.atgardsPunkter || [];
-  const actionItems = Array.isArray(actionItemsRaw)
-    ? actionItemsRaw.map((item: any) => {
-        if (typeof item === 'string') {
-          return { title: item, description: '', owner: '', deadline: '', priority: 'medium' as const };
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error(`[analyzeMeetingAI] Edge function error (attempt ${attempt}):`, response.status, errorData);
+
+        // Retry on server errors
+        if (response.status >= 500 && attempt < MAX_RETRIES) {
+          const delay = Math.min(3000 * Math.pow(2, attempt - 1), 20000);
+          console.log(`[analyzeMeetingAI] Server error ${response.status}, waiting ${delay}ms before retry`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
         }
-        return {
-          title: item.title || item.titel || '',
-          description: item.description || item.beskrivning || '',
-          owner: item.owner || item.ansvarig || '',
-          deadline: item.deadline || item.sistaDatum || item.deadlineDatum || '',
-          priority: (item.priority || item.prioritet || 'medium') as 'critical' | 'high' | 'medium' | 'low',
-        };
-      }).filter((item: any) => item.title.trim() !== '')
-    : [];
+        throw new Error(errorData.error || errorData.message || `Kunde inte generera protokoll (${response.status})`);
+      }
 
-  // Normalize next meeting suggestions
-  let nextMeetingSuggestions = protocol.nextMeetingSuggestions || protocol.nästaMöteFörslag || protocol.nextMeetingTopics || [];
-  if (!Array.isArray(nextMeetingSuggestions)) nextMeetingSuggestions = [];
-  nextMeetingSuggestions = nextMeetingSuggestions.map((s: any) => (typeof s === 'string' ? s : '')).filter((s: string) => s.trim() !== '');
+      const data = await response.json();
+      console.log('✅ Protocol received from edge function:', {
+        hasTitle: !!data.title,
+        hasSummary: !!data.summary,
+        mainPointsCount: data.mainPoints?.length || 0,
+      });
 
-  // Fallback for required fields
-  const safeSummary = summary && summary.trim().length > 0
-    ? summary
-    : `Mötet genomfördes och innehöll diskussioner kring planering, uppföljning och nästa steg.`;
+      // The edge function already returns normalized data
+      return {
+        title: data.title || meetingName || 'Mötesprotokoll',
+        summary: data.summary || 'Mötet genomfördes och innehöll diskussioner kring planering, uppföljning och nästa steg.',
+        mainPoints: Array.isArray(data.mainPoints) && data.mainPoints.length > 0
+          ? data.mainPoints
+          : ['Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg.'],
+        decisions: Array.isArray(data.decisions) ? data.decisions : [],
+        actionItems: Array.isArray(data.actionItems) ? data.actionItems : [],
+        nextMeetingSuggestions: Array.isArray(data.nextMeetingSuggestions) ? data.nextMeetingSuggestions : [],
+      };
+    } catch (err: any) {
+      // Network errors - retry
+      if ((err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) && attempt < MAX_RETRIES) {
+        const delay = Math.min(3000 * Math.pow(2, attempt - 1), 20000);
+        console.log(`[analyzeMeetingAI] Network error, waiting ${delay}ms before retry`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      if (attempt >= MAX_RETRIES) {
+        throw err;
+      }
+      throw err;
+    }
+  }
 
-  const safeMainPoints = mainPoints.length > 0
-    ? mainPoints
-    : ['Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg.', 'Deltagarna diskuterade ansvarsfördelning, tidsplan och prioriterade aktiviteter.'];
-
-  return {
-    title,
-    summary: safeSummary,
-    mainPoints: safeMainPoints,
-    decisions,
-    actionItems,
-    nextMeetingSuggestions,
-  };
+  throw new Error('Kunde inte nå AI-tjänsten efter flera försök');
 }
