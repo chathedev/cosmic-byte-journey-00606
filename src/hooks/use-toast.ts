@@ -134,7 +134,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ duration, ...props }: Toast) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -150,11 +150,16 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      duration: duration ?? 3000,
       onOpenChange: (open) => {
         if (!open) dismiss();
       },
     },
   });
+
+  // Auto-dismiss after duration
+  const ms = duration ?? 3000;
+  setTimeout(dismiss, ms);
 
   return {
     id: id,
