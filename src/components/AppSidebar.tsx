@@ -235,7 +235,7 @@ export function AppSidebar() {
             duration: 0.2,
             ease: "easeInOut",
           }}
-          className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-card border-r border-border`}
+          className={`sidebar-nav ${isMobile ? 'fixed' : 'sticky'} top-0 left-0 z-50 flex flex-col bg-white/70 dark:bg-card/70 backdrop-blur-2xl border-r border-white/20 dark:border-border/50`}
           style={{
             height: isMobile ? '100dvh' : '100vh',
             width: isMobile ? '280px' : undefined,

@@ -1072,8 +1072,8 @@ const Library = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-4 shadow-sm">
-        <h1 className="text-lg font-semibold">Mina möten</h1>
+      <div className="sticky top-0 z-40 bg-white/60 dark:bg-card/60 backdrop-blur-xl border-b border-white/20 dark:border-border/50 px-4 py-4">
+        <h1 className="text-lg font-semibold text-foreground">Mina möten</h1>
       </div>
 
       {/* Loading bar */}
