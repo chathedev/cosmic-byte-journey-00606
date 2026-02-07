@@ -2182,84 +2182,106 @@ const MeetingDetail = () => {
                 </div>
               </div>
             ) : hasTranscript ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
 
-                {/* Protocol Card - Clean, minimal */}
-                {protocolData && !isEditing && (
-                  <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="w-5 h-5 text-primary shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Protokoll</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')}
-                        </p>
-                      </div>
+                {/* Protocol Section — prominent CTA or existing protocol */}
+                {!isEditing && (
+                  <section className="rounded-lg border border-border bg-card">
+                    <div className="p-5">
+                      {protocolData ? (
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <h2 className="text-sm font-semibold text-foreground">Protokoll</h2>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Skapat {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')} · {(protocolData.size / 1024).toFixed(0)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button onClick={handleViewProtocol} size="sm" variant="default" className="gap-1.5 h-9 text-xs no-hover-lift">
+                              <Eye className="w-3.5 h-3.5" /> Visa protokoll
+                            </Button>
+                            <Button onClick={handleDownloadProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift">
+                              <Download className="w-3.5 h-3.5" /> Ladda ner
+                            </Button>
+                            <div className="flex items-center gap-1 ml-auto">
+                              {canGenerateMoreProtocols && (
+                                <Button onClick={handleCreateProtocol} size="sm" variant="ghost" className="gap-1.5 h-9 text-xs text-muted-foreground no-hover-lift">
+                                  <RefreshCw className="w-3.5 h-3.5" /> Ersätt
+                                </Button>
+                              )}
+                              <Button onClick={() => setShowDeleteProtocolConfirm(true)} size="sm" variant="ghost" className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive no-hover-lift">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          {!hasUnlimitedProtocols && (
+                            <p className="text-xs text-muted-foreground">
+                              {protocolCountRemaining > 0 
+                                ? `${protocolCountRemaining} av ${maxProtocolGenerations} genereringar kvar`
+                                : `Alla ${maxProtocolGenerations} genereringar använda`
+                              }
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="mt-0.5 w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                              <Sparkles className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <h2 className="text-sm font-semibold text-foreground">Skapa protokoll</h2>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Generera ett strukturerat mötesprotokoll med AI baserat på transkriptionen
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={handleCreateProtocol}
+                            size="sm"
+                            className="gap-1.5 h-10 px-5 text-sm shrink-0 no-hover-lift"
+                            disabled={loadingProtocol || !canGenerateMoreProtocols}
+                          >
+                            {loadingProtocol ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : !canGenerateMoreProtocols ? (
+                              <Lock className="w-4 h-4" />
+                            ) : (
+                              <Sparkles className="w-4 h-4" />
+                            )}
+                            {!canGenerateMoreProtocols ? 'Gräns nådd' : 'Skapa protokoll'}
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button onClick={handleViewProtocol} size="sm" variant="secondary" className="gap-1.5 h-8 text-xs no-hover-lift">
-                        <Eye className="w-3.5 h-3.5" /> Visa
-                      </Button>
-                      <Button onClick={handleDownloadProtocol} size="sm" variant="ghost" className="h-8 w-8 p-0 no-hover-lift">
-                        <Download className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button onClick={() => setShowDeleteProtocolConfirm(true)} size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive no-hover-lift">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+                  </section>
                 )}
 
-                {/* Action Row */}
+                {/* Meeting info bar */}
                 {!isEditing && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Button
-                      onClick={handleCreateProtocol}
-                      variant={protocolData ? "outline" : "default"}
-                      size="sm"
-                      className="gap-1.5 h-9 text-xs no-hover-lift"
-                      disabled={loadingProtocol || !canGenerateMoreProtocols}
-                    >
-                      {loadingProtocol ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : !canGenerateMoreProtocols ? (
-                        <Lock className="w-3.5 h-3.5" />
-                      ) : protocolData ? (
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      ) : (
-                        <Sparkles className="w-3.5 h-3.5" />
-                      )}
-                      {!canGenerateMoreProtocols 
-                        ? 'Gräns nådd'
-                        : protocolData 
-                          ? 'Ersätt protokoll'
-                          : 'Skapa protokoll'
-                      }
-                    </Button>
-                    
-                    {!hasUnlimitedProtocols && !isSISDisabled && (
-                      <span className="text-xs text-muted-foreground">
-                        {protocolCountRemaining > 0 
-                          ? `${protocolCountRemaining} av ${maxProtocolGenerations} kvar`
-                          : `0 av ${maxProtocolGenerations} kvar`
-                        }
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
+                    {meeting.source && (
+                      <span className="flex items-center gap-1">
+                        {meeting.source === 'live' ? <Mic className="w-3 h-3" /> : <Upload className="w-3 h-3" />}
+                        {meeting.source === 'live' ? 'Live-inspelning' : 'Uppladdad fil'}
                       </span>
                     )}
-
-                    {/* Status indicators */}
-                    <div className="flex items-center gap-1.5 ml-auto">
-                      {meeting.source && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          {meeting.source === 'live' ? <Mic className="w-3 h-3" /> : <Upload className="w-3 h-3" />}
-                          {meeting.source === 'live' ? 'Inspelning' : 'Uppladdad'}
-                        </span>
-                      )}
-                      {!isSISDisabled && lyraLearning.some(l => l.updated) && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Lyra lärde sig
-                        </span>
-                      )}
-                    </div>
+                    {!isSISDisabled && uniqueSpeakers.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {uniqueSpeakers.length} talare
+                      </span>
+                    )}
+                    {!isSISDisabled && lyraLearning.some(l => l.updated) && (
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Lyra lärde sig
+                      </span>
+                    )}
                   </div>
                 )}
 
