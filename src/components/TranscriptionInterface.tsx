@@ -329,11 +329,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         className="absolute inset-0 bg-cover bg-center scale-110"
         style={{ backgroundImage: "url('/images/hero-gradient.png')" }}
       />
-      {/* Grain overlay */}
-      <div 
-        className="absolute inset-0 opacity-[0.08] mix-blend-overlay pointer-events-none"
-        style={{ backgroundImage: "url('/images/grain-overlay.png')", backgroundRepeat: "repeat" }}
-      />
+      {/* No grain overlay */}
       {/* Dark vignette for depth */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 pointer-events-none" />
 
