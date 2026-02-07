@@ -4,7 +4,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, X, FileText, Loader2 } from "lucide-react";
+import { Download, Share2, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
 import mammoth from "mammoth";
@@ -145,59 +145,32 @@ export const ProtocolViewerDialog = ({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
-          {/* Header Section */}
-          <div className="p-8 pb-6 border-b bg-gradient-to-br from-background to-muted/20">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                <FileText className="w-7 h-7 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-2xl font-bold mb-2 text-foreground">
-                  {protocol?.fileName?.replace(/\.(docx|pdf)$/i, '') || "Protokoll"}
-                </h2>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                    <span>
-                      {protocol?.storedAt ? new Date(protocol.storedAt).toLocaleDateString('sv-SE', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : ''}
-                    </span>
-                  </div>
-                  {protocol?.size && (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                      <span>{formatFileSize(protocol.size)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Header with title + actions */}
+          <div className="flex items-center gap-3 px-6 py-4 border-b">
+            <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-semibold text-foreground truncate">
+                {protocol?.fileName?.replace(/\.(docx|pdf)$/i, '') || "Protokoll"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {protocol?.storedAt ? new Date(protocol.storedAt).toLocaleDateString('sv-SE', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                }) : ''}
+                {protocol?.size ? ` · ${formatFileSize(protocol.size)}` : ''}
+              </p>
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 px-8 py-4 border-b bg-muted/30">
-            <Button onClick={handleDownload} variant="outline" size="sm" className="gap-2 hover:bg-background">
-              <Download className="w-4 h-4" />
-              Ladda ner
-            </Button>
-            <Button onClick={handleShare} variant="outline" size="sm" className="gap-2 hover:bg-background">
-              <Share2 className="w-4 h-4" />
-              Dela via e-post
-            </Button>
-            <Button 
-              onClick={() => onOpenChange(false)} 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2 ml-auto hover:bg-background"
-            >
-              <X className="w-4 h-4" />
-              Stäng
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button onClick={handleDownload} variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                <Download className="w-4 h-4" />
+                Ladda ner
+              </Button>
+              <Button onClick={handleShare} variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                <Share2 className="w-4 h-4" />
+                Dela
+              </Button>
+            </div>
           </div>
 
           {/* Document Preview */}
