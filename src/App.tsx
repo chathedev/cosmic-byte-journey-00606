@@ -220,11 +220,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full relative overflow-hidden">
-        {/* Global gradient background */}
-        <div 
-          className="fixed inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url('/images/hero-gradient.png')" }}
-        />
+        {/* Vignette overlay only - bg image is on body via index.html for instant load */}
         <div className="fixed inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20 pointer-events-none" />
         <AppSidebar />
         <main className={`flex-1 overflow-auto relative ${isNative ? 'pt-6 md:pt-8 lg:pt-10' : ''}`}>
