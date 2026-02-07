@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { 
   Users, 
   BarChart3, 
   TrendingUp, 
-  Crown,
   Building2,
   ArrowLeft,
-  RefreshCw,
-  Infinity
+  RefreshCw
 } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { apiClient } from "@/lib/api";
@@ -105,7 +102,6 @@ export default function EnterpriseStats() {
       setStats(data);
     } catch (err: any) {
       console.error('Failed to load enterprise stats:', err);
-      // Handle "companyId is not defined" error gracefully
       if (err?.message?.includes('companyId')) {
         setError('Företags-ID saknas. Försök ladda om sidan.');
       } else {
@@ -125,17 +121,6 @@ export default function EnterpriseStats() {
     }
   }, [companyId]);
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "–";
-    const date = new Date(dateString);
-    return date.toLocaleDateString('sv-SE', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   const getInitials = (name?: string, email?: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -146,11 +131,11 @@ export default function EnterpriseStats() {
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'owner':
-        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">Ägare</Badge>;
+        return <Badge variant="outline">Ägare</Badge>;
       case 'admin':
-        return <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>;
+        return <Badge variant="outline">Admin</Badge>;
       default:
-        return <Badge variant="outline" className="text-muted-foreground">Medlem</Badge>;
+        return <Badge variant="outline">Medlem</Badge>;
     }
   };
 
@@ -180,13 +165,9 @@ export default function EnterpriseStats() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8"
-        >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <Button 
               variant="ghost" 
@@ -197,7 +178,7 @@ export default function EnterpriseStats() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+              <h1 className="text-xl font-semibold text-foreground">
                 Översikt
               </h1>
               <p className="text-muted-foreground text-sm mt-0.5">
@@ -210,7 +191,7 @@ export default function EnterpriseStats() {
             </div>
           </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => loadStats(true)}
             disabled={isRefreshing}
@@ -218,224 +199,156 @@ export default function EnterpriseStats() {
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Uppdatera
           </Button>
-        </motion.div>
+        </div>
 
         {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm"
-          >
+          <div className="mb-6 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
             {error}
-          </motion.div>
+          </div>
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
+            Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}>
-                <CardContent className="pt-6">
+                <CardContent className="pt-5 pb-4">
                   <Skeleton className="h-4 w-20 mb-2" />
-                  <Skeleton className="h-8 w-16" />
+                  <Skeleton className="h-7 w-12" />
                 </CardContent>
               </Card>
             ))
           ) : (
             <>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                      <Users className="h-4 w-4" />
-                      <span>Medlemmar</span>
-                    </div>
-                    <div className="text-3xl font-bold text-foreground">
-                      {stats?.totals?.memberCount ?? 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {stats?.totals?.activeMemberCount ?? 0} aktiva
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <Users className="h-3.5 w-3.5" />
+                    <span>Medlemmar</span>
+                  </div>
+                  <div className="text-2xl font-semibold text-foreground">
+                    {stats?.totals?.memberCount ?? 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {stats?.totals?.activeMemberCount ?? 0} aktiva
+                  </p>
+                </CardContent>
+              </Card>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-              >
-                <Card className="bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                      <BarChart3 className="h-4 w-4" />
-                      <span>Möten</span>
-                    </div>
-                    <div className="text-3xl font-bold text-foreground">
-                      {stats?.totals?.totalMeetingCount ?? 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Totalt skapade
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    <span>Möten</span>
+                  </div>
+                  <div className="text-2xl font-semibold text-foreground">
+                    {stats?.totals?.totalMeetingCount ?? 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Totalt
+                  </p>
+                </CardContent>
+              </Card>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Card className="bg-gradient-to-br from-violet-500/5 to-violet-500/10 border-violet-500/20">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Snitt/medlem</span>
-                    </div>
-                    <div className="text-3xl font-bold text-foreground">
-                      {Math.round(stats?.totals?.averageMeetingsPerMember ?? 0)}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Möten per medlem
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
-              >
-                <Card className="bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                      <Infinity className="h-4 w-4" />
-                      <span>Plan</span>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground">
-                      Enterprise
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Obegränsade möten
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span>Snitt</span>
+                  </div>
+                  <div className="text-2xl font-semibold text-foreground">
+                    {Math.round(stats?.totals?.averageMeetingsPerMember ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Per medlem
+                  </p>
+                </CardContent>
+              </Card>
             </>
           )}
         </div>
 
-
         {/* Scoreboard */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Crown className="h-5 w-5 text-amber-500" />
-                    Topplista
-                  </CardTitle>
-                  <CardDescription>
-                    Medlemmar sorterade efter antal möten
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="flex-1">
-                        <Skeleton className="h-4 w-32 mb-1" />
-                        <Skeleton className="h-3 w-24" />
-                      </div>
-                      <Skeleton className="h-6 w-16" />
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Medlemmar</CardTitle>
+            <CardDescription className="text-xs">
+              Sorterade efter antal möten
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-4 w-32 mb-1" />
+                      <Skeleton className="h-3 w-24" />
                     </div>
-                  ))}
-                </div>
-              ) : stats?.scoreboard?.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p>Inga medlemmar ännu</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto -mx-6">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="pl-6">#</TableHead>
-                        <TableHead>Medlem</TableHead>
-                        <TableHead className="hidden sm:table-cell">Roll</TableHead>
-                        <TableHead className="text-center pr-6">Möten</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {stats?.scoreboard?.map((member: any, index: number) => (
-                        <TableRow key={member.email} className="group">
-                          <TableCell className="pl-6 font-medium text-muted-foreground">
-                            {index === 0 && <span className="text-amber-500">🥇</span>}
-                            {index === 1 && <span className="text-gray-400">🥈</span>}
-                            {index === 2 && <span className="text-amber-700">🥉</span>}
-                            {index > 2 && <span>{index + 1}</span>}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-9 w-9">
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                  {getInitials(member.preferredName, member.email)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">
-                                  {member.preferredName || member.email.split('@')[0]}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {member.email}
-                                </p>
-                              </div>
+                    <Skeleton className="h-5 w-10" />
+                  </div>
+                ))}
+              </div>
+            ) : stats?.scoreboard?.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">Inga medlemmar ännu</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="pl-6 w-12">#</TableHead>
+                      <TableHead>Medlem</TableHead>
+                      <TableHead className="hidden sm:table-cell">Roll</TableHead>
+                      <TableHead className="text-right pr-6">Möten</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats?.scoreboard?.map((member: any, index: number) => (
+                      <TableRow key={member.email}>
+                        <TableCell className="pl-6 text-muted-foreground tabular-nums">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <Avatar className="h-7 w-7">
+                              <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
+                                {getInitials(member.preferredName, member.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {member.preferredName || member.email.split('@')[0]}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {member.email}
+                              </p>
                             </div>
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell">
-                            {getRoleBadge(member.role)}
-                          </TableCell>
-                          <TableCell className="text-center pr-6">
-                            <span className="font-semibold text-lg">
-                              {member.recordedMeetingCount ?? member.meetingUsage?.totalMeetingCount ?? 0}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {getRoleBadge(member.role)}
+                        </TableCell>
+                        <TableCell className="text-right pr-6 tabular-nums font-medium">
+                          {member.recordedMeetingCount ?? member.meetingUsage?.totalMeetingCount ?? 0}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Viewer Info */}
         {!isLoading && stats?.viewer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mt-6 text-center text-sm text-muted-foreground"
-          >
-            Inloggad som <span className="font-medium">{stats.viewer.preferredName || stats.viewer.email}</span>
-            {stats.viewer.role && ` (${stats.viewer.role === 'owner' ? 'Ägare' : stats.viewer.role === 'admin' ? 'Admin' : 'Medlem'})`}
-          </motion.div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Inloggad som {stats.viewer.preferredName || stats.viewer.email}
+            {stats.viewer.role && ` · ${stats.viewer.role === 'owner' ? 'Ägare' : stats.viewer.role === 'admin' ? 'Admin' : 'Medlem'}`}
+          </p>
         )}
       </div>
     </div>
