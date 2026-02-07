@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee } from "lucide-react";
-import { Document, Paragraph, HeadingLevel, AlignmentType, Packer, TextRun, BorderStyle, ImageRun } from "docx";
+import { Document, Paragraph, HeadingLevel, AlignmentType, Packer, TextRun, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -743,40 +743,16 @@ export const AutoProtocolGenerator = ({
       new Paragraph({
         children: [
           new TextRun({
-            text: "",
+            text: "dokumenterat av tivly.se",
+            color: "AAAAAA",
+            size: 14,
+            font: "Helvetica",
           }),
         ],
-        spacing: { after: 0 },
-        border: {
-          top: { style: BorderStyle.SINGLE, size: 1, color: "E0E0E0", space: 8 },
-        },
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 400 },
       })
     );
-
-    // Fetch footer image
-    let footerImageData: ArrayBuffer | null = null;
-    try {
-      const imgResponse = await fetch('/images/protocol-footer.png');
-      footerImageData = await imgResponse.arrayBuffer();
-    } catch (e) {
-      console.warn('Could not load footer image:', e);
-    }
-
-    if (footerImageData) {
-      documentChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: footerImageData,
-              transformation: { width: 595, height: 45 },
-              type: 'png',
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 200 },
-        })
-      );
-    }
 
     const doc = new Document({
       sections: [{

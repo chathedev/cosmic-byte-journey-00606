@@ -3,7 +3,7 @@ import { Download, Mail, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from "docx";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { saveAs } from "file-saver";
 import { EmailDialog } from "./EmailDialog";
 import { ConfirmCloseProtocolDialog } from "./ConfirmCloseProtocolDialog";
@@ -131,19 +131,10 @@ export const FreeUserProtocolDialog = ({
         setProtocol(finalProtocol);
         setProgress(75);
         
-        // Fetch footer image
-        let footerImageData: ArrayBuffer | null = null;
-        try {
-          const imgResponse = await fetch('/images/protocol-footer.png');
-          footerImageData = await imgResponse.arrayBuffer();
-        } catch (e) {
-          console.warn('Could not load footer image:', e);
-        }
-
         setProgress(90);
         await new Promise(resolve => setTimeout(resolve, 400));
 
-        // Build final doc with footer image
+        // Build final doc
         const finalChildren = [
           new Paragraph({
             text: "MÖTESPROTOKOLL",
@@ -211,25 +202,20 @@ export const FreeUserProtocolDialog = ({
           new Paragraph({
             text: "Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel",
             alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "dokumenterat av tivly.se",
+                color: "AAAAAA",
+                size: 14,
+                font: "Helvetica",
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
           }),
         ];
-
-        if (footerImageData) {
-          finalChildren.push(
-            new Paragraph({
-              children: [
-                new ImageRun({
-                  data: footerImageData,
-                  transformation: { width: 595, height: 45 },
-                  type: 'png',
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { before: 200 },
-            })
-          );
-        }
 
         const finalDoc = new Document({
           sections: [{
