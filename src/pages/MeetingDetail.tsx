@@ -2062,355 +2062,221 @@ const MeetingDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
-      {/* Floating Header */}
-      <motion.header 
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50"
-      >
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div className="min-h-screen bg-background">
+      {/* Clean Header */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/library')}
-            className="shrink-0 rounded-full hover:bg-muted"
+            className="shrink-0 no-hover-lift"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </Button>
           
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-base truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
+            <h1 className="font-medium text-sm truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
             {meeting && (
               <p className="text-xs text-muted-foreground">
-                {formatDate(meeting.createdAt)} • {formatTime(meeting.createdAt)}
+                {formatDate(meeting.createdAt)} · {formatTime(meeting.createdAt)}
               </p>
             )}
           </div>
 
-        </div>
-      </motion.header>
-
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        {isLoading ? (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-32 gap-4"
-          >
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">Laddar möte...</p>
-          </motion.div>
-        ) : meeting ? (
-          <AnimatePresence mode="wait">
-            {isProcessing ? (
-              <motion.div
-                key="processing"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center justify-center py-16 gap-8"
+          {/* Top-right actions when transcript is ready */}
+          {hasTranscript && !isEditing && (
+            <div className="flex items-center gap-1">
+              {hasPlusAccess(user, userPlan) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/chat?meeting=${meeting?.id}`)}
+                  className="gap-1.5 text-xs h-8 no-hover-lift"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Chatta</span>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="gap-1.5 text-xs h-8 text-muted-foreground hover:text-destructive no-hover-lift"
               >
-                {/* Animated background orb */}
-                <div className="relative">
-                  <motion.div 
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.5, 0.3] }}
-                    transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                    className="absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-full blur-2xl w-32 h-32 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2"
-                  />
-                </div>
-                
-                {/* Simple processing message */}
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-32 gap-3">
+            <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+            <p className="text-sm text-muted-foreground">Laddar möte...</p>
+          </div>
+        ) : meeting ? (
+          <>
+            {isProcessing ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-6">
                 <ProcessingStatusMessage />
                 
-                {/* Audio backup failsafe */}
-                <div className="flex flex-col items-center gap-3">
-                  
-                  {/* Audio backup indicator - visible during processing */}
-                  {audioBackup?.available && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card/50 border border-border/30">
-                      <Badge variant="outline" className="gap-1 text-green-600 border-green-500/30 bg-green-500/5 text-xs">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Ljud säkrat
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleDownloadAudioBackup}
-                        disabled={isDownloadingAudio}
-                        className="gap-1.5 h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
-                      >
-                        {isDownloadingAudio ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Download className="w-3 h-3" />
-                        )}
-                        Ladda ner
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
+                {audioBackup?.available && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                    <span>Ljud säkrat</span>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={handleDownloadAudioBackup}
+                      disabled={isDownloadingAudio}
+                      className="text-xs h-auto p-0 text-muted-foreground hover:text-foreground no-hover-lift"
+                    >
+                      {isDownloadingAudio ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Ladda ner'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             ) : status === 'failed' ? (
-              <motion.div
-                key="failed"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-16 sm:py-24"
-              >
-                {/* Minimal failed state */}
-                <div className="w-full max-w-sm space-y-8">
-                  {/* Icon and status */}
-                  <div className="text-center space-y-3">
-                    <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
-                      <AlertCircle className="w-7 h-7 text-destructive" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-medium">Transkribering misslyckades</h2>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {audioBackup?.available 
-                          ? 'Din inspelning är säkrad'
-                          : 'Ladda upp filen igen'
-                        }
-                      </p>
-                    </div>
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-full max-w-sm space-y-6 text-center">
+                  <div className="space-y-2">
+                    <AlertCircle className="w-8 h-8 text-destructive mx-auto" />
+                    <h2 className="text-base font-medium">Transkribering misslyckades</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {audioBackup?.available ? 'Din inspelning är säkrad.' : 'Ladda upp filen igen.'}
+                    </p>
                   </div>
                   
-                  {/* Action buttons - primary focus on retry */}
                   {audioBackup?.available && (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <Button
                         onClick={handleRetryTranscription}
                         disabled={isRetryingTranscription}
-                        className="w-full h-12 gap-2 rounded-xl"
-                        size="lg"
+                        className="w-full gap-2 no-hover-lift"
                       >
                         {isRetryingTranscription ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Startar...
-                          </>
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Startar...</>
                         ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4" />
-                            Försök igen
-                          </>
+                          <><RefreshCw className="w-4 h-4" /> Försök igen</>
                         )}
                       </Button>
-                      
                       <Button
                         onClick={handleDownloadAudioBackup}
                         disabled={isDownloadingAudio}
                         variant="ghost"
-                        className="w-full gap-2 text-muted-foreground"
+                        className="w-full gap-2 text-muted-foreground no-hover-lift"
                       >
-                        {isDownloadingAudio ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
+                        <Download className="w-4 h-4" />
                         Ladda ner inspelning
                       </Button>
                     </div>
                   )}
                   
-                  {/* File info - subtle */}
-                  {audioBackup?.available && (
-                    <div className="text-center text-xs text-muted-foreground/60 space-y-0.5">
-                      <p>{audioBackup.originalName || 'inspelning.wav'}</p>
-                      {audioBackup.sizeBytes && (
-                        <p>{(audioBackup.sizeBytes / 1024 / 1024).toFixed(1)} MB</p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Back link */}
-                  <div className="text-center pt-4">
-                    <Button 
-                      onClick={() => navigate('/library')} 
-                      variant="link" 
-                      className="text-muted-foreground text-sm"
-                    >
-                      ← Tillbaka till biblioteket
-                    </Button>
-                  </div>
+                  <Button onClick={() => navigate('/library')} variant="link" className="text-muted-foreground text-sm no-hover-lift">
+                    ← Tillbaka till biblioteket
+                  </Button>
                 </div>
-              </motion.div>
+              </div>
             ) : hasTranscript ? (
-              <motion.div
-                key="content"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
-              >
-                {/* Protocol Section - MOVED TO TOP for prominence */}
+              <div className="space-y-5">
+
+                {/* Protocol Card - Clean, minimal */}
                 {protocolData && !isEditing && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-card/50 to-card/50 backdrop-blur-sm overflow-hidden shadow-lg"
-                  >
-                    <div className="px-5 py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center">
-                          <FileText className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <span className="font-semibold text-base">Protokoll</span>
-                          <p className="text-xs text-muted-foreground">
-                            Sparat {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={handleViewProtocol}
-                          size="sm"
-                          variant="secondary"
-                          className="gap-1.5 h-9"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Visa
-                        </Button>
-                        <Button
-                          onClick={handleDownloadProtocol}
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 h-9"
-                        >
-                          <Download className="w-4 h-4" />
-                          Ladda ner
-                        </Button>
-                        <Button
-                          onClick={() => setShowDeleteProtocolConfirm(true)}
-                          size="sm"
-                          variant="ghost"
-                          className="h-9 w-9 p-0 text-destructive hover:text-destructive"
-                          title="Ta bort protokoll"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                  <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="w-5 h-5 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Protokoll</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(protocolData.storedAt).toLocaleDateString('sv-SE')}
+                        </p>
                       </div>
                     </div>
-                  </motion.div>
-                )}
-
-                {/* Quick Actions Bar - Create/Replace Protocol */}
-                {!isEditing && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
-                  >
-                    <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                      {/* Primary action - Create/Replace Protocol */}
-                      <Button
-                        onClick={handleCreateProtocol}
-                        variant={protocolData ? "outline" : "default"}
-                        className="gap-2 h-11 text-sm font-medium sm:flex-1"
-                        disabled={loadingProtocol || !canGenerateMoreProtocols}
-                      >
-                        {loadingProtocol ? (
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                        ) : !canGenerateMoreProtocols ? (
-                          <Lock className="w-4 h-4" />
-                        ) : protocolData ? (
-                          <RefreshCw className="w-4 h-4" />
-                        ) : (
-                          <Sparkles className="w-4 h-4" />
-                        )}
-                        {!canGenerateMoreProtocols 
-                          ? 'Gräns nådd'
-                          : protocolData 
-                            ? 'Ersätt protokoll'
-                            : 'Skapa protokoll med AI'
-                        }
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button onClick={handleViewProtocol} size="sm" variant="secondary" className="gap-1.5 h-8 text-xs no-hover-lift">
+                        <Eye className="w-3.5 h-3.5" /> Visa
                       </Button>
-                      
-                      {!isSISDisabled && (
-                        <Badge variant="secondary" className="text-xs px-2.5 py-1.5 shrink-0">
-                          {protocolCountRemaining > 0 
-                            ? `${protocolCountRemaining} av ${maxProtocolGenerations} kvar`
-                            : `0 av ${maxProtocolGenerations} kvar`
-                          }
-                        </Badge>
-                      )}
-
-                      {/* Secondary actions */}
-                      <div className="flex items-center gap-1 sm:ml-auto">
-                        {hasPlusAccess(user, userPlan) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/chat?meeting=${meeting.id}`)}
-                            className="gap-1.5 text-xs h-9"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Chatta</span>
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowDeleteConfirm(true)}
-                          className="gap-1.5 text-xs h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Ta bort</span>
-                        </Button>
-                      </div>
+                      <Button onClick={handleDownloadProtocol} size="sm" variant="ghost" className="h-8 w-8 p-0 no-hover-lift">
+                        <Download className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button onClick={() => setShowDeleteProtocolConfirm(true)} size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive no-hover-lift">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Status Bar - Compact */}
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  <Badge variant="outline" className="gap-1 h-6 text-green-600 border-green-500/30 bg-green-500/5">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Klar
-                  </Badge>
-                  {meeting.source && (
-                    <Badge variant="secondary" className="gap-1 h-6">
-                      {meeting.source === 'live' ? <Mic className="w-3 h-3" /> : <Upload className="w-3 h-3" />}
-                      {meeting.source === 'live' ? 'Inspelning' : 'Uppladdad'}
-                    </Badge>
-                  )}
-                  {!isSISDisabled && lyraLearning.some(l => l.updated) && (
-                    <Badge variant="outline" className="gap-1 h-6 text-purple-600 border-purple-500/30 bg-purple-500/5">
-                      <Sparkles className="w-3 h-3" />
-                      Lyra lärde sig
-                    </Badge>
-                  )}
-                </div>
+                {/* Action Row */}
+                {!isEditing && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      onClick={handleCreateProtocol}
+                      variant={protocolData ? "outline" : "default"}
+                      size="sm"
+                      className="gap-1.5 h-9 text-xs no-hover-lift"
+                      disabled={loadingProtocol || !canGenerateMoreProtocols}
+                    >
+                      {loadingProtocol ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : !canGenerateMoreProtocols ? (
+                        <Lock className="w-3.5 h-3.5" />
+                      ) : protocolData ? (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      {!canGenerateMoreProtocols 
+                        ? 'Gräns nådd'
+                        : protocolData 
+                          ? 'Ersätt protokoll'
+                          : 'Skapa protokoll'
+                      }
+                    </Button>
+                    
+                    {!hasUnlimitedProtocols && !isSISDisabled && (
+                      <span className="text-xs text-muted-foreground">
+                        {protocolCountRemaining > 0 
+                          ? `${protocolCountRemaining} av ${maxProtocolGenerations} kvar`
+                          : `0 av ${maxProtocolGenerations} kvar`
+                        }
+                      </span>
+                    )}
+
+                    {/* Status indicators */}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {meeting.source && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          {meeting.source === 'live' ? <Mic className="w-3 h-3" /> : <Upload className="w-3 h-3" />}
+                          {meeting.source === 'live' ? 'Inspelning' : 'Uppladdad'}
+                        </span>
+                      )}
+                      {!isSISDisabled && lyraLearning.some(l => l.updated) && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Lyra lärde sig
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Speakers Section - Only show when SIS is enabled and editing */}
                 {!isSISDisabled && uniqueSpeakers.length > 0 && isEditing && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden"
-                  >
+                  <div className="rounded-lg border border-border bg-card overflow-hidden">
                     <button
                       onClick={() => setShowSpeakers(!showSpeakers)}
-                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                          <Users className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="text-left">
-                          <span className="font-medium text-sm">Redigera talarnamn</span>
-                          <p className="text-xs text-muted-foreground">
-                            {uniqueSpeakers.length} {uniqueSpeakers.length === 1 ? 'talare' : 'talare'} • Namnge för protokollet
-                          </p>
-                        </div>
+                      <div className="flex items-center gap-2.5">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Talarnamn</span>
+                        <span className="text-xs text-muted-foreground">
+                          {uniqueSpeakers.length} talare
+                        </span>
                       </div>
-                      <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showSpeakers ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showSpeakers ? 'rotate-180' : ''}`} />
                     </button>
 
                     <AnimatePresence>
@@ -2421,13 +2287,12 @@ const MeetingDetail = () => {
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="px-5 pb-5 grid gap-3 sm:grid-cols-2">
+                          <div className="px-4 pb-4 grid gap-2 sm:grid-cols-2">
                             {uniqueSpeakers.map((speaker, idx) => {
                               const ownerEmail = user?.email?.toLowerCase();
                               const contextVerified = !!ownerEmail && uniqueSpeakers.length === 1 && (speaker.email || '').toLowerCase() === ownerEmail;
                               const isStrong = contextVerified || speaker.confidence >= 85;
                               
-                              // Use proper label based on identification status
                               let statusLabel: string;
                               if (contextVerified) {
                                 statusLabel = 'Verifierad (kontext)';
@@ -2438,16 +2303,13 @@ const MeetingDetail = () => {
                               }
 
                               return (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border/30 hover:border-border transition-colors"
-                                >
-                                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                                <div key={idx} className="flex items-center gap-2.5 p-2.5 rounded-md bg-muted/30 border border-border/50">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
                                     isStrong 
-                                      ? 'bg-green-500/15 text-green-600 dark:text-green-400 ring-2 ring-green-500/20' 
+                                      ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
                                       : speaker.isIdentified
-                                        ? 'bg-primary/10 text-primary ring-2 ring-primary/20'
-                                        : 'bg-muted text-muted-foreground ring-2 ring-border'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-muted text-muted-foreground'
                                   }`}>
                                     {speaker.name.charAt(0).toUpperCase()}
                                   </div>
@@ -2456,21 +2318,18 @@ const MeetingDetail = () => {
                                       <Input
                                         value={editedSpeakerNames[speaker.label] || speaker.name}
                                         onChange={(e) => handleSpeakerNameChange(speaker.label, e.target.value)}
-                                        className="h-8 text-sm"
+                                        className="h-7 text-xs"
                                         placeholder="Ange namn..."
                                       />
                                     ) : (
                                       <>
-                                        <div className="flex items-center gap-2">
-                                          <p className="font-medium text-sm truncate">{speaker.name}</p>
-                                          {speaker.learned && <Sparkles className="w-3 h-3 text-purple-500 shrink-0" />}
-                                        </div>
+                                        <p className="font-medium text-sm truncate">{speaker.name}</p>
                                         <p className="text-xs text-muted-foreground">{statusLabel}</p>
                                       </>
                                     )}
                                   </div>
                                   {!isEditing && speaker.isIdentified && (
-                                    <UserCheck className={`w-4 h-4 shrink-0 ${isStrong ? 'text-green-500' : 'text-primary'}`} />
+                                    <UserCheck className={`w-3.5 h-3.5 shrink-0 ${isStrong ? 'text-green-500' : 'text-primary'}`} />
                                   )}
                                 </div>
                               );
@@ -2479,60 +2338,48 @@ const MeetingDetail = () => {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Transcript Section with Integrated Audio Player */}
-                <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
-                  {/* Header with Audio Player integrated */}
-                  <div className="px-5 py-4 border-b border-border/30">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-primary" />
-                        </div>
-                        <div>
-                          <span className="font-medium text-sm">Transkription</span>
-                          {audioBackup?.available && (
-                            <p className="text-xs text-muted-foreground">
-                              Med ljuduppspelning
-                            </p>
-                          )}
-                        </div>
+                {/* Transcript Section */}
+                <div className="rounded-lg border border-border bg-card overflow-hidden">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Transkription</span>
                       </div>
-                      {/* Audio backup download */}
                       {audioBackup?.available && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={handleDownloadAudioBackup}
                           disabled={isDownloadingAudio}
-                          className="gap-1.5 h-8 text-xs text-muted-foreground hover:text-foreground"
+                          className="gap-1.5 h-7 text-xs text-muted-foreground hover:text-foreground no-hover-lift"
                         >
-                          {isDownloadingAudio ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Download className="w-3.5 h-3.5" />
-                          )}
-                          Ladda ner ljud
+                          {isDownloadingAudio ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                          Ljud
                         </Button>
                       )}
                     </div>
 
                     {/* Integrated Audio Player */}
                     {audioBackup?.available && audioBackup.downloadPath && !isEditing && (
-                      <IntegratedTranscriptPlayer
-                        meetingId={meeting.id}
-                        audioBackup={audioBackup}
-                        onTimeUpdate={setAudioCurrentTime}
-                        onPlayStateChange={setAudioIsPlaying}
-                        seekTo={audioSeekTo}
-                      />
+                      <div className="mt-3">
+                        <IntegratedTranscriptPlayer
+                          meetingId={meeting.id}
+                          audioBackup={audioBackup}
+                          onTimeUpdate={setAudioCurrentTime}
+                          onPlayStateChange={setAudioIsPlaying}
+                          seekTo={audioSeekTo}
+                        />
+                      </div>
                     )}
                   </div>
 
                   {/* Transcript Content */}
-                  <div className="px-5 py-4">
+                  <div className="p-4">
                     {isEditing ? (
                       <Textarea
                         value={editedTranscript}
@@ -2541,7 +2388,6 @@ const MeetingDetail = () => {
                         placeholder="Redigera transkriptionen..."
                       />
                     ) : transcriptWords.length > 0 && audioBackup?.available ? (
-                      // Synced transcript view with word-by-word highlighting during audio playback
                       <SyncedTranscriptView
                         meetingId={id || ''}
                         words={transcriptWords}
@@ -2552,14 +2398,12 @@ const MeetingDetail = () => {
                         currentTime={audioCurrentTime}
                         isPlaying={audioIsPlaying}
                         onSeek={(time) => {
-                          // Update UI immediately so markering + scroll hänger med direkt vid klick.
                           setAudioCurrentTime(time);
                           setAudioSeekTo(time);
                         }}
                         onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSpeakerBlocks ? (
-                      // Enhanced speaker view with speakerBlocksCleaned/Raw data
                       <EnhancedSpeakerView
                         meetingId={id || ''}
                         speakerBlocks={speakerBlocksCleaned || speakerBlocksRaw || []}
@@ -2568,7 +2412,6 @@ const MeetingDetail = () => {
                         onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSegments ? (
-                      // Speaker-segmented view (SIS enabled with segments)
                       <div className="space-y-0 max-h-[60vh] overflow-y-auto">
                         {groupedSegments.map((segment, idx) => {
                           const speakerName = getSegmentSpeakerName(segment.speakerId);
@@ -2599,7 +2442,6 @@ const MeetingDetail = () => {
                         })}
                       </div>
                     ) : (
-                      // Clean text view - prioritizes transcript field (AI-cleaned), then speakerBlocksCleaned, then transcriptRaw
                       <TranscriptTextView
                         meetingId={id || ''}
                         transcript={transcript}
@@ -2610,11 +2452,9 @@ const MeetingDetail = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Protocol section moved to top of page */}
-              </motion.div>
+              </div>
             ) : null}
-          </AnimatePresence>
+          </>
         ) : null}
       </main>
 
