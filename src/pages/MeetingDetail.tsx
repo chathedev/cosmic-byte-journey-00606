@@ -143,6 +143,7 @@ const MeetingDetail = () => {
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
   const [audioSeekTo, setAudioSeekTo] = useState<number | undefined>(undefined);
+  const [audioSeekGeneration, setAudioSeekGeneration] = useState(0);
 
   // Speaker identification UX thresholds (per docs)
   const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
@@ -2373,6 +2374,10 @@ const MeetingDetail = () => {
                           onTimeUpdate={setAudioCurrentTime}
                           onPlayStateChange={setAudioIsPlaying}
                           seekTo={audioSeekTo}
+                          onSeek={(time) => {
+                            setAudioCurrentTime(time);
+                            setAudioSeekGeneration(g => g + 1);
+                          }}
                         />
                       </div>
                     )}
@@ -2400,7 +2405,9 @@ const MeetingDetail = () => {
                         onSeek={(time) => {
                           setAudioCurrentTime(time);
                           setAudioSeekTo(time);
+                          setAudioSeekGeneration(g => g + 1);
                         }}
+                        seekGeneration={audioSeekGeneration}
                         onSpeakerNamesUpdated={(names) => setSpeakerNames(names)}
                       />
                     ) : hasSpeakerBlocks ? (

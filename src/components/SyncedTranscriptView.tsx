@@ -46,6 +46,8 @@ interface SyncedTranscriptViewProps {
   isPlaying: boolean;
   onSeek?: (time: number) => void;
   onSpeakerNamesUpdated?: (names: Record<string, string>) => void;
+  /** Monotonically increasing counter that signals an external seek happened (e.g. from audio player slider) */
+  seekGeneration?: number;
   className?: string;
 }
 
@@ -168,6 +170,7 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
   isPlaying,
   onSeek,
   onSpeakerNamesUpdated,
+  seekGeneration = 0,
   className,
 }) => {
   const [showSpeakerPanel, setShowSpeakerPanel] = useState(false);
@@ -237,6 +240,14 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
       }
     };
   }, []);
+
+  // When an external seek happens (audio player slider), force auto-scroll to the new position
+  useEffect(() => {
+    if (seekGeneration === 0) return;
+    forceAutoScrollRef.current = true;
+    isUserScrollingRef.current = false;
+    userScrollLockUntilRef.current = 0;
+  }, [seekGeneration]);
 
   const handleContainerScroll = useCallback(() => {
     if (programmaticScrollRef.current) return;

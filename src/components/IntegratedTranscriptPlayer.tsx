@@ -14,6 +14,7 @@ interface IntegratedTranscriptPlayerProps {
   audioBackup: AudioBackup;
   onTimeUpdate?: (currentTime: number) => void;
   onPlayStateChange?: (isPlaying: boolean) => void;
+  onSeek?: (time: number) => void;
   seekTo?: number;
   className?: string;
 }
@@ -46,6 +47,7 @@ export function IntegratedTranscriptPlayer({
   audioBackup,
   onTimeUpdate,
   onPlayStateChange,
+  onSeek,
   seekTo,
   className,
 }: IntegratedTranscriptPlayerProps) {
@@ -232,16 +234,21 @@ export function IntegratedTranscriptPlayer({
     audioRef.current.currentTime = value[0];
     setCurrentTime(value[0]);
     onTimeUpdate?.(value[0]);
+    onSeek?.(value[0]);
   };
 
   const skipBackward = () => {
     if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
+    const newTime = Math.max(0, audioRef.current.currentTime - 10);
+    audioRef.current.currentTime = newTime;
+    onSeek?.(newTime);
   };
 
   const skipForward = () => {
     if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
+    const newTime = Math.min(duration, audioRef.current.currentTime + 10);
+    audioRef.current.currentTime = newTime;
+    onSeek?.(newTime);
   };
 
   const toggleMute = () => {
