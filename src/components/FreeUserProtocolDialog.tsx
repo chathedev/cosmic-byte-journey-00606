@@ -3,7 +3,7 @@ import { Download, Mail, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } from "docx";
 import { saveAs } from "file-saver";
 import { EmailDialog } from "./EmailDialog";
 import { ConfirmCloseProtocolDialog } from "./ConfirmCloseProtocolDialog";
@@ -131,96 +131,114 @@ export const FreeUserProtocolDialog = ({
         setProtocol(finalProtocol);
         setProgress(75);
         
-        // Generate Word document
-        const doc = new Document({
+        // Fetch footer image
+        let footerImageData: ArrayBuffer | null = null;
+        try {
+          const imgResponse = await fetch('/images/protocol-footer.png');
+          footerImageData = await imgResponse.arrayBuffer();
+        } catch (e) {
+          console.warn('Could not load footer image:', e);
+        }
+
+        setProgress(90);
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Build final doc with footer image
+        const finalChildren = [
+          new Paragraph({
+            text: "MÖTESPROTOKOLL",
+            heading: HeadingLevel.TITLE,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: finalProtocol.title, bold: true, size: 32 })],
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Datum: ", bold: true }),
+              new TextRun(dateStr),
+              new TextRun({ text: " | Tid: ", bold: true }),
+              new TextRun(timeStr),
+            ],
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            text: "─────────────────────────────────────────",
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            text: "Sammanfattning",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 200, after: 200 },
+          }),
+          new Paragraph({ text: finalProtocol.summary, spacing: { after: 300 } }),
+          new Paragraph({
+            text: "Huvudpunkter",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 200, after: 200 },
+          }),
+          ...finalProtocol.mainPoints.map(point => 
+            new Paragraph({ text: `• ${point}`, spacing: { after: 100 } })
+          ),
+          ...(finalProtocol.decisions.length > 0 ? [
+            new Paragraph({ 
+              text: "Beslut", 
+              heading: HeadingLevel.HEADING_1, 
+              spacing: { before: 300, after: 200 } 
+            }),
+            ...finalProtocol.decisions.map(decision => 
+              new Paragraph({ text: `• ${decision}`, spacing: { after: 100 } })
+            ),
+          ] : []),
+          ...(finalProtocol.actionItems.length > 0 ? [
+            new Paragraph({ 
+              text: "Åtgärdspunkter", 
+              heading: HeadingLevel.HEADING_1, 
+              spacing: { before: 300, after: 200 } 
+            }),
+            ...finalProtocol.actionItems.map(item => 
+              new Paragraph({ text: `• ${item}`, spacing: { after: 100 } })
+            ),
+          ] : []),
+          new Paragraph({ text: "", spacing: { before: 600 } }),
+          new Paragraph({
+            children: [new TextRun({ text: "TIVLY - GRATIS PLAN", bold: true, size: 24 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 100 },
+          }),
+          new Paragraph({
+            text: "Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel",
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
+        ];
+
+        if (footerImageData) {
+          finalChildren.push(
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: footerImageData,
+                  transformation: { width: 595, height: 45 },
+                  type: 'png',
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 200 },
+            })
+          );
+        }
+
+        const finalDoc = new Document({
           sections: [{
             properties: {},
-            children: [
-              new Paragraph({
-                text: "MÖTESPROTOKOLL",
-                heading: HeadingLevel.TITLE,
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 },
-              }),
-              new Paragraph({
-                children: [new TextRun({ text: finalProtocol.title, bold: true, size: 32 })],
-                spacing: { after: 300 },
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({ text: "Datum: ", bold: true }),
-                  new TextRun(dateStr),
-                  new TextRun({ text: " | Tid: ", bold: true }),
-                  new TextRun(timeStr),
-                ],
-                spacing: { after: 300 },
-              }),
-              new Paragraph({
-                text: "─────────────────────────────────────────",
-                spacing: { after: 300 },
-              }),
-              new Paragraph({
-                text: "Sammanfattning",
-                heading: HeadingLevel.HEADING_1,
-                spacing: { before: 200, after: 200 },
-              }),
-              new Paragraph({ text: finalProtocol.summary, spacing: { after: 300 } }),
-              new Paragraph({
-                text: "Huvudpunkter",
-                heading: HeadingLevel.HEADING_1,
-                spacing: { before: 200, after: 200 },
-              }),
-              ...finalProtocol.mainPoints.map(point => 
-                new Paragraph({ text: `• ${point}`, spacing: { after: 100 } })
-              ),
-              ...(finalProtocol.decisions.length > 0 ? [
-                new Paragraph({ 
-                  text: "Beslut", 
-                  heading: HeadingLevel.HEADING_1, 
-                  spacing: { before: 300, after: 200 } 
-                }),
-                ...finalProtocol.decisions.map(decision => 
-                  new Paragraph({ text: `• ${decision}`, spacing: { after: 100 } })
-                ),
-              ] : []),
-              ...(finalProtocol.actionItems.length > 0 ? [
-                new Paragraph({ 
-                  text: "Åtgärdspunkter", 
-                  heading: HeadingLevel.HEADING_1, 
-                  spacing: { before: 300, after: 200 } 
-                }),
-                ...finalProtocol.actionItems.map(item => 
-                  new Paragraph({ text: `• ${item}`, spacing: { after: 100 } })
-                ),
-              ] : []),
-              new Paragraph({ text: "", spacing: { before: 600 } }),
-              new Paragraph({
-                text: "─────────────────────────────────────────",
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 200 },
-              }),
-              new Paragraph({
-                children: [new TextRun({ text: "TIVLY - GRATIS PLAN", bold: true, size: 24 })],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 100 },
-              }),
-              new Paragraph({
-                text: "Uppgradera till Tivly Pro eller Plus för obegränsade protokoll utan vattenstämpel",
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 200 },
-              }),
-              new Paragraph({
-                text: "─────────────────────────────────────────",
-                alignment: AlignmentType.CENTER,
-              }),
-            ],
+            children: finalChildren,
           }],
         });
         
-        setProgress(90);
-        await new Promise(resolve => setTimeout(resolve, 400));
-        
-        const blob = await Packer.toBlob(doc);
+        const blob = await Packer.toBlob(finalDoc);
         const generatedFileName = `Motesprotokoll_${dateStr}_${timeStr.replace(':', '-')}.docx`;
         
         if (cancelled) return;
