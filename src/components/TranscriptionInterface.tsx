@@ -323,22 +323,32 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const displayName = preferredName || user?.displayName?.split(' ')[0] || '';
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col">
+    <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
+      {/* Gradient background */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/images/hero-gradient.png')" }}
+      />
+      {/* Grain overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.12] mix-blend-overlay"
+        style={{ backgroundImage: "url('/images/grain-overlay.png')", backgroundRepeat: "repeat" }}
+      />
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
+      <div className="relative flex-1 flex flex-col items-center justify-center p-6 md:p-8">
         <div className="max-w-md w-full space-y-8">
           
           {/* Hero - simplified */}
           <div className="text-center space-y-3">
             {displayName && (
-              <p className="text-muted-foreground text-sm">
-                {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
+              <p className="text-white/70 text-sm">
+                {getGreeting()}, <span className="text-white font-medium">{displayName}</span>
               </p>
             )}
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
               Skapa protokoll
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white/60">
               Spela in, ladda upp eller klistra in text
             </p>
           </div>
@@ -363,7 +373,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={handleOpenDigitalMeeting}
               variant="outline"
               size="lg"
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
             >
               <Upload className="w-5 h-5" />
               Ladda upp fil
@@ -373,7 +383,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={() => setShowTextPasteDialog(true)}
               variant="outline"
               size="lg"
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
             >
               <ClipboardPaste className="w-5 h-5" />
               Klistra in text
@@ -381,7 +391,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           </div>
 
           {/* Minimal trust indicators */}
-          <div className="flex items-center justify-center gap-4 pt-4 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-4 pt-4 text-xs text-white/50">
             <div className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
               <span>GDPR</span>
