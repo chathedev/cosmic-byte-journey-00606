@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mic, Loader2, Upload, ClipboardPaste, Shield, Zap, Globe, ArrowRight } from "lucide-react";
+import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -284,7 +284,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           </div>
           <div className="pt-4 space-y-2">
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <Zap className="w-3.5 h-3.5 text-primary" />
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
               <span>Upp till 10 minuter beroende på längd</span>
             </div>
             <p className="text-xs text-muted-foreground/70">
@@ -323,97 +323,76 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const displayName = preferredName || user?.displayName?.split(' ')[0] || '';
 
   return (
-    <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
-      {/* Dark vignette for depth - bg gradient comes from body */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 pointer-events-none" />
-
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
-      <div className="relative flex-1 flex flex-col items-center justify-center px-5 py-12 md:px-8">
-        <div className="max-w-lg w-full space-y-10">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
+        <div className="max-w-md w-full space-y-8">
           
-          {/* Greeting */}
-          {displayName && (
-            <p className="text-center text-white/60 text-sm tracking-wide">
-              {getGreeting()}, <span className="text-white/90 font-medium">{displayName}</span>
-            </p>
-          )}
-
-          {/* Hero copy */}
-          <div className="text-center space-y-4">
-            <h1 className="text-3xl md:text-4xl font-semibold text-white tracking-tight leading-tight">
-              Dokumentera dina möten<br />
-              <span className="text-white/70 font-normal">automatiskt med AI</span>
+          {/* Hero - simplified */}
+          <div className="text-center space-y-3">
+            {displayName && (
+              <p className="text-muted-foreground text-sm">
+                {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
+              </p>
+            )}
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+              Skapa protokoll
             </h1>
-            <p className="text-white/50 text-sm max-w-xs mx-auto leading-relaxed">
-              Spela in, ladda upp eller klistra in — få ett färdigt protokoll på minuter.
+            <p className="text-sm text-muted-foreground">
+              Spela in, ladda upp eller klistra in text
             </p>
           </div>
 
-          {/* Glass card with actions */}
-          <div className="rounded-2xl border border-white/[0.12] bg-white/[0.07] backdrop-blur-xl p-6 space-y-3 shadow-2xl shadow-black/20">
-            <button
+          {/* Action buttons - clean and simple */}
+          <div className="space-y-3">
+            <Button 
               onClick={handleRecordLiveClick}
+              size="lg"
               disabled={isStartingRecording}
-              className="no-hover-lift w-full flex items-center gap-4 rounded-xl bg-white text-gray-900 px-5 py-4 font-medium text-[15px] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-60"
+              className="w-full h-14 text-base gap-3"
             >
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                {isStartingRecording ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-red-500" />
-                ) : (
-                  <Mic className="w-5 h-5 text-red-500" />
-                )}
-              </div>
-              <div className="text-left flex-1">
-                <span className="block">{isStartingRecording ? 'Startar...' : 'Spela in live'}</span>
-                <span className="block text-xs text-gray-500 font-normal">Starta en liveinspelning nu</span>
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-400" />
-            </button>
+              {isStartingRecording ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+              {isStartingRecording ? 'Startar...' : 'Spela in live'}
+            </Button>
 
-            <button
+            <Button 
               onClick={handleOpenDigitalMeeting}
-              className="no-hover-lift w-full flex items-center gap-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white px-5 py-4 font-medium text-[15px] transition-all hover:bg-white/[0.12] active:scale-[0.98]"
+              variant="outline"
+              size="lg"
+              className="w-full h-14 text-base gap-3"
             >
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                <Upload className="w-5 h-5 text-white/70" />
-              </div>
-              <div className="text-left flex-1">
-                <span className="block">Ladda upp fil</span>
-                <span className="block text-xs text-white/40 font-normal">Ljud- eller videofil</span>
-              </div>
-              <ArrowRight className="w-4 h-4 text-white/30" />
-            </button>
+              <Upload className="w-5 h-5" />
+              Ladda upp fil
+            </Button>
 
-            <button
+            <Button 
               onClick={() => setShowTextPasteDialog(true)}
-              className="no-hover-lift w-full flex items-center gap-4 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white px-5 py-4 font-medium text-[15px] transition-all hover:bg-white/[0.12] active:scale-[0.98]"
+              variant="outline"
+              size="lg"
+              className="w-full h-14 text-base gap-3"
             >
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                <ClipboardPaste className="w-5 h-5 text-white/70" />
-              </div>
-              <div className="text-left flex-1">
-                <span className="block">Klistra in text</span>
-                <span className="block text-xs text-white/40 font-normal">Anteckningar eller transkription</span>
-              </div>
-              <ArrowRight className="w-4 h-4 text-white/30" />
-            </button>
+              <ClipboardPaste className="w-5 h-5" />
+              Klistra in text
+            </Button>
           </div>
 
-          {/* Trust bar */}
-          <div className="flex items-center justify-center gap-6 text-[11px] text-white/35 tracking-wide uppercase">
+          {/* Minimal trust indicators */}
+          <div className="flex items-center justify-center gap-4 pt-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <Shield className="w-3 h-3" />
+              <Shield className="w-3.5 h-3.5" />
               <span>GDPR</span>
             </div>
-            <span className="w-px h-3 bg-white/15" />
             <div className="flex items-center gap-1.5">
-              <Zap className="w-3 h-3" />
-              <span>AI-protokoll</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI-driven</span>
             </div>
-            <span className="w-px h-3 bg-white/15" />
             <div className="flex items-center gap-1.5">
-              <Globe className="w-3 h-3" />
-              <span>SV · EN</span>
+              <FileText className="w-3.5 h-3.5" />
+              <span>SV / EN</span>
             </div>
           </div>
         </div>

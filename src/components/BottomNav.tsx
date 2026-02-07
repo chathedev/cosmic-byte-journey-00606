@@ -43,7 +43,7 @@ export const BottomNav = () => {
   const isActive = (path: string) => location.pathname === path;
   
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/60 dark:bg-card/60 backdrop-blur-2xl border-t border-white/20 dark:border-border/50 z-50 safe-area-pb">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 safe-area-pb">
       <div className="max-w-4xl mx-auto px-4 py-3 flex justify-around items-center">
         <Link
           to="/"

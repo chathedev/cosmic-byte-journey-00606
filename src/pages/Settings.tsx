@@ -255,17 +255,17 @@ const Settings = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <div className="w-full max-w-3xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 -ml-2 rounded-lg hover:bg-white/20 transition-colors"
+            className="p-2 -ml-2 rounded-lg hover:bg-muted transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-semibold text-foreground">Inställningar</h1>
+          <h1 className="text-2xl font-semibold">Inställningar</h1>
         </div>
 
         <div className="space-y-8">

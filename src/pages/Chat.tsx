@@ -346,8 +346,8 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
   if (!isPlusUser) {
     return (
       <>
-         <div className="sticky top-0 z-40 bg-white/60 dark:bg-card/60 backdrop-blur-xl border-b border-white/20 dark:border-border/50 px-4 py-3 flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-foreground">AI Möteschatt</h1>
+        <div className="sticky top-0 z-40 bg-background border-b px-4 py-3 flex items-center gap-2">
+          <h1 className="text-lg font-semibold">AI Möteschatt</h1>
         </div>
         <div className="flex items-center justify-center min-h-[70vh] px-4">
           <Card className="max-w-md w-full">
@@ -384,7 +384,7 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen">
+    <div className="flex flex-col lg:flex-row h-screen bg-background">
       {/* Loading bar */}
       {isLoading && (
         <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-gradient-to-r from-primary via-primary/60 to-primary animate-pulse">
@@ -395,7 +395,7 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
       {/* Desktop: Takes remaining space, Mobile: Full screen */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="border-b border-white/20 bg-white/60 dark:bg-card/60 backdrop-blur-xl px-5 py-4 flex-shrink-0">
+        <div className="border-b bg-background px-5 py-4 flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
