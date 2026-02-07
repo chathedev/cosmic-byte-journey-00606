@@ -324,13 +324,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   return (
     <div className="min-h-[100dvh] relative flex flex-col overflow-hidden">
-      {/* Gradient background */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center scale-110"
-        style={{ backgroundImage: "url('/images/hero-gradient.png')" }}
-      />
-      {/* No grain overlay */}
-      {/* Dark vignette for depth */}
+      {/* Dark vignette for depth - bg gradient comes from body */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 pointer-events-none" />
 
       {/* Main content */}
