@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Download, Trash2, RefreshCw, Construction, Terminal, Search, Filter, X, Pause, Play, Cpu, Activity, MemoryStick, Zap, Monitor, Box, Gauge, Mic } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, HardDrive, Server, Clock, AlertCircle, CheckCircle, Mail, CreditCard, Download, Trash2, RefreshCw, Construction, Terminal, Search, Filter, X, Pause, Play, Cpu, Activity, MemoryStick, Zap, Monitor, Box, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
-import { backendApi, DashboardData, HealthCheck, ASRLogsResponse } from '@/lib/backendApi';
+import { backendApi, DashboardData, HealthCheck, ASRLogsResponse, ASRProviderResponse } from '@/lib/backendApi';
 import { apiClient, MaintenanceStatus } from '@/lib/api';
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,10 @@ const AdminBackend = () => {
   const [maintenancePending, setMaintenancePending] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ASR Provider state
+  const [asrProvider, setAsrProvider] = useState<ASRProviderResponse | null>(null);
+  const [asrSwitching, setAsrSwitching] = useState(false);
   
   // ASR Logs state
   const [logsOpen, setLogsOpen] = useState(false);
@@ -79,16 +83,20 @@ const AdminBackend = () => {
 
   const fetchData = async () => {
     try {
-      const [dashboardData, healthData, maintenanceData] = await Promise.all([
+      const [dashboardData, healthData, maintenanceData, asrData] = await Promise.all([
         backendApi.getDashboard(),
         backendApi.getHealth(),
         apiClient.getMaintenanceStatus().catch(() => ({ success: false, maintenance: { enabled: false } })),
+        backendApi.getASRProvider().catch(() => null),
       ]);
       setDashboard(dashboardData);
       setHealth(healthData);
       
       if (maintenanceData.success) {
         setMaintenance(maintenanceData.maintenance);
+      }
+      if (asrData) {
+        setAsrProvider(asrData);
       }
       setLastUpdate(new Date());
     } catch (error) {
@@ -229,6 +237,24 @@ const AdminBackend = () => {
       setMaintenance(prev => prev ? { ...prev, enabled: previousState } : { enabled: previousState });
       setMaintenancePending(false);
       toast.error('Kunde inte ändra underhållsläge');
+    }
+  };
+
+  const handleASRProviderSwitch = async (newProvider: string) => {
+    if (!asrProvider || asrSwitching) return;
+    const previous = asrProvider.provider;
+    setAsrSwitching(true);
+    setAsrProvider(prev => prev ? { ...prev, provider: newProvider } : prev);
+
+    try {
+      const result = await backendApi.setASRProvider(newProvider);
+      setAsrProvider(result);
+      toast.success(`ASR-leverantör bytt till ${result.provider === 'elevenlabs' ? 'ElevenLabs' : 'AssemblyAI'}`);
+    } catch (error: any) {
+      setAsrProvider(prev => prev ? { ...prev, provider: previous } : prev);
+      toast.error(error.message || 'Kunde inte byta ASR-leverantör');
+    } finally {
+      setAsrSwitching(false);
     }
   };
 
@@ -623,8 +649,78 @@ const AdminBackend = () => {
             )}
           </div>
 
-          {/* Maintenance & Actions */}
-          <div className="grid lg:grid-cols-2 gap-6">
+          {/* ASR Provider, Maintenance & Actions */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* ASR Provider Switch */}
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2.5 rounded-xl bg-muted">
+                    <Mic className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium">ASR-leverantör</p>
+                    <p className="text-xs text-muted-foreground">Transkriptionstjänst</p>
+                  </div>
+                </div>
+
+                {asrProvider ? (
+                  <>
+                    <div className="flex rounded-lg border overflow-hidden mb-3">
+                      {['elevenlabs', 'assemblyai'].map((p) => {
+                        const info = asrProvider.providers?.[p];
+                        const isActive = asrProvider.provider === p;
+                        const isAvailable = info?.available ?? false;
+                        return (
+                          <button
+                            key={p}
+                            disabled={asrSwitching || !isAvailable}
+                            onClick={() => !isActive && handleASRProviderSwitch(p)}
+                            className={`flex-1 py-2 px-3 text-sm font-medium transition-colors relative ${
+                              isActive
+                                ? 'bg-primary text-primary-foreground'
+                                : isAvailable
+                                  ? 'bg-muted/30 text-muted-foreground hover:bg-muted/60'
+                                  : 'bg-muted/20 text-muted-foreground/40 cursor-not-allowed'
+                            }`}
+                          >
+                            {asrSwitching && isActive && (
+                              <span className="absolute inset-0 flex items-center justify-center">
+                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              </span>
+                            )}
+                            <span className={asrSwitching && isActive ? 'opacity-0' : ''}>
+                              {p === 'elevenlabs' ? 'ElevenLabs' : 'AssemblyAI'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-muted-foreground">
+                      {Object.entries(asrProvider.providers || {}).map(([key, info]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span>{key === 'elevenlabs' ? 'ElevenLabs' : 'AssemblyAI'}</span>
+                          <Badge variant={info.available ? 'default' : 'secondary'} className="text-[10px] h-5">
+                            {info.available ? 'Tillgänglig' : 'Ej tillgänglig'}
+                          </Badge>
+                        </div>
+                      ))}
+                      {asrProvider.updatedBy && (
+                        <p className="pt-1.5 border-t border-border mt-2">
+                          Ändrad av {asrProvider.updatedBy}
+                          {asrProvider.updatedAt && (
+                            <> · {new Date(asrProvider.updatedAt).toLocaleString('sv-SE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Kunde inte hämta ASR-status</p>
+                )}
+              </CardContent>
+            </Card>
             {/* Maintenance Mode */}
             <Card className={maintenance?.enabled ? 'border-yellow-500/50 bg-yellow-500/5' : ''}>
               <CardContent className="p-5">
