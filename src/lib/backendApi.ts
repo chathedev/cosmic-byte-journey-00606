@@ -190,6 +190,23 @@ export interface ASRLogsResponse {
   message?: string;
 }
 
+export interface ASRProviderInfo {
+  available: boolean;
+  gptFallbackEnabled?: boolean;
+  speechModels?: string[];
+}
+
+export interface ASRProviderResponse {
+  provider: string;
+  storedProvider: string;
+  defaultProvider: string;
+  configured: boolean;
+  providers: Record<string, ASRProviderInfo>;
+  speechModels?: string[];
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('authToken');
   return {
@@ -637,6 +654,36 @@ export const backendApi = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Kunde inte ta bort profilen' }));
       throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  // ASR Provider Management
+  async getASRProvider(): Promise<ASRProviderResponse> {
+    const response = await fetch(`${BACKEND_URL}/admin/asr/provider`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async setASRProvider(provider: string): Promise<ASRProviderResponse> {
+    const response = await fetch(`${BACKEND_URL}/admin/asr/provider`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ provider }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Kunde inte byta ASR-leverantör' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
     }
 
     return response.json();
