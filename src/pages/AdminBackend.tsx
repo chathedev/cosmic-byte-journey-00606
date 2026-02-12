@@ -249,7 +249,8 @@ const AdminBackend = () => {
     try {
       const result = await backendApi.setASRProvider(newProvider);
       setAsrProvider(result);
-      toast.success(`ASR-leverantör bytt till ${result.provider === 'elevenlabs' ? 'ElevenLabs' : 'AssemblyAI'}`);
+      const provLabel = result.provider === 'elevenlabs' ? 'ElevenLabs' : result.provider === 'assemblyai' ? 'AssemblyAI' : 'Google Speech';
+      toast.success(`ASR-leverantör bytt till ${provLabel}`);
     } catch (error: any) {
       setAsrProvider(prev => prev ? { ...prev, provider: previous } : prev);
       toast.error(error.message || 'Kunde inte byta ASR-leverantör');
@@ -666,46 +667,55 @@ const AdminBackend = () => {
 
                 {asrProvider ? (
                   <>
-                    <div className="flex rounded-lg border overflow-hidden mb-3">
-                      {['elevenlabs', 'assemblyai'].map((p) => {
-                        const info = asrProvider.providers?.[p];
-                        const isActive = asrProvider.provider === p;
-                        const isAvailable = info?.available ?? false;
-                        return (
-                          <button
-                            key={p}
-                            disabled={asrSwitching || !isAvailable}
-                            onClick={() => !isActive && handleASRProviderSwitch(p)}
-                            className={`flex-1 py-2 px-3 text-sm font-medium transition-colors relative ${
-                              isActive
-                                ? 'bg-primary text-primary-foreground'
-                                : isAvailable
-                                  ? 'bg-muted/30 text-muted-foreground hover:bg-muted/60'
-                                  : 'bg-muted/20 text-muted-foreground/40 cursor-not-allowed'
-                            }`}
-                          >
-                            {asrSwitching && isActive && (
-                              <span className="absolute inset-0 flex items-center justify-center">
-                                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              </span>
-                            )}
-                            <span className={asrSwitching && isActive ? 'opacity-0' : ''}>
-                              {p === 'elevenlabs' ? 'ElevenLabs' : 'AssemblyAI'}
+                    <div className="mb-3">
+                      <Select
+                        value={asrProvider.provider}
+                        onValueChange={(val) => handleASRProviderSwitch(val)}
+                        disabled={asrSwitching}
+                      >
+                        <SelectTrigger className="w-full">
+                          {asrSwitching ? (
+                            <span className="flex items-center gap-2">
+                              <span className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                              Byter...
                             </span>
-                          </button>
-                        );
-                      })}
+                          ) : (
+                            <SelectValue />
+                          )}
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            { value: 'elevenlabs', label: 'ElevenLabs' },
+                            { value: 'assemblyai', label: 'AssemblyAI' },
+                            { value: 'google-speech', label: 'Google Speech-to-Text' },
+                          ].map((p) => {
+                            const info = asrProvider.providers?.[p.value];
+                            const isAvailable = info?.available ?? false;
+                            return (
+                              <SelectItem key={p.value} value={p.value} disabled={!isAvailable}>
+                                <span className="flex items-center gap-2">
+                                  {p.label}
+                                  {!isAvailable && <span className="text-muted-foreground text-[10px]">(ej tillgänglig)</span>}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-1.5 text-xs text-muted-foreground">
-                      {Object.entries(asrProvider.providers || {}).map(([key, info]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span>{key === 'elevenlabs' ? 'ElevenLabs' : 'AssemblyAI'}</span>
-                          <Badge variant={info.available ? 'default' : 'secondary'} className="text-[10px] h-5">
-                            {info.available ? 'Tillgänglig' : 'Ej tillgänglig'}
-                          </Badge>
-                        </div>
-                      ))}
+                      {Object.entries(asrProvider.providers || {}).map(([key, info]) => {
+                        const label = key === 'elevenlabs' ? 'ElevenLabs' : key === 'assemblyai' ? 'AssemblyAI' : 'Google Speech';
+                        return (
+                          <div key={key} className="flex items-center justify-between">
+                            <span>{label}</span>
+                            <Badge variant={info.available ? 'default' : 'secondary'} className="text-[10px] h-5">
+                              {info.available ? 'Tillgänglig' : 'Ej tillgänglig'}
+                            </Badge>
+                          </div>
+                        );
+                      })}
                       {asrProvider.updatedBy && (
                         <p className="pt-1.5 border-t border-border mt-2">
                           Ändrad av {asrProvider.updatedBy}
