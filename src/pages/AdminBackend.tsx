@@ -704,6 +704,7 @@ const AdminBackend = () => {
                       </Select>
                     </div>
 
+                    {/* Provider availability */}
                     <div className="space-y-1.5 text-xs text-muted-foreground">
                       {Object.entries(asrProvider.providers || {}).map(([key, info]) => {
                         const label = key === 'elevenlabs' ? 'ElevenLabs' : key === 'assemblyai' ? 'AssemblyAI' : 'Google Speech';
@@ -716,15 +717,57 @@ const AdminBackend = () => {
                           </div>
                         );
                       })}
-                      {asrProvider.updatedBy && (
-                        <p className="pt-1.5 border-t border-border mt-2">
-                          Ändrad av {asrProvider.updatedBy}
-                          {asrProvider.updatedAt && (
-                            <> · {new Date(asrProvider.updatedAt).toLocaleString('sv-SE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
-                          )}
-                        </p>
-                      )}
                     </div>
+
+                    {/* Provider-specific config details */}
+                    {asrProvider.provider === 'assemblyai' && asrProvider.speechModels && asrProvider.speechModels.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Talmodeller</p>
+                        <div className="flex flex-wrap gap-1">
+                          {asrProvider.speechModels.map((m) => (
+                            <Badge key={m} variant="outline" className="text-[10px] h-5 font-mono">{m}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {asrProvider.provider === 'google-speech' && asrProvider.googleSpeech && (
+                      <div className="mt-3 pt-3 border-t border-border space-y-2">
+                        <p className="text-[11px] font-medium text-muted-foreground">Google Speech-konfiguration</p>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-[10px] h-5 font-mono">{asrProvider.googleSpeech.model || 'latest_long'}</Badge>
+                          {asrProvider.googleSpeech.useEnhanced && (
+                            <Badge variant="outline" className="text-[10px] h-5">Enhanced</Badge>
+                          )}
+                        </div>
+                        {asrProvider.googleSpeech.languageCodes && asrProvider.googleSpeech.languageCodes.length > 0 && (
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Språk</p>
+                            <div className="flex flex-wrap gap-1">
+                              {asrProvider.googleSpeech.languageCodes.map((lc) => (
+                                <Badge key={lc} variant="outline" className="text-[10px] h-5 font-mono">{lc}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {asrProvider.provider === 'elevenlabs' && asrProvider.providers?.elevenlabs?.gptFallbackEnabled && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <Badge variant="outline" className="text-[10px] h-5">GPT Fallback aktiv</Badge>
+                      </div>
+                    )}
+
+                    {/* Audit trail */}
+                    {asrProvider.updatedBy && (
+                      <p className="text-[11px] text-muted-foreground pt-2 mt-2 border-t border-border">
+                        Ändrad av {asrProvider.updatedBy}
+                        {asrProvider.updatedAt && (
+                          <> · {new Date(asrProvider.updatedAt).toLocaleString('sv-SE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
+                        )}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">Kunde inte hämta ASR-status</p>
