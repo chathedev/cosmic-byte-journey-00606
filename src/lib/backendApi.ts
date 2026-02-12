@@ -196,6 +196,12 @@ export interface ASRProviderInfo {
   speechModels?: string[];
 }
 
+export interface GoogleSpeechInfo {
+  model?: string;
+  useEnhanced?: boolean;
+  languageCodes?: string[];
+}
+
 export interface ASRProviderResponse {
   provider: string;
   storedProvider: string;
@@ -203,6 +209,7 @@ export interface ASRProviderResponse {
   configured: boolean;
   providers: Record<string, ASRProviderInfo>;
   speechModels?: string[];
+  googleSpeech?: GoogleSpeechInfo;
   updatedAt?: string;
   updatedBy?: string;
 }
