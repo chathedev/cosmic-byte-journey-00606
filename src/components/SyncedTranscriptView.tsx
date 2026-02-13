@@ -198,6 +198,39 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
     return suggestions;
   }, [speakerBlocks]);
 
+  // Build alias map: word speaker IDs (e.g. speaker_A) → block speaker IDs (e.g. speaker_1)
+  // This handles AssemblyAI which uses letter-based IDs in words but numeric in segments.
+  const wordToBlockSpeakerAlias = useMemo(() => {
+    const alias: Record<string, string> = {};
+    if (speakerBlocks.length === 0 || normalizedWords.length === 0) return alias;
+
+    // Collect unique word speaker IDs that have no numeric index (letter-based like speaker_A)
+    const wordSpeakerIds = new Set<string>();
+    normalizedWords.forEach(w => {
+      const id = w.speakerId || w.speaker || '';
+      if (id && !/\d/.test(id)) wordSpeakerIds.add(id);
+    });
+    if (wordSpeakerIds.size === 0) return alias;
+
+    // For each letter-based word speaker, find overlapping block by timestamp
+    for (const wordSpkId of wordSpeakerIds) {
+      const sampleWords = normalizedWords.filter(w => (w.speakerId || w.speaker) === wordSpkId).slice(0, 5);
+      if (sampleWords.length === 0) continue;
+      const sampleStart = sampleWords[0].start;
+      const sampleEnd = sampleWords[sampleWords.length - 1].end;
+
+      for (const block of speakerBlocks) {
+        const bStart = block.start ?? 0;
+        const bEnd = block.end ?? 0;
+        if (sampleStart <= bEnd + 1 && sampleEnd >= bStart - 1) {
+          alias[wordSpkId] = block.speakerId;
+          break;
+        }
+      }
+    }
+    return alias;
+  }, [normalizedWords, speakerBlocks]);
+
   // Auto-scroll stability: avoid fighting the user's manual scrolling and throttle programmatic scroll.
   const programmaticScrollRef = useRef(false);
   const userScrollLockUntilRef = useRef(0);
@@ -409,25 +442,28 @@ export const SyncedTranscriptView: React.FC<SyncedTranscriptViewProps> = ({
    * 3) Formatted label - "Talare X" fallback
    */
   const getSpeakerDisplayName = useCallback((speakerId: string): string => {
+    // 0) Resolve alias (e.g. speaker_A → speaker_1 for AssemblyAI letter-based IDs)
+    const resolvedId = wordToBlockSpeakerAlias[speakerId] || speakerId;
+
     // 1) Check user-edited names first (with normalization fallback)
-    const userName = lookupSpeakerNameRecord(speakerNames, speakerId, speakerIndexOffset);
-    if (userName) {
-      return userName;
-    }
-    // 2) Check block-level suggested names from AI cleanup (with normalization)
-    const blockName = lookupSpeakerNameRecord(blockSuggestedNames, speakerId, 0);
-    if (blockName) {
-      return blockName;
-    }
-    // 3) Check initial speaker names (may contain suggestions from backend)
-    const initialName = lookupSpeakerNameRecord(initialSpeakerNames, speakerId, speakerIndexOffset);
-    if (initialName) {
-      return initialName;
-    }
+    const userName = lookupSpeakerNameRecord(speakerNames, resolvedId, speakerIndexOffset)
+      || (resolvedId !== speakerId ? lookupSpeakerNameRecord(speakerNames, speakerId, speakerIndexOffset) : undefined);
+    if (userName) return userName;
+
+    // 2) Check block-level suggested names from AI cleanup
+    const blockName = lookupSpeakerNameRecord(blockSuggestedNames, resolvedId, 0)
+      || (resolvedId !== speakerId ? lookupSpeakerNameRecord(blockSuggestedNames, speakerId, 0) : undefined);
+    if (blockName) return blockName;
+
+    // 3) Check initial speaker names
+    const initialName = lookupSpeakerNameRecord(initialSpeakerNames, resolvedId, speakerIndexOffset)
+      || (resolvedId !== speakerId ? lookupSpeakerNameRecord(initialSpeakerNames, speakerId, speakerIndexOffset) : undefined);
+    if (initialName) return initialName;
+
     // 4) Fallback to formatted label
-    const num = getSpeakerNumber(speakerId);
+    const num = getSpeakerNumber(resolvedId);
     return `Talare ${num + 1}`;
-  }, [speakerNames, blockSuggestedNames, initialSpeakerNames, speakerIndexOffset]);
+  }, [speakerNames, blockSuggestedNames, initialSpeakerNames, speakerIndexOffset, wordToBlockSpeakerAlias]);
 
   // Check if name is AI-suggested (not user-edited)
   const isAISuggested = useCallback((speakerId: string): boolean => {
