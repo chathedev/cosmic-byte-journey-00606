@@ -116,8 +116,26 @@ export function useASRStream({
       }
       if (item.type === 'chunk') {
         const c = item.payload as ASRStreamChunk;
-        const next = c.orderedTranscript || c.transcript || '';
-        if (next) latestOrderedRef.current = next;
+        const orderedFull = c.orderedTranscript || '';
+        const chunkText = c.transcript || '';
+
+        if (orderedFull) {
+          // orderedTranscript is the full cumulative transcript from the backend
+          // If it's longer or same length, use it directly (it's cumulative)
+          // If it's shorter, it might be just a chunk — append it instead
+          if (orderedFull.length >= latestOrderedRef.current.length) {
+            latestOrderedRef.current = orderedFull;
+          } else {
+            // Append chunk transcript to accumulated text
+            latestOrderedRef.current = latestOrderedRef.current + '\n' + orderedFull;
+          }
+        } else if (chunkText) {
+          // No orderedTranscript — append the chunk transcript
+          latestOrderedRef.current = latestOrderedRef.current
+            ? latestOrderedRef.current + '\n' + chunkText
+            : chunkText;
+        }
+
         if (c.progressPercent != null) latestProgressRef.current = c.progressPercent;
         if (c.totalChunks != null) latestTotalChunksRef.current = c.totalChunks;
         if (c.completedChunks != null) latestCompletedChunksRef.current = c.completedChunks;
