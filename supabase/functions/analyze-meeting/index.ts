@@ -199,6 +199,9 @@ Innan du svarar, kontrollera:
 3. Finns det NÅGRA av de bannlysta formuleringarna? Om ja → skriv om.
 4. Kan en person som INTE var på mötet förstå exakt vad som ska göras? Om inte → förtydliga.
 
+Dagens datum: ${new Date().toISOString().split('T')[0]}
+VIKTIGT: Alla datum i protokollet (inklusive deadlines) MÅSTE vara i framtiden relativt dagens datum. Använd ALDRIG år som redan passerat.
+
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
 
