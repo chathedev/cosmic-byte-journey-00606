@@ -176,7 +176,15 @@ BESLUT – ultra-strikt:
   Bra: "Sammanställ beslutsunderlag med tre alternativa strategier för myndighetskontakt. Presentera som en A4-sida med för/nackdelar per alternativ vid nästa styrelsemöte."
   Bra: "Kontakta Arbetsmiljöverket per telefon och efterfråga skriftlig vägledning kring nya krav. Sammanfatta svaret i ett internt PM till teamet."
 - "ansvarig": Personens NAMN. Om ingen nämndes → "" (tomt, gissa aldrig)
-- "deadline": YYYY-MM-DD BARA om datum explicit sades. Annars "" (tomt, gissa aldrig)
+- "deadline": Använd ALLTID en av dessa strategier:
+  1. Om ett EXAKT DATUM nämndes → använd det (YYYY-MM-DD)
+  2. Om en TIDSRAM nämndes ("inom två veckor", "före sommaren") → beräkna ett rimligt datum från mötesdatumet
+  3. Om ett NÄSTA MÖTE eller EVENT nämndes ("före nästa styrelsemöte", "innan konferensen") → skriv "Före [event/möte]"
+  4. Om INGET av ovanstående → härleda en rimlig deadline baserat på prioritet och komplexitet:
+     - critical/high → "Inom 1-2 veckor"
+     - medium → "Inom 1 månad"  
+     - low → "Inom 2 månader"
+  ALDRIG lämna deadline tom. Varje åtgärd behöver en tidshorisont för att vara uppföljningsbar.
 - "prioritet": critical (blockerar annat arbete), high (måste ske snart), medium (viktigt men ej brådskande), low (nice-to-have)
 - KVALITETSTEST: Om en åtgärd kan besvaras med "ja, men vad exakt?" → den är för vag. Gör den mer konkret.
 
