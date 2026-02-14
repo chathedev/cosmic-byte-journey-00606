@@ -468,6 +468,7 @@ export const AutoProtocolGenerator = ({
             hasSpeakerAttribution: requestBody.hasSpeakerAttribution,
             speakers: requestBody.speakers,
             isEnterprise,
+            userPlan: userPlan?.plan || 'free',
           }
         );
 
