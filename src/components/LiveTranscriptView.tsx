@@ -55,7 +55,6 @@ export const LiveTranscriptView = memo(({
   isConnected,
 }: LiveTranscriptViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isAutoScrolling = useRef(true);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
 
@@ -73,15 +72,7 @@ export const LiveTranscriptView = memo(({
     return distFromBottom < 60;
   }, []);
 
-  // Auto-scroll to bottom when new content arrives (only if user hasn't scrolled up)
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !liveTranscript || !isAutoScrolling.current) return;
-
-    requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    });
-  }, [liveTranscript]);
+  // No auto-scroll — user controls scroll position manually
 
   // When done, scroll to top after a brief pause
   useEffect(() => {
@@ -90,21 +81,19 @@ export const LiveTranscriptView = memo(({
       const el = scrollRef.current;
       if (!el) return;
       const timer = setTimeout(() => {
-        isAutoScrolling.current = false;
         el.scrollTo({ top: 0, behavior: 'smooth' });
       }, 800);
       return () => clearTimeout(timer);
     }
   }, [isDone, hasTranscript, justCompleted]);
 
-  // Track user scroll to toggle auto-scroll and show/hide "scroll to bottom" button
+  // Show scroll-to-bottom button when not near bottom
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handleScroll = () => {
       if (isDone) return;
       const nearBottom = checkIfNearBottom();
-      isAutoScrolling.current = nearBottom;
       setShowScrollDown(!nearBottom);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
@@ -114,7 +103,6 @@ export const LiveTranscriptView = memo(({
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    isAutoScrolling.current = true;
     setShowScrollDown(false);
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
