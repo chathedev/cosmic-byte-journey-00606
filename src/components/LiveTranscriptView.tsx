@@ -57,7 +57,6 @@ export const LiveTranscriptView = memo(({
 }: LiveTranscriptViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
-  const prevLineCountRef = useRef(0);
   const [justCompleted, setJustCompleted] = useState(false);
 
   const lines = useMemo(() => splitLines(liveTranscript), [liveTranscript]);
@@ -66,23 +65,15 @@ export const LiveTranscriptView = memo(({
   const StageIcon = stageInfo.icon;
   const hasTranscript = lines.length > 0;
 
-  // Auto-scroll to bottom on new lines (smooth), unless user scrolled up
+  // Auto-scroll to bottom whenever transcript content changes
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !liveTranscript || userScrolledRef.current) return;
 
-    // Only auto-scroll when new lines arrive
-    if (lines.length > prevLineCountRef.current) {
-      prevLineCountRef.current = lines.length;
-
-      if (!userScrolledRef.current) {
-        // Use smooth scrolling for a fluid feel
-        requestAnimationFrame(() => {
-          el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-        });
-      }
-    }
-  }, [lines.length]);
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
+  }, [liveTranscript]);
 
   // When done, scroll back to top smoothly
   useEffect(() => {
