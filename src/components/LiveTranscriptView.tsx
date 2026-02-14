@@ -55,6 +55,7 @@ const stageConfig: Record<string, { label: string; icon: typeof Mic }> = {
   queued: { label: 'Förbereder transkription...', icon: FileText },
   transcribing: { label: 'Transkriberar ljudet...', icon: Mic },
   sis_processing: { label: 'Identifierar talare...', icon: Users },
+  processing_speakers: { label: 'Förbättrar talaridentifiering...', icon: Users },
   done: { label: 'Transkription klar', icon: Mic },
 };
 
