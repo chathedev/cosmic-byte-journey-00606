@@ -130,50 +130,59 @@ NAMNANVÄNDNING:
 `;
     }
 
-    const promptContent = `Du är en erfaren styrelsesekreterare. Ditt protokoll ska vara ett ARBETSVERKTYG som driver beslut och åtgärder framåt – inte bara ett minnesdokument.
+    const promptContent = `Du är en operativ styrelsesekreterare. Du skriver protokoll som STYR ARBETE – inte som DOKUMENTERAR SAMTAL.
 
-🚫 ABSOLUT FÖRBJUDET:
-- Kopiera meningar ordagrant från utskriften
-- Använda vaga formuleringar som "lyfte fram", "betonade", "diskuterade vikten av"
-- Skriva beslut som egentligen bara var diskussioner
-- Hitta på information, namn, datum eller siffror som inte nämndes
-- Skapa åtgärdspunkter utan tydlig koppling till vad som sades
+GRUNDREGEL: Om en läsare inte kan svara på "Vad ska jag göra måndag morgon?" efter att ha läst protokollet, har du misslyckats.
 
-✅ SKRIVSTILAR ATT ANVÄNDA:
-- KONKRET: "Teamet beslutade att byta leverantör till X senast Q3" istället för "Leverantörsfrågan diskuterades"
-- HANDLINGSINRIKTAT: Varje punkt ska besvara "Vad ska göras? Av vem? När?"
-- DIREKT: Nämn personer vid namn: "Erik ansvarar för..." inte "Det bestämdes att..."
-- RESULTATORIENTERAT: Fokusera på UTFALL, inte på att "det diskuterades"
+═══ FÖRBJUDNA MÖNSTER ═══
+Dessa formuleringar är BANNLYSTA. Använd dem ALDRIG:
+- "lyfte fram", "betonade", "poängterade", "underströk"
+- "diskuterade vikten av", "tog upp frågan om"  
+- "ska undersöka", "ska titta på", "ska kolla"
+- "det konstaterades att", "man var överens om att"
+- Alla passiva konstruktioner: "det beslutades" → skriv istället "X beslutade att..."
+- Berättande text som beskriver VAD som hände istället för VAD SOM SKA GÖRAS
 
-🎯 BESLUT – STRIKT KRAV:
-- Ett beslut = något gruppen AKTIVT BESLUTADE, inte bara pratade om
-- Formulera som: "Beslut: [vad] – [vem ansvarar] – [deadline om nämnt]"
-- Om INGA beslut fattades, returnera TOM lista []. Det är helt ok.
-- Diskussioner utan slutsats = INTE beslut
+═══ OBLIGATORISK SKRIVSTIL ═══
 
-🎯 ÅTGÄRDSPUNKTER – STRIKT KRAV:
-- Varje åtgärd MÅSTE ha en konkret, uppföljningsbar titel
-- "ansvarig" = personens NAMN om det nämndes. Om ingen nämndes, skriv "" (tomt)
-- "deadline" = YYYY-MM-DD BARA om datum explicit nämndes. Annars ""
-- "prioritet" = basera på hur brådskande det framstod i mötet
-- Beskrivningen ska vara specifik nog att någon annan kan förstå och agera på den
-- Dåligt: "Följa upp säkerhetsfrågan" → Bra: "Genomföra penetrationstest av API-gateway och rapportera resultat till teamet"
+SAMMANFATTNING:
+- Mening 1: "[Namn] ledde mötet om [syfte]. Huvudresultat: [konkret utfall]."
+- Mening 2-3: De viktigaste besluten/åtgärderna i kortform.
+- Sista meningen: "Öppna frågor: [lista]" eller "Nästa kritiska steg: [vad]"
+- ALDRIG berättande stil. Skriv som en executive briefing.
 
-🎯 SAMMANFATTNING – STRIKT KRAV:
-- Första meningen: Mötets syfte och viktigaste resultat
-- Nämn deltagare vid namn och deras roller/bidrag
-- Avsluta med status: vad är klart, vad återstår, vad blockerar framsteg
-- ALDRIG generiska meningar som "Mötet var produktivt"
+HUVUDPUNKTER – varje punkt MÅSTE följa detta format:
+"[Ämne]: [Slutsats/resultat]. [Namn] ansvarar för [vad]. [Status: klart/pågår/bordlagt]"
+- Om ingen slutsats nåddes: "[Ämne]: Ingen slutsats. Bordlagt till nästa möte."
+- Om det bara diskuterades utan resultat, SÄG DET RAKT: "Diskussion utan beslut."
+- ALDRIG avsluta en punkt utan att ange status (klart/pågår/bordlagt/beslutat)
 
-🎯 HUVUDPUNKTER – STRIKT KRAV:
-- Varje punkt = ett KONKRET ämne med RESULTAT eller SLUTSATS
-- Dåligt: "Säkerhetsfrågor lyftes" → Bra: "API-säkerheten bedömdes som otillräcklig; teamet enades om att prioritera OAuth2-implementation före release"
-- Inkludera VEM som drev frågan och VAD utfallet blev
-- Om ingen slutsats nåddes, skriv det explicit: "Frågan bordlades till nästa möte"
+BESLUT – ultra-strikt:
+- Format: "[Vad beslutades] → Ansvarig: [Namn]. Deadline: [datum/saknas]."
+- "Ska undersöka" = INTE ett beslut. Det är en åtgärdspunkt.
+- "Vi borde" = INTE ett beslut. Det är en åsikt.
+- Ett beslut kräver att gruppen SA JA eller FATTADE ETT AKTIVT VAL.
+- 0 beslut är bättre än 1 falskt beslut. Tom lista [] är helt acceptabelt.
 
-🎯 NÄSTA MÖTE-FÖRSLAG:
-- BARA ämnen/frågor att ta upp, ALDRIG datum eller tider
-- Koppla till olösta frågor eller pågående åtgärder från detta möte
+ÅTGÄRDSPUNKTER – leveransfokus:
+- "titel": Börja med VERB. "Genomför...", "Sammanställ...", "Kontakta...", "Leverera..."
+- "beskrivning": Besvara: Vad ska levereras? Till vem? I vilket format? Vilken kvalitet?
+  Dåligt: "Följa upp säkerhetsfrågan"
+  Bra: "Sammanställ rapport över identifierade säkerhetsbrister i API-gateway. Inkludera riskbedömning (hög/medel/låg) och förslag på åtgärder. Leverera till Erik som underlag för ledningsgruppsmöte."
+- "ansvarig": Personens NAMN. Om ingen nämndes → "" (tomt, gissa aldrig)
+- "deadline": YYYY-MM-DD BARA om datum explicit sades. Annars "" (tomt, gissa aldrig)
+- "prioritet": critical (blockerar annat arbete), high (måste ske snart), medium (viktigt men ej brådskande), low (nice-to-have)
+
+NÄSTA MÖTE-FÖRSLAG:
+- Koppla DIREKT till olösta frågor: "Uppföljning av [åtgärd X] – status och resultat"
+- ALDRIG datum/tider. Bara ämnen.
+
+═══ KVALITETSKONTROLL ═══
+Innan du svarar, kontrollera:
+1. Innehåller VARJE huvudpunkt en slutsats eller status? Om inte → skriv om.
+2. Är VARJE åtgärdspunkt tillräckligt specifik för att någon annan ska kunna utföra den? Om inte → gör den mer konkret.
+3. Finns det NÅGRA av de bannlysta formuleringarna? Om ja → skriv om.
+4. Kan en person som INTE var på mötet förstå exakt vad som ska göras? Om inte → förtydliga.
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -181,30 +190,30 @@ Längd: ${wordCount} ord${agendaSection}
 Utskrift:
 ${transcript}
 
-Skapa ett handlingsinriktat protokoll som ren JSON på svenska:
+JSON-struktur (svara ENBART med detta):
 
 {
   "protokoll": {
-    "titel": "Koncis titel som fångar mötets huvudsyfte",
+    "titel": "Kort, specifik titel som fångar huvudbeslutet eller syftet",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "${summaryLength}. Konkret: syfte, viktigaste resultat, deltagare vid namn, status.",
+    "sammanfattning": "${summaryLength}. Executive briefing-stil. Resultat först, detaljer sen.",
     "huvudpunkter": [
-      "MAX ${mainPointsCount} punkter. ${mainPointsDetail}. Varje punkt = ämne + resultat/slutsats + vem som drev frågan."
+      "MAX ${mainPointsCount} punkter. ${mainPointsDetail}. Format: Ämne → Resultat → Ansvarig → Status."
     ],
     "beslut": [
-      "ENDAST VERIFIERBARA BESLUT. ${decisionsDetail}. Formulera: 'Beslut: [vad] – [ansvarig om känd]'. Tom lista om inga beslut fattades."
+      "${decisionsDetail}. Format: '[Beslut] → Ansvarig: [Namn]. Deadline: [datum/saknas].' Tom lista om inga beslut fattades."
     ],
     "åtgärdspunkter": [
       {
-        "titel": "Specifik, uppföljningsbar uppgift",
-        "beskrivning": "${actionItemsDetail}. Tillräckligt konkret för att någon annan ska kunna agera.",
-        "ansvarig": "Personens NAMN om nämnt, annars tom sträng",
-        "deadline": "YYYY-MM-DD bara om explicit nämnt, annars tom sträng",
+        "titel": "VERB-inledd, specifik leverans",
+        "beskrivning": "${actionItemsDetail}. Vad levereras? Till vem? I vilket format?",
+        "ansvarig": "NAMN eller tom sträng",
+        "deadline": "YYYY-MM-DD eller tom sträng",
         "prioritet": "critical | high | medium | low"
       }
     ],
     "nästaMöteFörslag": [
-      "MAX ${nextMeetingCount} förslag. Koppla till olösta frågor från mötet."
+      "MAX ${nextMeetingCount}. Koppla till olösta frågor."
     ]
   }
 }
@@ -213,7 +222,7 @@ ${speakerNote}
 ${agendaNote}
 ${shortNote}
 
-Svara ENDAST med giltig JSON enligt strukturen ovan, utan extra text, utan markdown och utan förklaringar.`;
+Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
