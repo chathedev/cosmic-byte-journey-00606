@@ -240,19 +240,20 @@ const AdminBackend = () => {
     }
   };
 
-  const handleASRProviderSwitch = async (newProvider: string) => {
+  const handleASRProviderSwitch = async (newProvider: string, openaiModel?: string) => {
     if (!asrProvider || asrSwitching) return;
-    const previous = asrProvider.provider;
+    const previous = { ...asrProvider };
     setAsrSwitching(true);
     setAsrProvider(prev => prev ? { ...prev, provider: newProvider } : prev);
 
     try {
-      const result = await backendApi.setASRProvider(newProvider);
+      const result = await backendApi.setASRProvider(newProvider, openaiModel);
       setAsrProvider(result);
-      const provLabel = result.provider === 'elevenlabs' ? 'ElevenLabs' : result.provider === 'assemblyai' ? 'AssemblyAI' : 'Google Speech';
-      toast.success(`ASR-leverantör bytt till ${provLabel}`);
+      const provLabel = newProvider === 'elevenlabs' ? 'ElevenLabs' : newProvider === 'assemblyai' ? 'AssemblyAI' : 'OpenAI';
+      const modelSuffix = openaiModel ? ` (${openaiModel})` : '';
+      toast.success(`ASR-leverantör bytt till ${provLabel}${modelSuffix}`);
     } catch (error: any) {
-      setAsrProvider(prev => prev ? { ...prev, provider: previous } : prev);
+      setAsrProvider(previous);
       toast.error(error.message || 'Kunde inte byta ASR-leverantör');
     } finally {
       setAsrSwitching(false);
@@ -685,9 +686,9 @@ const AdminBackend = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {[
+                            { value: 'openai', label: 'OpenAI' },
                             { value: 'elevenlabs', label: 'ElevenLabs' },
                             { value: 'assemblyai', label: 'AssemblyAI' },
-                            { value: 'google-speech', label: 'Google Speech-to-Text' },
                           ].map((p) => {
                             const info = asrProvider.providers?.[p.value];
                             const isAvailable = info?.available ?? false;
@@ -707,7 +708,7 @@ const AdminBackend = () => {
                     {/* Provider availability */}
                     <div className="space-y-1.5 text-xs text-muted-foreground">
                       {Object.entries(asrProvider.providers || {}).map(([key, info]) => {
-                        const label = key === 'elevenlabs' ? 'ElevenLabs' : key === 'assemblyai' ? 'AssemblyAI' : 'Google Speech';
+                        const label = key === 'elevenlabs' ? 'ElevenLabs' : key === 'assemblyai' ? 'AssemblyAI' : key === 'openai' ? 'OpenAI' : key;
                         return (
                           <div key={key} className="flex items-center justify-between">
                             <span>{label}</span>
@@ -731,24 +732,27 @@ const AdminBackend = () => {
                       </div>
                     )}
 
-                    {asrProvider.provider === 'google-speech' && asrProvider.googleSpeech && (
+                    {asrProvider.provider === 'openai' && asrProvider.openaiAsr?.models && asrProvider.openaiAsr.models.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border space-y-2">
-                        <p className="text-[11px] font-medium text-muted-foreground">Google Speech-konfiguration</p>
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="outline" className="text-[10px] h-5 font-mono">{asrProvider.googleSpeech.model || 'latest_long'}</Badge>
-                          {asrProvider.googleSpeech.useEnhanced && (
-                            <Badge variant="outline" className="text-[10px] h-5">Enhanced</Badge>
-                          )}
+                        <p className="text-[11px] font-medium text-muted-foreground">OpenAI-modell</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {asrProvider.openaiAsr.models.map((m) => (
+                            <button
+                              key={m}
+                              disabled={asrSwitching}
+                              onClick={() => handleASRProviderSwitch('openai', m)}
+                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-mono transition-colors cursor-pointer disabled:opacity-50 ${
+                                asrProvider.storedProvider === 'openai'
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-muted-foreground hover:border-primary/50'
+                              }`}
+                            >
+                              {m}
+                            </button>
+                          ))}
                         </div>
-                        {asrProvider.googleSpeech.languageCodes && asrProvider.googleSpeech.languageCodes.length > 0 && (
-                          <div>
-                            <p className="text-[10px] text-muted-foreground mb-1">Språk</p>
-                            <div className="flex flex-wrap gap-1">
-                              {asrProvider.googleSpeech.languageCodes.map((lc) => (
-                                <Badge key={lc} variant="outline" className="text-[10px] h-5 font-mono">{lc}</Badge>
-                              ))}
-                            </div>
-                          </div>
+                        {asrProvider.openaiAsr.language && (
+                          <p className="text-[10px] text-muted-foreground">Språk: {asrProvider.openaiAsr.language}</p>
                         )}
                       </div>
                     )}

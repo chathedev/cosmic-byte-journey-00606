@@ -194,12 +194,19 @@ export interface ASRProviderInfo {
   available: boolean;
   gptFallbackEnabled?: boolean;
   speechModels?: string[];
+  models?: string[];
+  language?: string;
 }
 
 export interface GoogleSpeechInfo {
   model?: string;
   useEnhanced?: boolean;
   languageCodes?: string[];
+}
+
+export interface OpenAIASRInfo {
+  models?: string[];
+  language?: string;
 }
 
 export interface ASRProviderResponse {
@@ -210,6 +217,7 @@ export interface ASRProviderResponse {
   providers: Record<string, ASRProviderInfo>;
   speechModels?: string[];
   googleSpeech?: GoogleSpeechInfo;
+  openaiAsr?: OpenAIASRInfo;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -680,12 +688,16 @@ export const backendApi = {
     return response.json();
   },
 
-  async setASRProvider(provider: string): Promise<ASRProviderResponse> {
+  async setASRProvider(provider: string, openaiModel?: string): Promise<ASRProviderResponse> {
+    const body: Record<string, string> = { provider };
+    if (openaiModel && provider === 'openai') {
+      body.openaiModel = openaiModel;
+    }
     const response = await fetch(`${BACKEND_URL}/admin/asr/provider`, {
       method: 'POST',
       credentials: 'include',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ provider }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
