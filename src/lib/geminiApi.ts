@@ -755,9 +755,10 @@ export async function analyzeMeetingAI(
     hasSpeakerAttribution?: boolean;
     speakers?: { name: string; segments: number }[];
     isEnterprise?: boolean;
+    userPlan?: string;
   }
 ): Promise<AIProtocol> {
-  const { agenda, hasSpeakerAttribution, speakers } = options || {};
+  const { agenda, hasSpeakerAttribution, speakers, isEnterprise, userPlan } = options || {};
 
   if (!transcript || transcript.trim().length < 10) {
     throw new Error("Transkriptionen är för kort eller saknas");
@@ -797,6 +798,8 @@ export async function analyzeMeetingAI(
       if (agenda) body.agenda = agenda;
       if (hasSpeakerAttribution) body.hasSpeakerAttribution = true;
       if (speakers && speakers.length > 0) body.speakers = speakers;
+      if (isEnterprise) body.isEnterprise = true;
+      if (userPlan) body.userPlan = userPlan;
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
         method: 'POST',
