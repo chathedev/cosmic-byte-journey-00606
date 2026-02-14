@@ -196,6 +196,7 @@ export interface ASRProviderInfo {
   speechModels?: string[];
   models?: string[];
   language?: string;
+  activeModel?: string;
 }
 
 export interface GoogleSpeechInfo {
@@ -207,6 +208,8 @@ export interface GoogleSpeechInfo {
 export interface OpenAIASRInfo {
   models?: string[];
   language?: string;
+  activeModel?: string;
+  storedModel?: string;
 }
 
 export interface ASRProviderResponse {

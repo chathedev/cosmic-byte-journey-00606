@@ -98,7 +98,11 @@ const AdminBackend = () => {
       }
       if (asrData) {
         setAsrProvider(asrData);
-        if (asrData.provider === 'openai' && asrData.openaiAsr?.models?.[0]) {
+        // Use activeModel from backend response (providers.openai.activeModel or openaiAsr.activeModel)
+        const backendActiveModel = asrData.openaiAsr?.activeModel || asrData.providers?.openai?.activeModel || null;
+        if (backendActiveModel) {
+          setActiveOpenaiModel(backendActiveModel);
+        } else if (asrData.provider === 'openai' && asrData.openaiAsr?.models?.[0]) {
           setActiveOpenaiModel(prev => prev || asrData.openaiAsr?.models?.[0] || null);
         }
       }
@@ -253,7 +257,9 @@ const AdminBackend = () => {
     try {
       const result = await backendApi.setASRProvider(newProvider, openaiModel);
       setAsrProvider(result);
-      if (openaiModel) setActiveOpenaiModel(openaiModel);
+      // Update active model from response or fallback to what was sent
+      const resultActiveModel = result.openaiAsr?.activeModel || result.providers?.openai?.activeModel || openaiModel;
+      if (resultActiveModel) setActiveOpenaiModel(resultActiveModel);
       const provLabel = newProvider === 'elevenlabs' ? 'ElevenLabs' : newProvider === 'assemblyai' ? 'AssemblyAI' : 'OpenAI';
       const modelSuffix = openaiModel ? ` (${openaiModel})` : '';
       toast.success(`ASR-leverantör bytt till ${provLabel}${modelSuffix}`);
@@ -741,23 +747,30 @@ const AdminBackend = () => {
                       <div className="mt-3 pt-3 border-t border-border space-y-2">
                         <p className="text-[11px] font-medium text-muted-foreground">OpenAI-modell</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {asrProvider.openaiAsr.models.map((m) => (
-                            <button
-                              key={m}
-                              disabled={asrSwitching}
-                              onClick={() => handleASRProviderSwitch('openai', m)}
-                              className={`inline-flex items-center rounded border px-2.5 py-1 text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50 ${
-                                activeOpenaiModel === m
-                                  ? 'border-primary bg-primary text-primary-foreground font-semibold shadow-sm'
-                                  : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:bg-muted'
-                              }`}
-                            >
-                              {m}
-                            </button>
-                          ))}
+                          {asrProvider.openaiAsr.models.map((m) => {
+                            const isActive = activeOpenaiModel === m;
+                            return (
+                              <button
+                                key={m}
+                                disabled={asrSwitching}
+                                onClick={() => handleASRProviderSwitch('openai', m)}
+                                className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-[11px] font-mono transition-all cursor-pointer disabled:opacity-50 ${
+                                  isActive
+                                    ? 'border-primary bg-primary text-primary-foreground font-semibold shadow-sm ring-1 ring-primary/30'
+                                    : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:bg-muted'
+                                }`}
+                              >
+                                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />}
+                                {m}
+                              </button>
+                            );
+                          })}
                         </div>
                         {asrProvider.openaiAsr.language && (
                           <p className="text-[10px] text-muted-foreground">Språk: {asrProvider.openaiAsr.language}</p>
+                        )}
+                        {asrProvider.openaiAsr.storedModel && (
+                          <p className="text-[10px] text-muted-foreground">Pinnad modell: <span className="font-mono">{asrProvider.openaiAsr.storedModel}</span></p>
                         )}
                       </div>
                     )}
