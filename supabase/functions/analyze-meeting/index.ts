@@ -130,48 +130,50 @@ NAMNANVÄNDNING:
 `;
     }
 
-    const promptContent = `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett FOKUSERAT protokoll som täcker det viktigaste från mötet.
+    const promptContent = `Du är en erfaren styrelsesekreterare. Ditt protokoll ska vara ett ARBETSVERKTYG som driver beslut och åtgärder framåt – inte bara ett minnesdokument.
 
 🚫 ABSOLUT FÖRBJUDET:
-- Kopiera NÅGON mening direkt från utskriften
-- Klistra in fraser ordagrant från transkriptionen
-- Upprepa meningar eller stycken från originaltexten
-- Lista punkter som är direkta citat
-- Inkludera "beslut" som egentligen bara var diskussioner eller idéer
-- Skapa för många punkter - KVALITET över KVANTITET
+- Kopiera meningar ordagrant från utskriften
+- Använda vaga formuleringar som "lyfte fram", "betonade", "diskuterade vikten av"
+- Skriva beslut som egentligen bara var diskussioner
+- Hitta på information, namn, datum eller siffror som inte nämndes
+- Skapa åtgärdspunkter utan tydlig koppling till vad som sades
 
-✅ DU MÅSTE:
-- OMFORMULERA allt innehåll med egna ord
-- SYNTETISERA information från flera delar av mötet
-- SKRIVA professionella, välformulerade meningar
-- SAMMANFATTA och PARAFRASERA diskussionerna
-- INKLUDERA NAMN på deltagare som bidrog till diskussionen
-- BEGRÄNSA antal punkter - hellre färre och bättre än många och halvdana
+✅ SKRIVSTILAR ATT ANVÄNDA:
+- KONKRET: "Teamet beslutade att byta leverantör till X senast Q3" istället för "Leverantörsfrågan diskuterades"
+- HANDLINGSINRIKTAT: Varje punkt ska besvara "Vad ska göras? Av vem? När?"
+- DIREKT: Nämn personer vid namn: "Erik ansvarar för..." inte "Det bestämdes att..."
+- RESULTATORIENTERAT: Fokusera på UTFALL, inte på att "det diskuterades"
 
-🎯 KRITISKA KRAV FÖR BESLUT:
-- Ett "beslut" är ENDAST något som gruppen faktiskt BESTÄMDE - inte bara diskuterade
-- INGA beslut = tom beslutslista. Hellre tom lista än felaktiga beslut.
-- Beslut måste vara KONKRETA: "Vi bestämde att...", "Det beslutades att..."
-- Om det bara var en diskussion utan slutsats = INTE ett beslut
-- Om någon bara föreslog något utan att det godkändes = INTE ett beslut
+🎯 BESLUT – STRIKT KRAV:
+- Ett beslut = något gruppen AKTIVT BESLUTADE, inte bara pratade om
+- Formulera som: "Beslut: [vad] – [vem ansvarar] – [deadline om nämnt]"
+- Om INGA beslut fattades, returnera TOM lista []. Det är helt ok.
+- Diskussioner utan slutsats = INTE beslut
 
-🎯 KRITISKA KRAV FÖR NAMN:
-- NÄMN ALLTID personers namn när de bidrog till något
-- Skriv "Erik föreslog att..." istället för "Det föreslogs att..."
-- I åtgärdspunkter, sätt personens NAMN som ansvarig om de tog på sig uppgiften
-- Om ett namn nämndes i utskriften, ANVÄND DET i protokollet
+🎯 ÅTGÄRDSPUNKTER – STRIKT KRAV:
+- Varje åtgärd MÅSTE ha en konkret, uppföljningsbar titel
+- "ansvarig" = personens NAMN om det nämndes. Om ingen nämndes, skriv "" (tomt)
+- "deadline" = YYYY-MM-DD BARA om datum explicit nämndes. Annars ""
+- "prioritet" = basera på hur brådskande det framstod i mötet
+- Beskrivningen ska vara specifik nog att någon annan kan förstå och agera på den
+- Dåligt: "Följa upp säkerhetsfrågan" → Bra: "Genomföra penetrationstest av API-gateway och rapportera resultat till teamet"
 
-🎯 KRITISKA NOGGRANNHETSKRAV:
-- Inkludera ENDAST information som FAKTISKT diskuterades i mötet
-- Dra INGA slutsatser som inte EXPLICIT nämndes i utskriften
-- GÖR INGA ANTAGANDEN om saker som inte sades i mötet
-- Vid osäkerhet, var KONSERVATIV - utelämna hellre information än att gissa
-- Om siffror eller data nämns, använd EXAKT de värden som nämndes
-- Om ingen ansvarig nämndes för en åtgärd, lämna fältet TOMT - gissa inte
+🎯 SAMMANFATTNING – STRIKT KRAV:
+- Första meningen: Mötets syfte och viktigaste resultat
+- Nämn deltagare vid namn och deras roller/bidrag
+- Avsluta med status: vad är klart, vad återstår, vad blockerar framsteg
+- ALDRIG generiska meningar som "Mötet var produktivt"
 
-⚠️ VARNING: Felaktiga protokoll med uppfinnad information är OACCEPTABELT.
-Korrekthet och faktabaserad dokumentation är VIKTIGARE än omfattande protokoll.
-HELLRE ETT KORT, KORREKT PROTOKOLL ÄN ETT LÅNGT MED PÅHITT.
+🎯 HUVUDPUNKTER – STRIKT KRAV:
+- Varje punkt = ett KONKRET ämne med RESULTAT eller SLUTSATS
+- Dåligt: "Säkerhetsfrågor lyftes" → Bra: "API-säkerheten bedömdes som otillräcklig; teamet enades om att prioritera OAuth2-implementation före release"
+- Inkludera VEM som drev frågan och VAD utfallet blev
+- Om ingen slutsats nåddes, skriv det explicit: "Frågan bordlades till nästa möte"
+
+🎯 NÄSTA MÖTE-FÖRSLAG:
+- BARA ämnen/frågor att ta upp, ALDRIG datum eller tider
+- Koppla till olösta frågor eller pågående åtgärder från detta möte
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -179,36 +181,30 @@ Längd: ${wordCount} ord${agendaSection}
 Utskrift:
 ${transcript}
 
-VIKTIGT för "nästaMöteFörslag": Lista ENDAST diskussionsämnen och uppföljningspunkter. Inkludera ALDRIG datum, tider eller när mötet ska äga rum - bara VAD som bör tas upp.
-
-VIKTIGT för åtgärdspunkter: Om inget specifikt datum nämndes för en deadline, lämna "deadline"-fältet HELT TOMT (tom sträng ""). Gissa INTE eller lägg INTE till dagens år automatiskt.
-
-VIKTIGT för beslut: Inkludera ENDAST faktiska beslut som fattades. Om mötet bara innehöll diskussioner utan konkreta beslut, returnera en TOM lista []. ALDRIG hitta på beslut.
-
-Skapa ett professionellt, FOKUSERAT protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
+Skapa ett handlingsinriktat protokoll som ren JSON på svenska:
 
 {
   "protokoll": {
-    "titel": "...",
+    "titel": "Koncis titel som fångar mötets huvudsyfte",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "${summaryLength}. Inkludera kontext, viktiga diskussioner och nämn deltagare vid namn. Skriv professionellt.",
+    "sammanfattning": "${summaryLength}. Konkret: syfte, viktigaste resultat, deltagare vid namn, status.",
     "huvudpunkter": [
-      "MAX ${mainPointsCount} punkter. ${mainPointsDetail}. Nämn personers namn när relevant."
+      "MAX ${mainPointsCount} punkter. ${mainPointsDetail}. Varje punkt = ämne + resultat/slutsats + vem som drev frågan."
     ],
     "beslut": [
-      "ENDAST FAKTISKA BESLUT. ${decisionsDetail}. Om inga beslut fattades = tom lista []."
+      "ENDAST VERIFIERBARA BESLUT. ${decisionsDetail}. Formulera: 'Beslut: [vad] – [ansvarig om känd]'. Tom lista om inga beslut fattades."
     ],
     "åtgärdspunkter": [
       {
-        "titel": "Tydlig och konkret titel på uppgiften",
-        "beskrivning": "${actionItemsDetail}",
-        "ansvarig": "Personens NAMN om de nämndes som ansvarig, annars tom sträng",
-        "deadline": "YYYY-MM-DD endast om datum explicit nämndes, annars tom sträng",
-        "prioritet": "critical | high | medium | low baserat på urgency i mötet"
+        "titel": "Specifik, uppföljningsbar uppgift",
+        "beskrivning": "${actionItemsDetail}. Tillräckligt konkret för att någon annan ska kunna agera.",
+        "ansvarig": "Personens NAMN om nämnt, annars tom sträng",
+        "deadline": "YYYY-MM-DD bara om explicit nämnt, annars tom sträng",
+        "prioritet": "critical | high | medium | low"
       }
     ],
     "nästaMöteFörslag": [
-      "MAX ${nextMeetingCount} förslag."
+      "MAX ${nextMeetingCount} förslag. Koppla till olösta frågor från mötet."
     ]
   }
 }
