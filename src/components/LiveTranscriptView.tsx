@@ -20,14 +20,12 @@ function splitLines(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Reveals words one-by-one with a staggered fade */
+/** Each word fades in slowly with a stagger */
 const AnimatedLine = memo(({ text, animate }: { text: string; animate: boolean }) => {
   const words = useMemo(() => text.split(/\s+/), [text]);
 
   if (!animate) {
-    return (
-      <p className="text-sm leading-relaxed text-foreground/60">{text}</p>
-    );
+    return <p className="text-sm leading-relaxed text-foreground/55">{text}</p>;
   }
 
   return (
@@ -35,12 +33,12 @@ const AnimatedLine = memo(({ text, animate }: { text: string; animate: boolean }
       {words.map((word, i) => (
         <motion.span
           key={`${i}-${word}`}
-          initial={{ opacity: 0, filter: 'blur(4px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
+          initial={{ opacity: 0, y: 3, filter: 'blur(6px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           transition={{
-            duration: 0.25,
-            delay: Math.min(i * 0.04, 1.5),
-            ease: 'easeOut',
+            duration: 0.5,
+            delay: Math.min(i * 0.09, 4),
+            ease: [0.25, 0.1, 0.25, 1],
           }}
           className="inline"
         >
@@ -86,30 +84,33 @@ export const LiveTranscriptView = memo(({
   const StageIcon = stageInfo.icon;
   const hasTranscript = lines.length > 0;
 
-  // Track which lines are "new" for animation
   const newLineStart = prevLineCountRef.current;
   useEffect(() => {
     prevLineCountRef.current = lines.length;
   }, [lines.length]);
 
-  // Check if user is near bottom
-  const checkIfNearBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }, []);
-
-  // Smooth auto-scroll when new content arrives (unless user scrolled up)
+  // Aggressive auto-scroll: runs on every content change via an interval
   useEffect(() => {
     if (!hasTranscript || isDone) return;
     const el = scrollRef.current;
-    if (!el || userScrolledUpRef.current) return;
-    requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    });
+    if (!el) return;
+
+    // Immediate scroll
+    if (!userScrolledUpRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // Keep scrolling smoothly as word animations reveal
+    const interval = setInterval(() => {
+      if (!userScrolledUpRef.current && scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 150);
+
+    return () => clearInterval(interval);
   }, [lines.length, hasTranscript, isDone]);
 
-  // When done, scroll to top after a brief pause
+  // When done, scroll to top
   useEffect(() => {
     if (isDone && hasTranscript && !justCompleted) {
       setJustCompleted(true);
@@ -123,26 +124,27 @@ export const LiveTranscriptView = memo(({
     }
   }, [isDone, hasTranscript, justCompleted]);
 
-  // Track user scroll to show/hide FAB
+  // Detect user scroll-up
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handleScroll = () => {
       if (isDone) return;
-      const nearBottom = checkIfNearBottom();
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const nearBottom = distFromBottom < 100;
       userScrolledUpRef.current = !nearBottom;
       setShowScrollDown(!nearBottom);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
-  }, [isDone, checkIfNearBottom]);
+  }, [isDone]);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     userScrolledUpRef.current = false;
     setShowScrollDown(false);
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    el.scrollTop = el.scrollHeight;
   }, []);
 
   return (
@@ -184,19 +186,13 @@ export const LiveTranscriptView = memo(({
           )}
         </div>
 
-        {/* Audio bars indicator */}
         {isConnected && !isDone && (
           <div className="flex gap-[3px] items-end h-4 flex-shrink-0">
             {[0, 1, 2, 3].map(i => (
               <motion.div
                 key={i}
                 animate={{ scaleY: [0.3, 1, 0.3] }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 0.8,
-                  delay: i * 0.12,
-                  ease: 'easeInOut',
-                }}
+                transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.12, ease: 'easeInOut' }}
                 className="w-[3px] rounded-full bg-primary origin-bottom"
                 style={{ height: 14 }}
               />
@@ -222,7 +218,7 @@ export const LiveTranscriptView = memo(({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border bg-card p-5 space-y-2 shadow-sm"
+            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border bg-card p-5 space-y-2.5 shadow-sm"
             style={{ overscrollBehavior: 'contain' }}
           >
             {lines.map((line, i) => (
@@ -233,19 +229,13 @@ export const LiveTranscriptView = memo(({
               />
             ))}
 
-            {/* Typing indicator */}
             {isConnected && !isDone && (
               <div className="flex items-center gap-1.5 pt-2">
                 {[0, 1, 2].map(i => (
                   <motion.span
                     key={i}
                     animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 1,
-                      delay: i * 0.2,
-                      ease: 'easeInOut',
-                    }}
+                    transition={{ repeat: Infinity, duration: 1, delay: i * 0.2, ease: 'easeInOut' }}
                     className="w-1.5 h-1.5 rounded-full bg-primary"
                   />
                 ))}
@@ -253,7 +243,6 @@ export const LiveTranscriptView = memo(({
             )}
           </div>
 
-          {/* Scroll to bottom FAB */}
           <AnimatePresence>
             {showScrollDown && !isDone && (
               <motion.button
@@ -271,7 +260,6 @@ export const LiveTranscriptView = memo(({
           </AnimatePresence>
         </div>
       ) : (
-        /* Empty state */
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -302,12 +290,7 @@ export const LiveTranscriptView = memo(({
               <motion.div
                 key={i}
                 animate={{ scaleY: [0.3, 1, 0.3] }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1,
-                  delay: i * 0.1,
-                  ease: 'easeInOut',
-                }}
+                transition={{ repeat: Infinity, duration: 1, delay: i * 0.1, ease: 'easeInOut' }}
                 className="w-[3px] rounded-full bg-primary/40 origin-bottom"
                 style={{ height: 16 }}
               />
