@@ -20,17 +20,37 @@ function splitLines(text: string): string[] {
     .filter(Boolean);
 }
 
-const TranscriptLine = memo(({ text, isRecent }: { text: string; index: number; isRecent: boolean }) => (
-  <motion.p
-    initial={{ opacity: 0, y: 8 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.3, ease: 'easeOut' }}
-    className={`text-sm leading-relaxed transition-colors duration-500 ${isRecent ? 'text-foreground' : 'text-foreground/60'}`}
-  >
-    {text}
-  </motion.p>
-));
-TranscriptLine.displayName = 'TranscriptLine';
+/** Reveals words one-by-one with a staggered fade */
+const AnimatedLine = memo(({ text, animate }: { text: string; animate: boolean }) => {
+  const words = useMemo(() => text.split(/\s+/), [text]);
+
+  if (!animate) {
+    return (
+      <p className="text-sm leading-relaxed text-foreground/60">{text}</p>
+    );
+  }
+
+  return (
+    <p className="text-sm leading-relaxed text-foreground">
+      {words.map((word, i) => (
+        <motion.span
+          key={`${i}-${word}`}
+          initial={{ opacity: 0, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, filter: 'blur(0px)' }}
+          transition={{
+            duration: 0.25,
+            delay: Math.min(i * 0.04, 1.5),
+            ease: 'easeOut',
+          }}
+          className="inline"
+        >
+          {word}{i < words.length - 1 ? ' ' : ''}
+        </motion.span>
+      ))}
+    </p>
+  );
+});
+AnimatedLine.displayName = 'AnimatedLine';
 
 const stageConfig: Record<string, { label: string; icon: typeof Mic }> = {
   uploading: { label: 'Laddar upp ljudfil...', icon: FileText },
@@ -57,6 +77,8 @@ export const LiveTranscriptView = memo(({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
+  const userScrolledUpRef = useRef(false);
+  const prevLineCountRef = useRef(0);
 
   const lines = useMemo(() => splitLines(liveTranscript), [liveTranscript]);
   const isDone = stage === 'done' || progress >= 100;
@@ -64,20 +86,34 @@ export const LiveTranscriptView = memo(({
   const StageIcon = stageInfo.icon;
   const hasTranscript = lines.length > 0;
 
+  // Track which lines are "new" for animation
+  const newLineStart = prevLineCountRef.current;
+  useEffect(() => {
+    prevLineCountRef.current = lines.length;
+  }, [lines.length]);
+
   // Check if user is near bottom
   const checkIfNearBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return true;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    return distFromBottom < 60;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   }, []);
 
-  // No auto-scroll — user controls scroll position manually
+  // Smooth auto-scroll when new content arrives (unless user scrolled up)
+  useEffect(() => {
+    if (!hasTranscript || isDone) return;
+    const el = scrollRef.current;
+    if (!el || userScrolledUpRef.current) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
+  }, [lines.length, hasTranscript, isDone]);
 
   // When done, scroll to top after a brief pause
   useEffect(() => {
     if (isDone && hasTranscript && !justCompleted) {
       setJustCompleted(true);
+      userScrolledUpRef.current = false;
       const el = scrollRef.current;
       if (!el) return;
       const timer = setTimeout(() => {
@@ -87,13 +123,14 @@ export const LiveTranscriptView = memo(({
     }
   }, [isDone, hasTranscript, justCompleted]);
 
-  // Show scroll-to-bottom button when not near bottom
+  // Track user scroll to show/hide FAB
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handleScroll = () => {
       if (isDone) return;
       const nearBottom = checkIfNearBottom();
+      userScrolledUpRef.current = !nearBottom;
       setShowScrollDown(!nearBottom);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
@@ -103,6 +140,7 @@ export const LiveTranscriptView = memo(({
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    userScrolledUpRef.current = false;
     setShowScrollDown(false);
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
@@ -184,15 +222,14 @@ export const LiveTranscriptView = memo(({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border bg-card p-5 space-y-2.5 shadow-sm"
-            style={{ scrollBehavior: 'smooth', overscrollBehavior: 'contain' }}
+            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border bg-card p-5 space-y-2 shadow-sm"
+            style={{ overscrollBehavior: 'contain' }}
           >
             {lines.map((line, i) => (
-              <TranscriptLine
-                key={`${i}-${line.slice(0, 20)}`}
+              <AnimatedLine
+                key={`${i}-${line.slice(0, 30)}`}
                 text={line}
-                index={i}
-                isRecent={i >= lines.length - 2}
+                animate={i >= newLineStart}
               />
             ))}
 
