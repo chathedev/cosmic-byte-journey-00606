@@ -117,10 +117,10 @@ export const AutoProtocolGenerator = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { userPlan } = useSubscription();
+  const { userPlan, enterpriseMembership } = useSubscription();
   const hasGeneratedRef = useRef(false);
   
-  const isEnterprise = userPlan?.plan === 'enterprise';
+  const isEnterprise = userPlan?.plan === 'enterprise' || enterpriseMembership?.isMember === true;
   
   // Detect large transcripts (> 5000 words typically means 100MB+ audio files)
   const wordCount = transcript.trim().split(/\s+/).filter(w => w).length;

@@ -225,9 +225,10 @@ ${shortNote}
 Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar.`;
 
     // Model selection: Enterprise → Pro, Paid → Flash, Free → Flash Lite
+    const isEnterpriseUser = isEnterprise === true || userPlan === 'enterprise';
     const isPaid = userPlan && userPlan !== 'free';
-    const geminiModel = isEnterprise ? 'gemini-2.5-pro' : isPaid ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
-    console.log('🤖 Model selection:', { isEnterprise, userPlan, geminiModel });
+    const geminiModel = isEnterpriseUser ? 'gemini-2.5-pro' : isPaid ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
+    console.log('🤖 Model selection:', { isEnterprise, userPlan, isEnterpriseUser, geminiModel });
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_API_KEY}`,
