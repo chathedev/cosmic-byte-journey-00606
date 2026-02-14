@@ -1,6 +1,6 @@
-import { useRef, useEffect, useMemo, memo, useState } from 'react';
+import { useRef, useEffect, useMemo, memo, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, FileText, Users } from 'lucide-react';
+import { Mic, FileText, Users, ChevronDown } from 'lucide-react';
 
 interface LiveTranscriptViewProps {
   liveTranscript: string;
@@ -20,13 +20,12 @@ function splitLines(text: string): string[] {
     .filter(Boolean);
 }
 
-const TranscriptLine = memo(({ text, index, isRecent }: { text: string; index: number; isRecent: boolean }) => (
+const TranscriptLine = memo(({ text, isRecent }: { text: string; index: number; isRecent: boolean }) => (
   <motion.p
-    initial={{ opacity: 0, y: 10, filter: 'blur(3px)' }}
-    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-    transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-    className={`text-sm leading-relaxed ${isRecent ? 'text-foreground' : 'text-foreground/65'}`}
-    style={{ transition: 'color 0.5s ease' }}
+    initial={{ opacity: 0, y: 8 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3, ease: 'easeOut' }}
+    className={`text-sm leading-relaxed transition-colors duration-500 ${isRecent ? 'text-foreground' : 'text-foreground/60'}`}
   >
     {text}
   </motion.p>
@@ -56,7 +55,8 @@ export const LiveTranscriptView = memo(({
   isConnected,
 }: LiveTranscriptViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const userScrolledRef = useRef(false);
+  const isAutoScrolling = useRef(true);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
 
   const lines = useMemo(() => splitLines(liveTranscript), [liveTranscript]);
@@ -65,44 +65,59 @@ export const LiveTranscriptView = memo(({
   const StageIcon = stageInfo.icon;
   const hasTranscript = lines.length > 0;
 
-  // Auto-scroll to bottom whenever transcript content changes
+  // Check if user is near bottom
+  const checkIfNearBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return true;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    return distFromBottom < 60;
+  }, []);
+
+  // Auto-scroll to bottom when new content arrives (only if user hasn't scrolled up)
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !liveTranscript || userScrolledRef.current) return;
+    if (!el || !liveTranscript || !isAutoScrolling.current) return;
 
     requestAnimationFrame(() => {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     });
   }, [liveTranscript]);
 
-  // When done, scroll back to top smoothly
+  // When done, scroll to top after a brief pause
   useEffect(() => {
     if (isDone && hasTranscript && !justCompleted) {
       setJustCompleted(true);
       const el = scrollRef.current;
       if (!el) return;
-
-      // Small delay so user sees the "klar" state, then scroll up
       const timer = setTimeout(() => {
-        userScrolledRef.current = false;
+        isAutoScrolling.current = false;
         el.scrollTo({ top: 0, behavior: 'smooth' });
       }, 800);
       return () => clearTimeout(timer);
     }
   }, [isDone, hasTranscript, justCompleted]);
 
-  // Track user scroll position
+  // Track user scroll to toggle auto-scroll and show/hide "scroll to bottom" button
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handleScroll = () => {
-      if (isDone) return; // Don't interfere after completion scroll-to-top
-      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      userScrolledRef.current = distFromBottom > 80;
+      if (isDone) return;
+      const nearBottom = checkIfNearBottom();
+      isAutoScrolling.current = nearBottom;
+      setShowScrollDown(!nearBottom);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
-  }, [isDone]);
+  }, [isDone, checkIfNearBottom]);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isAutoScrolling.current = true;
+    setShowScrollDown(false);
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -164,46 +179,78 @@ export const LiveTranscriptView = memo(({
         )}
       </div>
 
+      {/* Progress bar */}
+      {!isDone && progress > 0 && (
+        <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
+          <motion.div
+            className="h-full rounded-full bg-primary"
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(progress, 100)}%` }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+          />
+        </div>
+      )}
+
       {/* Live transcript area */}
       {hasTranscript ? (
-        <div
-          ref={scrollRef}
-          className="relative max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-card p-5 space-y-3 shadow-sm scroll-smooth"
-        >
-          {lines.map((line, i) => (
-            <TranscriptLine
-              key={`${i}-${line.slice(0, 16)}`}
-              text={line}
-              index={i}
-              isRecent={i >= lines.length - 2}
-            />
-          ))}
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border bg-card p-5 space-y-2.5 shadow-sm"
+            style={{ scrollBehavior: 'smooth', overscrollBehavior: 'contain' }}
+          >
+            {lines.map((line, i) => (
+              <TranscriptLine
+                key={`${i}-${line.slice(0, 20)}`}
+                text={line}
+                index={i}
+                isRecent={i >= lines.length - 2}
+              />
+            ))}
 
-          {/* Typing indicator */}
-          {isConnected && !isDone && (
-            <div className="flex items-center gap-1.5 pt-2">
-              {[0, 1, 2].map(i => (
-                <motion.span
-                  key={i}
-                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 1,
-                    delay: i * 0.2,
-                    ease: 'easeInOut',
-                  }}
-                  className="w-1.5 h-1.5 rounded-full bg-primary"
-                />
-              ))}
-            </div>
-          )}
+            {/* Typing indicator */}
+            {isConnected && !isDone && (
+              <div className="flex items-center gap-1.5 pt-2">
+                {[0, 1, 2].map(i => (
+                  <motion.span
+                    key={i}
+                    animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 1,
+                      delay: i * 0.2,
+                      ease: 'easeInOut',
+                    }}
+                    className="w-1.5 h-1.5 rounded-full bg-primary"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Scroll to bottom FAB */}
+          <AnimatePresence>
+            {showScrollDown && !isDone && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                onClick={scrollToBottom}
+                className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+                aria-label="Scrolla till botten"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
       ) : (
         /* Empty state */
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center py-16 gap-4 rounded-lg border border-dashed border-border bg-card/50"
+          className="flex flex-col items-center justify-center py-16 gap-4 rounded-xl border border-dashed border-border bg-card/50"
         >
           <div className="relative">
             <motion.div
