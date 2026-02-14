@@ -30,6 +30,8 @@ import { TranscriptTextView } from "@/components/TranscriptTextView";
 import { EnhancedSpeakerView } from "@/components/EnhancedSpeakerView";
 import { SyncedTranscriptView } from "@/components/SyncedTranscriptView";
 import { hasPlusAccess } from "@/lib/accessCheck";
+import { useASRStream } from "@/hooks/useASRStream";
+import { LiveTranscriptView } from "@/components/LiveTranscriptView";
 
 interface AgendaLyraSpeaker {
   label: string;
@@ -166,6 +168,21 @@ const MeetingDetail = () => {
 
   const pollingRef = useRef(false);
   const transcriptionDoneRef = useRef(false);
+
+  // SSE live stream for real-time transcript during processing
+  const isProcessingForStream = (status === 'uploading' || status === 'queued' || status === 'processing') && !transcriptionDoneRef.current;
+  const asrStream = useASRStream({
+    meetingId: id || null,
+    enabled: isProcessingForStream && !!id,
+    onCompleted: useCallback((finalPayload: any) => {
+      console.log('[ASR Stream] onCompleted - will let polling handle full state update');
+      // The polling loop will pick up the completed status and handle all state updates
+      // We just let it know to check immediately
+    }, []),
+    onFailed: useCallback(() => {
+      console.log('[ASR Stream] onFailed - polling will handle');
+    }, []),
+  });
 
   // Recording mode handlers - defined early to satisfy hooks rules
   const handleRecordingComplete = useCallback(() => {
@@ -2121,12 +2138,20 @@ const MeetingDetail = () => {
         ) : meeting ? (
           <>
             {isProcessing ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-6">
-                <ProcessingStatusMessage />
+              <div className="flex flex-col py-6 gap-4">
+                <LiveTranscriptView
+                  liveTranscript={asrStream.liveTranscript}
+                  progress={asrStream.progress || backendProgress || 0}
+                  stage={asrStream.stage || stage}
+                  totalChunks={asrStream.totalChunks}
+                  completedChunks={asrStream.completedChunks}
+                  isConnected={asrStream.isConnected}
+                  meetingTitle={meeting?.title}
+                />
                 
                 {audioBackup?.available && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
                     <span>Ljud säkrat</span>
                     <Button
                       variant="link"
