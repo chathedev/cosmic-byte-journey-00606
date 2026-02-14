@@ -176,15 +176,19 @@ export const AutoProtocolGenerator = ({
         return;
       }
       
-      // Smooth, steady progress animation
+      // Smooth, steady progress animation - slower for enterprise (Pro model takes longer)
+      const progressCap = 92;
+      const intervalMs = isEnterprise ? 300 : 200;
+      const baseIncrement = isEnterprise ? 0.4 : 0.8;
+      const variance = isEnterprise ? 0.3 : 0.6;
+      
       const progressInterval = setInterval(() => {
         setProgress(prev => {
-          if (prev >= 92) return prev; // Cap at 92% until complete
-          // Smooth incremental increase with slight variance
-          const increment = 0.8 + Math.random() * 0.6;
-          return Math.min(prev + increment, 92);
+          if (prev >= progressCap) return prev;
+          const increment = baseIncrement + Math.random() * variance;
+          return Math.min(prev + increment, progressCap);
         });
-      }, 200);
+      }, intervalMs);
 
       try {
         // Build speaker-attributed transcript if SIS data available

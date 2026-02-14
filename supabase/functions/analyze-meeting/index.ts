@@ -44,63 +44,60 @@ serve(async (req) => {
     const wordCount = transcript.trim().split(/\s+/).length;
     console.log('📊 Processing transcript:', { wordCount, chars: transcript.length });
     
-    // Determine protocol length based on transcript length - QUALITY over QUANTITY
-    // Keep protocols focused and concise - never overwhelm with too many points
+    // Determine protocol length based on transcript length AND user tier
+    // Enterprise gets richer, more detailed protocols
+    const isEnterpriseTier = isEnterprise === true || userPlan === 'enterprise';
+    const tierMultiplier = isEnterpriseTier ? 1.5 : 1; // Enterprise gets ~50% more detail
+    
     let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
     
     if (wordCount < 100) {
-      // Very short - minimal protocol
-      summaryLength = "1-2 korta meningar";
-      mainPointsCount = "1-3";
-      mainPointsDetail = "Mycket kort, en halv mening per punkt";
+      summaryLength = isEnterpriseTier ? "2-3 meningar" : "1-2 korta meningar";
+      mainPointsCount = isEnterpriseTier ? "2-4" : "1-3";
+      mainPointsDetail = "Kort och koncis, en mening per punkt";
       decisionsDetail = "Endast FAKTISKA beslut som explicit fattades";
-      actionItemsCount = "0-1";
-      actionItemsDetail = "Endast om tydligt nämnt med namn och uppgift";
+      actionItemsCount = isEnterpriseTier ? "1-2" : "0-1";
+      actionItemsDetail = "Kort – titel, ansvarig och leverans om nämnt";
       nextMeetingCount = "0-1";
     } else if (wordCount < 200) {
-      // Short meeting
-      summaryLength = "2-3 meningar med kortfattad översikt";
-      mainPointsCount = "2-4";
-      mainPointsDetail = "En kort mening per punkt";
+      summaryLength = isEnterpriseTier ? "3-4 meningar" : "2-3 meningar";
+      mainPointsCount = isEnterpriseTier ? "3-5" : "2-4";
+      mainPointsDetail = "En till två meningar per punkt med resultat";
       decisionsDetail = "Endast FAKTISKA beslut - inte diskussioner eller förslag";
-      actionItemsCount = "0-2";
-      actionItemsDetail = "Kortfattad - titel och ansvarig om explicit nämnt";
-      nextMeetingCount = "0-2";
-    } else if (wordCount < 500) {
-      // Medium-short meeting
-      summaryLength = "3-4 meningar med översikt";
-      mainPointsCount = "3-5";
-      mainPointsDetail = "En till två meningar per punkt";
-      decisionsDetail = "Endast KONKRETA beslut som fattades - inte idéer eller förslag";
-      actionItemsCount = "1-3";
-      actionItemsDetail = "Beskrivning med viktiga detaljer";
+      actionItemsCount = isEnterpriseTier ? "1-3" : "0-2";
+      actionItemsDetail = "Titel, ansvarig, leveransmål";
       nextMeetingCount = "1-2";
+    } else if (wordCount < 500) {
+      summaryLength = isEnterpriseTier ? "4-5 meningar" : "3-4 meningar";
+      mainPointsCount = isEnterpriseTier ? "4-6" : "3-5";
+      mainPointsDetail = "Två meningar per punkt med slutsats och ansvarig";
+      decisionsDetail = "KONKRETA beslut med ansvarig och konsekvens";
+      actionItemsCount = isEnterpriseTier ? "2-5" : "1-3";
+      actionItemsDetail = "Detaljerad: vad levereras, till vem, i vilket format";
+      nextMeetingCount = "1-3";
     } else if (wordCount < 1000) {
-      // Medium meeting
-      summaryLength = "4-5 meningar med detaljerad översikt";
-      mainPointsCount = "4-7";
-      mainPointsDetail = "Två meningar per punkt med detaljer";
-      decisionsDetail = "Tydliga beslut med kontext - INTE diskussioner utan resultat";
-      actionItemsCount = "2-5";
-      actionItemsDetail = "Detaljerad beskrivning med kontext";
-      nextMeetingCount = "2-3";
+      summaryLength = isEnterpriseTier ? "5-7 meningar" : "4-5 meningar";
+      mainPointsCount = isEnterpriseTier ? "5-8" : "4-7";
+      mainPointsDetail = "Två till tre meningar per punkt med detaljer och ansvarig";
+      decisionsDetail = "Tydliga beslut med kontext, ansvarig och uppföljning";
+      actionItemsCount = isEnterpriseTier ? "3-8" : "2-5";
+      actionItemsDetail = "Fullständig: leverans, mottagare, format, kvalitetskrav";
+      nextMeetingCount = "2-4";
     } else if (wordCount < 2000) {
-      // Long meeting
-      summaryLength = "5-7 meningar med detaljerad översikt";
-      mainPointsCount = "5-8";
-      mainPointsDetail = "Två till tre meningar per punkt med detaljer";
-      decisionsDetail = "Detaljerade beslut med bakgrund - ENDAST faktiska beslut";
-      actionItemsCount = "3-7";
-      actionItemsDetail = "Omfattande beskrivning med kontext och plan";
+      summaryLength = isEnterpriseTier ? "6-8 meningar" : "5-7 meningar";
+      mainPointsCount = isEnterpriseTier ? "6-10" : "5-8";
+      mainPointsDetail = "Tre meningar per punkt med djupgående detaljer";
+      decisionsDetail = "Detaljerade beslut med bakgrund, ansvarig och uppföljningsdatum";
+      actionItemsCount = isEnterpriseTier ? "5-10" : "3-7";
+      actionItemsDetail = "Omfattande: leverans, mottagare, format, tidsperspektiv, kvalitetskrav";
       nextMeetingCount = "2-4";
     } else {
-      // Very long meeting - still keep it focused, max 10 main points
-      summaryLength = "6-8 meningar med omfattande översikt";
-      mainPointsCount = "6-10";
-      mainPointsDetail = "Två till tre meningar per punkt med djupgående detaljer";
-      decisionsDetail = "Fullständiga beslut med bakgrund - ENDAST verifierbara beslut";
-      actionItemsCount = "5-10";
-      actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext";
+      summaryLength = isEnterpriseTier ? "8-10 meningar med executive briefing" : "6-8 meningar";
+      mainPointsCount = isEnterpriseTier ? "8-12" : "6-10";
+      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående analys";
+      decisionsDetail = "Fullständiga beslut med bakgrund, konsekvensanalys och ansvarig";
+      actionItemsCount = isEnterpriseTier ? "7-15" : "5-10";
+      actionItemsDetail = "Mycket omfattande: exakt leverans, mottagare, format, kvalitetsmått, beroenden";
       nextMeetingCount = "3-5";
     }
     
@@ -137,11 +134,13 @@ GRUNDREGEL: Om en läsare inte kan svara på "Vad ska jag göra måndag morgon?"
 ═══ FÖRBJUDNA MÖNSTER ═══
 Dessa formuleringar är BANNLYSTA. Använd dem ALDRIG:
 - "lyfte fram", "betonade", "poängterade", "underströk"
-- "diskuterade vikten av", "tog upp frågan om"  
-- "ska undersöka", "ska titta på", "ska kolla"
+- "diskuterade vikten av", "tog upp frågan om"
+- "ska undersöka", "ska titta på", "ska kolla", "ska se över"
+- "upprätthålla dialog", "fortsätta diskussionen", "bevaka frågan"
 - "det konstaterades att", "man var överens om att"
 - Alla passiva konstruktioner: "det beslutades" → skriv istället "X beslutade att..."
 - Berättande text som beskriver VAD som hände istället för VAD SOM SKA GÖRAS
+- Vaga åtgärder utan leveransmål: "placera frågan på agendan" → skriv istället "Presentera beslutsunderlag med tre alternativ för [frågan] på nästa styrelsemöte"
 
 ═══ OBLIGATORISK SKRIVSTIL ═══
 
@@ -165,13 +164,21 @@ BESLUT – ultra-strikt:
 - 0 beslut är bättre än 1 falskt beslut. Tom lista [] är helt acceptabelt.
 
 ÅTGÄRDSPUNKTER – leveransfokus:
-- "titel": Börja med VERB. "Genomför...", "Sammanställ...", "Kontakta...", "Leverera..."
-- "beskrivning": Besvara: Vad ska levereras? Till vem? I vilket format? Vilken kvalitet?
+- "titel": Börja med VERB. "Genomför...", "Sammanställ...", "Kontakta...", "Leverera...", "Presentera..."
+- "beskrivning": MÅSTE besvara ALLA dessa frågor:
+  1. Vad ska levereras? (dokument, beslut, analys, rapport?)
+  2. Till vem? (mottagare/forum)
+  3. I vilket format? (presentation, mail, rapport, muntligt?)
+  4. Vad är godkänt resultat? (kvalitetskrav)
   Dåligt: "Följa upp säkerhetsfrågan"
-  Bra: "Sammanställ rapport över identifierade säkerhetsbrister i API-gateway. Inkludera riskbedömning (hög/medel/låg) och förslag på åtgärder. Leverera till Erik som underlag för ledningsgruppsmöte."
+  Dåligt: "Placera frågan på agendan"
+  Dåligt: "Upprätthålla dialog med myndigheten"
+  Bra: "Sammanställ beslutsunderlag med tre alternativa strategier för myndighetskontakt. Presentera som en A4-sida med för/nackdelar per alternativ vid nästa styrelsemöte."
+  Bra: "Kontakta Arbetsmiljöverket per telefon och efterfråga skriftlig vägledning kring nya krav. Sammanfatta svaret i ett internt PM till teamet."
 - "ansvarig": Personens NAMN. Om ingen nämndes → "" (tomt, gissa aldrig)
 - "deadline": YYYY-MM-DD BARA om datum explicit sades. Annars "" (tomt, gissa aldrig)
 - "prioritet": critical (blockerar annat arbete), high (måste ske snart), medium (viktigt men ej brådskande), low (nice-to-have)
+- KVALITETSTEST: Om en åtgärd kan besvaras med "ja, men vad exakt?" → den är för vag. Gör den mer konkret.
 
 NÄSTA MÖTE-FÖRSLAG:
 - Koppla DIREKT till olösta frågor: "Uppföljning av [åtgärd X] – status och resultat"
