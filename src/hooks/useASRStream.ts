@@ -204,6 +204,15 @@ export function useASRStream({
         if (data.stage) {
           latestStageRef.current = data.stage;
         }
+        // If status already contains transcript, render it immediately (rule 9)
+        const statusTranscript = data?.transcript || '';
+        if (statusTranscript) {
+          queueRef.current.push({
+            type: 'chunk',
+            payload: { transcript: statusTranscript, orderedTranscript: statusTranscript },
+          });
+          scheduleFlush();
+        }
         setState(prev => ({
           ...prev,
           isConnected: true,
