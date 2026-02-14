@@ -175,16 +175,94 @@ const MeetingDetail = () => {
   const asrStream = useASRStream({
     meetingId: id || null,
     enabled: (isProcessingForStream || speakerEnhancementActive) && !!id,
-    onCompleted: useCallback((finalPayload: any) => {
+    onCompleted: useCallback(async (finalPayload: any) => {
       console.log('[ASR Stream] onCompleted - final transcript with speaker labels received');
-      setSpeakerEnhancementActive(false);
-      // Update transcript with final speaker-aligned version
+      
+      // Update transcript immediately with final version
       const finalTranscript = finalPayload?.transcript;
       if (finalTranscript) {
         setTranscript(finalTranscript);
       }
-      // The polling loop will pick up the completed status and handle remaining state updates
-    }, []),
+
+      // Fetch full ASR status to get speaker blocks, segments, names etc.
+      // This enables the automatic transition from plain text → speaker-divided view
+      if (id) {
+        try {
+          console.log('[ASR Stream] Fetching full ASR status for speaker data...');
+          const asrStatus = await pollASRStatus(id);
+
+          // Update transcript if ASR has a better version
+          if (asrStatus.transcript && asrStatus.transcript.trim().length > 0) {
+            setTranscript(asrStatus.transcript);
+          }
+
+          // Speaker blocks (cleaned + raw)
+          if (asrStatus.speakerBlocksCleaned) {
+            setSpeakerBlocksCleaned(asrStatus.speakerBlocksCleaned);
+          }
+          if (asrStatus.speakerBlocksRaw) {
+            setSpeakerBlocksRaw(asrStatus.speakerBlocksRaw);
+          }
+
+          // Transcript raw
+          if (asrStatus.transcriptRaw) {
+            setTranscriptRaw(asrStatus.transcriptRaw);
+          }
+
+          // Segments for speaker-divided view
+          const sisDisabled = asrStatus.lyraStatus === 'disabled' || asrStatus.sisStatus === 'disabled';
+          setIsSISDisabled(sisDisabled);
+          if (!sisDisabled) {
+            if (asrStatus.transcriptSegments?.length) {
+              setTranscriptSegments(asrStatus.transcriptSegments);
+            }
+            if (asrStatus.reconstructedSegments?.length) {
+              setReconstructedSegments(asrStatus.reconstructedSegments);
+            }
+          }
+
+          // Speaker identification data
+          setLyraSpeakers(asrStatus.lyraSpeakers || asrStatus.sisSpeakers || []);
+          setLyraMatches(asrStatus.lyraMatches || asrStatus.sisMatches || []);
+          setLyraLearning(asrStatus.lyraLearning || asrStatus.sisLearning || []);
+
+          // Speaker names: merge ASR names with dedicated endpoint names
+          const asrSpeakerNames = asrStatus.lyraSpeakerNames || asrStatus.speakerNames || {};
+          try {
+            const namesData = await backendApi.getSpeakerNames(id);
+            if (namesData.speakerNames && Object.keys(namesData.speakerNames).length > 0) {
+              setSpeakerNames({ ...asrSpeakerNames, ...namesData.speakerNames });
+            } else {
+              setSpeakerNames(asrSpeakerNames);
+            }
+          } catch {
+            setSpeakerNames(asrSpeakerNames);
+          }
+
+          // Word-level timing
+          if (asrStatus.words?.length) {
+            setTranscriptWords(asrStatus.words);
+          }
+
+          // Audio backup
+          if (asrStatus.audioBackup?.available) {
+            setAudioBackup(asrStatus.audioBackup);
+          }
+
+          // Protocol count (not in ASRStatus type but may exist)
+          const pc = (asrStatus as any).protocolCount;
+          if (typeof pc === 'number') {
+            setBackendProtocolCount(pc);
+          }
+
+          console.log('[ASR Stream] Speaker data loaded — view will transform automatically');
+        } catch (e) {
+          console.warn('[ASR Stream] Could not fetch ASR status after completion:', e);
+        }
+      }
+
+      setSpeakerEnhancementActive(false);
+    }, [id]),
     onFailed: useCallback(() => {
       console.log('[ASR Stream] onFailed - polling will handle');
       setSpeakerEnhancementActive(false);
