@@ -2318,15 +2318,10 @@ const MeetingDetail = () => {
                       transition={{ duration: 0.3, ease: 'easeOut' }}
                       className="overflow-hidden"
                     >
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
-                        >
-                          <Users className="w-4 h-4 text-primary" />
-                        </motion.div>
-                        <p className="text-sm text-muted-foreground">
-                          Förbättrar talaridentifiering i bakgrunden...
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse" />
+                        <p className="text-xs text-muted-foreground">
+                          Förbättrar talaridentifiering...
                         </p>
                       </div>
                     </motion.div>
