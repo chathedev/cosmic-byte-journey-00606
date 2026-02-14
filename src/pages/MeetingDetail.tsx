@@ -170,19 +170,40 @@ const MeetingDetail = () => {
   const transcriptionDoneRef = useRef(false);
 
   // SSE live stream for real-time transcript during processing
+  const [speakerEnhancementActive, setSpeakerEnhancementActive] = useState(false);
   const isProcessingForStream = (status === 'uploading' || status === 'queued' || status === 'processing') && !transcriptionDoneRef.current;
   const asrStream = useASRStream({
     meetingId: id || null,
-    enabled: isProcessingForStream && !!id,
+    enabled: (isProcessingForStream || speakerEnhancementActive) && !!id,
     onCompleted: useCallback((finalPayload: any) => {
-      console.log('[ASR Stream] onCompleted - will let polling handle full state update');
-      // The polling loop will pick up the completed status and handle all state updates
-      // We just let it know to check immediately
+      console.log('[ASR Stream] onCompleted - final transcript with speaker labels received');
+      setSpeakerEnhancementActive(false);
+      // Update transcript with final speaker-aligned version
+      const finalTranscript = finalPayload?.transcript;
+      if (finalTranscript) {
+        setTranscript(finalTranscript);
+      }
+      // The polling loop will pick up the completed status and handle remaining state updates
     }, []),
     onFailed: useCallback(() => {
       console.log('[ASR Stream] onFailed - polling will handle');
+      setSpeakerEnhancementActive(false);
     }, []),
   });
+
+  // When transcript is ready but speakers still processing, exit stream mode early
+  useEffect(() => {
+    if (asrStream.isTranscriptReady && asrStream.liveTranscript && !transcriptionDoneRef.current) {
+      console.log('[MeetingDetail] Transcript ready early — exiting stream mode, speakers still processing');
+      transcriptionDoneRef.current = true;
+      setSpeakerEnhancementActive(true);
+      
+      // Set transcript immediately so normal view renders
+      setTranscript(asrStream.liveTranscript);
+      setStatus('done');
+      setStage('done');
+    }
+  }, [asrStream.isTranscriptReady, asrStream.liveTranscript]);
 
   // Recording mode handlers - defined early to satisfy hooks rules
   const handleRecordingComplete = useCallback(() => {
@@ -2208,6 +2229,31 @@ const MeetingDetail = () => {
               </div>
             ) : hasTranscript ? (
               <div className="space-y-6">
+
+                {/* Speaker enhancement banner — shown while speakers still processing in background */}
+                <AnimatePresence>
+                  {speakerEnhancementActive && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3, ease: 'easeOut' }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
+                        >
+                          <Users className="w-4 h-4 text-primary" />
+                        </motion.div>
+                        <p className="text-sm text-muted-foreground">
+                          Förbättrar talaridentifiering i bakgrunden...
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Protocol Section — prominent CTA or existing protocol */}
                 {!isEditing && (
