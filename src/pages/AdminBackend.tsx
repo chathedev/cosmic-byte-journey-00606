@@ -59,6 +59,7 @@ const AdminBackend = () => {
   // ASR Provider state
   const [asrProvider, setAsrProvider] = useState<ASRProviderResponse | null>(null);
   const [asrSwitching, setAsrSwitching] = useState(false);
+  const [activeOpenaiModel, setActiveOpenaiModel] = useState<string | null>(null);
   
   // ASR Logs state
   const [logsOpen, setLogsOpen] = useState(false);
@@ -97,6 +98,9 @@ const AdminBackend = () => {
       }
       if (asrData) {
         setAsrProvider(asrData);
+        if (asrData.provider === 'openai' && asrData.openaiAsr?.models?.[0]) {
+          setActiveOpenaiModel(prev => prev || asrData.openaiAsr?.models?.[0] || null);
+        }
       }
       setLastUpdate(new Date());
     } catch (error) {
@@ -249,6 +253,7 @@ const AdminBackend = () => {
     try {
       const result = await backendApi.setASRProvider(newProvider, openaiModel);
       setAsrProvider(result);
+      if (openaiModel) setActiveOpenaiModel(openaiModel);
       const provLabel = newProvider === 'elevenlabs' ? 'ElevenLabs' : newProvider === 'assemblyai' ? 'AssemblyAI' : 'OpenAI';
       const modelSuffix = openaiModel ? ` (${openaiModel})` : '';
       toast.success(`ASR-leverantör bytt till ${provLabel}${modelSuffix}`);
@@ -741,10 +746,10 @@ const AdminBackend = () => {
                               key={m}
                               disabled={asrSwitching}
                               onClick={() => handleASRProviderSwitch('openai', m)}
-                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-mono transition-colors cursor-pointer disabled:opacity-50 ${
-                                asrProvider.storedProvider === 'openai'
-                                  ? 'border-primary bg-primary/10 text-primary'
-                                  : 'border-border text-muted-foreground hover:border-primary/50'
+                              className={`inline-flex items-center rounded border px-2.5 py-1 text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50 ${
+                                activeOpenaiModel === m
+                                  ? 'border-primary bg-primary text-primary-foreground font-semibold shadow-sm'
+                                  : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:bg-muted'
                               }`}
                             >
                               {m}
