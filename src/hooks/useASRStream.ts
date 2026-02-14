@@ -45,6 +45,8 @@ export interface ASRStreamState {
   isFailed: boolean;
   /** Final payload from 'completed' event */
   finalPayload: any | null;
+  /** Whether transcript is ready (processing_speakers stage reached — transcript usable but speakers still refining) */
+  isTranscriptReady: boolean;
 }
 
 interface UseASRStreamOptions {
@@ -62,7 +64,7 @@ export function useASRStream({
   onFailed,
   onProgress,
 }: UseASRStreamOptions): ASRStreamState & { disconnect: () => void } {
-  const [state, setState] = useState<ASRStreamState>({
+  const initialState: ASRStreamState = {
     isConnected: false,
     liveTranscript: '',
     progress: 0,
@@ -72,7 +74,10 @@ export function useASRStream({
     isCompleted: false,
     isFailed: false,
     finalPayload: null,
-  });
+    isTranscriptReady: false,
+  };
+
+  const [state, setState] = useState<ASRStreamState>(initialState);
 
   const sseRef = useRef<EventSource | null>(null);
   const queueRef = useRef<Array<{ type: string; payload: any }>>([]);
@@ -125,6 +130,8 @@ export function useASRStream({
       }
     }
 
+    const transcriptReady = latestStageRef.current === 'processing_speakers' && !!latestOrderedRef.current;
+
     setState(prev => ({
       ...prev,
       liveTranscript: latestOrderedRef.current,
@@ -132,6 +139,7 @@ export function useASRStream({
       stage: latestStageRef.current,
       totalChunks: latestTotalChunksRef.current,
       completedChunks: latestCompletedChunksRef.current,
+      isTranscriptReady: prev.isTranscriptReady || transcriptReady,
     }));
 
     onProgressRef.current?.(latestProgressRef.current, latestStageRef.current || 'processing');
@@ -173,17 +181,7 @@ export function useASRStream({
     latestCompletedChunksRef.current = 0;
     queueRef.current = [];
 
-    setState({
-      isConnected: false,
-      liveTranscript: '',
-      progress: 0,
-      stage: null,
-      totalChunks: 0,
-      completedChunks: 0,
-      isCompleted: false,
-      isFailed: false,
-      finalPayload: null,
-    });
+    setState({ ...initialState });
 
     console.log(`[ASR Stream] Connecting to SSE for meeting ${meetingId}`);
     const sse = new EventSource(streamUrl);
