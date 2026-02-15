@@ -52,53 +52,53 @@ serve(async (req) => {
     let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
     
     if (wordCount < 100) {
-      summaryLength = isEnterpriseTier ? "2-3 meningar" : "1-2 korta meningar";
-      mainPointsCount = isEnterpriseTier ? "2-4" : "1-3";
-      mainPointsDetail = "Kort och koncis, en mening per punkt";
-      decisionsDetail = "Endast FAKTISKA beslut som explicit fattades";
-      actionItemsCount = isEnterpriseTier ? "1-2" : "0-1";
-      actionItemsDetail = "Kort – titel, ansvarig och leverans om nämnt";
-      nextMeetingCount = "0-1";
-    } else if (wordCount < 200) {
       summaryLength = isEnterpriseTier ? "3-4 meningar" : "2-3 meningar";
       mainPointsCount = isEnterpriseTier ? "3-5" : "2-4";
-      mainPointsDetail = "En till två meningar per punkt med resultat";
+      mainPointsDetail = "Kort och koncis, en till två meningar per punkt";
+      decisionsDetail = "Endast FAKTISKA beslut som explicit fattades";
+      actionItemsCount = isEnterpriseTier ? "1-3" : "1-2";
+      actionItemsDetail = "Kort – titel, ansvarig och leverans om nämnt";
+      nextMeetingCount = "1-2";
+    } else if (wordCount < 200) {
+      summaryLength = isEnterpriseTier ? "4-5 meningar" : "3-4 meningar";
+      mainPointsCount = isEnterpriseTier ? "4-6" : "3-5";
+      mainPointsDetail = "Två meningar per punkt med resultat";
       decisionsDetail = "Endast FAKTISKA beslut - inte diskussioner eller förslag";
-      actionItemsCount = isEnterpriseTier ? "1-3" : "0-2";
+      actionItemsCount = isEnterpriseTier ? "2-4" : "1-3";
       actionItemsDetail = "Titel, ansvarig, leveransmål";
       nextMeetingCount = "1-2";
     } else if (wordCount < 500) {
-      summaryLength = isEnterpriseTier ? "4-5 meningar" : "3-4 meningar";
-      mainPointsCount = isEnterpriseTier ? "4-6" : "3-5";
-      mainPointsDetail = "Två meningar per punkt med slutsats och ansvarig";
-      decisionsDetail = "KONKRETA beslut med ansvarig och konsekvens";
-      actionItemsCount = isEnterpriseTier ? "2-5" : "1-3";
-      actionItemsDetail = "Detaljerad: vad levereras, till vem, i vilket format";
-      nextMeetingCount = "1-3";
-    } else if (wordCount < 1000) {
       summaryLength = isEnterpriseTier ? "5-7 meningar" : "4-5 meningar";
-      mainPointsCount = isEnterpriseTier ? "5-8" : "4-7";
-      mainPointsDetail = "Två till tre meningar per punkt med detaljer och ansvarig";
-      decisionsDetail = "Tydliga beslut med kontext, ansvarig och uppföljning";
-      actionItemsCount = isEnterpriseTier ? "3-8" : "2-5";
-      actionItemsDetail = "Fullständig: leverans, mottagare, format, kvalitetskrav";
-      nextMeetingCount = "2-4";
-    } else if (wordCount < 2000) {
+      mainPointsCount = isEnterpriseTier ? "5-8" : "4-6";
+      mainPointsDetail = "Två till tre meningar per punkt med slutsats och ansvarig";
+      decisionsDetail = "KONKRETA beslut med ansvarig och konsekvens";
+      actionItemsCount = isEnterpriseTier ? "3-6" : "2-4";
+      actionItemsDetail = "Detaljerad: vad levereras, till vem, i vilket format";
+      nextMeetingCount = "2-3";
+    } else if (wordCount < 1000) {
       summaryLength = isEnterpriseTier ? "6-8 meningar" : "5-7 meningar";
-      mainPointsCount = isEnterpriseTier ? "6-10" : "5-8";
-      mainPointsDetail = "Tre meningar per punkt med djupgående detaljer";
-      decisionsDetail = "Detaljerade beslut med bakgrund, ansvarig och uppföljningsdatum";
-      actionItemsCount = isEnterpriseTier ? "5-10" : "3-7";
-      actionItemsDetail = "Omfattande: leverans, mottagare, format, tidsperspektiv, kvalitetskrav";
-      nextMeetingCount = "2-4";
-    } else {
-      summaryLength = isEnterpriseTier ? "8-10 meningar med executive briefing" : "6-8 meningar";
-      mainPointsCount = isEnterpriseTier ? "8-12" : "6-10";
-      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående analys";
-      decisionsDetail = "Fullständiga beslut med bakgrund, konsekvensanalys och ansvarig";
-      actionItemsCount = isEnterpriseTier ? "7-15" : "5-10";
-      actionItemsDetail = "Mycket omfattande: exakt leverans, mottagare, format, kvalitetsmått, beroenden";
+      mainPointsCount = isEnterpriseTier ? "7-10" : "5-8";
+      mainPointsDetail = "Tre meningar per punkt med detaljer och ansvarig";
+      decisionsDetail = "Tydliga beslut med kontext, ansvarig och uppföljning";
+      actionItemsCount = isEnterpriseTier ? "4-10" : "3-6";
+      actionItemsDetail = "Fullständig: leverans, mottagare, format, kvalitetskrav";
       nextMeetingCount = "3-5";
+    } else if (wordCount < 2000) {
+      summaryLength = isEnterpriseTier ? "8-10 meningar" : "6-8 meningar";
+      mainPointsCount = isEnterpriseTier ? "8-12" : "6-10";
+      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer";
+      decisionsDetail = "Detaljerade beslut med bakgrund, ansvarig och uppföljningsdatum";
+      actionItemsCount = isEnterpriseTier ? "6-12" : "4-8";
+      actionItemsDetail = "Omfattande: leverans, mottagare, format, tidsperspektiv, kvalitetskrav";
+      nextMeetingCount = "3-5";
+    } else {
+      summaryLength = isEnterpriseTier ? "10-14 meningar med executive briefing" : "8-10 meningar";
+      mainPointsCount = isEnterpriseTier ? "10-18" : "8-12";
+      mainPointsDetail = "Fyra till fem meningar per punkt med djupgående analys och kontext";
+      decisionsDetail = "Fullständiga beslut med bakgrund, konsekvensanalys och ansvarig";
+      actionItemsCount = isEnterpriseTier ? "8-18" : "6-12";
+      actionItemsDetail = "Mycket omfattande: exakt leverans, mottagare, format, kvalitetsmått, beroenden";
+      nextMeetingCount = "4-6";
     }
     
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
@@ -113,17 +113,19 @@ serve(async (req) => {
 🎤 TALARINFORMATION - ANVÄND NAMN AKTIVT:
 Identifierade talare i mötet: ${speakerList}
 
-DU MÅSTE referera till talare med namn i protokollet:
-- I sammanfattningen, nämn vem som ledde mötet och viktiga bidrag (t.ex. "Mötet leddes av Charlie som presenterade...")
-- I huvudpunkter, inkludera talarens namn när de framförde något viktigt (t.ex. "Erik lyfte frågan om...")
-- I åtgärdspunkter, sätt ALLTID talarens namn som "ansvarig" om de tog på sig uppgiften
-- I beslut, nämn VEM som föreslog beslutet och vem som godkände
+DU MÅSTE referera till talare med namn i ALLA delar av protokollet:
+- I sammanfattningen, nämn vem som ledde mötet, vem som presenterade vad, och viktiga bidrag (t.ex. "Mötet leddes av Charlie som presenterade kvartalsrapporten. Erik ansvarade för den tekniska genomgången.")
+- I VARJE huvudpunkt, inkludera talarens namn och vad de sa/föreslog/beslutade (t.ex. "Erik presenterade tre alternativ för servermigrering och rekommenderade...")
+- I åtgärdspunkter, sätt ALLTID talarens namn som "ansvarig" om de tog på sig uppgiften eller nämndes i samband med den
+- I beslut, nämn VEM som föreslog beslutet, vem som stödde det, och vem som ansvarar för genomförande
 
-NAMNANVÄNDNING:
-- Skriv naturligt: "Charlie föreslog att...", "Erik och Lisa diskuterade...", "Enligt Maria bör..."
-- Nämn namn på de som aktivt bidrog till diskussionen
-- Om en specifik person var ansvarig för ett ämne, nämn dem
+NAMNANVÄNDNING - OBLIGATORISKT:
+- Skriv naturligt med namn: "Charlie föreslog att...", "Erik och Lisa diskuterade...", "Enligt Maria bör..."
+- VARJE huvudpunkt bör om möjligt nämna minst en person vid namn
+- Om en specifik person var ansvarig för ett ämne, nämn dem ALLTID
 - I åtgärdspunkter MÅSTE ansvarig-fältet innehålla namn om någon nämndes
+- Om flera personer deltog i en diskussion, nämn de viktigaste bidragsgivarna
+- Använd formuleringen "[Namn] ansvarar för..." eller "[Namn] ska leverera..." i huvudpunkter
 `;
     }
 
