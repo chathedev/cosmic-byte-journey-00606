@@ -2321,7 +2321,7 @@ const MeetingDetail = () => {
                       <div className="flex items-center gap-2 px-3 py-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse" />
                         <p className="text-xs text-muted-foreground">
-                          Förbättrar talaridentifiering...
+                          Identifierar talare — detta kan ta upp till en minut
                         </p>
                       </div>
                     </motion.div>
