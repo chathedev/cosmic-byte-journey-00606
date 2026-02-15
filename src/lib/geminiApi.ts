@@ -569,53 +569,53 @@ function buildProtocolPrompt(
   let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
   
   if (wordCount < 100) {
-    summaryLength = "2-3 meningar";
-    mainPointsCount = "2-4";
-    mainPointsDetail = "En till två meningar per punkt";
+    summaryLength = "3-4 meningar";
+    mainPointsCount = "3-5";
+    mainPointsDetail = "Två meningar per punkt med substans";
     decisionsDetail = "Endast om explicit nämnt";
     actionItemsCount = "1-2";
     actionItemsDetail = "Titel och ansvarig om nämnt";
     nextMeetingCount = "1-2";
   } else if (wordCount < 200) {
-    summaryLength = "3-4 meningar med översikt";
-    mainPointsCount = "3-5";
-    mainPointsDetail = "Två meningar per punkt";
-    decisionsDetail = "Kort formulering om nämnt";
-    actionItemsCount = "1-3";
-    actionItemsDetail = "Titel, ansvarig och leveransmål";
-    nextMeetingCount = "1-2";
-  } else if (wordCount < 500) {
     summaryLength = "4-5 meningar med översikt";
     mainPointsCount = "4-6";
-    mainPointsDetail = "Två till tre meningar per punkt";
-    decisionsDetail = "Tydlig formulering";
-    actionItemsCount = "2-4";
-    actionItemsDetail = "Beskrivning med viktiga detaljer";
+    mainPointsDetail = "Två till tre meningar per punkt med kontext";
+    decisionsDetail = "Kort formulering om nämnt";
+    actionItemsCount = "2-3";
+    actionItemsDetail = "Titel, ansvarig och leveransmål";
     nextMeetingCount = "2-3";
+  } else if (wordCount < 500) {
+    summaryLength = "5-6 meningar med översikt";
+    mainPointsCount = "5-8";
+    mainPointsDetail = "Tre meningar per punkt med kontext och slutsats";
+    decisionsDetail = "Tydlig formulering";
+    actionItemsCount = "3-5";
+    actionItemsDetail = "Beskrivning med viktiga detaljer";
+    nextMeetingCount = "2-4";
   } else if (wordCount < 1000) {
-    summaryLength = "5-7 meningar med detaljerad översikt";
+    summaryLength = "6-8 meningar med detaljerad översikt";
     mainPointsCount = "6-10";
-    mainPointsDetail = "Tre meningar per punkt med detaljer";
+    mainPointsDetail = "Tre till fyra meningar per punkt med detaljer och kontext";
     decisionsDetail = "Utförlig formulering med kontext";
-    actionItemsCount = "3-6";
+    actionItemsCount = "4-7";
     actionItemsDetail = "Detaljerad beskrivning med kontext";
     nextMeetingCount = "3-5";
   } else if (wordCount < 2000) {
-    summaryLength = "7-9 meningar med mycket detaljerad översikt";
+    summaryLength = "8-10 meningar med mycket detaljerad översikt";
     mainPointsCount = "8-12";
-    mainPointsDetail = "Tre till fyra meningar per punkt med omfattande detaljer";
+    mainPointsDetail = "Fyra meningar per punkt med djupgående detaljer";
     decisionsDetail = "Mycket utförlig formulering med bakgrund och konsekvenser";
-    actionItemsCount = "5-10";
+    actionItemsCount = "5-9";
     actionItemsDetail = "Omfattande beskrivning med full kontext och plan";
-    nextMeetingCount = "3-5";
-  } else {
-    summaryLength = "10-14 meningar med extremt detaljerad översikt";
-    mainPointsCount = "10-18";
-    mainPointsDetail = "Fyra till fem meningar per punkt med djupgående detaljer och insikter";
-    decisionsDetail = "Extremt detaljerad med fullständig bakgrund och långsiktiga konsekvenser";
-    actionItemsCount = "8-15";
-    actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext och genomförandeplan";
     nextMeetingCount = "4-6";
+  } else {
+    summaryLength = "10-12 meningar med extremt detaljerad översikt";
+    mainPointsCount = "10-15";
+    mainPointsDetail = "Fyra till fem meningar per punkt med djupgående analys och kontext";
+    decisionsDetail = "Extremt detaljerad med fullständig bakgrund och långsiktiga konsekvenser";
+    actionItemsCount = "7-14";
+    actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext och genomförandeplan";
+    nextMeetingCount = "5-7";
   }
   
   const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
