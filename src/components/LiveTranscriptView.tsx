@@ -1,6 +1,6 @@
-import { useRef, useEffect, useMemo, memo, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, FileText, Users, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 interface LiveTranscriptViewProps {
   liveTranscript: string;
@@ -12,74 +12,26 @@ interface LiveTranscriptViewProps {
   meetingTitle?: string;
 }
 
-function splitLines(text: string): string[] {
-  if (!text) return [];
-  return text
-    .split(/\n+/)
-    .map(l => l.trim())
-    .filter(Boolean);
-}
-
-/** Each word fades in with a controlled stagger — never dumps a wall of text */
-const AnimatedLine = memo(({ text, animate, lineIndex = 0 }: { text: string; animate: boolean; lineIndex?: number }) => {
-  const words = useMemo(() => text.split(/\s+/), [text]);
-  const [visibleCount, setVisibleCount] = useState(animate ? 0 : words.length);
-
-  useEffect(() => {
-    if (!animate) {
-      setVisibleCount(words.length);
-      return;
-    }
-    // Reveal words one-by-one with a controlled interval
-    setVisibleCount(0);
-    const baseDelay = lineIndex * 120; // stagger lines too
-    const timer = setTimeout(() => {
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        setVisibleCount(i);
-        if (i >= words.length) clearInterval(interval);
-      }, 55); // ~55ms per word = smooth typewriter feel
-      return () => clearInterval(interval);
-    }, baseDelay);
-    return () => clearTimeout(timer);
-  }, [animate, words.length, lineIndex]);
-
-  return (
-    <p className="text-sm leading-relaxed text-foreground">
-      {words.map((word, i) => (
-        <span
-          key={`${i}-${word}`}
-          className="inline transition-all duration-300 ease-out"
-          style={{
-            opacity: i < visibleCount ? 1 : 0,
-            filter: i < visibleCount ? 'blur(0px)' : 'blur(4px)',
-            transform: i < visibleCount ? 'translateY(0)' : 'translateY(2px)',
-          }}
-        >
-          {word}{i < words.length - 1 ? ' ' : ''}
-        </span>
-      ))}
-    </p>
-  );
-});
-AnimatedLine.displayName = 'AnimatedLine';
-
-const stageConfig: Record<string, { label: string; icon: typeof Mic }> = {
-  uploading: { label: 'Laddar upp ljudfil...', icon: FileText },
-  queued: { label: 'Förbereder transkription...', icon: FileText },
-  transcribing: { label: 'Transkriberar ljudet...', icon: Mic },
-  sis_processing: { label: 'Identifierar talare...', icon: Users },
-  processing_speakers: { label: 'Förbättrar talaridentifiering...', icon: Users },
-  done: { label: 'Transkription klar', icon: Mic },
+const stageLabels: Record<string, string> = {
+  uploading: 'Laddar upp ljudfil',
+  queued: 'Förbereder transkription',
+  transcribing: 'Transkriberar',
+  sis_processing: 'Identifierar talare',
+  processing_speakers: 'Förbättrar talaridentifiering',
+  done: 'Klar',
 };
 
-const getStageInfo = (stage: string | null, progress: number) => {
-  if (!stage && progress === 0) return { label: 'Ansluter...', icon: Mic };
-  if (stage && stageConfig[stage]) return stageConfig[stage];
-  return { label: 'Bearbetar...', icon: Mic };
+const getStageLabel = (stage: string | null, progress: number) => {
+  if (!stage && progress === 0) return 'Ansluter';
+  if (stage && stageLabels[stage]) return stageLabels[stage];
+  return 'Bearbetar';
 };
 
+/**
+ * Word-buffer approach: incoming text is diffed against what we've already queued.
+ * New words go into a queue that drains at a fixed rate (~40ms/word) for a smooth
+ * typewriter effect, regardless of how large the backend chunks are.
+ */
 export const LiveTranscriptView = memo(({
   liveTranscript,
   progress,
@@ -90,55 +42,95 @@ export const LiveTranscriptView = memo(({
 }: LiveTranscriptViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  const [justCompleted, setJustCompleted] = useState(false);
   const userScrolledUpRef = useRef(false);
-  const prevLineCountRef = useRef(0);
 
-  const lines = useMemo(() => splitLines(liveTranscript), [liveTranscript]);
+  // Word buffer state
+  const allWordsRef = useRef<string[]>([]);
+  const [visibleWords, setVisibleWords] = useState<string[]>([]);
+  const drainTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const targetCountRef = useRef(0);
+
   const isDone = stage === 'done' || progress >= 100;
-  const stageInfo = getStageInfo(stage, progress);
-  const StageIcon = stageInfo.icon;
-  const hasTranscript = lines.length > 0;
+  const stageLabel = getStageLabel(stage, progress);
 
-  const newLineStart = prevLineCountRef.current;
+  // When liveTranscript changes, compute new words and push to buffer
   useEffect(() => {
-    prevLineCountRef.current = lines.length;
-  }, [lines.length]);
+    if (!liveTranscript) return;
 
-  // Aggressive auto-scroll: runs on every content change via an interval
-  useEffect(() => {
-    if (!hasTranscript || isDone) return;
-    const el = scrollRef.current;
-    if (!el) return;
+    const incomingWords = liveTranscript.split(/\s+/).filter(Boolean);
+    const prevLen = allWordsRef.current.length;
 
-    // Immediate scroll
-    if (!userScrolledUpRef.current) {
-      el.scrollTop = el.scrollHeight;
+    if (incomingWords.length <= prevLen) return; // no new words
+
+    allWordsRef.current = incomingWords;
+    targetCountRef.current = incomingWords.length;
+
+    // Start drain if not running
+    if (!drainTimerRef.current) {
+      drainTimerRef.current = setInterval(() => {
+        setVisibleWords(prev => {
+          const next = prev.length + 1;
+          if (next >= targetCountRef.current) {
+            // Caught up — stop draining until more words arrive
+            if (drainTimerRef.current) {
+              clearInterval(drainTimerRef.current);
+              drainTimerRef.current = null;
+            }
+            return allWordsRef.current.slice(0, targetCountRef.current);
+          }
+          return allWordsRef.current.slice(0, next);
+        });
+      }, 40); // 40ms per word ≈ 25 words/sec — fast but readable
     }
+  }, [liveTranscript]);
 
-    // Keep scrolling smoothly as word animations reveal
+  // When done, show everything immediately
+  useEffect(() => {
+    if (isDone && allWordsRef.current.length > 0) {
+      if (drainTimerRef.current) {
+        clearInterval(drainTimerRef.current);
+        drainTimerRef.current = null;
+      }
+      setVisibleWords([...allWordsRef.current]);
+    }
+  }, [isDone]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (drainTimerRef.current) clearInterval(drainTimerRef.current);
+    };
+  }, []);
+
+  // Auto-scroll
+  useEffect(() => {
+    if (isDone || visibleWords.length === 0) return;
+    const el = scrollRef.current;
+    if (!el || userScrolledUpRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [visibleWords.length, isDone]);
+
+  // Smooth scroll interval for in-between renders
+  useEffect(() => {
+    if (isDone || visibleWords.length === 0) return;
     const interval = setInterval(() => {
       if (!userScrolledUpRef.current && scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
-    }, 150);
-
+    }, 200);
     return () => clearInterval(interval);
-  }, [lines.length, hasTranscript, isDone]);
+  }, [isDone, visibleWords.length]);
 
-  // When done, scroll to top
+  // When done scroll to top
   useEffect(() => {
-    if (isDone && hasTranscript && !justCompleted) {
-      setJustCompleted(true);
+    if (isDone && visibleWords.length > 0) {
       userScrolledUpRef.current = false;
-      const el = scrollRef.current;
-      if (!el) return;
-      const timer = setTimeout(() => {
-        el.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 800);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 600);
+      return () => clearTimeout(t);
     }
-  }, [isDone, hasTranscript, justCompleted]);
+  }, [isDone, visibleWords.length]);
 
   // Detect user scroll-up
   useEffect(() => {
@@ -146,117 +138,72 @@ export const LiveTranscriptView = memo(({
     if (!el) return;
     const handleScroll = () => {
       if (isDone) return;
-      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      const nearBottom = distFromBottom < 100;
-      userScrolledUpRef.current = !nearBottom;
-      setShowScrollDown(!nearBottom);
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const near = dist < 100;
+      userScrolledUpRef.current = !near;
+      setShowScrollDown(!near);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, [isDone]);
 
   const scrollToBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
     userScrolledUpRef.current = false;
     setShowScrollDown(false);
-    el.scrollTop = el.scrollHeight;
+    scrollRef.current && (scrollRef.current.scrollTop = scrollRef.current.scrollHeight);
   }, []);
 
+  const hasContent = visibleWords.length > 0;
+
   return (
-    <div className="flex flex-col gap-4 w-full">
-      {/* Stage indicator */}
-      <div className="flex items-center gap-3 px-1">
-        <div className="relative flex-shrink-0">
-          {!isDone && (
-            <motion.div
-              animate={{ scale: [1, 1.5, 1], opacity: [0.15, 0.35, 0.15] }}
-              transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-              className="absolute inset-0 rounded-full bg-primary/20 blur-md"
-            />
-          )}
-          <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center ${
-            isDone ? 'bg-green-500/10' : 'bg-primary/10'
-          }`}>
-            <StageIcon className={`w-4 h-4 ${isDone ? 'text-green-600' : 'text-primary'}`} />
-          </div>
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={stageInfo.label}
-              initial={{ opacity: 0, x: -4 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 4 }}
-              transition={{ duration: 0.15 }}
-              className="text-sm font-medium text-foreground"
-            >
-              {stageInfo.label}
-            </motion.p>
-          </AnimatePresence>
+    <div className="flex flex-col gap-3 w-full">
+      {/* Minimal status bar */}
+      <div className="flex items-center gap-2 px-1">
+        {!isDone && (
+          <div className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse flex-shrink-0" />
+        )}
+        <p className="text-xs text-muted-foreground">
+          {stageLabel}
           {totalChunks > 0 && !isDone && (
-            <p className="text-[11px] text-muted-foreground">
-              Del {completedChunks} av {totalChunks}
-            </p>
+            <span className="ml-1 tabular-nums">{completedChunks}/{totalChunks}</span>
           )}
-        </div>
-
-        {isConnected && !isDone && (
-          <div className="flex gap-[3px] items-end h-4 flex-shrink-0">
-            {[0, 1, 2, 3].map(i => (
-              <motion.div
-                key={i}
-                animate={{ scaleY: [0.3, 1, 0.3] }}
-                transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.12, ease: 'easeInOut' }}
-                className="w-[3px] rounded-full bg-primary origin-bottom"
-                style={{ height: 14 }}
-              />
-            ))}
+        </p>
+        {!isDone && progress > 0 && (
+          <div className="flex-1 h-[2px] rounded-full bg-muted overflow-hidden ml-2">
+            <div
+              className="h-full rounded-full bg-primary/50 transition-all duration-500 ease-out"
+              style={{ width: `${Math.min(progress, 100)}%` }}
+            />
           </div>
         )}
       </div>
 
-      {/* Progress bar */}
-      {!isDone && progress > 0 && (
-        <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-primary"
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-          />
-        </div>
-      )}
-
-      {/* Live transcript area */}
-      {hasTranscript ? (
+      {/* Transcript area */}
+      {hasContent ? (
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border bg-card p-5 space-y-2.5 shadow-sm"
+            className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-card px-5 py-4"
             style={{ overscrollBehavior: 'contain' }}
           >
-            {lines.map((line, i) => (
-              <AnimatedLine
-                key={`${i}-${line.slice(0, 30)}`}
-                text={line}
-                animate={i >= newLineStart}
-                lineIndex={i >= newLineStart ? i - newLineStart : 0}
-              />
-            ))}
+            <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+              {visibleWords.map((word, i) => (
+                <span
+                  key={i}
+                  className="inline animate-fade-in"
+                  style={{
+                    animationDuration: '0.25s',
+                    animationFillMode: 'both',
+                  }}
+                >
+                  {word}{i < visibleWords.length - 1 ? ' ' : ''}
+                </span>
+              ))}
+            </p>
 
+            {/* Typing cursor */}
             {isConnected && !isDone && (
-              <div className="flex items-center gap-1.5 pt-2">
-                {[0, 1, 2].map(i => (
-                  <motion.span
-                    key={i}
-                    animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1, 0.8] }}
-                    transition={{ repeat: Infinity, duration: 1, delay: i * 0.2, ease: 'easeInOut' }}
-                    className="w-1.5 h-1.5 rounded-full bg-primary"
-                  />
-                ))}
-              </div>
+              <span className="inline-block w-[2px] h-[14px] bg-primary/60 animate-pulse ml-0.5 align-middle" />
             )}
           </div>
 
@@ -266,54 +213,24 @@ export const LiveTranscriptView = memo(({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.15 }}
                 onClick={scrollToBottom}
-                className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+                className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-md flex items-center justify-center hover:bg-primary/90 transition-colors"
                 aria-label="Scrolla till botten"
               >
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-3.5 h-3.5" />
               </motion.button>
             )}
           </AnimatePresence>
         </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center py-16 gap-4 rounded-xl border border-dashed border-border bg-card/50"
-        >
-          <div className="relative">
-            <motion.div
-              animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.3, 0.1] }}
-              transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-              className="absolute -inset-3 bg-primary/10 rounded-full blur-lg"
-            />
-            <motion.div
-              animate={{ scale: [1, 1.06, 1] }}
-              transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-              className="relative w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/10"
-            >
-              <Mic className="w-6 h-6 text-primary" />
-            </motion.div>
-          </div>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-medium text-foreground">{stageInfo.label}</p>
-            <p className="text-xs text-muted-foreground">
-              Transkriptet byggs upp i realtid och visas här
-            </p>
-          </div>
-          <div className="flex gap-1 items-end h-5 mt-1">
-            {[0, 1, 2, 3, 4].map(i => (
-              <motion.div
-                key={i}
-                animate={{ scaleY: [0.3, 1, 0.3] }}
-                transition={{ repeat: Infinity, duration: 1, delay: i * 0.1, ease: 'easeInOut' }}
-                className="w-[3px] rounded-full bg-primary/40 origin-bottom"
-                style={{ height: 16 }}
-              />
-            ))}
-          </div>
-        </motion.div>
+        /* Empty / waiting state */
+        <div className="flex flex-col items-center justify-center py-14 gap-3 rounded-lg border border-dashed border-border bg-card/50">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-pulse" />
+          <p className="text-xs text-muted-foreground">
+            Transkriptet visas här i realtid
+          </p>
+        </div>
       )}
     </div>
   );
