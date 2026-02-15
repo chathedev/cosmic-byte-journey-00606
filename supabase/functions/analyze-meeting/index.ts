@@ -210,6 +210,16 @@ NÄSTA MÖTE-FÖRSLAG:
 - Koppla DIREKT till olösta frågor: "Uppföljning av [specifik åtgärd] – status och resultat"
 - ALDRIG datum/tider. Bara ämnen.
 
+═══ DIPLOMATISK SPRÅKPOLERING ═══
+Protokollet ska vara institutionellt hållbart – det kan skickas till myndigheter, styrelser eller externa parter.
+
+REGLER:
+- Undvik absoluta påståenden som kan ifrågasättas. Skriv "med en mycket låg officiell olycksfrekvens" istället för "med endast två dödsfall sedan 1972".
+- Undvik retoriska eller informella uttryck från transkriptionen (t.ex. "agera polis"). Omformulera till formellt språk: "ta ett större egenansvar för säkerhetsuppföljning".
+- Om en talare använde starkt eller färgat språk, BEHÅLL innebörden men GÖR den diplomatisk och formell.
+- Varje formulering ska klara testet: "Kan detta publiceras i en årsredovisning utan att någon reagerar?"
+- Strategiska spänningar och meningsskiljaktigheter ska beskrivas NEUTRALT men TYDLIGT – aldrig dramatiserat, aldrig urvattnat.
+
 ═══ KVALITETSKONTROLL ═══
 Innan du svarar, kontrollera:
 1. Innehåller VARJE huvudpunkt DOMÄNSPECIFIK substans? Om en punkt "kunde tillhöra vilket möte som helst" → SKRIV OM med specifika detaljer från transkriptionen.
@@ -218,6 +228,7 @@ Innan du svarar, kontrollera:
 4. Finns det NÅGRA av de bannlysta formuleringarna? Om ja → skriv om.
 5. Kan en person som INTE var på mötet förstå exakt vad som diskuterades och vad som ska göras? Om inte → förtydliga med domänspecifika detaljer.
 6. Nämns organisationer, regelverk, tekniska termer och siffror som togs upp i mötet? Om inte → lägg till dem.
+7. Klarar VARJE formulering det diplomatiska testet? Om ett uttryck är för informellt, retoriskt eller absolut → omformulera till institutionellt hållbart språk.
 
 Dagens datum: ${new Date().toISOString().split('T')[0]}
 VIKTIGT: Alla datum i protokollet (inklusive deadlines) MÅSTE vara i framtiden relativt dagens datum. Använd ALDRIG år som redan passerat.
