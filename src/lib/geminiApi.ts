@@ -569,53 +569,53 @@ function buildProtocolPrompt(
   let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
   
   if (wordCount < 100) {
-    summaryLength = "1-2 korta meningar";
-    mainPointsCount = "2-3";
-    mainPointsDetail = "Mycket kort, en halv mening per punkt";
+    summaryLength = "2-3 meningar";
+    mainPointsCount = "2-4";
+    mainPointsDetail = "En till två meningar per punkt";
     decisionsDetail = "Endast om explicit nämnt";
-    actionItemsCount = "0-1";
-    actionItemsDetail = "Endast om tydligt nämnt med namn och uppgift";
-    nextMeetingCount = "0-1";
-  } else if (wordCount < 200) {
-    summaryLength = "2-3 meningar med kortfattad översikt";
-    mainPointsCount = "3-4";
-    mainPointsDetail = "En kort mening per punkt";
-    decisionsDetail = "Kort formulering om nämnt";
     actionItemsCount = "1-2";
-    actionItemsDetail = "Kortfattad - titel och ansvarig om nämnt";
+    actionItemsDetail = "Titel och ansvarig om nämnt";
+    nextMeetingCount = "1-2";
+  } else if (wordCount < 200) {
+    summaryLength = "3-4 meningar med översikt";
+    mainPointsCount = "3-5";
+    mainPointsDetail = "Två meningar per punkt";
+    decisionsDetail = "Kort formulering om nämnt";
+    actionItemsCount = "1-3";
+    actionItemsDetail = "Titel, ansvarig och leveransmål";
     nextMeetingCount = "1-2";
   } else if (wordCount < 500) {
-    summaryLength = "3-4 meningar med översikt";
+    summaryLength = "4-5 meningar med översikt";
     mainPointsCount = "4-6";
-    mainPointsDetail = "En till två meningar per punkt";
+    mainPointsDetail = "Två till tre meningar per punkt";
     decisionsDetail = "Tydlig formulering";
     actionItemsCount = "2-4";
     actionItemsDetail = "Beskrivning med viktiga detaljer";
     nextMeetingCount = "2-3";
   } else if (wordCount < 1000) {
-    summaryLength = "4-6 meningar med detaljerad översikt";
+    summaryLength = "5-7 meningar med detaljerad översikt";
     mainPointsCount = "6-10";
-    mainPointsDetail = "Två meningar per punkt med detaljer";
+    mainPointsDetail = "Tre meningar per punkt med detaljer";
     decisionsDetail = "Utförlig formulering med kontext";
     actionItemsCount = "3-6";
     actionItemsDetail = "Detaljerad beskrivning med kontext";
-    nextMeetingCount = "3-4";
+    nextMeetingCount = "3-5";
   } else if (wordCount < 2000) {
-    summaryLength = "6-8 meningar med mycket detaljerad översikt";
-    mainPointsCount = "10-15";
-    mainPointsDetail = "Två till tre meningar per punkt med omfattande detaljer";
+    summaryLength = "7-9 meningar med mycket detaljerad översikt";
+    mainPointsCount = "8-12";
+    mainPointsDetail = "Tre till fyra meningar per punkt med omfattande detaljer";
     decisionsDetail = "Mycket utförlig formulering med bakgrund och konsekvenser";
     actionItemsCount = "5-10";
     actionItemsDetail = "Omfattande beskrivning med full kontext och plan";
-    nextMeetingCount = "4-5";
+    nextMeetingCount = "3-5";
   } else {
-    summaryLength = "8-12 meningar med extremt detaljerad översikt";
-    mainPointsCount = "15-25";
-    mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer och insikter";
+    summaryLength = "10-14 meningar med extremt detaljerad översikt";
+    mainPointsCount = "10-18";
+    mainPointsDetail = "Fyra till fem meningar per punkt med djupgående detaljer och insikter";
     decisionsDetail = "Extremt detaljerad med fullständig bakgrund och långsiktiga konsekvenser";
     actionItemsCount = "8-15";
     actionItemsDetail = "Mycket omfattande beskrivning med komplett kontext och genomförandeplan";
-    nextMeetingCount = "5-7";
+    nextMeetingCount = "4-6";
   }
   
   const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
@@ -627,20 +627,20 @@ function buildProtocolPrompt(
   if (hasSpeakerAttribution && speakers && speakers.length > 0) {
     const speakerList = speakers.map(s => s.name).join(', ');
     speakerNote = `
-🎤 TALARINFORMATION (använd naturligt, inte överdrivet):
+🎤 TALARINFORMATION - ANVÄND NAMN AKTIVT I ALLA SEKTIONER:
 Identifierade talare i mötet: ${speakerList}
 
-Du SKA subtilt och naturligt referera till talare i protokollet:
-- I sammanfattningen, nämn huvudtalare kort om relevant (t.ex. "Mötet leddes av Charlie som...")
-- I huvudpunkter, inkludera talarens namn när de hade en specifik åsikt eller förslag
-- I åtgärdspunkter, sätt talarens namn som "ansvarig" om de tog på sig uppgiften
-- I beslut, nämn om en specifik person föreslog det
+DU MÅSTE referera till talare med namn i ALLA delar av protokollet:
+- I sammanfattningen, nämn vem som ledde mötet och vem som presenterade vad
+- I VARJE huvudpunkt, inkludera talarens namn och vad de sa/föreslog/beslutade
+- I åtgärdspunkter, sätt ALLTID talarens namn som "ansvarig"
+- I beslut, nämn VEM som föreslog och vem som ansvarar
 
-VIKTIGT - Balans:
-- Använd INTE talarnamn på varje punkt - bara när det tillför värde
-- Skriv naturligt, t.ex. "Charlie föreslog..." eller "Enligt Erik bör..."
-- Om samma person säger allt, nämn dem bara 1-2 gånger, inte på varje punkt
-- Fokusera på INNEHÅLLET först, talarattribuering är sekundär
+NAMNANVÄNDNING - OBLIGATORISKT:
+- Skriv naturligt: "Charlie föreslog att...", "Erik och Lisa diskuterade..."
+- VARJE huvudpunkt bör nämna minst en person vid namn
+- I åtgärdspunkter MÅSTE ansvarig-fältet innehålla namn om någon nämndes
+- Använd formuleringen "[Namn] ansvarar för..." i huvudpunkter
 `;
   }
 

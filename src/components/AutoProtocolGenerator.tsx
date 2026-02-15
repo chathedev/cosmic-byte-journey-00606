@@ -664,16 +664,16 @@ export const AutoProtocolGenerator = ({
 
       protocol.actionItems.forEach((item, index) => {
         // Title with priority indicator
-        const priorityEmoji = item.priority === 'critical' ? '🔴' : 
-                             item.priority === 'high' ? '🟠' : 
-                             item.priority === 'medium' ? '🟡' : '🟢';
+        const priorityLabel = item.priority === 'critical' ? '[KRITISK]' : 
+                             item.priority === 'high' ? '[HÖG]' : 
+                             item.priority === 'medium' ? '[MEDIUM]' : '[LÅG]';
         
         documentChildren.push(
           new Paragraph({
             children: [
               new TextRun({ text: `${index + 1}. `, bold: true }),
               new TextRun({ text: item.title, bold: true }),
-              new TextRun({ text: ` ${priorityEmoji}` }),
+              new TextRun({ text: ` ${priorityLabel}`, italics: true, color: "888888", size: 18 }),
             ],
             spacing: { before: 150, after: 50 },
           })
@@ -1162,6 +1162,21 @@ export const AutoProtocolGenerator = ({
               </div>
             )}
 
+          </div>
+
+          {/* Footer */}
+          <div className="mt-12 pt-6 border-t border-border/40">
+            <p className="text-center text-xs text-muted-foreground/50">
+              dokumenterat av{' '}
+              <a 
+                href="https://tivly.se" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors"
+              >
+                tivly.se
+              </a>
+            </p>
           </div>
         </Card>
       </div>

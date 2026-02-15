@@ -196,8 +196,31 @@ export const ProtocolViewerDialog = ({
                       fontFamily: 'Georgia, "Times New Roman", serif',
                       lineHeight: '1.8',
                     }}
-                    dangerouslySetInnerHTML={{ __html: htmlContent }}
-                  />
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                    <div style={{ 
+                      marginTop: '4rem', 
+                      paddingTop: '1.5rem', 
+                      borderTop: '1px solid #e5e5e5',
+                      textAlign: 'center' 
+                    }}>
+                      <a 
+                        href="https://tivly.se" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ 
+                          color: '#aaaaaa', 
+                          fontSize: '11px', 
+                          fontFamily: 'Helvetica, Arial, sans-serif',
+                          textDecoration: 'none',
+                          borderBottom: '1px solid #cccccc',
+                          paddingBottom: '1px',
+                        }}
+                      >
+                        dokumenterat av tivly.se
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
