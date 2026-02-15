@@ -20,30 +20,45 @@ function splitLines(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Each word fades in slowly with a stagger */
-const AnimatedLine = memo(({ text, animate }: { text: string; animate: boolean }) => {
+/** Each word fades in with a controlled stagger — never dumps a wall of text */
+const AnimatedLine = memo(({ text, animate, lineIndex = 0 }: { text: string; animate: boolean; lineIndex?: number }) => {
   const words = useMemo(() => text.split(/\s+/), [text]);
+  const [visibleCount, setVisibleCount] = useState(animate ? 0 : words.length);
 
-  if (!animate) {
-    return <p className="text-sm leading-relaxed text-foreground/55">{text}</p>;
-  }
+  useEffect(() => {
+    if (!animate) {
+      setVisibleCount(words.length);
+      return;
+    }
+    // Reveal words one-by-one with a controlled interval
+    setVisibleCount(0);
+    const baseDelay = lineIndex * 120; // stagger lines too
+    const timer = setTimeout(() => {
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        setVisibleCount(i);
+        if (i >= words.length) clearInterval(interval);
+      }, 55); // ~55ms per word = smooth typewriter feel
+      return () => clearInterval(interval);
+    }, baseDelay);
+    return () => clearTimeout(timer);
+  }, [animate, words.length, lineIndex]);
 
   return (
     <p className="text-sm leading-relaxed text-foreground">
       {words.map((word, i) => (
-        <motion.span
+        <span
           key={`${i}-${word}`}
-          initial={{ opacity: 0, y: 3, filter: 'blur(6px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          transition={{
-            duration: 0.5,
-            delay: Math.min(i * 0.09, 4),
-            ease: [0.25, 0.1, 0.25, 1],
+          className="inline transition-all duration-300 ease-out"
+          style={{
+            opacity: i < visibleCount ? 1 : 0,
+            filter: i < visibleCount ? 'blur(0px)' : 'blur(4px)',
+            transform: i < visibleCount ? 'translateY(0)' : 'translateY(2px)',
           }}
-          className="inline"
         >
           {word}{i < words.length - 1 ? ' ' : ''}
-        </motion.span>
+        </span>
       ))}
     </p>
   );
@@ -227,6 +242,7 @@ export const LiveTranscriptView = memo(({
                 key={`${i}-${line.slice(0, 30)}`}
                 text={line}
                 animate={i >= newLineStart}
+                lineIndex={i >= newLineStart ? i - newLineStart : 0}
               />
             ))}
 
