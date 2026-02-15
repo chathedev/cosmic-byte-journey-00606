@@ -644,36 +644,30 @@ NAMNANVÄNDNING - OBLIGATORISKT:
 `;
   }
 
-  return `Du är en professionell mötessekreterare. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett DETALJERAT protokoll som täcker det viktigaste från mötet.
+  return `Du är en operativ styrelsesekreterare med expertis inom det aktuella ämnesområdet. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett DETALJERAT protokoll.
 
-🚫 ABSOLUT FÖRBJUDET:
+ABSOLUT FÖRBJUDET:
 - Kopiera NÅGON mening direkt från utskriften
 - Klistra in fraser ordagrant från transkriptionen
-- Upprepa meningar eller stycken från originaltexten
-- Lista punkter som är direkta citat
+- Generiska formuleringar som "kunde tillhöra vilket möte som helst"
+- "Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg" (BANNLYST)
+- "Deltagarna diskuterade ansvarsfördelning, tidsplan och prioriterade aktiviteter" (BANNLYST)
+- Alla vaga, abstrakta sammanfattningar utan domänspecifikt innehåll
 
-✅ DU MÅSTE:
+DU MÅSTE:
 - OMFORMULERA allt innehåll med egna ord
 - SYNTETISERA information från flera delar av mötet
-- SKRIVA professionella, välformulerade meningar
-- SAMMANFATTA och PARAFRASERA diskussionerna
-- INKLUDERA VIKTIGA DETALJER från mötet
+- Inkludera DOMÄNSPECIFIKA detaljer: organisationsnamn, tekniska termer, regelverk, siffror, produkter
+- Om deltagare hade OLIKA STÅNDPUNKTER, beskriv dem: "[Namn A] förespråkade X medan [Namn B] argumenterade för Y"
+- Fånga strategiska spänningar eller meningsskiljaktigheter neutralt men tydligt
+- VARJE huvudpunkt MÅSTE vara unik för just detta möte – inte generisk
 
-🎯 KRITISKA NOGGRANNHETSKRAV:
-- Inkludera ENDAST information som FAKTISKT diskuterades i mötet
-- Dra INGA slutsatser som inte EXPLICIT nämndes i utskriften
-- Om något är oklart, använd formuleringen "enligt diskussionen" eller "som nämndes"
-- GÖR INGA ANTAGANDEN om saker som inte sades i mötet
-- Vid osäkerhet, var KONSERVATIV - utelämna hellre information än att gissa
-- VERIFIERA att varje punkt du skriver faktiskt har stöd i utskriften
+KRITISKA NOGGRANNHETSKRAV:
+- Inkludera ENDAST information som FAKTISKT diskuterades
+- Dra INGA slutsatser som inte EXPLICIT nämndes
 - Om en person nämns, använd EXAKT det namn som används i utskriften
 - Om siffror eller data nämns, använd EXAKT de värden som nämndes
-- Lägg ALDRIG till extra kontext eller bakgrundsinformation som inte diskuterades
-- Om ingen ansvarig nämndes för en åtgärd, lämna fältet TOMT - gissa inte
-- Om inget beslut togs om något, inkludera det INTE i beslutslistan
-
-⚠️ VARNING: Felaktiga protokoll med uppfinnad information är OACCEPTABELT.
-Korrekthet och faktabaserad dokumentation är VIKTIGARE än omfattande protokoll.
+- Om ingen ansvarig nämndes, lämna fältet TOMT
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -681,35 +675,30 @@ Längd: ${wordCount} ord${agendaSection}
 Utskrift:
 ${transcript}
 
-VIKTIGT för "nästaMöteFörslag": Lista ENDAST diskussionsämnen och uppföljningspunkter. Inkludera ALDRIG datum, tider eller när mötet ska äga rum - bara VAD som bör tas upp.
-
-VIKTIGT för åtgärdspunkter: Om inget specifikt datum nämndes för en deadline, lämna "deadline"-fältet HELT TOMT (tom sträng ""). Gissa INTE eller lägg INTE till dagens år automatiskt.
-
-Skapa ett professionellt, DETALJERAT och OMFATTANDE protokoll som ren JSON-struktur på svenska med följande form (inga kommentarer):
+Skapa ett professionellt, DETALJERAT och DOMÄNSPECIFIKT protokoll som ren JSON-struktur på svenska:
 
 {
   "protokoll": {
-    "titel": "...",
+    "titel": "Kort, specifik titel som fångar huvudbeslutet eller syftet",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "${summaryLength}. Inkludera kontext, viktiga diskussioner, beslut och resultat. Skriv professionellt.",
+    "sammanfattning": "${summaryLength}. Executive briefing-stil med domänspecifika detaljer.",
     "huvudpunkter": [
-      "${mainPointsCount} totalt. ${mainPointsDetail}. Täck alla viktiga ämnen som diskuterades under mötet."
+      "${mainPointsCount} totalt. ${mainPointsDetail}. VARJE punkt MÅSTE innehålla specifika organisationer, termer, siffror eller sakfrågor från mötet. Format: Ämne → Resultat → Ansvarig → Status."
     ],
     "beslut": [
-      "${decisionsDetail}. Lista alla beslut som togs."
+      "${decisionsDetail}. Format: '[Beslut] → Ansvarig: [Namn]. Deadline: [datum/saknas].' Tom lista om inga beslut fattades."
     ],
     "åtgärdspunkter": [
-      "VIKTIGT: Generera EXAKT ${actionItemsCount} åtgärdspunkter baserat på mötets längd.",
       {
-        "titel": "Tydlig och konkret titel på uppgiften",
-        "beskrivning": "${actionItemsDetail}",
-        "ansvarig": "Namn eller roll om nämnt i mötet, annars tom sträng",
-        "deadline": "YYYY-MM-DD endast om datum explicit nämndes, annars tom sträng",
-        "prioritet": "critical | high | medium | low baserat på urgency i mötet"
+        "titel": "VERB-inledd, specifik leverans",
+        "beskrivning": "${actionItemsDetail}. Vad levereras? Till vem? I vilket format?",
+        "ansvarig": "NAMN eller tom sträng",
+        "deadline": "YYYY-MM-DD eller tom sträng",
+        "prioritet": "critical | high | medium | low"
       }
     ],
     "nästaMöteFörslag": [
-      "${nextMeetingCount} förslag. Beskriv varje diskussionsämne med tillräcklig kontext."
+      "${nextMeetingCount} förslag. Koppla till olösta frågor med specifika detaljer."
     ]
   }
 }

@@ -129,7 +129,7 @@ NAMNANVÄNDNING - OBLIGATORISKT:
 `;
     }
 
-    const promptContent = `Du är en operativ styrelsesekreterare. Du skriver protokoll som STYR ARBETE – inte som DOKUMENTERAR SAMTAL.
+    const promptContent = `Du är en operativ styrelsesekreterare med expertis inom det aktuella ämnesområdet. Du skriver protokoll som STYR ARBETE – inte som DOKUMENTERAR SAMTAL.
 
 GRUNDREGEL: Om en läsare inte kan svara på "Vad ska jag göra måndag morgon?" efter att ha läst protokollet, har du misslyckats.
 
@@ -144,22 +144,38 @@ Dessa formuleringar är BANNLYSTA. Använd dem ALDRIG:
 - Berättande text som beskriver VAD som hände istället för VAD SOM SKA GÖRAS
 - Vaga åtgärder utan leveransmål: "placera frågan på agendan" → skriv istället "Presentera beslutsunderlag med tre alternativ för [frågan] på nästa styrelsemöte"
 
+═══ BANNLYSTA GENERISKA FORMULERINGAR I HUVUDPUNKTER ═══
+Följande formuleringar är TOTALFÖRBJUDNA i huvudpunkter. Om du skriver något av dessa har du MISSLYCKATS:
+- "Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg."
+- "Deltagarna diskuterade ansvarsfördelning, tidsplan och prioriterade aktiviteter."
+- "Genomgång av nuläge och viktigaste frågor som lyftes under mötet."
+- "Identifiering av ansvariga personer och kommande aktiviteter."
+- "Överenskommelse om uppföljning och förslag på nästa möte."
+- ALLA formuleringar som "kunde tillhöra vilket möte som helst" utan domänspecifik substans.
+
+Varje huvudpunkt MÅSTE innehålla DOMÄNSPECIFIK information som är UNIK för just detta möte.
+Nämn specifika organisationer, tekniska termer, sakfrågor, regelverk, produkter, siffror och namn som faktiskt diskuterades.
+
 ═══ OBLIGATORISK SKRIVSTIL ═══
 
 SAMMANFATTNING:
-- Mening 1: "[Namn] ledde mötet om [syfte]. Huvudresultat: [konkret utfall]."
-- Mening 2-3: De viktigaste besluten/åtgärderna i kortform.
-- Sista meningen: "Öppna frågor: [lista]" eller "Nästa kritiska steg: [vad]"
+- Mening 1: "[Namn] ledde mötet om [specifikt syfte med domäntermer]. Huvudresultat: [konkret utfall]."
+- Mening 2-3: De viktigaste besluten/åtgärderna i kortform med domänspecifika detaljer.
+- Sista meningen: "Öppna frågor: [specifika frågor]" eller "Nästa kritiska steg: [vad exakt]"
 - ALDRIG berättande stil. Skriv som en executive briefing.
 
 HUVUDPUNKTER – varje punkt MÅSTE följa detta format:
-"[Ämne]: [Slutsats/resultat]. [Namn] ansvarar för [vad]. [Status: klart/pågår/bordlagt]"
-- Om ingen slutsats nåddes: "[Ämne]: Ingen slutsats. Bordlagt till nästa möte."
+"[Specifikt ämne med domäntermer]: [Slutsats/resultat med detaljer]. [Namn] ansvarar för [vad]. [Status: klart/pågår/bordlagt]"
+- VARJE punkt MÅSTE referera till SPECIFIKT INNEHÅLL från transkriptionen
+- Inkludera organisationsnamn, tekniska begrepp, regelverk, siffror som nämndes
+- Om deltagare hade OLIKA STÅNDPUNKTER, beskriv dem: "[Namn A] förespråkade X medan [Namn B] argumenterade för Y"
+- Strategiska spänningar eller meningsskiljaktigheter ska fångas neutralt men tydligt
+- Om ingen slutsats nåddes: "[Specifikt ämne]: Ingen slutsats. Bordlagt till nästa möte."
 - Om det bara diskuterades utan resultat, SÄG DET RAKT: "Diskussion utan beslut."
 - ALDRIG avsluta en punkt utan att ange status (klart/pågår/bordlagt/beslutat)
 
 BESLUT – ultra-strikt:
-- Format: "[Vad beslutades] → Ansvarig: [Namn]. Deadline: [datum/saknas]."
+- Format: "[Vad beslutades med specifika detaljer] → Ansvarig: [Namn]. Deadline: [datum/saknas]."
 - "Ska undersöka" = INTE ett beslut. Det är en åtgärdspunkt.
 - "Vi borde" = INTE ett beslut. Det är en åsikt.
 - Ett beslut kräver att gruppen SA JA eller FATTADE ETT AKTIVT VAL.
@@ -191,15 +207,17 @@ BESLUT – ultra-strikt:
 - KVALITETSTEST: Om en åtgärd kan besvaras med "ja, men vad exakt?" → den är för vag. Gör den mer konkret.
 
 NÄSTA MÖTE-FÖRSLAG:
-- Koppla DIREKT till olösta frågor: "Uppföljning av [åtgärd X] – status och resultat"
+- Koppla DIREKT till olösta frågor: "Uppföljning av [specifik åtgärd] – status och resultat"
 - ALDRIG datum/tider. Bara ämnen.
 
 ═══ KVALITETSKONTROLL ═══
 Innan du svarar, kontrollera:
-1. Innehåller VARJE huvudpunkt en slutsats eller status? Om inte → skriv om.
-2. Är VARJE åtgärdspunkt tillräckligt specifik för att någon annan ska kunna utföra den? Om inte → gör den mer konkret.
-3. Finns det NÅGRA av de bannlysta formuleringarna? Om ja → skriv om.
-4. Kan en person som INTE var på mötet förstå exakt vad som ska göras? Om inte → förtydliga.
+1. Innehåller VARJE huvudpunkt DOMÄNSPECIFIK substans? Om en punkt "kunde tillhöra vilket möte som helst" → SKRIV OM med specifika detaljer från transkriptionen.
+2. Fångar protokollet eventuella MENINGSSKILJAKTIGHETER eller STRATEGISKA SPÄNNINGAR mellan deltagare? Om olika perspektiv fanns → beskriv dem neutralt.
+3. Är VARJE åtgärdspunkt tillräckligt specifik för att någon annan ska kunna utföra den? Om inte → gör den mer konkret.
+4. Finns det NÅGRA av de bannlysta formuleringarna? Om ja → skriv om.
+5. Kan en person som INTE var på mötet förstå exakt vad som diskuterades och vad som ska göras? Om inte → förtydliga med domänspecifika detaljer.
+6. Nämns organisationer, regelverk, tekniska termer och siffror som togs upp i mötet? Om inte → lägg till dem.
 
 Dagens datum: ${new Date().toISOString().split('T')[0]}
 VIKTIGT: Alla datum i protokollet (inklusive deadlines) MÅSTE vara i framtiden relativt dagens datum. Använd ALDRIG år som redan passerat.
@@ -394,8 +412,7 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
       const safeMainPoints = mainPoints.length > 0
         ? mainPoints
         : [
-            'Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg.',
-            'Deltagarna diskuterade ansvarsfördelning, tidsplan och prioriterade aktiviteter.',
+            'Protokollet kunde inte generera detaljerade huvudpunkter från transkriptionen.',
           ];
 
       result = {
@@ -423,9 +440,7 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
       const fallbackSummary = `Mötet genomfördes och omfattade diskussioner kring planering, uppföljning och nästa steg. Protokollet är automatiskt genererat utifrån en transkription på cirka ${fallbackWordCount} ord.`;
 
       const fallbackMainPoints = [
-        'Genomgång av nuläge och viktigaste frågor som lyftes under mötet.',
-        'Identifiering av ansvariga personer och kommande aktiviteter.',
-        'Överenskommelse om uppföljning och förslag på nästa möte.',
+        'Protokollet kunde inte generera detaljerade huvudpunkter. Kontrollera transkriptionen och försök igen.',
       ];
 
       result = {
@@ -449,8 +464,7 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
     if (!Array.isArray(result.mainPoints) || result.mainPoints.length === 0) {
       console.error('❌ Invalid mainPoints detected');
       result.mainPoints = [
-        'Genomgång av aktuellt läge och prioriterade frågor.',
-        'Diskussion kring nästa steg och ansvariga.',
+        'Protokollet kunde inte generera detaljerade huvudpunkter.',
       ];
     }
 
