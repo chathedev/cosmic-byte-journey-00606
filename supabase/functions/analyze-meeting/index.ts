@@ -338,18 +338,31 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
       
       // Support both English and Swedish JSON structures
       const protocol = parsed.protokoll || parsed.protocol || parsed;
+      
+      // Debug: log actual keys from AI response
+      console.log('🔑 Parsed keys (top-level):', Object.keys(parsed));
+      console.log('🔑 Protocol keys:', Object.keys(protocol));
 
       const title = protocol.title || protocol.titel || meetingName || 'Mötesprotokoll';
       const summary = protocol.summary || protocol.sammanfattning || protocol.sammandrag || '';
       
-      // Normalize main points - ensure it's always an array of strings
-      let mainPoints = protocol.mainPoints || protocol.huvudpunkter || protocol.punkter || [];
+      // Normalize main points - check all possible Swedish/English key variations
+      let mainPoints = protocol.mainPoints || protocol.huvudpunkter || protocol.punkter 
+        || protocol.main_points || protocol.Huvudpunkter || protocol.MainPoints || [];
       if (!Array.isArray(mainPoints)) {
-        mainPoints = [];
+        mainPoints = typeof mainPoints === 'string' ? [mainPoints] : [];
       }
+      console.log('📋 Raw mainPoints count:', mainPoints.length, 'types:', mainPoints.slice(0, 3).map((p: any) => typeof p));
       mainPoints = mainPoints
-        .map((p: any) => (typeof p === 'string' ? p : ''))
-        .filter((p: string) => p.trim() !== '');
+        .map((p: any) => {
+          if (typeof p === 'string') return p;
+          // Handle object-style points: {punkt: "...", ämne: "...", text: "..."}
+          if (typeof p === 'object' && p !== null) {
+            return p.punkt || p.text || p.ämne || p.description || p.beskrivning || p.content || p.title || p.titel || JSON.stringify(p);
+          }
+          return String(p);
+        })
+        .filter((p: string) => p.trim() !== '' && p !== '{}');
       
       // Normalize decisions - ensure it's always an array of strings
       let decisions = protocol.decisions || protocol.beslut || [];
