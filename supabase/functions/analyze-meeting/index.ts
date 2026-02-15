@@ -409,14 +409,13 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
         ? summary
         : `Mötet behandlade ${meetingName || 'aktuella frågor'} med fokus på planering och nästa steg.`;
 
-      // Never show "could not generate" — extract key topics from transcript as fallback
+      // Never dump raw transcript as main points — use a strategic single-point fallback
       let safeMainPoints = mainPoints;
-      if (mainPoints.length === 0) {
-        // Extract first few sentences from transcript as strategic summary points
-        const sentences = transcript.split(/[.!?]+/).filter((s: string) => s.trim().length > 20).slice(0, 5);
-        safeMainPoints = sentences.length > 0
-          ? sentences.map((s: string) => s.trim() + '.')
-          : [`Mötet omfattade diskussioner kring ${meetingName || 'aktuella ämnen'} med fokus på uppföljning och framtida prioriteringar.`];
+      if (mainPoints.length === 0 && safeSummary.length > 30) {
+        // Re-use the summary as a single main point if AI failed to generate bullets
+        safeMainPoints = [safeSummary];
+      } else if (mainPoints.length === 0) {
+        safeMainPoints = [`Mötet behandlade ${meetingName || 'aktuella ämnen'} och identifierade uppföljningspunkter för kommande arbete.`];
       }
 
       result = {
@@ -443,11 +442,9 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
       const fallbackWordCount = transcript.trim().split(/\s+/).length;
       const fallbackSummary = `Mötet behandlade ${meetingName || 'aktuella ämnen'} och omfattade cirka ${fallbackWordCount} ord av diskussion.`;
 
-      // Extract real sentences from transcript as main points
-      const sentences = transcript.split(/[.!?]+/).filter((s: string) => s.trim().length > 20).slice(0, 5);
-      const fallbackMainPoints = sentences.length > 0
-        ? sentences.map((s: string) => s.trim() + '.')
-        : [`Mötet omfattade diskussioner kring ${meetingName || 'aktuella ämnen'} med fokus på uppföljning och framtida prioriteringar.`];
+      const fallbackMainPoints = [
+        `Mötet behandlade ${meetingName || 'aktuella ämnen'} och identifierade uppföljningspunkter för kommande arbete.`,
+      ];
 
       result = {
         title: meetingName || 'Mötesprotokoll',
@@ -469,10 +466,9 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
     
     if (!Array.isArray(result.mainPoints) || result.mainPoints.length === 0) {
       console.error('❌ Invalid mainPoints detected');
-      const sentences = transcript.split(/[.!?]+/).filter((s: string) => s.trim().length > 20).slice(0, 5);
-      result.mainPoints = sentences.length > 0
-        ? sentences.map((s: string) => s.trim() + '.')
-        : [`Mötet omfattade diskussioner kring ${meetingName || 'aktuella ämnen'} med fokus på uppföljning.`];
+      result.mainPoints = [
+        `Mötet behandlade ${meetingName || 'aktuella ämnen'} och identifierade uppföljningspunkter för kommande arbete.`,
+      ];
     }
 
     console.log("✅ Returning protocol:", {
