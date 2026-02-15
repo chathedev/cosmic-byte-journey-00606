@@ -52,53 +52,53 @@ serve(async (req) => {
     let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
     
     if (wordCount < 100) {
-      summaryLength = isEnterpriseTier ? "3-4 meningar" : "2-3 meningar";
-      mainPointsCount = isEnterpriseTier ? "3-5" : "2-4";
-      mainPointsDetail = "Kort och koncis, en till två meningar per punkt";
+      summaryLength = isEnterpriseTier ? "4-5 meningar" : "3-4 meningar";
+      mainPointsCount = isEnterpriseTier ? "4-6" : "3-5";
+      mainPointsDetail = "Två meningar per punkt med substans";
       decisionsDetail = "Endast FAKTISKA beslut som explicit fattades";
-      actionItemsCount = isEnterpriseTier ? "1-3" : "1-2";
+      actionItemsCount = isEnterpriseTier ? "2-3" : "1-2";
       actionItemsDetail = "Kort – titel, ansvarig och leverans om nämnt";
       nextMeetingCount = "1-2";
     } else if (wordCount < 200) {
-      summaryLength = isEnterpriseTier ? "4-5 meningar" : "3-4 meningar";
-      mainPointsCount = isEnterpriseTier ? "4-6" : "3-5";
-      mainPointsDetail = "Två meningar per punkt med resultat";
+      summaryLength = isEnterpriseTier ? "5-6 meningar" : "4-5 meningar";
+      mainPointsCount = isEnterpriseTier ? "5-7" : "4-6";
+      mainPointsDetail = "Två till tre meningar per punkt med resultat och kontext";
       decisionsDetail = "Endast FAKTISKA beslut - inte diskussioner eller förslag";
-      actionItemsCount = isEnterpriseTier ? "2-4" : "1-3";
+      actionItemsCount = isEnterpriseTier ? "2-5" : "2-3";
       actionItemsDetail = "Titel, ansvarig, leveransmål";
-      nextMeetingCount = "1-2";
-    } else if (wordCount < 500) {
-      summaryLength = isEnterpriseTier ? "5-7 meningar" : "4-5 meningar";
-      mainPointsCount = isEnterpriseTier ? "5-8" : "4-6";
-      mainPointsDetail = "Två till tre meningar per punkt med slutsats och ansvarig";
-      decisionsDetail = "KONKRETA beslut med ansvarig och konsekvens";
-      actionItemsCount = isEnterpriseTier ? "3-6" : "2-4";
-      actionItemsDetail = "Detaljerad: vad levereras, till vem, i vilket format";
       nextMeetingCount = "2-3";
+    } else if (wordCount < 500) {
+      summaryLength = isEnterpriseTier ? "6-8 meningar" : "5-6 meningar";
+      mainPointsCount = isEnterpriseTier ? "6-10" : "5-8";
+      mainPointsDetail = "Tre meningar per punkt med slutsats, ansvarig och kontext";
+      decisionsDetail = "KONKRETA beslut med ansvarig och konsekvens";
+      actionItemsCount = isEnterpriseTier ? "4-7" : "3-5";
+      actionItemsDetail = "Detaljerad: vad levereras, till vem, i vilket format";
+      nextMeetingCount = "2-4";
     } else if (wordCount < 1000) {
-      summaryLength = isEnterpriseTier ? "6-8 meningar" : "5-7 meningar";
-      mainPointsCount = isEnterpriseTier ? "7-10" : "5-8";
-      mainPointsDetail = "Tre meningar per punkt med detaljer och ansvarig";
+      summaryLength = isEnterpriseTier ? "8-10 meningar" : "6-8 meningar";
+      mainPointsCount = isEnterpriseTier ? "8-12" : "6-10";
+      mainPointsDetail = "Tre till fyra meningar per punkt med detaljer, kontext och ansvarig";
       decisionsDetail = "Tydliga beslut med kontext, ansvarig och uppföljning";
-      actionItemsCount = isEnterpriseTier ? "4-10" : "3-6";
+      actionItemsCount = isEnterpriseTier ? "5-10" : "4-7";
       actionItemsDetail = "Fullständig: leverans, mottagare, format, kvalitetskrav";
       nextMeetingCount = "3-5";
     } else if (wordCount < 2000) {
-      summaryLength = isEnterpriseTier ? "8-10 meningar" : "6-8 meningar";
-      mainPointsCount = isEnterpriseTier ? "8-12" : "6-10";
-      mainPointsDetail = "Tre till fyra meningar per punkt med djupgående detaljer";
+      summaryLength = isEnterpriseTier ? "10-12 meningar" : "8-10 meningar";
+      mainPointsCount = isEnterpriseTier ? "10-15" : "8-12";
+      mainPointsDetail = "Fyra meningar per punkt med djupgående detaljer och kontext";
       decisionsDetail = "Detaljerade beslut med bakgrund, ansvarig och uppföljningsdatum";
-      actionItemsCount = isEnterpriseTier ? "6-12" : "4-8";
+      actionItemsCount = isEnterpriseTier ? "7-14" : "5-9";
       actionItemsDetail = "Omfattande: leverans, mottagare, format, tidsperspektiv, kvalitetskrav";
-      nextMeetingCount = "3-5";
-    } else {
-      summaryLength = isEnterpriseTier ? "10-14 meningar med executive briefing" : "8-10 meningar";
-      mainPointsCount = isEnterpriseTier ? "10-18" : "8-12";
-      mainPointsDetail = "Fyra till fem meningar per punkt med djupgående analys och kontext";
-      decisionsDetail = "Fullständiga beslut med bakgrund, konsekvensanalys och ansvarig";
-      actionItemsCount = isEnterpriseTier ? "8-18" : "6-12";
-      actionItemsDetail = "Mycket omfattande: exakt leverans, mottagare, format, kvalitetsmått, beroenden";
       nextMeetingCount = "4-6";
+    } else {
+      summaryLength = isEnterpriseTier ? "12-16 meningar med executive briefing" : "10-12 meningar";
+      mainPointsCount = isEnterpriseTier ? "12-20" : "10-15";
+      mainPointsDetail = "Fyra till fem meningar per punkt med djupgående analys, kontext och strategisk implikation";
+      decisionsDetail = "Fullständiga beslut med bakgrund, konsekvensanalys och ansvarig";
+      actionItemsCount = isEnterpriseTier ? "10-20" : "7-14";
+      actionItemsDetail = "Mycket omfattande: exakt leverans, mottagare, format, kvalitetsmått, beroenden";
+      nextMeetingCount = "5-7";
     }
     
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
