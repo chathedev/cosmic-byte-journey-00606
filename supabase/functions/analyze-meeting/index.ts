@@ -273,50 +273,105 @@ ${shortNote}
 
 Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar.`;
 
-    // Model selection: Enterprise → Pro, Paid → Flash, Free → Flash Lite
+    // Model selection: Enterprise → OpenAI GPT-4.1 via api.tivly.se, Paid → Flash, Free → Flash Lite
     const isEnterpriseUser = isEnterprise === true || userPlan === 'enterprise';
     const isPaid = userPlan && userPlan !== 'free';
-    const geminiModel = isEnterpriseUser ? 'gemini-2.5-pro' : isPaid ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
-    console.log('🤖 Model selection:', { isEnterprise, userPlan, isEnterpriseUser, geminiModel });
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_API_KEY}`,
-      {
+    
+    let data: any;
+    
+    if (isEnterpriseUser) {
+      // Enterprise: Use OpenAI GPT-4.1 via api.tivly.se backend
+      const BACKEND_URL = 'https://api.tivly.se';
+      console.log('🤖 Model selection: ENTERPRISE → OpenAI GPT-4.1 via api.tivly.se');
+      
+      const response = await fetch(`${BACKEND_URL}/ai/gemini`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{ text: promptContent }]
-          }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 16384,
-            responseMimeType: "application/json"
-          }
+          provider: "openai",
+          model: "gpt-4.1",
+          prompt: promptContent,
+          temperature: 0.2,
+          maxOutputTokens: 16384,
+          costUsd: 0.05, // Higher cost for GPT-4.1
         }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Gemini API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText.substring(0, 500)
       });
-      return new Response(
-        JSON.stringify({
-          error: "Kunde inte analysera mötet",
-          details: `Gemini API error: ${response.status}`,
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
-    const data = await response.json();
-    console.log("✅ Gemini API response received, processing...");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ OpenAI API error via backend:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 500)
+        });
+        return new Response(
+          JSON.stringify({
+            error: "Kunde inte analysera mötet",
+            details: `OpenAI API error: ${response.status}`,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const backendData = await response.json();
+      console.log("✅ OpenAI GPT-4.1 response received via backend, model:", backendData.model);
+      
+      // The backend returns responseText directly - wrap it in Gemini-compatible format
+      // so downstream parsing works the same way
+      const responseText = backendData.responseText || '';
+      data = {
+        candidates: [{
+          content: {
+            parts: [{ text: responseText }]
+          }
+        }]
+      };
+    } else {
+      // Non-enterprise: Use Gemini API directly
+      const geminiModel = isPaid ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
+      console.log('🤖 Model selection:', { isEnterprise, userPlan, geminiModel });
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: promptContent }]
+            }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 16384,
+              responseMimeType: "application/json"
+            }
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Gemini API error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 500)
+        });
+        return new Response(
+          JSON.stringify({
+            error: "Kunde inte analysera mötet",
+            details: `Gemini API error: ${response.status}`,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      data = await response.json();
+      console.log("✅ Gemini API response received, processing...");
+    }
     
     // Parse the JSON content from the Gemini response
     let result;
