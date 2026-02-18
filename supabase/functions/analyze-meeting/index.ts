@@ -11,6 +11,7 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('authorization') || '';
     const { transcript, meetingName, agenda, hasSpeakerAttribution, speakers, isEnterprise, userPlan } = await req.json();
     
     console.log('📥 analyze-meeting request:', {
@@ -288,6 +289,7 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": authHeader,
         },
         body: JSON.stringify({
           provider: "openai",
