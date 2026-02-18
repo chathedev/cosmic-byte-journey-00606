@@ -80,7 +80,7 @@ export const LiveTranscriptView = memo(({
           }
           return allWordsRef.current.slice(0, next);
         });
-      }, 40); // 40ms per word ≈ 25 words/sec — fast but readable
+      }, 12); // 12ms per word ≈ 83 words/sec — very fast stream
     }
   }, [liveTranscript]);
 
@@ -187,18 +187,7 @@ export const LiveTranscriptView = memo(({
             style={{ overscrollBehavior: 'contain' }}
           >
             <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-              {visibleWords.map((word, i) => (
-                <span
-                  key={i}
-                  className="inline animate-fade-in"
-                  style={{
-                    animationDuration: '0.25s',
-                    animationFillMode: 'both',
-                  }}
-                >
-                  {word}{i < visibleWords.length - 1 ? ' ' : ''}
-                </span>
-              ))}
+              {visibleWords.join(' ')}
             </p>
 
             {/* Typing cursor */}
