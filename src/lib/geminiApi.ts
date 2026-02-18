@@ -646,30 +646,44 @@ NAMNANVÄNDNING - OBLIGATORISKT:
 `;
   }
 
-  return `Du är en operativ styrelsesekreterare med expertis inom det aktuella ämnesområdet. Din uppgift är att ANALYSERA och SYNTETISERA mötesutskriften nedan till ett DETALJERAT protokoll.
+  return `Du är en erfaren styrelsesekreterare som skriver formella, handlingsdrivna mötesprotokoll. Din uppgift är att OMFORMULERA mötesutskriften nedan till ett DETALJERAT protokoll.
+
+TONALITET – FORMELLT PROTOKOLL, INTE RAPPORT:
+- Skriv SAKLIGT och REFERERANDE: "X framförde att…", "Det konstaterades att…", "Mötet enades om…"
+- FÖRBJUDET att tolka eller analysera dynamiken: ALDRIG "Strategiska spänningar identifierades", "En intressant konfliktlinje framkom"
+- Protokollet ska dokumentera VAD som sades, VAD som beslutades, VAD som ska göras — INTE analysera VARFÖR
+- Skildra olika ståndpunkter NEUTRALT utan att kommentera dem: "[Namn A] framförde X. [Namn B] invände att Y."
 
 ABSOLUT FÖRBJUDET:
 - Kopiera NÅGON mening direkt från utskriften
-- Klistra in fraser ordagrant från transkriptionen
 - Generiska formuleringar som "kunde tillhöra vilket möte som helst"
 - "Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg" (BANNLYST)
 - "Deltagarna diskuterade ansvarsfördelning, tidsplan och prioriterade aktiviteter" (BANNLYST)
 - Alla vaga, abstrakta sammanfattningar utan domänspecifikt innehåll
+- Analytiska kommentarer om mötesdynamik, maktförhållanden eller "strategiska spänningar"
 
 DU MÅSTE:
 - OMFORMULERA allt innehåll med egna ord
 - SYNTETISERA information från flera delar av mötet
 - Inkludera DOMÄNSPECIFIKA detaljer: organisationsnamn, tekniska termer, regelverk, siffror, produkter
-- Om deltagare hade OLIKA STÅNDPUNKTER, beskriv dem: "[Namn A] förespråkade X medan [Namn B] argumenterade för Y"
-- Fånga strategiska spänningar eller meningsskiljaktigheter neutralt men tydligt
 - VARJE huvudpunkt MÅSTE vara unik för just detta möte – inte generisk
+
+ANSVARSKRAV – KRITISKT:
+- VARJE huvudpunkt och VARJE åtgärdspunkt MÅSTE ha en ansvarig person
+- Om en ansvarig INTE nämndes explicit i mötet, skriv: "Ansvar ej tilldelat — beslut tas vid nästa möte"
+- Lämna ALDRIG ansvarig-fältet tomt utan förklaring
+- Om flera kan vara ansvariga, ange den som nämndes mest i samband med frågan
+
+BESLUT vs DISKUSSION – STRIKT SEPARATION:
+- "beslut" ska ENBART innehålla punkter där mötet EXPLICIT fattade beslut eller enades om något
+- "huvudpunkter" innehåller diskussion, kontext och sakfrågor — även olösta
+- Om något diskuterades MEN inget beslut fattades, lägg det ENBART under huvudpunkter med status "Diskuterat utan beslut" eller "Bordlagt"
 
 KRITISKA NOGGRANNHETSKRAV:
 - Inkludera ENDAST information som FAKTISKT diskuterades
 - Dra INGA slutsatser som inte EXPLICIT nämndes
 - Om en person nämns, använd EXAKT det namn som används i utskriften
 - Om siffror eller data nämns, använd EXAKT de värden som nämndes
-- Om ingen ansvarig nämndes, lämna fältet TOMT
 
 Möte: ${meetingName || 'Namnlöst möte'}
 Längd: ${wordCount} ord${agendaSection}
@@ -683,24 +697,24 @@ Skapa ett professionellt, DETALJERAT och DOMÄNSPECIFIKT protokoll som ren JSON-
   "protokoll": {
     "titel": "Kort, specifik titel som fångar huvudbeslutet eller syftet",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "${summaryLength}. Executive briefing-stil med domänspecifika detaljer.",
+    "sammanfattning": "${summaryLength}. Saklig executive briefing med domänspecifika detaljer. Avsluta med 'Nästa kritiska steg: …' som pekar ut de viktigaste åtgärderna.",
     "huvudpunkter": [
-      "${mainPointsCount} totalt. ${mainPointsDetail}. VARJE punkt MÅSTE innehålla specifika organisationer, termer, siffror eller sakfrågor från mötet. Format: Ämne → Resultat → Ansvarig → Status."
+      "${mainPointsCount} totalt. ${mainPointsDetail}. Format: Ämne → Vad framfördes → Ansvarig: [Namn] (eller 'Ansvar ej tilldelat — beslut tas vid nästa möte') → Status: Beslutat/Pågår/Bordlagt/Diskuterat utan beslut."
     ],
     "beslut": [
-      "${decisionsDetail}. Format: '[Beslut] → Ansvarig: [Namn]. Deadline: [datum/saknas].' Tom lista om inga beslut fattades."
+      "${decisionsDetail}. ENBART faktiska beslut. Format: '§[nr] [Beslut] — Ansvarig: [Namn]. Deadline: [datum/saknas].' Tom lista om inga beslut fattades."
     ],
     "åtgärdspunkter": [
       {
         "titel": "VERB-inledd, specifik leverans",
-        "beskrivning": "${actionItemsDetail}. Vad levereras? Till vem? I vilket format?",
-        "ansvarig": "NAMN eller tom sträng",
+        "beskrivning": "${actionItemsDetail}. Vad levereras? Till vem? I vilket format? Vad räknas som godkänt resultat?",
+        "ansvarig": "NAMN (eller 'Ansvar ej tilldelat — beslut tas vid nästa möte')",
         "deadline": "YYYY-MM-DD eller tom sträng",
         "prioritet": "critical | high | medium | low"
       }
     ],
     "nästaMöteFörslag": [
-      "${nextMeetingCount} förslag. Koppla till olösta frågor med specifika detaljer."
+      "${nextMeetingCount} förslag. Koppla till olösta frågor och saknade ansvarstilldelningar."
     ]
   }
 }
