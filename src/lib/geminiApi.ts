@@ -244,6 +244,7 @@ export async function generateWithGemini(
   const estimatedCost = request.costUsd ?? MODEL_COSTS[model as GeminiModel] ?? 0.001;
 
   const requestBody: Record<string, unknown> = {
+    provider: "gemini",
     prompt: request.prompt,
     model,
     costUsd: estimatedCost, // Always include cost for tracking
@@ -459,6 +460,7 @@ export async function streamChat({
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
+        provider: "gemini",
         prompt: `${systemPrompt}\n\n${userPrompt}`,
         model,
         costUsd: estimatedCost,
