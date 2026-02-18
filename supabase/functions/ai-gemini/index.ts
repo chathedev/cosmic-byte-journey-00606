@@ -35,12 +35,14 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const model = body.model || 'gemini-2.5-flash';
+    const provider = body.provider || 'gemini';
+    const model = body.model || (provider === 'openai' ? 'gpt-4.1' : 'gemini-2.5-flash');
     
     // Use provided costUsd or fallback to model default
     const costUsd = body.costUsd ?? MODEL_COSTS[model] ?? 0.001;
     
     console.log('[ai-gemini] Proxying request to backend:', { 
+      provider,
       model, 
       promptLength: body.prompt?.length,
       costUsd,
@@ -55,6 +57,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         ...body,
+        provider,
         model,
         costUsd, // Always include cost for tracking
       }),
