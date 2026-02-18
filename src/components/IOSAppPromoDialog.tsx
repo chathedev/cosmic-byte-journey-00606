@@ -7,8 +7,7 @@ import { isWebBrowser } from '@/utils/environment';
 import appStoreBadge from '@/assets/app-store-badge-black.svg';
 
 const IOS_APP_STORE_URL = 'https://apps.apple.com/se/app/tivly/id6755223770';
-const PROMO_DISMISSED_KEY = 'ios_app_promo_dismissed';
-const PROMO_SHOW_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 7 days
+const PROMO_DISMISSED_KEY = 'ios_app_promo_dismissed_forever';
 
 export const IOSAppPromoDialog = () => {
   const [open, setOpen] = useState(false);
@@ -20,13 +19,10 @@ export const IOSAppPromoDialog = () => {
     if (!enterpriseMembership?.isMember) return;
     if (!isWebBrowser()) return;
     
-    // Check if dismissed recently
-    const dismissedAt = localStorage.getItem(PROMO_DISMISSED_KEY);
-    if (dismissedAt) {
-      const dismissedTime = parseInt(dismissedAt, 10);
-      if (Date.now() - dismissedTime < PROMO_SHOW_INTERVAL) {
-        return;
-      }
+    // Check if EVER dismissed on this device - once dismissed, never show again
+    const wasDismissed = localStorage.getItem(PROMO_DISMISSED_KEY);
+    if (wasDismissed === 'true') {
+      return;
     }
     
     // Show after a short delay
@@ -35,7 +31,7 @@ export const IOSAppPromoDialog = () => {
   }, [enterpriseMembership, isLoading]);
   
   const handleDismiss = () => {
-    localStorage.setItem(PROMO_DISMISSED_KEY, Date.now().toString());
+    localStorage.setItem(PROMO_DISMISSED_KEY, 'true');
     setOpen(false);
   };
   

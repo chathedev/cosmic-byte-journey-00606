@@ -8,11 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { Trash2, CheckCircle, XCircle, LogOut, Building2, Loader2, Headphones, ExternalLink, ArrowLeft, ChevronRight } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, LogOut, Building2, Loader2, Headphones, ExternalLink, ArrowLeft, ChevronRight, Smartphone, Zap, Shield, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { SupportCodeDialog } from "@/components/SupportCodeDialog";
 import { Separator } from "@/components/ui/separator";
+import { isWebBrowser } from "@/utils/environment";
+import appStoreBadge from "@/assets/app-store-badge-black.svg";
 
 const formatSwedishDate = (dateString: string | undefined) => {
   if (!dateString) return '';
@@ -494,6 +496,62 @@ const Settings = () => {
                     )}
                   </div>
                 )}
+              </section>
+              <Separator />
+            </>
+          )}
+
+          {/* iOS App Section - For enterprise users on web */}
+          {enterpriseMembership?.isMember && isWebBrowser() && !isIosApp && (
+            <>
+              <section>
+                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">iOS-app</h2>
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shrink-0">
+                      <Smartphone className="w-6 h-6 text-primary-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold">Tivly för iOS</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Som en del av {enterpriseMembership?.company?.name || 'ditt företag'} har du tillgång till vår iOS-app
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-2 mt-4">
+                    <div className="flex items-center gap-3 text-sm">
+                      <Zap className="w-4 h-4 text-primary shrink-0" />
+                      <span>Snabbare inspelning med ett tryck</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Shield className="w-4 h-4 text-primary shrink-0" />
+                      <span>Offline-läge – spela in utan internet</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                      <span>Push-notiser för klara protokoll</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-2 mt-4 pt-3 border-t border-primary/10">
+                    <a 
+                      href="https://apps.apple.com/se/app/tivly/id6755223770"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="transition-transform hover:scale-105 active:scale-95"
+                    >
+                      <img 
+                        src={appStoreBadge} 
+                        alt="Ladda ner i App Store" 
+                        className="h-11"
+                      />
+                    </a>
+                    <p className="text-xs text-muted-foreground">
+                      Gratis för alla {enterpriseMembership?.company?.name || 'företagets'}-medarbetare
+                    </p>
+                  </div>
+                </div>
               </section>
               <Separator />
             </>
