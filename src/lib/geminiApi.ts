@@ -792,9 +792,13 @@ export async function analyzeMeetingAI(
       if (isEnterprise) body.isEnterprise = true;
       if (userPlan) body.userPlan = userPlan;
 
+      const token = await getAuthToken();
       const response = await fetch(`${SUPABASE_URL}/functions/v1/analyze-meeting`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(body),
       });
 
