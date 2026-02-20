@@ -16,6 +16,7 @@ import { isNativeApp } from "@/utils/capacitorDetection";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
+import { TeamSelector } from "./TeamSelector";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
 
@@ -62,6 +63,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [folders, setFolders] = useState<string[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isTestMode, setIsTestMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -706,6 +708,9 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         // For browser mode: done immediately. For ASR mode: processing
         transcriptionStatus: useAsrMode ? 'processing' as const : 'done' as const,
         forceCreate: !isContinuedMeeting,
+        // Team assignment for enterprise meetings
+        teamId: selectedTeamId || undefined,
+        enterpriseTeamId: selectedTeamId || undefined,
       };
 
       const meetingId = isContinuedMeeting 
@@ -916,6 +921,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
               {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
+          {/* Team selector for enterprise users */}
+          <TeamSelector value={selectedTeamId} onChange={setSelectedTeamId} compact className="mt-2 w-full max-w-[200px]" />
 
           <VoiceNamePrompt />
 
