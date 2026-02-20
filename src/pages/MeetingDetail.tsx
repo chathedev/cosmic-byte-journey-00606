@@ -23,6 +23,7 @@ import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
 import { IntegratedTranscriptPlayer } from "@/components/IntegratedTranscriptPlayer";
+import { TeamSelector } from "@/components/TeamSelector";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ProtocolViewerDialog } from "@/components/ProtocolViewerDialog";
@@ -2226,6 +2227,23 @@ const MeetingDetail = () => {
               <p className="text-xs text-muted-foreground">
                 {formatDate(meeting.createdAt)} · {formatTime(meeting.createdAt)}
               </p>
+            )}
+            {/* Team selector for meeting owner */}
+            {meeting && enterpriseMembership?.isMember && !isReadOnly && !isRecordingMode && (
+              <TeamSelector
+                value={meeting.enterpriseTeamId || null}
+                onChange={async (teamId) => {
+                  try {
+                    await apiClient.updateMeeting(meeting.id, { teamId: teamId || null });
+                    setMeeting(prev => prev ? { ...prev, enterpriseTeamId: teamId || undefined, enterpriseTeamName: undefined, accessScope: teamId ? 'team' : 'individual' } : prev);
+                    toast({ title: teamId ? 'Möte delat med team' : 'Möte ändrat till individuellt' });
+                  } catch (e: any) {
+                    toast({ title: 'Kunde inte ändra', description: e.message, variant: 'destructive' });
+                  }
+                }}
+                compact
+                className="mt-1"
+              />
             )}
           </div>
 

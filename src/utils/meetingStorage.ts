@@ -38,6 +38,12 @@ export interface MeetingSession {
   enterpriseTeamId?: string; // Team the meeting belongs to (null = individual/private)
   enterpriseTeamName?: string; // Convenience name for display
   readOnly?: boolean; // True if this is a shared team meeting the user doesn't own
+  // Access labels from backend
+  accessScope?: 'team' | 'individual';
+  accessLabel?: 'team_shared' | 'individual_private';
+  isTeamMeeting?: boolean;
+  teamId?: string; // Alias for enterpriseTeamId
+  teamName?: string; // Alias for enterpriseTeamName
 }
 
 export interface MeetingFolder {
@@ -50,27 +56,37 @@ export interface MeetingFolder {
 
 const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 
-const mapMeeting = (m: any, userIdHint?: string): MeetingSession => ({
-  id: String(m.id),
-  title: m.title || 'Möte',
-  transcript: m.transcript || '',
-  protocol: m.protocol || undefined,
-  folder: m.folder?.name || m.folder || m.folderId || 'Allmänt',
-  createdAt: m.createdAt || m.created_at || new Date().toISOString(),
-  updatedAt: m.updatedAt || m.updated_at || new Date().toISOString(),
-  userId: m.userId || userIdHint || '',
-  isCompleted: !!(m.isCompleted ?? m.completed ?? false),
-  protocolCount: Number(m.protocolCount ?? 0),
-  agendaId: m.agendaId || m.agendaid || undefined,
-  source: m.source || undefined,
-  transcriptSegments: m.transcriptSegments || undefined, // Speaker diarization data
-  speakerNames: m.speakerNames || undefined, // Custom speaker names
-  enterpriseTeamId: m.enterpriseTeamId || m.teamId || undefined,
-  enterpriseTeamName: m.enterpriseTeamName || m.teamName || undefined,
-  readOnly: m.readOnly || false,
-  // CRITICAL: Override status to 'done' if real transcript exists (not placeholder text)
-  transcriptionStatus: (m.transcript && m.transcript.trim().length > 0 && !m.transcript.includes('Transkribering pågår')) ? 'done' : (m.transcriptionStatus || 'processing'),
-});
+const mapMeeting = (m: any, userIdHint?: string): MeetingSession => {
+  const enterpriseTeamId = m.enterpriseTeamId || m.teamId || m.access?.teamId || undefined;
+  const enterpriseTeamName = m.enterpriseTeamName || m.teamName || m.access?.teamName || undefined;
+  return {
+    id: String(m.id),
+    title: m.title || 'Möte',
+    transcript: m.transcript || '',
+    protocol: m.protocol || undefined,
+    folder: m.folder?.name || m.folder || m.folderId || 'Allmänt',
+    createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+    updatedAt: m.updatedAt || m.updated_at || new Date().toISOString(),
+    userId: m.userId || userIdHint || '',
+    isCompleted: !!(m.isCompleted ?? m.completed ?? false),
+    protocolCount: Number(m.protocolCount ?? 0),
+    agendaId: m.agendaId || m.agendaid || undefined,
+    source: m.source || undefined,
+    transcriptSegments: m.transcriptSegments || undefined,
+    speakerNames: m.speakerNames || undefined,
+    enterpriseTeamId,
+    enterpriseTeamName,
+    readOnly: m.readOnly || false,
+    // Access labels from backend
+    accessScope: m.accessScope || m.access?.scope || (enterpriseTeamId ? 'team' : 'individual'),
+    accessLabel: m.accessLabel || m.access?.label || (enterpriseTeamId ? 'team_shared' : 'individual_private'),
+    isTeamMeeting: m.isTeamMeeting ?? !!enterpriseTeamId,
+    teamId: enterpriseTeamId,
+    teamName: enterpriseTeamName,
+    // CRITICAL: Override status to 'done' if real transcript exists (not placeholder text)
+    transcriptionStatus: (m.transcript && m.transcript.trim().length > 0 && !m.transcript.includes('Transkribering pågår')) ? 'done' : (m.transcriptionStatus || 'processing'),
+  };
+};
 
 export const meetingStorage = {
   // Meetings
@@ -129,6 +145,8 @@ export const meetingStorage = {
         createdAt: meeting.createdAt,
         startedAt: meeting.createdAt,
         meetingStartedAt: meeting.createdAt,
+        // Team assignment for enterprise meetings
+        teamId: meeting.enterpriseTeamId || meeting.teamId || (meeting as any).teamId || undefined,
       };
 
       // Resolve folderId if only a folder name was provided

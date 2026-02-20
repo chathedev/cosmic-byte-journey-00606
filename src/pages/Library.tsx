@@ -96,6 +96,7 @@ const Library = () => {
   const [pendingMeetingData, setPendingMeetingData] = useState<any>(null);
   const [protocolStatus, setProtocolStatus] = useState<Record<string, any>>({});
   const [loadingProtocol, setLoadingProtocol] = useState<string | null>(null);
+  const [accessScopeFilter, setAccessScopeFilter] = useState<'all' | 'team' | 'individual'>('all');
   const [viewingProtocol, setViewingProtocol] = useState<{ meetingId: string; protocol: any } | null>(null);
   const [meetingToDeleteProtocol, setMeetingToDeleteProtocol] = useState<MeetingSession | null>(null);
   const [meetingToReplaceProtocol, setMeetingToReplaceProtocol] = useState<MeetingSession | null>(null);
@@ -978,9 +979,15 @@ const Library = () => {
     }).format(date);
   };
 
-  const filteredMeetings = selectedFolder === "Alla" 
+  const filteredMeetings = (selectedFolder === "Alla" 
     ? meetings 
-    : meetings.filter(m => m.folder === selectedFolder);
+    : meetings.filter(m => m.folder === selectedFolder)
+  ).filter(m => {
+    if (!isEnterprise || accessScopeFilter === 'all') return true;
+    if (accessScopeFilter === 'team') return m.accessScope === 'team' || !!m.enterpriseTeamId;
+    if (accessScopeFilter === 'individual') return m.accessScope === 'individual' || !m.enterpriseTeamId;
+    return true;
+  });
 
   // Show loading state while plan is being fetched to prevent flash
   if (planLoading) {
@@ -1087,6 +1094,38 @@ const Library = () => {
         {/* Chat Upgrade Banner - Show only for users without Plus access (but not for demo accounts) */}
         {!isDemoAccount && !hasPlusAccess(user, userPlan) && (
           <ChatUpgradeBanner onUpgrade={() => setShowSubscribeDialog(true)} />
+        )}
+
+        {/* Enterprise Scope Filter */}
+        {isEnterprise && (
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Button
+              variant={accessScopeFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setAccessScopeFilter('all')}
+              className="text-xs"
+            >
+              Alla möten
+            </Button>
+            <Button
+              variant={accessScopeFilter === 'team' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setAccessScopeFilter('team')}
+              className="text-xs"
+            >
+              <Users className="w-3.5 h-3.5 mr-1" />
+              Teammöten
+            </Button>
+            <Button
+              variant={accessScopeFilter === 'individual' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setAccessScopeFilter('individual')}
+              className="text-xs"
+            >
+              <Lock className="w-3.5 h-3.5 mr-1" />
+              Individuella
+            </Button>
+          </div>
         )}
 
         {/* Folder Management */}
@@ -1461,8 +1500,9 @@ const Library = () => {
                       onClick={() => handleCreateProtocol(meeting)}
                       size="sm"
                       variant="outline"
-                      disabled={!!protocolStatus[meeting.id] || isProcessing || !hasTranscript}
+                      disabled={!!protocolStatus[meeting.id] || isProcessing || !hasTranscript || (meeting as any).readOnly}
                       title={
+                        (meeting as any).readOnly ? 'Skrivskyddat teammöte' :
                         isProcessing ? 'Väntar på transkribering...' :
                         protocolStatus[meeting.id] ? 'Protokoll redan sparat för detta möte' :
                         !hasTranscript ? 'Ingen transkription tillgänglig' :
@@ -1482,31 +1522,35 @@ const Library = () => {
                         Chatta
                       </Button>
                     )}
-                    <Select value={(folders.includes(meeting.folder) || meeting.folder === 'Allmänt') ? meeting.folder : undefined} onValueChange={(value) => handleMoveToFolder(meeting, value)}>
-                      <SelectTrigger className="w-[160px] h-9">
-                        <SelectValue placeholder="Klicka för att välja mapp" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["Allmänt", ...folders.filter(f => f !== "Allmänt")].map(folder => (
-                          <SelectItem key={folder} value={folder}>
-                            <div className="flex items-center gap-2">
-                              <Folder className="w-3 h-3" />
-                              {folder}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      onClick={() => handleDeleteMeeting(meeting.id)}
-                      size="sm"
-                      variant="destructive"
-                      disabled={userPlan?.plan === 'free' || deletingMeetingId === meeting.id}
-                      title={userPlan?.plan === 'free' ? 'Inte tillåtet på gratisplanen' : deletingMeetingId === meeting.id ? 'Tar bort...' : undefined}
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Ta bort
-                    </Button>
+                    {!(meeting as any).readOnly && (
+                      <Select value={(folders.includes(meeting.folder) || meeting.folder === 'Allmänt') ? meeting.folder : undefined} onValueChange={(value) => handleMoveToFolder(meeting, value)}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Klicka för att välja mapp" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Allmänt", ...folders.filter(f => f !== "Allmänt")].map(folder => (
+                            <SelectItem key={folder} value={folder}>
+                              <div className="flex items-center gap-2">
+                                <Folder className="w-3 h-3" />
+                                {folder}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {!(meeting as any).readOnly && (
+                      <Button
+                        onClick={() => handleDeleteMeeting(meeting.id)}
+                        size="sm"
+                        variant="destructive"
+                        disabled={userPlan?.plan === 'free' || deletingMeetingId === meeting.id}
+                        title={userPlan?.plan === 'free' ? 'Inte tillåtet på gratisplanen' : deletingMeetingId === meeting.id ? 'Tar bort...' : undefined}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Ta bort
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
