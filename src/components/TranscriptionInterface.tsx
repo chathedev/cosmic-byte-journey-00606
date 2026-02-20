@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
@@ -6,6 +6,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
+import { TeamSelectDialog } from "./TeamSelectDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -39,7 +40,7 @@ interface TranscriptionInterfaceProps {
 export const TranscriptionInterface = ({ isFreeTrialMode = false }: TranscriptionInterfaceProps) => {
   const [currentView, setCurrentView] = useState<View>("welcome");
   const [transcript, setTranscript] = useState("");
-  const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan } = useSubscription();
+  const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan, enterpriseMembership } = useSubscription();
   const { user } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState('');
@@ -51,6 +52,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
   const [showTextPasteDialog, setShowTextPasteDialog] = useState(false);
   const isMobile = useIsMobile();
+  const [showTeamSelect, setShowTeamSelect] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'record' | 'upload' | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+
+  const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
@@ -82,11 +88,40 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
+     // Enterprise users: show team selection first
+     if (isEnterprise) {
+       setPendingAction('record');
+       setShowTeamSelect(true);
+       return;
+     }
+
      await startInPersonRecording();
   };
 
+  const handleUploadClick = async () => {
+    // Enterprise users: show team selection first
+    if (isEnterprise) {
+      setPendingAction('upload');
+      setShowTeamSelect(true);
+      return;
+    }
+    setShowDigitalMeetingDialog(true);
+  };
+
+  const handleTeamSelected = async (teamId: string | null) => {
+    setSelectedTeamId(teamId);
+    const action = pendingAction;
+    setPendingAction(null);
+
+    if (action === 'record') {
+      await startInPersonRecording(teamId);
+    } else if (action === 'upload') {
+      setShowDigitalMeetingDialog(true);
+    }
+  };
+
   // Start in-person recording (current behavior)
-  const startInPersonRecording = async () => {
+  const startInPersonRecording = async (teamId?: string | null) => {
     setIsStartingRecording(true);
 
     try {
@@ -97,7 +132,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         meetingStartedAt: now,
         transcript: '',
         transcriptionStatus: 'recording',
-        
+        ...(teamId ? { teamId } : {}),
       });
 
       const meetingId = result.meeting?.id;
@@ -361,7 +396,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </Button>
 
             <Button 
-              onClick={handleOpenDigitalMeeting}
+              onClick={handleUploadClick}
               variant="outline"
               size="lg"
               className="w-full h-14 text-base gap-3"
@@ -417,6 +452,12 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         open={showTextPasteDialog}
         onOpenChange={setShowTextPasteDialog}
         onTextReady={handleTextPaste}
+      />
+
+      <TeamSelectDialog
+        open={showTeamSelect}
+        onOpenChange={setShowTeamSelect}
+        onSelect={handleTeamSelected}
       />
     </div>
   );
