@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle, Shield, Users, Lock, ChevronRight } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, Clock, ArrowLeft, AlertTriangle, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { meetingStorage } from "@/utils/meetingStorage";
@@ -16,7 +16,6 @@ import { isNativeApp } from "@/utils/capacitorDetection";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { apiClient } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
 
@@ -27,7 +26,7 @@ interface RecordingViewNewProps {
   selectedLanguage?: 'sv-SE' | 'en-US';
 }
 
-type ViewState = 'recording' | 'team-select';
+type ViewState = 'recording';
 
 // Check if user has ASR access for LIVE recording (Enterprise or Admin)
 // Free and Pro use browser-based transcription for live recording
@@ -49,7 +48,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userPlan, canCreateMeeting, incrementMeetingCount, refreshPlan, isAdmin, enterpriseMembership } = useSubscription();
+  const { userPlan, canCreateMeeting, incrementMeetingCount, refreshPlan, isAdmin } = useSubscription();
   
   const [viewState, setViewState] = useState<ViewState>('recording');
   const [isRecording, setIsRecording] = useState(false);
@@ -65,7 +64,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isTestMode, setIsTestMode] = useState(false);
-  const [teams, setTeams] = useState<Array<{ id: string; name: string; description?: string; memberCount?: number }>>([]);
   const [isSaving, setIsSaving] = useState(false);
   
   // Real-time transcript for Free/Pro plans (browser speech recognition)
@@ -124,20 +122,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     loadFolders();
   }, [user]);
 
-  // Load enterprise teams
-  const isEnterprise = enterpriseMembership?.isMember;
-  const companyId = enterpriseMembership?.company?.id;
-  useEffect(() => {
-    if (!companyId || !isEnterprise) return;
-    apiClient.getEnterpriseTeams(companyId)
-      .then(data => {
-        const myTeams = (data.teams || [])
-          .filter((t: any) => t.status === 'active' && t.isMember)
-          .map((t: any) => ({ id: t.id, name: t.name, description: t.description, memberCount: t.memberCount }));
-        setTeams(myTeams);
-      })
-      .catch(err => console.warn('Failed to load teams:', err));
-  }, [companyId, isEnterprise]);
 
   // Check instructions
   useEffect(() => {
@@ -629,18 +613,6 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
       }
     }
 
-    // If enterprise user with teams, show team selection step first
-    if (isEnterprise && teams.length > 0 && viewState !== 'team-select') {
-      setViewState('team-select');
-      // Pause recording but keep data
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.pause();
-      }
-      setIsPaused(true);
-      stopSpeechRecognition();
-      return;
-    }
-
     setIsSaving(true);
     setIsRecording(false);
     stopSpeechRecognition();
@@ -854,26 +826,6 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
     onBack();
   };
 
-  // Proceed after team selection step
-  const proceedAfterTeamSelect = async () => {
-    setViewState('recording');
-    // Resume and immediately stop + save
-    setIsSaving(true);
-    setIsRecording(false);
-    await releaseWakeLock();
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      if (mediaRecorderRef.current.state === 'paused') {
-        mediaRecorderRef.current.resume();
-      }
-      mediaRecorderRef.current.onstop = () => {
-        saveAndRedirectInstantly();
-      };
-      mediaRecorderRef.current.stop();
-    } else {
-      saveAndRedirectInstantly();
-    }
-  };
 
   // Loading overlay while saving - only for users with library access
   const canAccessLibraryForOverlay = hasLibraryAccess(userPlan?.plan, isAdmin);
@@ -883,96 +835,6 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <h2 className="text-lg font-medium">Sparar möte...</h2>
-        </div>
-      </div>
-    );
-  }
-
-  // Team Selection Step
-  if (viewState === 'team-select') {
-    return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
-        <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 ${isNative ? 'pt-safe' : ''}`}>
-          <div className="max-w-lg mx-auto px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => { setViewState('recording'); setIsPaused(false); if (mediaRecorderRef.current?.state === 'paused') mediaRecorderRef.current.resume(); }} className="h-8 px-2">
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <div>
-                <h1 className="text-sm font-semibold">Dela möte</h1>
-                <p className="text-[11px] text-muted-foreground">Välj om mötet ska delas med ett team</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-          <div className="w-full max-w-md space-y-3">
-            {/* Individual / Private option */}
-            <button
-              onClick={() => { setSelectedTeamId(null); proceedAfterTeamSelect(); }}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                !selectedTeamId
-                  ? 'border-primary bg-primary/5 shadow-sm'
-                  : 'border-border hover:border-primary/40 hover:bg-accent/50'
-              }`}
-            >
-              <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                <Lock className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-foreground">Individuellt möte</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Bara du kan se detta möte</div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 py-1">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Eller dela med team</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {/* Team options */}
-            {teams.map((team) => (
-              <button
-                key={team.id}
-                onClick={() => { setSelectedTeamId(team.id); proceedAfterTeamSelect(); }}
-                className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                  selectedTeamId === team.id
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-border hover:border-primary/40 hover:bg-accent/50'
-                }`}
-              >
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-foreground">{team.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {team.description && (
-                      <span className="text-xs text-muted-foreground truncate">{team.description}</span>
-                    )}
-                    {team.memberCount && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
-                        {team.memberCount} medlemmar
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </button>
-            ))}
-          </div>
-
-          {/* Recording info reminder */}
-          <div className="mt-8 text-center">
-            <p className="text-xs text-muted-foreground">
-              <span className="font-mono">{Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}</span>
-              {' '}inspelat · {meetingName}
-            </p>
-          </div>
         </div>
       </div>
     );
