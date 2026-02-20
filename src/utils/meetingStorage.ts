@@ -35,6 +35,9 @@ export interface MeetingSession {
   source?: 'live' | 'upload'; // Indikerar om mötet är från live-inspelning eller uppladdad fil
   transcriptionStatus?: 'uploading' | 'processing' | 'done' | 'failed'; // Status för transkribering
   transcriptionStage?: 'uploading' | 'transcribing' | 'sis_processing' | 'done' | 'error'; // More granular stage from backend
+  enterpriseTeamId?: string; // Team the meeting belongs to (null = individual/private)
+  enterpriseTeamName?: string; // Convenience name for display
+  readOnly?: boolean; // True if this is a shared team meeting the user doesn't own
 }
 
 export interface MeetingFolder {
@@ -62,6 +65,9 @@ const mapMeeting = (m: any, userIdHint?: string): MeetingSession => ({
   source: m.source || undefined,
   transcriptSegments: m.transcriptSegments || undefined, // Speaker diarization data
   speakerNames: m.speakerNames || undefined, // Custom speaker names
+  enterpriseTeamId: m.enterpriseTeamId || m.teamId || undefined,
+  enterpriseTeamName: m.enterpriseTeamName || m.teamName || undefined,
+  readOnly: m.readOnly || false,
   // CRITICAL: Override status to 'done' if real transcript exists (not placeholder text)
   transcriptionStatus: (m.transcript && m.transcript.trim().length > 0 && !m.transcript.includes('Transkribering pågår')) ? 'done' : (m.transcriptionStatus || 'processing'),
 });

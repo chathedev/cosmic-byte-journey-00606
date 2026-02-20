@@ -2528,6 +2528,103 @@ class ApiClient {
    * @param companyId - The company ID to fetch stats for
    * @returns Company stats with totals and scoreboard
    */
+  // ==================== ENTERPRISE TEAMS API ====================
+
+  async getEnterpriseTeams(companyId: string, includeArchived: boolean = false): Promise<{
+    company: any;
+    viewer: { email: string; role: string; canManageTeams: boolean };
+    teams: Array<{
+      id: string;
+      name: string;
+      status: 'active' | 'archived';
+      description?: string;
+      members: string[];
+      memberCount: number;
+      createdAt: string;
+      updatedAt: string;
+      createdBy?: string;
+      updatedBy?: string;
+      isMember: boolean;
+    }>;
+    availableMembers?: string[];
+    teamCount: number;
+  }> {
+    const params = includeArchived ? '?includeArchived=true' : '';
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/teams${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch teams' }));
+      throw new Error((error as any).error || 'Failed to fetch teams');
+    }
+    return response.json();
+  }
+
+  async createEnterpriseTeam(companyId: string, data: {
+    name: string;
+    description?: string;
+    members?: string[];
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/teams`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create team' }));
+      throw new Error((error as any).error || 'Failed to create team');
+    }
+    return response.json();
+  }
+
+  async updateEnterpriseTeam(companyId: string, teamId: string, data: {
+    name?: string;
+    description?: string;
+    status?: 'active' | 'archived';
+    members?: string[];
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/teams/${teamId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update team' }));
+      throw new Error((error as any).error || 'Failed to update team');
+    }
+    return response.json();
+  }
+
+  async deleteEnterpriseTeam(companyId: string, teamId: string): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/teams/${teamId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to delete team' }));
+      throw new Error((error as any).error || 'Failed to delete team');
+    }
+    return response.json();
+  }
+
+  async addEnterpriseTeamMember(companyId: string, teamId: string, email: string): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/teams/${teamId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to add team member' }));
+      throw new Error((error as any).error || 'Failed to add team member');
+    }
+    return response.json();
+  }
+
+  async removeEnterpriseTeamMember(companyId: string, teamId: string, memberEmail: string): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/teams/${teamId}/members/${encodeURIComponent(memberEmail)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to remove team member' }));
+      throw new Error((error as any).error || 'Failed to remove team member');
+    }
+    return response.json();
+  }
+
   async getEnterpriseCompanyStats(companyId: string): Promise<{
     company: any;
     scope: { type: string; memberCount: number };
