@@ -2228,24 +2228,6 @@ const MeetingDetail = () => {
                 {formatDate(meeting.createdAt)} · {formatTime(meeting.createdAt)}
               </p>
             )}
-            {/* Team selector for meeting owner - compact inline */}
-            {meeting && enterpriseMembership?.isMember && !isReadOnly && !isRecordingMode && (
-              <div className="mt-1">
-                <TeamSelector
-                  value={meeting.enterpriseTeamId || null}
-                  onChange={async (teamId) => {
-                    try {
-                      await apiClient.updateMeeting(meeting.id, { teamId: teamId || null });
-                      setMeeting(prev => prev ? { ...prev, enterpriseTeamId: teamId || undefined, enterpriseTeamName: undefined, accessScope: teamId ? 'team' : 'individual' } : prev);
-                      toast({ title: teamId ? 'Möte delat med team' : 'Möte ändrat till individuellt', duration: 3000 });
-                    } catch (e: any) {
-                      toast({ title: 'Kunde inte ändra', description: e.message, variant: 'destructive', duration: 3000 });
-                    }
-                  }}
-                  compact
-                />
-              </div>
-            )}
           </div>
 
           {/* Top-right actions when transcript is ready */}
