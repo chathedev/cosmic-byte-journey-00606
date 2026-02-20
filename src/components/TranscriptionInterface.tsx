@@ -446,6 +446,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         onOpenChange={setShowDigitalMeetingDialog}
         onTranscriptReady={handleDigitalMeetingUpload}
         selectedLanguage={selectedLanguage}
+        teamId={selectedTeamId}
       />
 
       <TextPasteDialog
