@@ -9,6 +9,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 import { Trash2, CheckCircle, XCircle, LogOut, Building2, Loader2, Headphones, ExternalLink, ArrowLeft, ChevronRight, Smartphone, Zap, Shield, Sparkles } from "lucide-react";
+import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { SupportCodeDialog } from "@/components/SupportCodeDialog";
@@ -416,6 +417,13 @@ const Settings = () => {
                   </div>
                 )}
               </section>
+
+              {/* Enterprise Teams */}
+              <Separator />
+              <section>
+                <EnterpriseTeamManager />
+              </section>
+
               <Separator />
             </>
           )}

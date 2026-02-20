@@ -1008,8 +1008,13 @@ const MeetingDetail = () => {
     }
   };
 
-  // Enter edit mode
+  // Enter edit mode (blocked for readOnly shared team meetings)
+  const isReadOnly = !!(meeting as any)?.readOnly;
   const enterEditMode = () => {
+    if (isReadOnly) {
+      toast({ title: 'Skrivskyddat', description: 'Detta är ett delat teammöte som du inte kan redigera.', variant: 'destructive' });
+      return;
+    }
     setEditedTranscript(transcript || '');
     setEditedSpeakerNames({ ...speakerNames });
     setIsEditing(true);

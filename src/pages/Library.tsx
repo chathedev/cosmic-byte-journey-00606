@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { Play, Calendar, Trash2, FolderPlus, X, Edit2, Check, Folder, FileText, Lock, TrendingUp, MessageCircle, Mic, Upload, Loader2, Mail, CheckCircle2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { meetingStorage, type MeetingSession, type TranscriptSegment } from "@/utils/meetingStorage";
@@ -1260,6 +1260,21 @@ const Library = () => {
                             <Badge variant="destructive" className="flex items-center gap-1 text-xs">
                               Misslyckades
                             </Badge>
+                          </>
+                        )}
+                        {/* Team badge */}
+                        {(meeting as any).enterpriseTeamId && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <Badge variant="outline" className="flex items-center gap-1 text-xs bg-accent/50 border-accent">
+                              <Users className="w-2.5 h-2.5" />
+                              {(meeting as any).enterpriseTeamName || 'Team'}
+                            </Badge>
+                            {(meeting as any).readOnly && (
+                              <Badge variant="secondary" className="text-xs">
+                                Skrivskyddat
+                              </Badge>
+                            )}
                           </>
                         )}
                       </CardDescription>
