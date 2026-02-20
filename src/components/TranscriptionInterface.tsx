@@ -132,7 +132,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         meetingStartedAt: now,
         transcript: '',
         transcriptionStatus: 'recording',
-        ...(teamId ? { teamId } : {}),
+        ...(teamId ? { teamId, enterpriseTeamId: teamId, accessScope: 'team' } : {}),
       });
 
       const meetingId = result.meeting?.id;

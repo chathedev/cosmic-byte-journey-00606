@@ -221,7 +221,7 @@ export const DigitalMeetingDialog = ({
         source: 'upload' as const,
         transcriptionStatus: 'uploading' as const,
         forceCreate: true,
-        ...(teamId ? { teamId } : {}),
+        ...(teamId ? { teamId, enterpriseTeamId: teamId, accessScope: 'team' as const } : {}),
       };
 
       // Save meeting to get an ID
