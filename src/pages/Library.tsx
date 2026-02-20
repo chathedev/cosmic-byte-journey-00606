@@ -1262,16 +1262,24 @@ const Library = () => {
                             </Badge>
                           </>
                         )}
-                        {/* Team badge */}
-                        {(meeting as any).enterpriseTeamId && (
+                        {/* Meeting visibility badge */}
+                        {isEnterprise && (
                           <>
                             <span className="text-muted-foreground">•</span>
-                            <Badge variant="outline" className="flex items-center gap-1 text-xs bg-accent/50 border-accent">
-                              <Users className="w-2.5 h-2.5" />
-                              {(meeting as any).enterpriseTeamName || 'Team'}
-                            </Badge>
+                            {(meeting as any).enterpriseTeamId ? (
+                              <Badge variant="outline" className="flex items-center gap-1.5 text-xs px-2.5 py-0.5 bg-primary/8 border-primary/20 text-primary">
+                                <Users className="w-3 h-3" />
+                                {(meeting as any).enterpriseTeamName || 'Team'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="flex items-center gap-1.5 text-xs px-2.5 py-0.5 bg-muted/50 border-border text-muted-foreground">
+                                <Lock className="w-3 h-3" />
+                                Individuellt
+                              </Badge>
+                            )}
                             {(meeting as any).readOnly && (
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="secondary" className="flex items-center gap-1.5 text-xs px-2.5 py-0.5">
+                                <Eye className="w-3 h-3" />
                                 Skrivskyddat
                               </Badge>
                             )}

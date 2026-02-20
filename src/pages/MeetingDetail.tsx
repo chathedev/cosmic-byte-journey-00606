@@ -2198,7 +2198,30 @@ const MeetingDetail = () => {
           </Button>
           
           <div className="flex-1 min-w-0">
-            <h1 className="font-medium text-sm truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-medium text-sm truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
+              {meeting && enterpriseMembership?.isMember && (
+                <>
+                  {meeting.enterpriseTeamId ? (
+                    <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-5 bg-primary/8 border-primary/20 text-primary shrink-0">
+                      <Users className="w-2.5 h-2.5" />
+                      {meeting.enterpriseTeamName || 'Team'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-5 bg-muted/50 border-border text-muted-foreground shrink-0">
+                      <Lock className="w-2.5 h-2.5" />
+                      Individuellt
+                    </Badge>
+                  )}
+                  {isReadOnly && (
+                    <Badge variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0 h-5 shrink-0">
+                      <Eye className="w-2.5 h-2.5" />
+                      Skrivskyddat
+                    </Badge>
+                  )}
+                </>
+              )}
+            </div>
             {meeting && (
               <p className="text-xs text-muted-foreground">
                 {formatDate(meeting.createdAt)} · {formatTime(meeting.createdAt)}
