@@ -648,6 +648,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     console.log('[SubscriptionContext] 🔄 Switching to company:', companyId);
     try {
       await apiClient.setActiveEnterpriseCompany(companyId);
+      // Remember that user has made a choice
+      localStorage.setItem('tivly_org_chosen', companyId);
       // Reload membership with new active company
       await loadEnterpriseMembership();
       // Refresh plan since enterprise context changed

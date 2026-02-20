@@ -91,12 +91,23 @@ export function AppSidebar() {
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
   const meetingsLeft = meetingsLimit !== null ? Math.max(0, Number(meetingsLimit) - Number(meetingsUsed)) : null;
 
-  // Show org switcher on launch if multi-company member
+  // Show org switcher on launch ONLY if user has never picked a company before
   useEffect(() => {
-    if (!orgSwitcherShownOnLaunch && enterpriseMembership?.isMultiCompanyMember && (enterpriseMembership.memberships?.length ?? 0) > 1) {
-      setShowOrgSwitcher(true);
+    if (orgSwitcherShownOnLaunch) return;
+    if (!enterpriseMembership?.isMultiCompanyMember || (enterpriseMembership.memberships?.length ?? 0) <= 1) return;
+    
+    // If backend already has an activeCompanyId or user previously chose one, skip
+    const previouslyChosen = localStorage.getItem('tivly_org_chosen');
+    const hasActiveCompany = !!enterpriseMembership.activeCompanyId;
+    
+    if (previouslyChosen || hasActiveCompany) {
       setOrgSwitcherShownOnLaunch(true);
+      return;
     }
+    
+    // First time multi-org user — show picker
+    setShowOrgSwitcher(true);
+    setOrgSwitcherShownOnLaunch(true);
   }, [enterpriseMembership, orgSwitcherShownOnLaunch]);
 
   useEffect(() => {
