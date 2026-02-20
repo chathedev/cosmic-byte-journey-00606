@@ -135,6 +135,10 @@ export default function AdminEnterpriseCompanyDetail() {
   const [companyMeetings, setCompanyMeetings] = useState<any>(null);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
 
+  // Teams
+  const [companyTeams, setCompanyTeams] = useState<any[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
   // Company stats
   const [companyStats, setCompanyStats] = useState<{
     totalMeetings: number;
@@ -1013,10 +1017,22 @@ export default function AdminEnterpriseCompanyDetail() {
 
         {/* Tabs for Members and Billing */}
         <Tabs defaultValue="members" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
             <TabsTrigger value="members">
               <Users className="h-4 w-4 mr-2" />
               Medlemmar ({company.members.length})
+            </TabsTrigger>
+            <TabsTrigger value="teams" onClick={() => {
+              if (companyTeams.length === 0 && !loadingTeams) {
+                setLoadingTeams(true);
+                apiClient.getEnterpriseTeams(company.id, true)
+                  .then(data => setCompanyTeams(data.teams || []))
+                  .catch(() => toast({ title: 'Kunde inte ladda team', variant: 'destructive' }))
+                  .finally(() => setLoadingTeams(false));
+              }
+            }}>
+              <Shield className="h-4 w-4 mr-2" />
+              Team
             </TabsTrigger>
             <TabsTrigger value="billing">
               <FileText className="h-4 w-4 mr-2" />
@@ -1193,6 +1209,59 @@ export default function AdminEnterpriseCompanyDetail() {
                     })}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Teams Tab */}
+          <TabsContent value="teams" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Team ({companyTeams.filter(t => t.status === 'active').length} aktiva)
+                </CardTitle>
+                <CardDescription>Alla team i företaget</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingTeams ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : companyTeams.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Inga team skapade ännu</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Namn</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Medlemmar</TableHead>
+                        <TableHead>Beskrivning</TableHead>
+                        <TableHead>Skapad</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {companyTeams.map((team: any) => (
+                        <TableRow key={team.id}>
+                          <TableCell className="font-medium">{team.name}</TableCell>
+                          <TableCell>
+                            <Badge variant={team.status === 'active' ? 'default' : 'secondary'}>
+                              {team.status === 'active' ? 'Aktiv' : 'Arkiverad'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{team.memberCount ?? team.members?.length ?? 0}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                            {team.description || '–'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {team.createdAt ? new Date(team.createdAt).toLocaleDateString('sv-SE') : '–'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

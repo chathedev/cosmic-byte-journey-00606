@@ -21,7 +21,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -170,6 +170,7 @@ export function AppSidebar() {
     { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
     ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats", locked: false }] : []),
+    ...(enterpriseMembership?.isMember ? [{ Icon: Users, title: "Organisation", path: "/org/settings", locked: false }] : []),
     ...(enterpriseMembership?.isMember ? [{ Icon: CreditCard, title: "Fakturering", path: "/billing/invoices", locked: false }] : []),
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
   ];
