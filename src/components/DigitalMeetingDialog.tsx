@@ -16,6 +16,7 @@ interface DigitalMeetingDialogProps {
   onOpenChange: (open: boolean) => void;
   onTranscriptReady: (transcript: string) => void;
   selectedLanguage: 'sv-SE' | 'en-US';
+  teamId?: string | null;
 }
 
 // Accepted audio formats
@@ -70,7 +71,8 @@ export const DigitalMeetingDialog = ({
   open, 
   onOpenChange, 
   onTranscriptReady,
-  selectedLanguage 
+  selectedLanguage,
+  teamId,
 }: DigitalMeetingDialogProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -215,10 +217,11 @@ export const DigitalMeetingDialog = ({
         createdAt: now,
         updatedAt: now,
         userId: user.uid,
-        isCompleted: true,  // Must be true to create real backend meeting
+        isCompleted: true,
         source: 'upload' as const,
         transcriptionStatus: 'uploading' as const,
         forceCreate: true,
+        ...(teamId ? { teamId } : {}),
       };
 
       // Save meeting to get an ID
