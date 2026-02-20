@@ -133,6 +133,7 @@ export const meetingStorage = {
       // NOTE: protocolCount is NOT stored in meeting records anymore.
       // It's stored in a separate file (data/protocol-counts.json).
       // We should NOT include protocolCount in the payload.
+      const resolvedTeamId = meeting.enterpriseTeamId || meeting.teamId || (meeting as any).teamId || undefined;
       const payload: any = {
         title: meeting.title,
         transcript: meeting.transcript,
@@ -145,9 +146,14 @@ export const meetingStorage = {
         createdAt: meeting.createdAt,
         startedAt: meeting.createdAt,
         meetingStartedAt: meeting.createdAt,
-        // Team assignment for enterprise meetings
-        teamId: meeting.enterpriseTeamId || meeting.teamId || (meeting as any).teamId || undefined,
       };
+
+      // Only include team fields when explicitly set (avoid clearing existing team assignment)
+      if (resolvedTeamId) {
+        payload.teamId = resolvedTeamId;
+        payload.enterpriseTeamId = resolvedTeamId;
+        payload.accessScope = 'team';
+      }
 
       // Resolve folderId if only a folder name was provided
       try {

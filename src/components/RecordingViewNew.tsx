@@ -708,9 +708,8 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
         // For browser mode: done immediately. For ASR mode: processing
         transcriptionStatus: useAsrMode ? 'processing' as const : 'done' as const,
         forceCreate: !isContinuedMeeting,
-        // Team assignment for enterprise meetings
-        teamId: selectedTeamId || undefined,
-        enterpriseTeamId: selectedTeamId || undefined,
+        // Team assignment for enterprise meetings (only include if set, to avoid clearing existing team)
+        ...(selectedTeamId ? { teamId: selectedTeamId, enterpriseTeamId: selectedTeamId, accessScope: 'team' as const } : {}),
       };
 
       const meetingId = isContinuedMeeting 
