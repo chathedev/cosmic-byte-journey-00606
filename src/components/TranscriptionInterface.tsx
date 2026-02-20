@@ -6,7 +6,6 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { SubscribeDialog } from "./SubscribeDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
-import { TeamSelector } from "./TeamSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -51,7 +50,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const navigate = useNavigate();
   const [showDigitalMeetingDialog, setShowDigitalMeetingDialog] = useState(false);
   const [showTextPasteDialog, setShowTextPasteDialog] = useState(false);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   useEffect(() => {
     const id = searchParams.get('continue');
@@ -99,7 +97,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         meetingStartedAt: now,
         transcript: '',
         transcriptionStatus: 'recording',
-        ...(selectedTeamId ? { teamId: selectedTeamId } : {}),
+        
       });
 
       const meetingId = result.meeting?.id;
@@ -383,12 +381,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </Button>
           </div>
 
-          {/* Team Selector (only shows for enterprise users with teams) */}
-          <TeamSelector
-            value={selectedTeamId}
-            onChange={setSelectedTeamId}
-            compact
-          />
 
           {/* Minimal trust indicators */}
           <div className="flex items-center justify-center gap-4 pt-4 text-xs text-muted-foreground">
