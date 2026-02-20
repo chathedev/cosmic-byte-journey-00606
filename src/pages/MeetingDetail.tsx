@@ -2188,7 +2188,7 @@ const MeetingDetail = () => {
     <div className="min-h-screen bg-background">
       {/* Clean Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 min-h-[3.5rem] py-2 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -2228,22 +2228,23 @@ const MeetingDetail = () => {
                 {formatDate(meeting.createdAt)} · {formatTime(meeting.createdAt)}
               </p>
             )}
-            {/* Team selector for meeting owner */}
+            {/* Team selector for meeting owner - compact inline */}
             {meeting && enterpriseMembership?.isMember && !isReadOnly && !isRecordingMode && (
-              <TeamSelector
-                value={meeting.enterpriseTeamId || null}
-                onChange={async (teamId) => {
-                  try {
-                    await apiClient.updateMeeting(meeting.id, { teamId: teamId || null });
-                    setMeeting(prev => prev ? { ...prev, enterpriseTeamId: teamId || undefined, enterpriseTeamName: undefined, accessScope: teamId ? 'team' : 'individual' } : prev);
-                    toast({ title: teamId ? 'Möte delat med team' : 'Möte ändrat till individuellt' });
-                  } catch (e: any) {
-                    toast({ title: 'Kunde inte ändra', description: e.message, variant: 'destructive' });
-                  }
-                }}
-                compact
-                className="mt-1"
-              />
+              <div className="mt-1">
+                <TeamSelector
+                  value={meeting.enterpriseTeamId || null}
+                  onChange={async (teamId) => {
+                    try {
+                      await apiClient.updateMeeting(meeting.id, { teamId: teamId || null });
+                      setMeeting(prev => prev ? { ...prev, enterpriseTeamId: teamId || undefined, enterpriseTeamName: undefined, accessScope: teamId ? 'team' : 'individual' } : prev);
+                      toast({ title: teamId ? 'Möte delat med team' : 'Möte ändrat till individuellt', duration: 3000 });
+                    } catch (e: any) {
+                      toast({ title: 'Kunde inte ändra', description: e.message, variant: 'destructive', duration: 3000 });
+                    }
+                  }}
+                  compact
+                />
+              </div>
             )}
           </div>
 
