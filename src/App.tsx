@@ -55,6 +55,7 @@ import AdminAICosts from "./pages/AdminAICosts";
 import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
 import Settings from "./pages/Settings";
+import OrgSettings from "./pages/OrgSettings";
 import NotFound from "./pages/NotFound";
 import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
@@ -370,6 +371,7 @@ const AppContent = () => {
                 <Route path="/billing/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
                 <Route path="/billing/invoices/:invoiceId" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
