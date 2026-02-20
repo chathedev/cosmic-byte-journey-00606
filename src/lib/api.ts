@@ -973,13 +973,23 @@ class ApiClient {
       title?: string;
       joinedAt?: string;
     };
+    isMultiCompanyMember?: boolean;
+    activeCompanyId?: string;
+    memberships?: Array<{
+      companyId: string;
+      companyName: string;
+      role: string;
+      dataAccessMode?: string;
+      joinedAt?: string;
+      updatedAt?: string;
+      speakerIdentificationEnabled?: boolean;
+    }>;
   }> {
     try {
       const url = companyId ? `/enterprise/me?companyId=${companyId}` : '/enterprise/me';
       const response = await this.fetchWithAuth(url, { suppressAuthRedirect: true });
       
       if (!response.ok) {
-        // Legacy 404 handling for older backends
         if (response.status === 404) {
           return { isMember: false };
         }
@@ -998,7 +1008,7 @@ class ApiClient {
       const sisEnabled = data.company?.speakerIdentificationEnabled ?? 
                          data.company?.preferences?.speakerIdentificationEnabled ??
                          data.enterprise?.speakerIdentificationEnabled ??
-                         true; // Default to true per docs
+                         true;
       
       return {
         isMember: true,
@@ -1006,15 +1016,30 @@ class ApiClient {
           ...data.company,
           speakerIdentificationEnabled: sisEnabled,
         },
-        membership: data.membership
+        membership: data.membership,
+        isMultiCompanyMember: data.isMultiCompanyMember || (Array.isArray(data.memberships) && data.memberships.length > 1),
+        activeCompanyId: data.activeCompanyId,
+        memberships: data.memberships,
       };
     } catch (error) {
-      // Silently return false for expected cases, only log unexpected errors
       if (error instanceof Error && !error.message.includes('404')) {
         console.error('[API] Enterprise membership error:', error);
       }
       return { isMember: false };
     }
+  }
+
+  // Set active enterprise company for multi-org users
+  async setActiveEnterpriseCompany(companyId: string): Promise<any> {
+    const response = await this.fetchWithAuth('/enterprise/active-company', {
+      method: 'PUT',
+      body: JSON.stringify({ companyId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Failed to switch company' }));
+      throw new Error((err as any).error || 'Failed to switch company');
+    }
+    return response.json();
   }
 
   // Enterprise Billing Subscription Status (Member Endpoint)

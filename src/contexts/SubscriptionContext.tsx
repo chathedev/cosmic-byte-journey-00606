@@ -22,8 +22,21 @@ export interface EnterpriseBillingRecord {
   invoiceUrl?: string;
 }
 
+export interface EnterpriseMembershipItem {
+  companyId: string;
+  companyName: string;
+  role: string;
+  dataAccessMode?: string;
+  joinedAt?: string;
+  updatedAt?: string;
+  speakerIdentificationEnabled?: boolean;
+}
+
 export interface EnterpriseMembership {
   isMember: boolean;
+  isMultiCompanyMember?: boolean;
+  activeCompanyId?: string;
+  memberships?: EnterpriseMembershipItem[];
   company?: {
     id: string;
     name: string;
@@ -113,6 +126,7 @@ interface SubscriptionContextType {
   isAdmin: boolean;
   refreshPlan: () => Promise<void>;
   refreshEnterpriseMembership: () => Promise<void>;
+  switchCompany: (companyId: string) => Promise<void>;
   canCreateMeeting: () => Promise<{ allowed: boolean; reason?: string }>;
   canGenerateProtocol: (meetingId: string, protocolCount: number) => Promise<{ allowed: boolean; reason?: string }>;
   incrementMeetingCount: (meetingId: string) => Promise<void>;
@@ -395,6 +409,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         
         setEnterpriseMembership({
           ...membership,
+          isMultiCompanyMember: membership.isMultiCompanyMember,
+          activeCompanyId: membership.activeCompanyId,
+          memberships: membership.memberships,
           company: {
             ...membership.company,
             speakerIdentificationEnabled: sisEnabled,
@@ -627,9 +644,22 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       await refreshPlan();
     }
   };
+  const switchCompany = useCallback(async (companyId: string) => {
+    console.log('[SubscriptionContext] 🔄 Switching to company:', companyId);
+    try {
+      await apiClient.setActiveEnterpriseCompany(companyId);
+      // Reload membership with new active company
+      await loadEnterpriseMembership();
+      // Refresh plan since enterprise context changed
+      await loadPlan();
+    } catch (error) {
+      console.error('[SubscriptionContext] ❌ Failed to switch company:', error);
+      throw error;
+    }
+  }, [loadEnterpriseMembership, loadPlan]);
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, switchCompany, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );

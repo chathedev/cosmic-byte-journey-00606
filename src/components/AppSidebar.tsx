@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import {
   FiHome,
   FiBookOpen,
@@ -20,7 +21,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -43,11 +44,13 @@ export function AppSidebar() {
   const [showAdminSupport, setShowAdminSupport] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
+  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
+  const [orgSwitcherShownOnLaunch, setOrgSwitcherShownOnLaunch] = useState(false);
   const isNative = isNativeApp();
   
   const scrollYRef = useRef(0);
   const { user, logout } = useAuth();
-  const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership } = useSubscription();
+  const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership, switchCompany } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,6 +90,14 @@ export function AppSidebar() {
   const meetingsUsed = !planLoading && userPlan ? (userPlan.meetingsUsed ?? 0) : 0;
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
   const meetingsLeft = meetingsLimit !== null ? Math.max(0, Number(meetingsLimit) - Number(meetingsUsed)) : null;
+
+  // Show org switcher on launch if multi-company member
+  useEffect(() => {
+    if (!orgSwitcherShownOnLaunch && enterpriseMembership?.isMultiCompanyMember && (enterpriseMembership.memberships?.length ?? 0) > 1) {
+      setShowOrgSwitcher(true);
+      setOrgSwitcherShownOnLaunch(true);
+    }
+  }, [enterpriseMembership, orgSwitcherShownOnLaunch]);
 
   useEffect(() => {
     if (user) {
@@ -286,11 +297,21 @@ export function AppSidebar() {
                   </div>
                 ) : (
                   <>
-                    <div className="text-sm font-semibold text-foreground truncate">
-                      {enterpriseMembership?.isMember && enterpriseMembership.company?.name 
-                        ? enterpriseMembership.company.name 
-                        : 'Tivly'}
-                    </div>
+                    <button
+                      onClick={enterpriseMembership?.isMultiCompanyMember ? () => setShowOrgSwitcher(true) : undefined}
+                      className={`text-sm font-semibold text-foreground truncate block max-w-full text-left ${
+                        enterpriseMembership?.isMultiCompanyMember ? 'hover:text-primary cursor-pointer transition-colors' : ''
+                      }`}
+                    >
+                      <span className="flex items-center gap-1">
+                        {enterpriseMembership?.isMember && enterpriseMembership.company?.name 
+                          ? enterpriseMembership.company.name 
+                          : 'Tivly'}
+                        {enterpriseMembership?.isMultiCompanyMember && (
+                          <FiChevronDown className="text-xs shrink-0 text-muted-foreground" />
+                        )}
+                      </span>
+                    </button>
                     <div className="text-xs text-muted-foreground truncate">
                       {enterpriseMembership?.isMember ? (
                         <span className="flex items-center gap-1">
@@ -543,6 +564,15 @@ export function AppSidebar() {
       {/* Dialogs */}
       <SubscribeDialog open={showSubscribe} onOpenChange={setShowSubscribe} />
       <AdminSupportPanel open={showAdminSupport} onOpenChange={setShowAdminSupport} />
+      {enterpriseMembership?.isMultiCompanyMember && enterpriseMembership.memberships && (
+        <OrgSwitcherDialog
+          open={showOrgSwitcher}
+          onOpenChange={setShowOrgSwitcher}
+          memberships={enterpriseMembership.memberships}
+          activeCompanyId={enterpriseMembership.activeCompanyId || enterpriseMembership.company?.id}
+          onSelect={switchCompany}
+        />
+      )}
     </>
   );
 }
