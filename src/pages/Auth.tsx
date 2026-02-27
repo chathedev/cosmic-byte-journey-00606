@@ -10,7 +10,6 @@ import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoAppAccessScreen from '@/components/NoAppAccessScreen';
 import tivlyLogo from '@/assets/tivly-logo.png';
-import { cn } from '@/lib/utils';
 
 declare global {
   interface Window {
@@ -70,8 +69,6 @@ export default function Auth() {
   const [codeSent, setCodeSent] = useState(false);
   const verifyingRef = useRef(false);
   const [isSignup, setIsSignup] = useState(false);
-  const focusScrollTimeoutRef = useRef<number | null>(null);
-  const [isFieldActive, setIsFieldActive] = useState(false);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
@@ -79,32 +76,12 @@ export default function Auth() {
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (focusScrollTimeoutRef.current) window.clearTimeout(focusScrollTimeoutRef.current);
-    };
-  }, []);
-
-  const handleFieldFocus = (target?: HTMLElement | null) => {
-    setIsFieldActive(true);
-    const focusedElement = target ?? (document.activeElement as HTMLElement | null);
-    if (!focusedElement) return;
-
+  const scrollInputIntoView = (target: HTMLElement) => {
+    if (window.innerWidth >= 1024) return;
     window.scrollTo({ top: 0, behavior: 'auto' });
-
-    if (focusScrollTimeoutRef.current) window.clearTimeout(focusScrollTimeoutRef.current);
-    focusScrollTimeoutRef.current = window.setTimeout(() => {
-      focusedElement.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
-    }, 220);
-  };
-
-  const handleFieldBlur = () => {
-    if (focusScrollTimeoutRef.current) window.clearTimeout(focusScrollTimeoutRef.current);
-    focusScrollTimeoutRef.current = window.setTimeout(() => {
-      const activeElement = document.activeElement;
-      const isTextInputFocused = activeElement instanceof HTMLInputElement;
-      setIsFieldActive(isTextInputFocused);
-    }, 0);
+    window.setTimeout(() => {
+      target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+    }, 180);
   };
 
   useEffect(() => {
@@ -295,12 +272,7 @@ export default function Auth() {
           </div>
 
           {/* Right panel — auth form */}
-          <div
-            className={cn(
-              'flex-1 relative flex flex-col items-center px-5 sm:px-8 py-12 sm:py-16 min-h-[100dvh] lg:min-h-screen lg:justify-center',
-              isFieldActive ? 'justify-start pt-8 sm:pt-10 lg:pt-0' : 'justify-center'
-            )}
-          >
+          <div className="flex-1 relative flex flex-col items-center px-5 sm:px-8 py-10 sm:py-12 min-h-[100dvh] lg:min-h-screen justify-start lg:justify-center">
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
               <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
@@ -341,8 +313,7 @@ export default function Auth() {
                             placeholder="namn@foretag.se"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            onFocus={(e) => handleFieldFocus(e.currentTarget)}
-                            onBlur={handleFieldBlur}
+                            onFocus={(e) => scrollInputIntoView(e.currentTarget)}
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
                             disabled={loading}
                             className="h-11 text-base pl-10 rounded-lg bg-background border-border focus:border-primary touch-manipulation"
@@ -417,17 +388,12 @@ export default function Auth() {
                       </p>
                     </div>
 
-                    <div
-                      className="flex justify-center py-2"
-                      onFocusCapture={(e) => handleFieldFocus(e.target as HTMLElement)}
-                      onBlurCapture={handleFieldBlur}
-                    >
+                    <div className="flex justify-center py-2">
                       <InputOTP
                         maxLength={6}
                         value={pinCode}
                         onChange={(value) => { if (!verifying && !isNavigating) { setPinCode(value); setAuthError(null); } }}
                         disabled={verifying || isNavigating}
-                        autoFocus
                       >
                         <InputOTPGroup className="gap-2">
                           {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -495,7 +461,7 @@ export default function Auth() {
             </div>
 
             {/* Footer inside the form panel */}
-            <div className={cn('w-full flex justify-center transition-[height,padding,opacity] duration-200 lg:absolute lg:bottom-6 lg:left-0 lg:pt-0', isFieldActive ? 'h-0 pt-0 overflow-hidden opacity-0' : 'pt-8 opacity-100')}>
+            <div className="hidden lg:flex w-full justify-center absolute bottom-6 left-0">
               <p className="text-[11px] text-muted-foreground/50 text-center">© {new Date().getFullYear()} Tivly AB</p>
             </div>
           </div>
