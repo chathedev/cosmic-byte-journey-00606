@@ -385,7 +385,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={handleRecordLiveClick}
               size="lg"
               disabled={isStartingRecording}
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 rounded-none"
             >
               {isStartingRecording ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -399,7 +399,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={handleUploadClick}
               variant="outline"
               size="lg"
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 rounded-none"
             >
               <Upload className="w-5 h-5" />
               Ladda upp fil
@@ -409,7 +409,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={() => setShowTextPasteDialog(true)}
               variant="outline"
               size="lg"
-              className="w-full h-14 text-base gap-3"
+              className="w-full h-14 text-base gap-3 rounded-none"
             >
               <ClipboardPaste className="w-5 h-5" />
               Klistra in text
