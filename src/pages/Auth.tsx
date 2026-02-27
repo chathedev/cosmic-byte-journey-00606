@@ -4,9 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Mail, Shield, Mic, FileText, ListChecks, FileOutput } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Shield, Mic, FileText, ListChecks, FileOutput } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import tivlyLogo from '@/assets/tivly-logo.png';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -279,91 +278,83 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
-      {/* Subtle background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-primary/[0.04] blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-accent/[0.03] blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12 relative">
+      {/* Subtle grid texture */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.015]" style={{
+        backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }} />
 
-      <div className="w-full max-w-[420px] relative z-10">
-        {/* Logo area above card */}
-        <div className="text-center mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-          >
-            <img src={tivlyLogo} alt="Tivly" className="w-10 h-10 mx-auto mb-3" />
-            <h2 className="text-[11px] font-semibold tracking-[0.35em] uppercase text-muted-foreground">
-              Tivly
-            </h2>
-          </motion.div>
-        </div>
+      <div className="w-full max-w-sm relative z-10">
+        {/* Wordmark */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-10"
+        >
+          <span className="text-[11px] font-semibold tracking-[0.4em] uppercase text-foreground">
+            Tivly
+          </span>
+        </motion.div>
 
         {/* Card */}
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
-          className="border border-border/80 bg-card rounded-2xl shadow-lg shadow-primary/[0.03] overflow-hidden"
+          transition={{ duration: 0.3, delay: 0.05 }}
+          className="border border-border bg-card rounded-lg overflow-hidden"
         >
-          {/* Accent bar */}
-          <div className="h-1 w-full bg-gradient-to-r from-primary via-accent to-primary/60" />
-
-          {/* Card header */}
-          <div className="px-8 pt-7 pb-0">
-            <div className="flex items-center justify-between mb-5">
-              <span className="text-[13px] font-semibold text-foreground">
-                {viewMode === 'code-entry' ? 'Verifiering' : viewMode === 'welcome' ? 'Välkommen' : 'Logga in'}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/8 text-[10px] font-medium text-primary">
-                <Shield className="w-3 h-3" />
-                Krypterad
-              </span>
-            </div>
-            <Separator className="bg-border/60" />
+          {/* Step indicator */}
+          <div className="flex">
+            <div className={`h-0.5 flex-1 transition-colors duration-300 ${viewMode === 'welcome' || viewMode === 'email' || viewMode === 'code-entry' ? 'bg-foreground' : 'bg-border'}`} />
+            <div className={`h-0.5 flex-1 transition-colors duration-300 ${viewMode === 'email' || viewMode === 'code-entry' ? 'bg-foreground' : 'bg-border'}`} />
+            <div className={`h-0.5 flex-1 transition-colors duration-300 ${viewMode === 'code-entry' ? 'bg-foreground' : 'bg-border'}`} />
           </div>
 
-          {/* Card body */}
-          <div className="px-8 py-7">
+          <div className="p-8">
             <AnimatePresence mode="wait">
               {/* WELCOME */}
               {viewMode === 'welcome' && (
                 <motion.div
                   key="welcome"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="space-y-7"
                 >
-                  <div>
-                    <h1 className="text-xl font-semibold text-foreground leading-tight">
+                  <div className="space-y-2">
+                    <h1 className="text-lg font-semibold text-foreground">
                       Mötesdokumentation med AI
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                    <p className="text-[13px] text-muted-foreground leading-relaxed">
                       Transkribera, sammanfatta och exportera – automatiskt.
                     </p>
                   </div>
 
-                   <div className="grid grid-cols-2 gap-3">
-                     {[
-                       { label: 'Realtidstranskribering', Icon: Mic },
-                       { label: 'Automatiska protokoll', Icon: FileText },
-                       { label: 'Action points', Icon: ListChecks },
-                       { label: 'Export Word & PDF', Icon: FileOutput },
-                     ].map((item) => (
-                       <div key={item.label} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-secondary/60 border border-border/50">
-                         <item.Icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                         <span className="text-[12px] text-foreground font-medium leading-tight">{item.label}</span>
-                       </div>
-                     ))}
+                  <div className="space-y-0 divide-y divide-border">
+                    {[
+                      { label: 'Realtidstranskribering', desc: 'Automatisk text från ljud', Icon: Mic },
+                      { label: 'AI-protokoll', desc: 'Genererade mötesprotokoll', Icon: FileText },
+                      { label: 'Action points', desc: 'Uppgifter och beslut', Icon: ListChecks },
+                      { label: 'Export', desc: 'Word, PDF och delning', Icon: FileOutput },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-4 py-3.5">
+                        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0">
+                          <item.Icon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-foreground">{item.label}</p>
+                          <p className="text-[11px] text-muted-foreground">{item.desc}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   <Button
                     onClick={handleGetStarted}
-                    className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shadow-md shadow-primary/20 no-hover-lift"
+                    className="w-full h-10 text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 rounded-md no-hover-lift"
                   >
                     Kom igång
                   </Button>
@@ -374,17 +365,17 @@ export default function Auth() {
               {viewMode === 'email' && (
                 <motion.div
                   key="email"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-5"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="space-y-6"
                 >
-                  <div>
-                    <h1 className="text-xl font-semibold text-foreground leading-tight">
-                      {platform === 'ios' ? 'Enterprise-inloggning' : 'Logga in på ditt konto'}
+                  <div className="space-y-1.5">
+                    <h1 className="text-lg font-semibold text-foreground">
+                      {platform === 'ios' ? 'Enterprise-inloggning' : 'Logga in'}
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-[13px] text-muted-foreground">
                       {platform === 'ios'
                         ? 'Appen kräver ett Enterprise-konto.'
                         : 'Vi skickar en engångskod till din e-post.'}
@@ -392,40 +383,34 @@ export default function Auth() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">
-                        E-postadress
+                    <div className="space-y-1.5">
+                      <Label htmlFor="email" className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                        E-post
                       </Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 z-10 pointer-events-none" />
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="namn@foretag.se"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
-                          disabled={loading}
-                          autoComplete="email"
-                          autoFocus
-                          className="h-11 text-sm bg-secondary/40 border-border/60 pl-10 rounded-xl focus:bg-background transition-colors relative"
-                        />
-                      </div>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="namn@foretag.se"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
+                        disabled={loading}
+                        autoComplete="email"
+                        autoFocus
+                        className="h-10 text-[13px] bg-background border-border rounded-md"
+                      />
                     </div>
 
                     <Button
                       onClick={handleRequestCode}
                       disabled={loading || !email.trim()}
-                      className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl shadow-md shadow-primary/20 no-hover-lift"
+                      className="w-full h-10 text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 rounded-md no-hover-lift"
                       type="button"
                     >
                       {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Skickar...
-                        </>
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</>
                       ) : (
-                        'Skicka verifieringskod'
+                        'Fortsätt'
                       )}
                     </Button>
                   </div>
@@ -436,11 +421,11 @@ export default function Auth() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="rounded-xl bg-destructive/8 border border-destructive/15 px-4 py-3"
+                        className="rounded-md bg-destructive/8 border border-destructive/15 px-3 py-2.5"
                       >
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex items-center gap-2">
                           <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                          <p className="text-[13px] text-destructive font-medium">{authError}</p>
+                          <p className="text-[12px] text-destructive font-medium">{authError}</p>
                         </div>
                       </motion.div>
                     )}
@@ -449,7 +434,7 @@ export default function Auth() {
                   {!isAppDomain() && !isIoDomain() && (
                     <button
                       onClick={handleBackToWelcome}
-                      className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors mx-auto"
+                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors mx-auto"
                     >
                       <ArrowLeft className="w-3 h-3" />
                       Tillbaka
@@ -462,27 +447,27 @@ export default function Auth() {
               {viewMode === 'code-entry' && (
                 <motion.div
                   key="code-entry"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.2 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
                   className="space-y-6"
                 >
-                  <div>
-                    <h1 className="text-xl font-semibold text-foreground leading-tight">
-                      {isNavigating ? 'Välkommen tillbaka!' : verifying ? 'Verifierar...' : 'Ange din kod'}
+                  <div className="space-y-1.5">
+                    <h1 className="text-lg font-semibold text-foreground">
+                      {isNavigating ? 'Välkommen!' : verifying ? 'Verifierar...' : 'Verifiering'}
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-[13px] text-muted-foreground">
                       {isNavigating
                         ? 'Du loggas in...'
                         : verifying
                           ? 'Kontrollerar koden...'
-                          : <>Skickad till <span className="font-medium text-foreground">{email}</span></>
+                          : <>Kod skickad till <span className="font-medium text-foreground">{email}</span></>
                       }
                     </p>
                   </div>
 
-                  <div className="flex justify-center py-2">
+                  <div className="flex justify-center py-1">
                     <InputOTP
                       maxLength={6}
                       value={pinCode}
@@ -495,37 +480,35 @@ export default function Auth() {
                       disabled={verifying || isNavigating}
                       autoFocus
                     >
-                      <InputOTPGroup className="gap-2">
+                      <InputOTPGroup className="gap-1.5">
                         {[0, 1, 2, 3, 4, 5].map((i) => (
-                          <InputOTPSlot key={i} index={i} className="w-11 h-12 rounded-xl border-border/60 text-lg" />
+                          <InputOTPSlot key={i} index={i} className="w-10 h-11 rounded-md border-border text-base" />
                         ))}
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
 
                   {/* Status */}
-                  <div className="text-center">
+                  <div className="text-center min-h-[28px]">
                     {verifying && (
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/8 text-[12px] text-primary font-medium">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Verifierar...
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Verifierar
+                      </span>
                     )}
                     {isNavigating && (
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-[12px] text-primary font-medium">
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-foreground font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Inloggning lyckades
-                      </div>
+                      </span>
                     )}
                     {!verifying && !isNavigating && codeExpiry > 0 && (
-                      <p className="text-[12px] text-muted-foreground">
-                        Koden giltig i <span className="font-medium text-foreground">{formatTime(codeExpiry)}</span>
+                      <p className="text-[11px] text-muted-foreground">
+                        Giltig i {formatTime(codeExpiry)}
                       </p>
                     )}
                     {!verifying && !isNavigating && codeExpiry === 0 && (
-                      <p className="text-[12px] text-destructive font-medium">
-                        Koden har gått ut
-                      </p>
+                      <p className="text-[11px] text-destructive font-medium">Koden har gått ut</p>
                     )}
                   </div>
 
@@ -535,66 +518,66 @@ export default function Auth() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="rounded-xl bg-destructive/8 border border-destructive/15 px-4 py-3"
+                        className="rounded-md bg-destructive/8 border border-destructive/15 px-3 py-2.5"
                       >
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex items-center gap-2">
                           <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                          <p className="text-[13px] text-destructive font-medium">{authError}</p>
+                          <p className="text-[12px] text-destructive font-medium">{authError}</p>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   {!isNavigating && (
-                    <>
-                      <Separator className="bg-border/60" />
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={handleStartOver}
-                          disabled={verifying}
-                          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-                        >
-                          <ArrowLeft className="w-3 h-3" />
-                          Ändra e-post
-                        </button>
-                        <button
-                          onClick={handleResendCode}
-                          disabled={verifying || loading}
-                          className="text-[12px] font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-40"
-                        >
-                          {loading ? 'Skickar...' : 'Skicka ny kod'}
-                        </button>
-                      </div>
-                    </>
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        onClick={handleStartOver}
+                        disabled={verifying}
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                      >
+                        <ArrowLeft className="w-3 h-3" />
+                        Ändra e-post
+                      </button>
+                      <button
+                        onClick={handleResendCode}
+                        disabled={verifying || loading}
+                        className="text-[11px] font-medium text-foreground hover:text-foreground/70 transition-colors disabled:opacity-40"
+                      >
+                        {loading ? 'Skickar...' : 'Skicka ny kod'}
+                      </button>
+                    </div>
                   )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Card footer */}
+          {/* Footer */}
           <div className="px-8 pb-6">
-            <Separator className="bg-border/60 mb-4" />
-            <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+            <Separator className="mb-4" />
+            <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Shield className="w-3 h-3" />
-                End-to-end krypterat
+                Krypterad
               </span>
-              <span className="w-px h-3 bg-border" />
-              <span>GDPR-kompatibel</span>
+              <span className="w-px h-2.5 bg-border" />
+              <span>GDPR</span>
+              <span className="w-px h-2.5 bg-border" />
+              <span>ISO 27001</span>
             </div>
           </div>
         </motion.div>
 
         {/* Below card */}
-        <div className="text-center mt-8 space-y-2">
-          <p className="text-[11px] text-muted-foreground">
-            Behöver du ett företagskonto?{' '}
-            <a href="/enterprise/onboarding" className="text-primary font-medium hover:text-primary/80 transition-colors">
-              Starta Enterprise-trial
-            </a>
-          </p>
-          <p className="text-[10px] text-muted-foreground/60">
+        <div className="text-center mt-8 space-y-3">
+          <a
+            href="/enterprise/onboarding"
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-foreground hover:text-foreground/70 transition-colors"
+          >
+            Starta Enterprise-trial
+            <ArrowLeft className="w-3 h-3 rotate-180" />
+          </a>
+          <p className="text-[10px] text-muted-foreground/50">
             © {new Date().getFullYear()} Tivly AB
           </p>
         </div>
