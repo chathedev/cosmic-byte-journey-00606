@@ -16,6 +16,7 @@ import {
   getOnboardingStatus,
   type OnboardingFormData,
   type ValidationResponse,
+  type OnboardingAuthOpts,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -28,7 +29,7 @@ const PLANS = [
 ];
 
 const EXTRA_SEAT_PRICE = 249;
-const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalkort'];
+const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta & Betala'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -87,6 +88,7 @@ export default function EnterpriseOnboarding() {
   const [completedEmail, setCompletedEmail] = useState('');
   const [completedCompanyId, setCompletedCompanyId] = useState('');
   const [cardDone, setCardDone] = useState(false);
+  const [setupToken, setSetupToken] = useState<string | undefined>();
   const [draftId, setDraftId] = useState<string | undefined>();
   const [resumeToken, setResumeToken] = useState<string | undefined>();
 
@@ -238,10 +240,13 @@ export default function EnterpriseOnboarding() {
     && !orgTaken && !emailTaken;
   const canSubmit = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
-  const handleSubmit = async () => {
+  const authOpts: OnboardingAuthOpts = setupToken ? { setupToken } : draftId && resumeToken ? { draftId, resumeToken } : {};
+
+  const handleStartTrialAndCard = async () => {
     setSubmitError('');
     setIsSubmitting(true);
     try {
+      // Final validation
       const valRes = await validateOnboarding({ ...form, requireCommitments: true } as any);
       if (!valRes.valid) {
         setFieldErrors(valRes.validation?.errors || {});
@@ -251,14 +256,14 @@ export default function EnterpriseOnboarding() {
         setIsSubmitting(false);
         return;
       }
+      // Start trial
       const res = await startTrial({ ...(form as OnboardingFormData), draftId, resumeToken });
       setTrialStarted(true);
       setCompletedEmail(res.invitation?.email || form.workEmail || '');
       setCompletedCompanyId(res.company?.id || '');
+      if (res.billing?.setupToken) setSetupToken(res.billing.setupToken);
       clearDraftLocal();
       clearFormLocal();
-      // Auto-advance to card step
-      setStep(4);
     } catch (err: any) {
       setSubmitError(err?.message || err?.error || 'Något gick fel. Försök igen.');
     } finally {
@@ -344,26 +349,30 @@ export default function EnterpriseOnboarding() {
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
             {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
-            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
-            {step === 4 && <StepCard companyId={completedCompanyId} email={completedEmail} onComplete={() => setCardDone(true)} onSkip={() => setCardDone(true)} />}
+            {step === 3 && !trialStarted && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 3 && trialStarted && <StepCard companyId={completedCompanyId} email={completedEmail} authOpts={authOpts} onComplete={() => setCardDone(true)} onSkip={() => setCardDone(true)} />}
           </motion.div>
         </AnimatePresence>
 
-        {/* Navigation - hide on card step */}
-        {step < 4 && (
+        {/* Navigation */}
+        {step < 3 && (
           <div className="flex items-center justify-between mt-10">
             <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift">
               <ChevronLeft className="h-4 w-4" /> Tillbaka
             </Button>
-            {step < 3 ? (
-              <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
-                Nästa <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="gap-1.5 min-w-[160px] bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
-                {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Startar...</> : <>Starta trial <ArrowRight className="h-4 w-4" /></>}
-              </Button>
-            )}
+            <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
+              Nästa <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        {step === 3 && !trialStarted && (
+          <div className="flex items-center justify-between mt-10">
+            <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift">
+              <ChevronLeft className="h-4 w-4" /> Tillbaka
+            </Button>
+            <Button size="sm" onClick={handleStartTrialAndCard} disabled={!canSubmit || isSubmitting} className="gap-1.5 min-w-[160px] bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
+              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Skapar konto...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
+            </Button>
           </div>
         )}
       </main>
@@ -573,25 +582,25 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* ─── STEP 4: Card (Stripe SetupIntent) ─── */
-function StepCard({ companyId, email, onComplete, onSkip }: { companyId: string; email: string; onComplete: () => void; onSkip: () => void }) {
+/* ─── STEP 3b: Card (Stripe SetupIntent) ─── */
+function StepCard({ companyId, email, authOpts, onComplete, onSkip }: { companyId: string; email: string; authOpts?: OnboardingAuthOpts; onComplete: () => void; onSkip: () => void }) {
   const [loading, setLoading] = useState(true);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!companyId) {
-      setError('Inget company-ID. Trial kanske inte skapades korrekt.');
+      setError('Inget company-ID. Kontot kanske inte skapades korrekt.');
       setLoading(false);
       return;
     }
-    subscribeOnboarding(companyId)
+    subscribeOnboarding(companyId, authOpts)
       .then(res => {
         setClientSecret(res.setupIntentClientSecret);
         setLoading(false);
       })
       .catch(err => {
-        setError(err?.message || 'Kunde inte ladda betalningsformuläret.');
+        setError(err?.message || err?.error || 'Kunde inte ladda betalningsformuläret.');
         setLoading(false);
       });
   }, [companyId]);
@@ -605,12 +614,11 @@ function StepCard({ companyId, email, onComplete, onSkip }: { companyId: string;
         </p>
       </div>
 
-      {/* Trial confirmation banner */}
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
         <CheckCircle2 className="h-4 w-4 text-foreground shrink-0 mt-0.5" />
         <div className="text-[13px] text-muted-foreground space-y-0.5">
-          <p className="text-foreground font-medium">Trial startad!</p>
-          <p>Inbjudan skickad till <span className="text-foreground font-medium">{email}</span></p>
+          <p className="text-foreground font-medium">Konto skapat</p>
+          <p>Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> när kortet sparats.</p>
         </div>
       </div>
 
@@ -633,14 +641,14 @@ function StepCard({ companyId, email, onComplete, onSkip }: { companyId: string;
 
       {!loading && !error && clientSecret && (
         <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#000', fontFamily: 'inherit', borderRadius: '8px' } } }}>
-          <CardFormInner companyId={companyId} onComplete={onComplete} onSkip={onSkip} />
+          <CardFormInner companyId={companyId} authOpts={authOpts} onComplete={onComplete} onSkip={onSkip} />
         </Elements>
       )}
     </div>
   );
 }
 
-function CardFormInner({ companyId, onComplete, onSkip }: { companyId: string; onComplete: () => void; onSkip: () => void }) {
+function CardFormInner({ companyId, authOpts, onComplete, onSkip }: { companyId: string; authOpts?: OnboardingAuthOpts; onComplete: () => void; onSkip: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -664,12 +672,11 @@ function CardFormInner({ companyId, onComplete, onSkip }: { companyId: string; o
       return;
     }
 
-    // Poll status
     let attempts = 0;
     const poll = async () => {
       attempts++;
       try {
-        const status = await getOnboardingStatus(companyId);
+        const status = await getOnboardingStatus(companyId, authOpts);
         if (status.billingSetup?.autoChargeReady) {
           setSubmitting(false);
           onComplete();
@@ -692,7 +699,7 @@ function CardFormInner({ companyId, onComplete, onSkip }: { companyId: string; o
       )}
       <Button type="submit" disabled={!stripe || submitting} className="w-full h-10 bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px]">
         {submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar kort...</> : <>
-          <CreditCard className="h-4 w-4 mr-2" /> Spara betalkort
+          <CreditCard className="h-4 w-4 mr-2" /> Spara betalkort & starta trial
         </>}
       </Button>
       <button type="button" onClick={onSkip} className="w-full text-[12px] text-muted-foreground hover:text-foreground transition-colors py-2">
@@ -706,5 +713,4 @@ function CardFormInner({ companyId, onComplete, onSkip }: { companyId: string; o
   );
 }
 
-/* ─── Exported for use elsewhere ─── */
 export { StepCard as StripeSetupForm };
