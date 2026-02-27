@@ -321,41 +321,7 @@ export function AppSidebar() {
           </div>
         </div>
 
-        {/* Enterprise Trial Banner */}
-        {!collapsed && enterpriseMembership?.isMember && enterpriseMembership.company?.trial?.enabled && 
-         !enterpriseMembership.company.trial.expired && 
-         !enterpriseMembership.company.trial.manuallyDisabled &&
-         enterpriseMembership.company.trial.daysRemaining !== null && 
-         enterpriseMembership.company.trial.daysRemaining > 0 && (() => {
-          const daysRemaining = enterpriseMembership.company!.trial!.daysRemaining!;
-          const trialEndDate = new Date();
-          trialEndDate.setDate(trialEndDate.getDate() + daysRemaining);
-          const formattedEndDate = trialEndDate.toLocaleDateString('sv-SE', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-          });
-          
-          const getBgColor = () => {
-            if (daysRemaining <= 3) return 'bg-destructive/10 border-destructive/30 text-destructive';
-            if (daysRemaining <= 7) return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-500';
-            return 'bg-primary/10 border-primary/30 text-primary';
-          };
-
-          return (
-            <div className={`mx-3 mb-2 p-3 rounded-lg border ${getBgColor()}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <FiAlertTriangle className="text-sm shrink-0" />
-                <span className="text-xs font-semibold">
-                  {daysRemaining === 1 ? 'Sista dagen' : `${daysRemaining} dagar kvar`}
-                </span>
-              </div>
-              <p className="text-[10px] opacity-80">
-                Testperiod slutar {formattedEndDate}
-              </p>
-            </div>
-          );
-        })()}
+        {/* Trial banner rendered at bottom */}
 
         {/* Navigation Items */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-2 py-3">
@@ -364,7 +330,7 @@ export function AppSidebar() {
               <button
                 key={item.title}
                 onClick={() => handleNavigation(item.path, item.title, item.locked, (item as any).external)}
-                className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-sm transition-all duration-150 ${
                   selected === item.title
                     ? 'bg-primary/10 text-primary font-medium'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -454,7 +420,40 @@ export function AppSidebar() {
           </nav>
         </div>
 
-        {/* Upgrade Section - Only for Free users, never on iOS (Apple compliance) */}
+        {/* Enterprise Trial Banner — minimal, bottom-positioned */}
+        {!collapsed && enterpriseMembership?.isMember && enterpriseMembership.company?.trial?.enabled && 
+         !enterpriseMembership.company.trial.expired && 
+         !enterpriseMembership.company.trial.manuallyDisabled &&
+         enterpriseMembership.company.trial.daysRemaining !== null && 
+         enterpriseMembership.company.trial.daysRemaining > 0 && (() => {
+          const daysRemaining = enterpriseMembership.company!.trial!.daysRemaining!;
+          const trialEndDate = new Date();
+          trialEndDate.setDate(trialEndDate.getDate() + daysRemaining);
+          const formattedEndDate = trialEndDate.toLocaleDateString('sv-SE', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          });
+          
+          const getTextColor = () => {
+            if (daysRemaining <= 3) return 'text-destructive';
+            if (daysRemaining <= 7) return 'text-yellow-600 dark:text-yellow-500';
+            return 'text-muted-foreground';
+          };
+
+          return (
+            <div className={`shrink-0 px-4 py-2.5 border-t border-border ${getTextColor()}`}>
+              <div className="flex items-center gap-2">
+                <FiAlertTriangle className="text-xs shrink-0" />
+                <span className="text-[11px] font-medium">
+                  {daysRemaining === 1 ? 'Sista dagen' : `${daysRemaining} dagar kvar`}
+                  <span className="font-normal opacity-70"> · Trial t.o.m. {formattedEndDate}</span>
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && 
          !(typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se') && (
           <div className="shrink-0 p-3 border-t border-border">
@@ -463,7 +462,7 @@ export function AppSidebar() {
             </div>
             <button
               onClick={() => setShowSubscribe(true)}
-              className="w-full bg-primary text-primary-foreground rounded-lg py-2.5 px-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
+              className="w-full bg-primary text-primary-foreground rounded-none py-2.5 px-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
             >
               <FiZap className="text-base" />
               Uppgradera
