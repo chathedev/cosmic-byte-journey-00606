@@ -78,6 +78,17 @@ export interface PricingInfo {
   perExtraSeatSek: number;
 }
 
+// Response from POST /enterprise/onboarding/subscribe (draft-level, pre-trial)
+export interface DraftSubscribeResponse {
+  billing: {
+    setupIntentId: string;
+    setupIntentClientSecret: string;
+    setupIntentStatus: string;
+    paymentMethodSaved: boolean;
+    readyForTrialStart: boolean;
+  };
+}
+
 export interface StartResponse {
   accountSetupRequired: boolean;
   invitation: {
@@ -94,11 +105,6 @@ export interface StartResponse {
     [key: string]: any;
   };
   pricing: PricingInfo;
-  billing?: {
-    setupEndpoint?: string;
-    setupToken?: string;
-    setupTokenExpiresAt?: string;
-  };
 }
 
 export interface OnboardingStatusResponse {
@@ -124,7 +130,8 @@ export interface OnboardingStatusResponse {
   };
 }
 
-export interface SubscribeResponse {
+// Response from POST /enterprise/companies/:companyId/onboarding/subscribe (post-trial, legacy)
+export interface CompanySubscribeResponse {
   subscriptionId: string;
   subscriptionStatus: string;
   setupIntentId: string;
@@ -146,6 +153,12 @@ export interface ActivateResponse {
   subscriptionId: string;
 }
 
+export interface OnboardingAuthOpts {
+  setupToken?: string;
+  draftId?: string;
+  resumeToken?: string;
+}
+
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -162,15 +175,14 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   return res.json();
 }
 
-function authHeaders(opts?: { setupToken?: string; draftId?: string; resumeToken?: string }): Record<string, string> {
+function authHeaders(opts?: OnboardingAuthOpts): Record<string, string> {
   const token = localStorage.getItem('authToken');
   if (token) return { Authorization: `Bearer ${token}` };
   if (opts?.setupToken) return { 'x-onboarding-setup-token': opts.setupToken };
-  // draftId + resumeToken sent as query params, not headers
   return {};
 }
 
-function buildAuthQuery(opts?: { setupToken?: string; draftId?: string; resumeToken?: string }): string {
+function buildAuthQuery(opts?: OnboardingAuthOpts): string {
   const token = localStorage.getItem('authToken');
   if (token || opts?.setupToken) return '';
   if (opts?.draftId && opts?.resumeToken) {
@@ -209,7 +221,18 @@ export async function getDraft(draftId: string, resumeToken: string): Promise<Dr
   return apiFetch(`/enterprise/onboarding/draft/${draftId}?resumeToken=${encodeURIComponent(resumeToken)}`);
 }
 
-// 4) Start trial
+// 4) Subscribe (draft-level, PRE-TRIAL) — creates Stripe SetupIntent for card collection
+export async function subscribeDraft(
+  draftId: string,
+  resumeToken: string
+): Promise<DraftSubscribeResponse> {
+  return apiFetch('/enterprise/onboarding/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ draftId, resumeToken }),
+  });
+}
+
+// 5) Start trial (ONLY after card confirmed)
 export async function startTrial(
   data: OnboardingFormData & { draftId?: string; resumeToken?: string }
 ): Promise<StartResponse> {
@@ -219,35 +242,29 @@ export async function startTrial(
   });
 }
 
-export interface OnboardingAuthOpts {
-  setupToken?: string;
-  draftId?: string;
-  resumeToken?: string;
-}
-
-// 5) Onboarding status (authenticated)
+// 6) Onboarding status (post-trial, authenticated)
 export async function getOnboardingStatus(companyId: string, opts?: OnboardingAuthOpts): Promise<OnboardingStatusResponse> {
   return apiFetch(`/enterprise/companies/${companyId}/onboarding/status${buildAuthQuery(opts)}`, {
     headers: authHeaders(opts),
   });
 }
 
-// 6) Live pricing (authenticated)
+// 7) Live pricing (post-trial, authenticated)
 export async function getOnboardingPricing(companyId: string, opts?: OnboardingAuthOpts): Promise<{ pricing: PricingInfo }> {
   return apiFetch(`/enterprise/companies/${companyId}/onboarding/pricing${buildAuthQuery(opts)}`, {
     headers: authHeaders(opts),
   });
 }
 
-// 7) Subscribe (creates Stripe subscription + SetupIntent)
-export async function subscribeOnboarding(companyId: string, opts?: OnboardingAuthOpts): Promise<SubscribeResponse> {
+// 8) Company-level subscribe (post-trial, legacy/compat)
+export async function subscribeCompany(companyId: string, opts?: OnboardingAuthOpts): Promise<CompanySubscribeResponse> {
   return apiFetch(`/enterprise/companies/${companyId}/onboarding/subscribe${buildAuthQuery(opts)}`, {
     method: 'POST',
     headers: authHeaders(opts),
   });
 }
 
-// 8) Activate (fallback after trial expiry)
+// 9) Activate (fallback after trial expiry)
 export async function activateOnboarding(companyId: string, opts?: OnboardingAuthOpts): Promise<ActivateResponse> {
   return apiFetch(`/enterprise/companies/${companyId}/onboarding/activate${buildAuthQuery(opts)}`, {
     method: 'POST',
