@@ -17,7 +17,7 @@ import {
   type ValidationResponse,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 const stripePromise = loadStripe('pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu');
 
@@ -423,6 +423,7 @@ export default function EnterpriseOnboarding() {
                 initialClientSecret={setupIntentClientSecret}
                 email={form.workEmail || ''}
                 monthlyTotal={monthlyTotal}
+                planBaseSek={selectedPlan.priceSek}
                 activationFeeSek={selectedPlan.activationSek}
                 includedSeats={selectedPlan.seats}
                 expectedSeats={seats}
@@ -663,12 +664,13 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /* ─── STEP 4: Card (Stripe SetupIntent via draft-level subscribe) ─── */
-function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTotal, activationFeeSek, includedSeats, expectedSeats, extraSeats, onCardConfirmed }: {
+function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, onCardConfirmed }: {
   draftId: string;
   resumeToken: string;
   initialClientSecret: string | null;
   email: string;
   monthlyTotal: number;
+  planBaseSek: number;
   activationFeeSek: number;
   includedSeats: number;
   expectedSeats: number;
@@ -688,6 +690,36 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
     month: 'long',
     year: 'numeric',
   });
+
+  const verifyClientSecret = useCallback(async (secret: string): Promise<{ ok: boolean; reason?: string; status?: string }> => {
+    try {
+      const stripe = await stripePromise;
+      if (!stripe) return { ok: true };
+
+      const { error: setupError, setupIntent } = await stripe.retrieveSetupIntent(secret);
+      if (setupError || !setupIntent) {
+        return {
+          ok: false,
+          reason: 'Ogiltig kortsession från backend (client_secret). Kontrollera att backend och frontend använder samma Stripe-miljö (test/live).',
+        };
+      }
+
+      if (setupIntent.status === 'canceled') {
+        return {
+          ok: false,
+          reason: 'Kortsessionen har avbrutits/utgått. Klicka på "Försök igen" för att skapa en ny session.',
+          status: setupIntent.status,
+        };
+      }
+
+      return { ok: true, status: setupIntent.status };
+    } catch {
+      return {
+        ok: false,
+        reason: 'Kunde inte verifiera kortsessionen. Försök igen.',
+      };
+    }
+  }, []);
 
   const applySubscribeResponse = useCallback((res: any) => {
     const billing = res?.billing || {};
@@ -722,6 +754,29 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
     setLoading(true);
     try {
       const res = await subscribeDraft(draftId, resumeToken);
+      const billing: any = res?.billing || {};
+      const secret = extractSetupIntentClientSecret(res);
+
+      if (!billing?.readyForTrialStart && !billing?.paymentMethodSaved && secret) {
+        const verification = await verifyClientSecret(secret);
+        if (!verification.ok) {
+          setClientSecret(null);
+          setError(verification.reason || 'Ogiltig kortsession. Försök igen.');
+          setLoading(false);
+          return;
+        }
+
+        if (verification.status === 'succeeded') {
+          setReadyForTrialStart(true);
+          setPaymentMethodSaved(true);
+          setSetupIntentStatus('succeeded');
+          setClientSecret(null);
+          setError('');
+          setLoading(false);
+          return;
+        }
+      }
+
       applySubscribeResponse(res);
     } catch (err: any) {
       const msg = err?.message || err?.error || err?.detail ||
@@ -730,17 +785,37 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
     } finally {
       setLoading(false);
     }
-  }, [draftId, resumeToken, applySubscribeResponse]);
+  }, [draftId, resumeToken, applySubscribeResponse, verifyClientSecret]);
 
   useEffect(() => {
     if (initialClientSecret) {
-      setClientSecret(initialClientSecret);
-      setLoading(false);
+      setLoading(true);
+      verifyClientSecret(initialClientSecret)
+        .then((verification) => {
+          if (!verification.ok) {
+            setClientSecret(null);
+            setError(verification.reason || 'Ogiltig kortsession.');
+            return;
+          }
+
+          if (verification.status === 'succeeded') {
+            setReadyForTrialStart(true);
+            setPaymentMethodSaved(true);
+            setSetupIntentStatus('succeeded');
+            setClientSecret(null);
+            setError('');
+            return;
+          }
+
+          setClientSecret(initialClientSecret);
+          setError('');
+        })
+        .finally(() => setLoading(false));
       return;
     }
 
     loadCardSetup();
-  }, [initialClientSecret, loadCardSetup]);
+  }, [initialClientSecret, loadCardSetup, verifyClientSecret]);
 
   const handleStartTrialNow = async () => {
     setStartingTrial(true);
@@ -775,15 +850,15 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
         </div>
         <div className="pl-3 space-y-0.5 text-[11px] text-muted-foreground">
           <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(activationFeeSek)} kr</span></div>
-          <div className="flex justify-between"><span>{includedSeats} anv. × {fmt(Math.round(monthlyTotal / Math.max(1, expectedSeats)))} kr</span><span>{fmt(monthlyTotal - extraSeats * 249)} kr</span></div>
-          {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × 249 kr</span><span>{fmt(extraSeats * 249)} kr</span></div>}
+          <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
+          {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
         </div>
         <Separator className="!my-1.5" />
         <div className="flex justify-between">
           <span className="text-muted-foreground">Därefter/mån</span>
           <span className="text-foreground font-medium">{fmt(monthlyTotal)} kr</span>
         </div>
-        <p className="text-[10px] text-muted-foreground pt-1">Exkl. moms · Avsluta när som helst</p>
+        <p className="text-[10px] text-muted-foreground pt-1">Exkl. moms · Valda användare: {expectedSeats}</p>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
@@ -829,19 +904,22 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
             variables: { fontFamily: 'inherit', borderRadius: '8px' },
           },
         }}>
-          <CardFormInner onCardConfirmed={onCardConfirmed} />
+          <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
         </Elements>
       )}
     </div>
   );
 }
 
-function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<void> }) {
+function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret: string; email: string; onCardConfirmed: () => Promise<void> }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [phase, setPhase] = useState<'card' | 'starting'>('card');
+  const [paymentElementLoadError, setPaymentElementLoadError] = useState('');
+
+  const useCardFallback = paymentElementLoadError.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -849,11 +927,24 @@ function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<voi
     setSubmitting(true);
     setError('');
 
-    const result = await stripe.confirmSetup({
-      elements,
-      confirmParams: { return_url: window.location.href },
-      redirect: 'if_required',
-    });
+    const result = useCardFallback
+      ? await (async () => {
+          const cardElement = elements.getElement(CardElement);
+          if (!cardElement) {
+            return { error: { message: 'Kortfältet kunde inte laddas.' } } as any;
+          }
+          return stripe.confirmCardSetup(clientSecret, {
+            payment_method: {
+              card: cardElement,
+              billing_details: email ? { email } : undefined,
+            },
+          });
+        })()
+      : await stripe.confirmSetup({
+          elements,
+          confirmParams: { return_url: window.location.href },
+          redirect: 'if_required',
+        });
 
     if (result.error) {
       setError(result.error.message || 'Betalmetoden kunde inte sparas.');
@@ -879,11 +970,28 @@ function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<voi
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <PaymentElement options={{
-        layout: 'tabs',
-        paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
-        wallets: { applePay: 'auto', googlePay: 'auto' },
-      }} />
+      {!useCardFallback && (
+        <PaymentElement
+          onLoadError={(event) => setPaymentElementLoadError(event?.error?.message || 'Kunde inte ladda alla betalmetoder.')}
+          options={{
+            layout: 'tabs',
+            paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
+            wallets: { applePay: 'auto', googlePay: 'auto' },
+          }}
+        />
+      )}
+
+      {useCardFallback && (
+        <div className="space-y-2">
+          <div className="rounded-lg border border-border bg-background px-3 py-3">
+            <CardElement options={{ hidePostalCode: true }} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Fler betalmetoder kunde inte laddas i denna session. Kortbetalning fungerar fortfarande.
+          </p>
+        </div>
+      )}
+
       {error && (
         <div className="rounded bg-destructive/8 border border-destructive/15 px-3 py-2.5">
           <p className="text-[12px] text-destructive font-medium">{error}</p>
