@@ -94,6 +94,7 @@ export default function Auth() {
   const [codeSent, setCodeSent] = useState(false);
   const verifyingRef = useRef(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [isSignup, setIsSignup] = useState(false);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
@@ -410,7 +411,7 @@ export default function Auth() {
                       <div className="space-y-2">
                         <h1 className="text-xl font-bold text-foreground">Välkommen</h1>
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                          AI-driven mötesdokumentation för moderna team.
+                          Logga in eller skapa ett gratis konto för att börja.
                         </p>
                       </div>
 
@@ -436,13 +437,22 @@ export default function Auth() {
                         </p>
                       </div>
 
-                      <Button
-                        onClick={handleGetStarted}
-                        className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl no-hover-lift shadow-md shadow-primary/15"
-                      >
-                        Kom igång
-                        <ArrowRight className="w-4 h-4 ml-1.5" />
-                      </Button>
+                      <div className="space-y-3">
+                        <Button
+                          onClick={() => { setIsSignup(false); handleGetStarted(); }}
+                          className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl no-hover-lift shadow-md shadow-primary/15"
+                        >
+                          Logga in
+                          <ArrowRight className="w-4 h-4 ml-1.5" />
+                        </Button>
+                        <Button
+                          onClick={() => { setIsSignup(true); handleGetStarted(); }}
+                          variant="outline"
+                          className="w-full h-11 text-sm font-medium rounded-xl no-hover-lift"
+                        >
+                          Skapa gratis konto
+                        </Button>
+                      </div>
                     </motion.div>
                   )}
 
@@ -451,10 +461,10 @@ export default function Auth() {
                     <motion.div key="email" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="space-y-6">
                       <div className="space-y-1.5">
                         <h1 className="text-xl font-bold text-foreground">
-                          {platform === 'ios' ? 'Enterprise-inloggning' : 'Logga in'}
+                          {platform === 'ios' ? 'Enterprise-inloggning' : isSignup ? 'Skapa konto' : 'Logga in'}
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                          {platform === 'ios' ? 'Appen kräver ett Enterprise-konto.' : 'Vi skickar en engångskod till din e-post.'}
+                          {platform === 'ios' ? 'Appen kräver ett Enterprise-konto.' : isSignup ? 'Ange din e-post så skapar vi ditt konto.' : 'Vi skickar en engångskod till din e-post.'}
                         </p>
                       </div>
 
@@ -481,7 +491,7 @@ export default function Auth() {
                           className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl no-hover-lift shadow-md shadow-primary/15"
                           type="button"
                         >
-                          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</> : 'Fortsätt'}
+                          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</> : isSignup ? 'Skapa konto' : 'Fortsätt'}
                         </Button>
                       </div>
 
@@ -497,6 +507,15 @@ export default function Auth() {
                           </motion.div>
                         )}
                       </AnimatePresence>
+
+                      {/* Toggle between login/signup */}
+                      <p className="text-center text-xs text-muted-foreground">
+                        {isSignup ? (
+                          <>Har redan ett konto?{' '}<button onClick={() => setIsSignup(false)} className="text-primary font-medium hover:text-primary/70 transition-colors">Logga in</button></>
+                        ) : (
+                          <>Inget konto?{' '}<button onClick={() => setIsSignup(true)} className="text-primary font-medium hover:text-primary/70 transition-colors">Skapa gratis konto</button></>
+                        )}
+                      </p>
 
                       {!isAppDomain() && !isIoDomain() && (
                         <button onClick={handleBackToWelcome} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto">
