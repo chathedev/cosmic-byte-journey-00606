@@ -808,42 +808,52 @@ function StepCard({ draftId, resumeToken, initialClientSecret, stripePublishable
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Registrera betalkort</h2>
+        <h2 className="text-xl font-semibold text-foreground">Registrera betalmetod</h2>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Trial startar först när kortet är bekräftat.
+          Kort, Apple Pay, Google Pay eller Klarna. Ingen debitering under trial.
         </p>
       </div>
 
-      {/* Cost breakdown */}
-      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-[13px]">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Idag</span>
-          <span className="text-foreground font-semibold">0 kr</span>
+      {/* Cost breakdown — premium card */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-foreground/5 flex items-center justify-center">
+              <Check className="h-4 w-4 text-foreground" />
+            </div>
+            <span className="text-[13px] font-medium text-foreground">Idag</span>
+          </div>
+          <span className="text-lg font-bold text-foreground">0 kr</span>
         </div>
-        <Separator className="!my-1.5" />
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">{trialChargeDate}</span>
-          <span className="text-foreground font-medium">{fmt(activationFeeSek + monthlyTotal)} kr</span>
+
+        <div className="h-px bg-border" />
+
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-muted-foreground">{trialChargeDate}</span>
+          <span className="text-[15px] font-semibold text-foreground">{fmt(activationFeeSek + monthlyTotal)} kr</span>
         </div>
-        <div className="pl-3 space-y-0.5 text-[11px] text-muted-foreground">
+        <div className="pl-1 space-y-1 text-[11px] text-muted-foreground">
           <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(activationFeeSek)} kr</span></div>
           <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
           {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
         </div>
-        <Separator className="!my-1.5" />
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Därefter/mån</span>
-          <span className="text-foreground font-medium">{fmt(monthlyTotal)} kr</span>
+
+        <div className="h-px bg-border" />
+
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-muted-foreground">Därefter/mån</span>
+          <span className="text-[15px] font-semibold text-foreground">{fmt(monthlyTotal)} kr</span>
         </div>
-        <p className="text-[10px] text-muted-foreground pt-1">Exkl. moms · {expectedSeats} användare</p>
+        <p className="text-[10px] text-muted-foreground">Exkl. moms · {expectedSeats} användare</p>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
-        <Mail className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        <p className="text-[13px] text-muted-foreground">
-          Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> när kortet är sparat och trial startad.
+      {/* Email notice */}
+      <div className="rounded-2xl border border-border bg-muted/20 px-4 py-3 flex items-center gap-3">
+        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+        <p className="text-[12px] text-muted-foreground">
+          Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> efter kort sparats.
         </p>
       </div>
 
@@ -875,8 +885,52 @@ function StepCard({ draftId, resumeToken, initialClientSecret, stripePublishable
         <Elements stripe={resolvedStripePromise} options={{
           clientSecret,
           appearance: {
-            theme: 'stripe',
-            variables: { fontFamily: 'inherit', borderRadius: '8px' },
+            theme: 'flat',
+            variables: {
+              fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+              fontSizeBase: '14px',
+              borderRadius: '10px',
+              colorPrimary: 'hsl(0 0% 9%)',
+              colorBackground: 'hsl(0 0% 100%)',
+              colorText: 'hsl(0 0% 9%)',
+              colorDanger: 'hsl(0 84% 60%)',
+              spacingUnit: '4px',
+              spacingGridRow: '16px',
+            },
+            rules: {
+              '.Tab': {
+                border: '1px solid hsl(0 0% 90%)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                transition: 'all 0.15s ease',
+              },
+              '.Tab--selected': {
+                border: '1.5px solid hsl(0 0% 9%)',
+                backgroundColor: 'hsl(0 0% 98%)',
+                boxShadow: '0 1px 3px 0 rgba(0,0,0,0.06)',
+              },
+              '.Tab:hover': {
+                border: '1px solid hsl(0 0% 60%)',
+              },
+              '.Input': {
+                border: '1px solid hsl(0 0% 90%)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                transition: 'border-color 0.15s ease',
+              },
+              '.Input:focus': {
+                border: '1.5px solid hsl(0 0% 9%)',
+                boxShadow: '0 0 0 3px hsla(0, 0%, 9%, 0.08)',
+              },
+              '.Label': {
+                fontSize: '11px',
+                fontWeight: '500',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'hsl(0 0% 45%)',
+                marginBottom: '6px',
+              },
+            },
           },
         }}>
           <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
@@ -953,42 +1007,48 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {!useCardFallback && (
-        <PaymentElement
-          onLoadError={(event) => setPaymentElementLoadError(event?.error?.message || 'Kunde inte ladda alla betalmetoder.')}
-          options={{
-            layout: 'tabs',
-            paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
-            wallets: { applePay: 'auto', googlePay: 'auto' },
-          }}
-        />
-      )}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-5">
+        {!useCardFallback && (
+          <PaymentElement
+            onLoadError={(event) => setPaymentElementLoadError(event?.error?.message || 'Kunde inte ladda alla betalmetoder.')}
+            options={{
+              layout: 'tabs',
+              paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
+              wallets: { applePay: 'auto', googlePay: 'auto' },
+              fields: { billingDetails: { email: 'auto' } },
+            }}
+          />
+        )}
 
-      {useCardFallback && (
-        <div className="space-y-2">
-          <div className="rounded-lg border border-border bg-background px-3 py-3">
-            <CardElement options={{ hidePostalCode: true }} />
+        {useCardFallback && (
+          <div className="space-y-2">
+            <div className="rounded-xl border border-border bg-background px-3 py-3">
+              <CardElement options={{ hidePostalCode: true }} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Fler betalmetoder kunde inte laddas. Kortbetalning fungerar.
+            </p>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Fler betalmetoder kunde inte laddas. Kortbetalning fungerar.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
 
       {error && (
-        <div className="rounded bg-destructive/8 border border-destructive/15 px-3 py-2.5">
+        <div className="rounded-xl bg-destructive/5 border border-destructive/15 px-4 py-3">
           <p className="text-[12px] text-destructive font-medium">{error}</p>
         </div>
       )}
-      <Button type="submit" disabled={!stripe || submitting} className="w-full h-10 bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px]">
-        {submitting && phase === 'card' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar...</>}
+
+      <Button type="submit" disabled={!stripe || submitting} className="w-full h-11 rounded-xl bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px] font-medium shadow-sm">
+        {submitting && phase === 'card' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar betalmetod...</>}
         {submitting && phase === 'starting' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</>}
-        {!submitting && <><Shield className="h-4 w-4 mr-2" /> Spara & starta trial</>}
+        {!submitting && <><Shield className="h-4 w-4 mr-2" /> Spara & starta 7 dagars trial</>}
       </Button>
-      <p className="text-center text-[10px] text-muted-foreground">
-        Krypterad betalning via Stripe · 0 kr under trial
-      </p>
+
+      <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
+        <Shield className="h-3 w-3" />
+        <span>Krypterad betalning · 0 kr under trial</span>
+      </div>
     </form>
   );
 }
