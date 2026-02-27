@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
-import { ArrowLeft, Shield, AlertCircle, Sparkles, Mail, Loader2, Clock, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import tivlyLogo from '@/assets/tivly-logo.png';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoAppAccessScreen from '@/components/NoAppAccessScreen';
@@ -445,8 +443,9 @@ export default function Auth() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Clean header */}
-        <div className="mb-8 text-center">
-          <p className="text-sm font-semibold tracking-widest uppercase text-foreground">TIVLY</p>
+        <div className="mb-10 text-center">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-foreground">TIVLY</p>
+          <div className="mt-3 mx-auto w-8 h-px bg-border" />
         </div>
 
         <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
@@ -462,35 +461,35 @@ export default function Auth() {
                 <h1 className="text-2xl font-bold text-foreground mb-2">
                   Välkommen till Tivly
                 </h1>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Hej! Logga in för att komma igång.
+                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                  AI-driven mötesdokumentation som lyssnar, transkriberar och sammanfattar automatiskt. Fokusera på mötet – vi tar hand om resten.
                 </p>
 
-                <p className="text-sm font-medium text-foreground mb-3">
-                  Tivly hjälper dig med:
+                <p className="text-xs font-semibold uppercase tracking-wider text-foreground mb-3">
+                  Det här kan du göra i Tivly:
                 </p>
-                <ul className="space-y-1.5 mb-8 text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <span className="text-foreground">–</span>
+                <ul className="space-y-2 mb-8 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-foreground mt-px">–</span>
                     AI-transkribering av möten
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-foreground">–</span>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-foreground mt-px">–</span>
                     Automatiska sammanfattningar
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-foreground">–</span>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-foreground mt-px">–</span>
                     Action points och uppföljning
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-foreground">–</span>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-foreground mt-px">–</span>
                     Export till Word/PDF
                   </li>
                 </ul>
 
                 <Button 
                   onClick={handleGetStarted}
-                  className="w-full h-11 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 no-hover-lift"
+                  className="w-full h-11 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 no-hover-lift rounded-md"
                   size="lg"
                 >
                   Kom igång
@@ -517,7 +516,7 @@ export default function Auth() {
 
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="email" className="text-sm font-medium text-foreground">E-postadress</Label>
+                    <Label htmlFor="email" className="text-xs font-medium text-foreground">E-postadress</Label>
                     <Input
                       id="email"
                       type="email"
@@ -540,7 +539,7 @@ export default function Auth() {
                   <Button
                     onClick={handleRequestCode}
                     disabled={loading || !email.trim()}
-                    className="w-full h-11 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 no-hover-lift"
+                    className="w-full h-11 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 no-hover-lift rounded-md"
                     type="button"
                   >
                     {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -625,7 +624,6 @@ export default function Auth() {
                     </InputOTP>
                   </div>
 
-                  {/* Status */}
                   <div className="text-center">
                     {verifying && (
                       <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
@@ -700,9 +698,9 @@ export default function Auth() {
         </div>
 
         {/* Footer */}
-        <div className="mt-6 text-center space-y-1">
+        <div className="mt-8 text-center space-y-1.5">
           <p className="text-xs text-muted-foreground">
-            Frågor? Kontakta oss på support@tivly.se
+            Frågor? Svara på detta mejl.
           </p>
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Tivly
