@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck, Circle } from 'lucide-react';
+import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck, Circle, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
 import { AdminResetDialog } from '@/components/AdminResetDialog';
@@ -646,18 +646,40 @@ export default function AdminUsers() {
                       {filteredUsers.map((user, index) => (
                         <TableRow 
                           key={index} 
-                          className="cursor-pointer hover:bg-muted/50"
+                          className={`cursor-pointer hover:bg-muted/50 ${isSuperAdmin(user.email) ? 'bg-primary/5' : ''}`}
                           onClick={() => setSelectedUserDetail(user)}
                         >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm font-medium">
-                                  {user.email.charAt(0).toUpperCase()}
-                                </span>
+                              <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                isSuperAdmin(user.email) 
+                                  ? 'bg-gradient-to-br from-primary to-accent' 
+                                  : isAdmin(user.email) 
+                                  ? 'bg-primary/20' 
+                                  : 'bg-muted'
+                              }`}>
+                                {isSuperAdmin(user.email) ? (
+                                  <Crown className="h-4 w-4 text-primary-foreground" />
+                                ) : (
+                                  <span className="text-sm font-medium">
+                                    {user.email.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{user.email}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-sm font-medium truncate">{user.email}</p>
+                                  {isSuperAdmin(user.email) && (
+                                    <Badge className="h-5 text-[10px] bg-gradient-to-r from-primary to-accent border-0">
+                                      Owner
+                                    </Badge>
+                                  )}
+                                  {!isSuperAdmin(user.email) && isAdmin(user.email) && (
+                                    <Badge variant="secondary" className="h-5 text-[10px]">
+                                      Admin
+                                    </Badge>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-1 mt-0.5">
                                   {user.googleId && (
                                     <Badge variant="outline" className="h-5 text-xs">
@@ -783,18 +805,40 @@ export default function AdminUsers() {
                   {filteredUsers.map((user, index) => (
                     <div 
                       key={index} 
-                      className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                      className={`p-4 cursor-pointer hover:bg-muted/30 transition-colors ${isSuperAdmin(user.email) ? 'bg-primary/5' : ''}`}
                       onClick={() => setSelectedUserDetail(user)}
                     >
                       {/* User Header */}
                       <div className="flex items-start gap-3 mb-3">
-                        <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <span className="text-base font-medium">
-                            {user.email.charAt(0).toUpperCase()}
-                          </span>
+                        <div className={`h-11 w-11 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isSuperAdmin(user.email) 
+                            ? 'bg-gradient-to-br from-primary to-accent' 
+                            : isAdmin(user.email) 
+                            ? 'bg-primary/20' 
+                            : 'bg-muted'
+                        }`}>
+                          {isSuperAdmin(user.email) ? (
+                            <Crown className="h-5 w-5 text-primary-foreground" />
+                          ) : (
+                            <span className="text-base font-medium">
+                              {user.email.charAt(0).toUpperCase()}
+                            </span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{user.email}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium truncate">{user.email}</p>
+                            {isSuperAdmin(user.email) && (
+                              <Badge className="h-5 text-[10px] bg-gradient-to-r from-primary to-accent border-0">
+                                Owner
+                              </Badge>
+                            )}
+                            {!isSuperAdmin(user.email) && isAdmin(user.email) && (
+                              <Badge variant="secondary" className="h-5 text-[10px]">
+                                Admin
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <Badge 
                               variant={getDisplayPlan(user) === 'free' ? 'outline' : 'default'}
