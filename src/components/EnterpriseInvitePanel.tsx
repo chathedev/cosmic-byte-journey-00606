@@ -1,13 +1,20 @@
-import { useState } from 'react';
-import { UserPlus, Loader2, Check, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { UserPlus, Loader2, Check, Users, Mail, Shield, Crown, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+
+interface MemberInfo {
+  email: string;
+  preferredName?: string;
+  role?: string;
+  verified?: boolean;
+  lastLoginAt?: string;
+}
 
 export function EnterpriseInvitePanel() {
   const { enterpriseMembership } = useSubscription();
@@ -16,17 +23,47 @@ export function EnterpriseInvitePanel() {
   const [name, setName] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [recentInvites, setRecentInvites] = useState<string[]>([]);
+  const [members, setMembers] = useState<MemberInfo[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
 
   const company = enterpriseMembership?.company;
   const role = enterpriseMembership?.membership?.role;
   const canInvite = role === 'admin' || role === 'owner';
+  const canViewMembers = role === 'admin' || role === 'owner' || role === 'member';
 
-  if (!company || !canInvite) return null;
+  useEffect(() => {
+    if (!company?.id || !canViewMembers) return;
+    loadMembers();
+  }, [company?.id, canViewMembers]);
+
+  const loadMembers = async () => {
+    if (!company?.id) return;
+    setLoadingMembers(true);
+    try {
+      const stats = await apiClient.getEnterpriseCompanyStats(company.id);
+      if (stats.scoreboard) {
+        setMembers(stats.scoreboard.map(m => ({
+          email: m.email,
+          preferredName: m.preferredName,
+          role: m.role,
+          verified: m.verified,
+          lastLoginAt: m.lastLoginAt,
+        })));
+      }
+    } catch (err) {
+      console.error('[EnterpriseInvitePanel] Failed to load members:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  if (!company || !canViewMembers) return null;
 
   const memberLimit = (company as any).memberLimit;
-  const currentMembers = (company as any).memberCount;
+  const memberCount = members.length || (company as any).memberCount || 0;
   const hasLimit = typeof memberLimit === 'number' && memberLimit > 0;
-  const atLimit = hasLimit && typeof currentMembers === 'number' && currentMembers >= memberLimit;
+  const atLimit = hasLimit && memberCount >= memberLimit;
 
   const handleInvite = async () => {
     if (!email.trim()) return;
@@ -49,14 +86,15 @@ export function EnterpriseInvitePanel() {
 
       toast({
         title: 'Inbjudan skickad',
-        description: `${name.trim() || email.trim()} har lagts till i ${company.name}`,
+        description: `${name.trim() || email.trim()} har bjudits in till ${company.name}`,
       });
 
       setRecentInvites(prev => [email.trim(), ...prev.slice(0, 4)]);
       setEmail('');
       setName('');
+      setShowInviteForm(false);
+      loadMembers();
     } catch (error: any) {
-      console.error('Failed to invite member:', error);
       toast({
         title: 'Kunde inte bjuda in',
         description: error?.message || 'Ett oväntat fel uppstod',
@@ -67,79 +105,148 @@ export function EnterpriseInvitePanel() {
     }
   };
 
+  const getRoleBadge = (memberRole?: string) => {
+    if (memberRole === 'owner') return <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary"><Crown className="w-2.5 h-2.5 mr-0.5" />Ägare</Badge>;
+    if (memberRole === 'admin') return <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-accent/30 text-accent"><Shield className="w-2.5 h-2.5 mr-0.5" />Admin</Badge>;
+    return null;
+  };
+
   return (
-    <Card>
-      <CardHeader>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <UserPlus className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base">Bjud in medlem</CardTitle>
-        </div>
-        <CardDescription className="text-xs">
-          Lägg till nya personer i {company.name}
+          <Users className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Medlemmar</h3>
           {hasLimit && (
-            <span className="ml-1">
-              ({currentMembers ?? '?'}/{memberLimit} platser)
+            <span className="text-xs text-muted-foreground">
+              {memberCount} av {memberLimit}
             </span>
           )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {atLimit ? (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-            <p className="font-medium">Platsgräns nådd</p>
-            <p className="text-xs mt-1">Kontakta support för att utöka antalet platser.</p>
+        </div>
+        {canInvite && !atLimit && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowInviteForm(!showInviteForm)}
+            className="h-7 text-xs gap-1"
+          >
+            <UserPlus className="w-3 h-3" />
+            Bjud in
+            {showInviteForm ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </Button>
+        )}
+      </div>
+
+      {/* Capacity bar */}
+      {hasLimit && (
+        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all rounded-full ${atLimit ? 'bg-destructive' : 'bg-primary'}`}
+            style={{ width: `${Math.min((memberCount / memberLimit) * 100, 100)}%` }}
+          />
+        </div>
+      )}
+
+      {/* Limit reached */}
+      {atLimit && canInvite && (
+        <div className="border border-destructive/20 bg-destructive/5 p-3 rounded-lg">
+          <p className="text-xs font-medium text-destructive">Alla {memberLimit} platser är fyllda</p>
+          <p className="text-[10px] text-destructive/70 mt-0.5">Kontakta support för att utöka.</p>
+        </div>
+      )}
+
+      {/* Invite form */}
+      {showInviteForm && !atLimit && (
+        <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
+            <Input
+              id="invite-email"
+              type="email"
+              placeholder="kollega@företag.se"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
+            <Input
+              id="invite-name"
+              placeholder="Förnamn Efternamn"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              className="h-9 text-sm"
+            />
+          </div>
+          <Button
+            onClick={handleInvite}
+            disabled={!email.trim() || isInviting}
+            className="w-full h-9 text-xs"
+            size="sm"
+          >
+            {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
+            Skicka inbjudan
+          </Button>
+
+          {recentInvites.length > 0 && (
+            <div className="pt-2 border-t border-border/50 space-y-1">
+              <p className="text-[10px] text-muted-foreground font-medium">Nyligen inbjudna</p>
+              {recentInvites.map((invite, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Check className="w-3 h-3 text-green-500" />
+                  <span className="truncate">{invite}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Members list */}
+      <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
+        {loadingMembers ? (
+          <div className="p-6 flex items-center justify-center">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : members.length === 0 ? (
+          <div className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Inga medlemmar hittades</p>
           </div>
         ) : (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="invite-email" className="text-sm">E-postadress *</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                placeholder="kollega@företag.se"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-name" className="text-sm">Namn (valfritt)</Label>
-              <Input
-                id="invite-name"
-                placeholder="Förnamn Efternamn"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              />
-            </div>
-            <Button
-              onClick={handleInvite}
-              disabled={!email.trim() || isInviting}
-              className="w-full"
-              size="sm"
-            >
-              {isInviting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <UserPlus className="w-4 h-4 mr-2" />
-              )}
-              Bjud in
-            </Button>
-          </>
-        )}
-
-        {recentInvites.length > 0 && (
-          <div className="pt-2 border-t space-y-1.5">
-            <p className="text-xs text-muted-foreground font-medium">Nyligen inbjudna</p>
-            {recentInvites.map((invite, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Check className="w-3 h-3 text-green-500" />
-                <span className="truncate">{invite}</span>
+          members.map((member) => (
+            <div key={member.email} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-[11px] font-semibold text-primary uppercase">
+                  {(member.preferredName || member.email).charAt(0)}
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {member.preferredName || member.email.split('@')[0]}
+                  </p>
+                  {getRoleBadge(member.role)}
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                  <Mail className="w-2.5 h-2.5" />
+                  {member.email}
+                </p>
+              </div>
+              <div className="shrink-0">
+                {member.verified !== false ? (
+                  <span className="w-2 h-2 rounded-full bg-green-500 block" title="Verifierad" />
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground/30 block" title="Ej verifierad" />
+                )}
+              </div>
+            </div>
+          ))
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
