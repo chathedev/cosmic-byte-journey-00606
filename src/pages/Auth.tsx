@@ -68,11 +68,37 @@ export default function Auth() {
   const [codeSent, setCodeSent] = useState(false);
   const verifyingRef = useRef(false);
   const [isSignup, setIsSignup] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      const nextHeight = Math.round(viewport?.height ?? window.innerHeight);
+      setViewportHeight(nextHeight);
+
+      const keyboardDelta = window.innerHeight - nextHeight;
+      setIsKeyboardOpen(keyboardDelta > 140);
+    };
+
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+
+    return () => {
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+    };
   }, []);
 
   useEffect(() => {
@@ -233,7 +259,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative min-h-screen h-[100svh] bg-background overflow-x-hidden flex flex-col">
+    <div className="relative min-h-screen bg-background overflow-x-hidden flex flex-col" style={viewportHeight ? { height: `${viewportHeight}px` } : { minHeight: '100dvh' }}>
       <div
         className="absolute inset-0 pointer-events-none opacity-60"
         style={{
@@ -242,7 +268,7 @@ export default function Auth() {
         }}
       />
 
-      <header className="relative z-10 px-4 sm:px-6 pt-5 pb-3">
+      <header className={`relative z-10 px-4 sm:px-6 pt-5 pb-3 ${isKeyboardOpen ? 'hidden sm:block' : ''}`}>
         <div className="max-w-md mx-auto flex items-center justify-between">
           <span className="text-[12px] font-semibold tracking-[0.26em] uppercase text-foreground/80">Tivly</span>
           <a
@@ -254,8 +280,8 @@ export default function Auth() {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6">
-        <div className="w-full max-w-md mx-auto min-h-full flex items-center py-6 sm:py-10">
+      <main className="relative z-10 flex-1 overflow-y-auto overscroll-contain touch-pan-y px-4 sm:px-6">
+        <div className={`w-full max-w-5xl mx-auto min-h-full flex flex-col py-6 sm:py-10 lg:py-14 ${isKeyboardOpen ? 'justify-start' : 'justify-center'}`}>
           <AnimatePresence mode="wait">
             {viewMode === 'email' && (
               <motion.div
@@ -264,10 +290,10 @@ export default function Auth() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="w-full border border-border/70 bg-card shadow-xl shadow-primary/10 rounded-2xl p-6 sm:p-7 space-y-6"
+                className="w-full max-w-xl lg:max-w-2xl mx-auto border border-border/70 bg-card shadow-xl shadow-primary/10 rounded-2xl p-6 sm:p-8 space-y-6"
               >
                 <div className="space-y-1.5">
-                  <h1 className="text-2xl font-bold text-card-foreground tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground tracking-tight">
                     {isSignup ? 'Skapa konto' : 'Logga in'}
                   </h1>
                   <p className="text-sm text-muted-foreground">
@@ -340,10 +366,10 @@ export default function Auth() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="w-full border border-border/70 bg-card shadow-xl shadow-primary/10 rounded-2xl p-6 sm:p-7 space-y-6"
+                className="w-full max-w-xl lg:max-w-2xl mx-auto border border-border/70 bg-card shadow-xl shadow-primary/10 rounded-2xl p-6 sm:p-8 space-y-6"
               >
                 <div className="space-y-1.5">
-                  <h1 className="text-2xl font-bold text-card-foreground tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground tracking-tight">
                     {isNavigating ? 'Välkommen!' : verifying ? 'Verifierar' : 'Ange kod'}
                   </h1>
                   <p className="text-sm text-muted-foreground">
