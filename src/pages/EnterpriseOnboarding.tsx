@@ -99,6 +99,9 @@ export default function EnterpriseOnboarding() {
 
   // Load draft or local form on mount
   useEffect(() => {
+    const hasRealData = (f: Partial<OnboardingFormData>) =>
+      !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
+
     const local = loadDraftLocal();
     if (local) {
       getDraft(local.draftId, local.resumeToken)
@@ -106,29 +109,28 @@ export default function EnterpriseOnboarding() {
           setDraftId(res.draft.id);
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
-          setForm((prev) => ({ ...prev, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : prev.expectedSeats }));
-          if (res.draft.progress?.step) setStep(Math.min(res.draft.progress.step, STEPS.length - 1));
+          const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
+          if (hasRealData(restored)) {
+            setForm(restored);
+            if (res.draft.progress?.step) setStep(Math.min(res.draft.progress.step, STEPS.length - 1));
+          }
         })
         .catch(() => {
           clearDraftLocal();
-          // Fallback: load from localStorage form backup
-          try {
-            const saved = localStorage.getItem(FORM_KEY);
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (parsed.form) setForm(prev => ({ ...prev, ...parsed.form }));
-              if (parsed.step) setStep(Math.min(parsed.step, STEPS.length - 1));
-            }
-          } catch {}
+          restoreFromLocal();
         });
     } else {
-      // No draft - try local form backup
+      restoreFromLocal();
+    }
+
+    function restoreFromLocal() {
       try {
         const saved = localStorage.getItem(FORM_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.form) setForm(prev => ({ ...prev, ...parsed.form }));
-          if (parsed.step) setStep(Math.min(parsed.step, STEPS.length - 1));
+        if (!saved) return;
+        const parsed = JSON.parse(saved);
+        if (parsed.form && hasRealData(parsed.form)) {
+          setForm(prev => ({ ...prev, ...parsed.form }));
+          if (parsed.step > 0) setStep(Math.min(parsed.step, STEPS.length - 1));
         }
       } catch {}
     }
