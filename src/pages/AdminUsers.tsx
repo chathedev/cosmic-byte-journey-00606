@@ -10,10 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck } from 'lucide-react';
+import { Loader2, ExternalLink, Edit, Trash2, Users, FileText, ShieldCheck, Circle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
 import { AdminResetDialog } from '@/components/AdminResetDialog';
+
+interface PresenceData {
+  email: string;
+  lastActiveAt: string | null;
+  lastActiveEpochMs: number | null;
+  lastLoginAt: string | null;
+  source: string | null;
+  isOnline: boolean;
+  status: 'online' | 'offline' | 'never_active';
+  idleSeconds: number;
+  idleMinutes: number;
+}
 
 interface UserData {
   email: string;
@@ -72,6 +84,8 @@ export default function AdminUsers() {
   const [resetUsageUser, setResetUsageUser] = useState<UserData | null>(null);
   const [isResettingUsage, setIsResettingUsage] = useState(false);
   const [selectedUserDetail, setSelectedUserDetail] = useState<UserData | null>(null);
+  const [presenceMap, setPresenceMap] = useState<Record<string, PresenceData>>({});
+  const [now, setNow] = useState(Date.now());
   const { toast } = useToast();
 
   // Filter users based on search
@@ -174,18 +188,52 @@ export default function AdminUsers() {
     }
   };
 
+  const fetchPresence = async () => {
+    try {
+      const data = await apiClient.getAdminUsersLastActive();
+      const map: Record<string, PresenceData> = {};
+      (data.users || []).forEach((u: any) => {
+        const p = u.presence || u;
+        map[u.email?.toLowerCase() || p.email?.toLowerCase()] = {
+          email: u.email || p.email,
+          lastActiveAt: p.lastActiveAt || u.lastActiveAt || null,
+          lastActiveEpochMs: p.lastActiveEpochMs || null,
+          lastLoginAt: p.lastLoginAt || u.lastLoginAt || null,
+          source: p.source || null,
+          isOnline: p.isOnline || false,
+          status: p.status || 'never_active',
+          idleSeconds: p.idleSeconds || 0,
+          idleMinutes: p.idleMinutes || 0,
+        };
+      });
+      setPresenceMap(map);
+    } catch (err) {
+      console.error('Failed to fetch presence:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchAdmins();
+    fetchPresence();
 
-    const interval = setInterval(() => {
+    const dataInterval = setInterval(() => {
       fetchUsers();
       fetchAdmins();
     }, 5000);
 
+    const presenceInterval = setInterval(fetchPresence, 15000);
+
     return () => {
-      clearInterval(interval);
+      clearInterval(dataInterval);
+      clearInterval(presenceInterval);
     };
+  }, []);
+
+  // Tick every second for relative time labels
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
   }, []);
 
   const handleAddAdmin = async () => {
@@ -376,6 +424,27 @@ export default function AdminUsers() {
     }
   };
 
+
+  const getPresenceLabel = (email: string): { label: string; isOnline: boolean; status: string } => {
+    const p = presenceMap[email.toLowerCase()];
+    if (!p) return { label: '', isOnline: false, status: 'unknown' };
+    if (p.status === 'never_active') return { label: 'Never active', isOnline: false, status: 'never_active' };
+
+    const epochMs = p.lastActiveEpochMs;
+    if (!epochMs) return { label: 'Never active', isOnline: false, status: 'never_active' };
+
+    const diffMs = now - epochMs;
+    const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+
+    if (p.isOnline && diffSec < 60) return { label: 'Online now', isOnline: true, status: 'online' };
+    if (p.isOnline && diffSec < 3600) return { label: `Active ${Math.floor(diffSec / 60)} min ago`, isOnline: true, status: 'online' };
+
+    if (diffSec < 60) return { label: 'Just now', isOnline: false, status: 'offline' };
+    if (diffSec < 3600) return { label: `${Math.floor(diffSec / 60)} min ago`, isOnline: false, status: 'offline' };
+    if (diffSec < 86400) return { label: `${Math.floor(diffSec / 3600)}h ago`, isOnline: false, status: 'offline' };
+    const days = Math.floor(diffSec / 86400);
+    return { label: `${days}d ago`, isOnline: false, status: 'offline' };
+  };
 
   if (loading) {
     return (
@@ -569,6 +638,7 @@ export default function AdminUsers() {
                         <TableHead className="font-medium">User</TableHead>
                         <TableHead className="font-medium">Plan</TableHead>
                         <TableHead className="font-medium">Meetings</TableHead>
+                        <TableHead className="font-medium">Last Active</TableHead>
                         <TableHead className="text-right font-medium">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -636,6 +706,29 @@ export default function AdminUsers() {
                                 );
                               })()}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const presence = getPresenceLabel(user.email);
+                              return (
+                                <div className="flex items-center gap-1.5">
+                                  <Circle
+                                    className={`h-2 w-2 flex-shrink-0 ${
+                                      presence.isOnline
+                                        ? 'fill-green-500 text-green-500'
+                                        : presence.status === 'never_active'
+                                        ? 'fill-muted-foreground/30 text-muted-foreground/30'
+                                        : 'fill-muted-foreground/50 text-muted-foreground/50'
+                                    }`}
+                                  />
+                                  <span className={`text-xs ${
+                                    presence.isOnline ? 'text-green-600 dark:text-green-400 font-medium' : 'text-muted-foreground'
+                                  }`}>
+                                    {presence.label || '—'}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
@@ -714,6 +807,20 @@ export default function AdminUsers() {
                                 Google
                               </Badge>
                             )}
+                            {(() => {
+                              const presence = getPresenceLabel(user.email);
+                              if (!presence.label) return null;
+                              return (
+                                <span className={`flex items-center gap-1 text-xs ${
+                                  presence.isOnline ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
+                                }`}>
+                                  <Circle className={`h-1.5 w-1.5 ${
+                                    presence.isOnline ? 'fill-green-500 text-green-500' : 'fill-muted-foreground/50 text-muted-foreground/50'
+                                  }`} />
+                                  {presence.label}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>

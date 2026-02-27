@@ -1382,6 +1382,22 @@ class ApiClient {
     return response.json();
   }
 
+  async getAdminUsersLastActive(): Promise<any> {
+    const response = await this.fetchWithAuth('/admin/users/last-active');
+    if (!response.ok) {
+      throw new Error('Failed to fetch last-active data');
+    }
+    return response.json();
+  }
+
+  async getAdminUserLastActive(email: string): Promise<any> {
+    const response = await this.fetchWithAuth(`/admin/users/${encodeURIComponent(email)}/last-active`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch user last-active data');
+    }
+    return response.json();
+  }
+
   async getAdminUserDetail(email: string): Promise<any> {
     const response = await this.fetchWithAuth(`/admin/users/${encodeURIComponent(email)}`);
     if (!response.ok) {
