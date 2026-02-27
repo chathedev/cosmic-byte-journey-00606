@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Shield, Mic, FileText, ListChecks, FileOutput, ArrowRight, Quote, Star } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Shield, Mic, FileText, ListChecks, FileOutput, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
@@ -60,18 +60,6 @@ const FEATURES = [
   { label: 'Export', desc: 'Word, PDF och enkel delning', Icon: FileOutput },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: 'Tivly har sparat oss timmar varje vecka. Protokollen skriver sig själva.',
-    author: 'Maria L.',
-    role: 'Projektledare',
-  },
-  {
-    quote: 'Äntligen slipper vi manuella mötesanteckningar. Helt fantastiskt verktyg.',
-    author: 'Erik S.',
-    role: 'IT-chef',
-  },
-];
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -93,20 +81,12 @@ export default function Auth() {
   const [platform, setPlatform] = useState<'ios' | 'web'>('web');
   const [codeSent, setCodeSent] = useState(false);
   const verifyingRef = useRef(false);
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [isSignup, setIsSignup] = useState(false);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveTestimonial(prev => (prev + 1) % TESTIMONIALS.length);
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -269,125 +249,18 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* ─── LEFT: Branding panel (hidden on mobile) ─── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary/[0.06] via-background to-accent/[0.04]">
-        {/* Subtle pattern */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{
-          backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-        }} />
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 sm:px-8 py-12 relative">
+      {/* Subtle pattern */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.02]" style={{
+        backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
+        backgroundSize: '28px 28px',
+      }} />
 
-        <div className="relative z-10 flex flex-col justify-between p-12 xl:p-16 w-full">
-          {/* Top: Logo + tagline */}
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <span className="text-xs font-semibold tracking-[0.3em] uppercase text-foreground">Tivly</span>
-          </motion.div>
-
-          {/* Center: Hero content */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="space-y-10"
-          >
-            <div className="space-y-4">
-              <h1 className="text-4xl xl:text-5xl font-bold text-foreground leading-[1.15] tracking-tight">
-                Mötesdokumentation<br />
-                <span className="text-primary">med AI</span>
-              </h1>
-              <p className="text-base text-muted-foreground max-w-md leading-relaxed">
-                Transkribera, sammanfatta och exportera — automatiskt. Sparar timmar varje vecka för ditt team.
-              </p>
-            </div>
-
-            {/* Features */}
-            <div className="grid grid-cols-2 gap-4">
-              {FEATURES.map((item, i) => (
-                <motion.div
-                  key={item.label}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 + i * 0.08 }}
-                  className="flex items-start gap-3"
-                >
-                  <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <item.Icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{item.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Bottom: Testimonial carousel */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-          >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                  <CardContent className="p-5">
-                    <Quote className="h-4 w-4 text-primary/40 mb-2" />
-                    <p className="text-sm text-foreground leading-relaxed italic">
-                      "{TESTIMONIALS[activeTestimonial].quote}"
-                    </p>
-                    <div className="flex items-center justify-between mt-4">
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">{TESTIMONIALS[activeTestimonial].author}</p>
-                        <p className="text-[10px] text-muted-foreground">{TESTIMONIALS[activeTestimonial].role}</p>
-                      </div>
-                      <div className="flex gap-0.5">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="h-3 w-3 fill-primary/80 text-primary/80" />
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Testimonial dots */}
-            <div className="flex justify-center gap-1.5 mt-3">
-              {TESTIMONIALS.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveTestimonial(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 no-hover-lift ${
-                    i === activeTestimonial ? 'w-6 bg-primary' : 'w-1.5 bg-border hover:bg-muted-foreground/30'
-                  }`}
-                />
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* ─── RIGHT: Form panel ─── */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-4 sm:px-8 py-12 relative">
-        {/* Mobile-only pattern */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.012] lg:hidden" style={{
-          backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-        }} />
-
-        <div className="w-full max-w-sm relative z-10">
-          {/* Logo */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="text-center mb-8">
-            <span className="text-xs font-semibold tracking-[0.3em] uppercase text-foreground lg:hidden">Tivly</span>
-          </motion.div>
+      <div className="w-full max-w-sm relative z-10">
+        {/* Logo */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="text-center mb-8">
+          <span className="text-xs font-semibold tracking-[0.3em] uppercase text-foreground">Tivly</span>
+        </motion.div>
 
           {/* Auth card */}
           <motion.div
@@ -416,7 +289,7 @@ export default function Auth() {
                       </div>
 
                       {/* Features list — visible on mobile since left panel is hidden */}
-                      <div className="space-y-0 divide-y divide-border/50 lg:hidden">
+                      <div className="space-y-0 divide-y divide-border/50">
                         {FEATURES.map((item) => (
                           <div key={item.label} className="flex items-center gap-3 py-3">
                             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -430,12 +303,6 @@ export default function Auth() {
                         ))}
                       </div>
 
-                      {/* Desktop welcome — simpler since features are on the left */}
-                      <div className="hidden lg:block space-y-3">
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Logga in eller skapa ett konto för att börja transkribera, generera protokoll och exportera — helt automatiskt.
-                        </p>
-                      </div>
 
                       <div className="space-y-3">
                         <Button
@@ -602,7 +469,6 @@ export default function Auth() {
               Starta Enterprise-trial <ArrowRight className="w-3 h-3" />
             </a>
             <p className="text-[10px] text-muted-foreground/50">© {new Date().getFullYear()} Tivly AB</p>
-          </div>
         </div>
       </div>
     </div>
