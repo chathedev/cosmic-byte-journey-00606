@@ -26,6 +26,8 @@ import {
   type CompanyRegistryResult,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { toast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 /* ─── Constants ─── */
@@ -263,7 +265,8 @@ export default function EnterpriseOnboarding() {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
         if (res.emailVerification?.status === 'verified') {
           setEmailVerifyState('verified');
-          setStep(3); // advance to Bekräfta
+          toast({ title: '✅ E-post verifierad', description: 'Din företagsmail har bekräftats.' });
+          setTimeout(() => setStep(3), 1500);
         }
       } catch {}
     }, 4000);
@@ -978,12 +981,24 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
               </div>
             )}
 
-            {emailVerifyState === 'verified' && (
-              <div className="flex items-center gap-2 py-2">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-sm text-foreground font-medium">E-post verifierad</span>
-              </div>
-            )}
+            <AnimatePresence>
+              {emailVerifyState === 'verified' && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ type: 'spring', duration: 0.4 }}
+                  className="flex items-center gap-3 py-3 px-4 rounded-xl bg-primary/10 border border-primary/20"
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">E-post verifierad</p>
+                    <p className="text-xs text-muted-foreground">Går vidare till nästa steg…</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {emailVerifyState === 'pending' && (
               <div className="space-y-4">
