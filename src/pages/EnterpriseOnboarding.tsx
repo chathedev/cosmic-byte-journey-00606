@@ -180,8 +180,53 @@ export default function EnterpriseOnboarding() {
     hasUserInteractedRef.current = true;
     const next = { ...form, [field]: value };
     setForm(next);
-    if (step >= 2) triggerValidation(next as Partial<OnboardingFormData>);
+    // Clear field-level error on edit so user gets fresh feedback on next validate
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => { const copy = { ...prev }; delete copy[field]; return copy; });
+    }
     triggerDraftSave(next as Partial<OnboardingFormData>, step);
+  };
+
+  const [stepValidating, setStepValidating] = useState(false);
+
+  const handleNextFromStep2 = async () => {
+    hasUserInteractedRef.current = true;
+    // Basic client-side presence check first
+    const missing: string[] = [];
+    if (!form.companyName?.trim()) missing.push('companyName');
+    if (!form.organizationNumber?.trim()) missing.push('organizationNumber');
+    if (!form.contactName?.trim()) missing.push('contactName');
+    if (!form.workEmail?.trim()) missing.push('workEmail');
+    if (!form.contactPhone?.trim()) missing.push('contactPhone');
+    if (missing.length > 0) {
+      const labels: Record<string, string> = { companyName: 'Företagsnamn krävs', organizationNumber: 'Organisationsnummer krävs', contactName: 'Kontaktperson krävs', workEmail: 'Jobbmejl krävs', contactPhone: 'Telefon krävs' };
+      const errs: Record<string, string> = {};
+      missing.forEach(f => { errs[f] = labels[f] || 'Obligatoriskt fält'; });
+      setFieldErrors(prev => ({ ...prev, ...errs }));
+      return;
+    }
+    // Server-side validation
+    setStepValidating(true);
+    try {
+      const res = await validateOnboarding(form as Partial<OnboardingFormData>);
+      setFieldErrors(res.validation?.errors || {});
+      setFieldChecks(res.validation?.checks || {});
+      setAvailability(res.validation?.availability || {});
+      setCompanyRegistry(res.validation?.companyRegistry || null);
+      const hasErrors = Object.keys(res.validation?.errors || {}).length > 0;
+      const orgTakenNow = res.validation?.availability?.organizationNumberAvailable === false;
+      const emailTakenNow = res.validation?.availability?.workEmailAvailable === false;
+      if (hasErrors || orgTakenNow || emailTakenNow) {
+        setStepValidating(false);
+        return;
+      }
+      // All good — proceed to confirm step
+      setStep(3);
+    } catch {
+      setFieldErrors(prev => ({ ...prev, _general: 'Validering misslyckades. Försök igen.' }));
+    } finally {
+      setStepValidating(false);
+    }
   };
 
   useEffect(() => {
@@ -195,7 +240,6 @@ export default function EnterpriseOnboarding() {
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
     if (step < 4) triggerDraftSave(form as Partial<OnboardingFormData>, step);
-    if (step >= 2 && step < 4) triggerValidation(form as Partial<OnboardingFormData>);
   }, [step]);
 
   useEffect(() => {
@@ -474,7 +518,7 @@ export default function EnterpriseOnboarding() {
           <main className="flex-1 min-w-0">
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={isValidating} updateField={updateField} />}
+            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={stepValidating} updateField={updateField} />}
             {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
             {step === 4 && draftId && resumeToken && (
               <StepCardPayment
@@ -500,9 +544,15 @@ export default function EnterpriseOnboarding() {
                 <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
-                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 no-hover-lift rounded-none px-6">
-                  Nästa <ChevronRight className="h-4 w-4" />
-                </Button>
+                {step === 2 ? (
+                  <Button size="sm" onClick={handleNextFromStep2} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
+                    {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
+                    Nästa <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             )}
             {step === 3 && (
@@ -832,6 +882,13 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
             {orgTaken && emailTaken ? 'Organisationsnummer och mejl redan registrerade.' : orgTaken ? 'Organisationsnumret redan registrerat.' : 'Mejladressen redan registrerad.'}
             {' '}Kontakta <a href="mailto:support@tivly.se" className="underline font-medium">support@tivly.se</a>.
           </p>
+        </div>
+      )}
+
+      {fieldErrors._general && (
+        <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">{fieldErrors._general}</p>
         </div>
       )}
     </div>
