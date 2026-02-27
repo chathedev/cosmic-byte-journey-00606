@@ -319,6 +319,20 @@ export async function sendOnboardingEmailVerification(data: { email: string; dra
 }
 
 // 11) Poll email verification status (real-time check)
-export async function checkOnboardingEmailVerification(draftId: string): Promise<{ verified: boolean; emailVerification?: { status: string } }> {
+export async function checkOnboardingEmailVerification(draftId: string): Promise<{
+  success: boolean;
+  draftId: string;
+  emailVerification?: {
+    email: string;
+    method: string;
+    status: string;
+    issuedAt?: string;
+    sentAt?: string;
+    expiresAt?: string;
+    verifiedAt?: string;
+    attempts?: number;
+    attemptsRemaining?: number;
+  };
+}> {
   return apiFetch(`/enterprise/onboarding/verify-email/status?draftId=${encodeURIComponent(draftId)}`);
 }
