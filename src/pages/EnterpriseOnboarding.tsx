@@ -80,7 +80,24 @@ export default function EnterpriseOnboarding() {
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Load draft
+  // Use refs to avoid stale closures in callbacks/effects
+  const draftIdRef = useRef(draftId);
+  const resumeTokenRef = useRef(resumeToken);
+  const formRef = useRef(form);
+  const stepRef = useRef(step);
+
+  useEffect(() => { draftIdRef.current = draftId; }, [draftId]);
+  useEffect(() => { resumeTokenRef.current = resumeToken; }, [resumeToken]);
+  useEffect(() => { formRef.current = form; }, [form]);
+  useEffect(() => { stepRef.current = step; }, [step]);
+
+  // Persist form locally as fallback
+  const FORM_KEY = 'tivly_enterprise_form';
+  const saveFormLocal = useCallback((f: Partial<OnboardingFormData>, s: number) => {
+    try { localStorage.setItem(FORM_KEY, JSON.stringify({ form: f, step: s })); } catch {}
+  }, []);
+
+  // Load draft or local form on mount
   useEffect(() => {
     const local = loadDraftLocal();
     if (local) {
@@ -92,7 +109,28 @@ export default function EnterpriseOnboarding() {
           setForm((prev) => ({ ...prev, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : prev.expectedSeats }));
           if (res.draft.progress?.step) setStep(Math.min(res.draft.progress.step, STEPS.length - 1));
         })
-        .catch(() => clearDraftLocal());
+        .catch(() => {
+          clearDraftLocal();
+          // Fallback: load from localStorage form backup
+          try {
+            const saved = localStorage.getItem(FORM_KEY);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (parsed.form) setForm(prev => ({ ...prev, ...parsed.form }));
+              if (parsed.step) setStep(Math.min(parsed.step, STEPS.length - 1));
+            }
+          } catch {}
+        });
+    } else {
+      // No draft - try local form backup
+      try {
+        const saved = localStorage.getItem(FORM_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.form) setForm(prev => ({ ...prev, ...parsed.form }));
+          if (parsed.step) setStep(Math.min(parsed.step, STEPS.length - 1));
+        }
+      } catch {}
     }
   }, []);
 
@@ -112,21 +150,35 @@ export default function EnterpriseOnboarding() {
   }, []);
 
   const triggerDraftSave = useCallback((fields: Partial<OnboardingFormData>, currentStep: number) => {
+    // Always save locally immediately
+    saveFormLocal(fields, currentStep);
+
     clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(async () => {
       setIsSaving(true);
       try {
-        const res = await saveDraft({ ...fields, draftId, resumeToken, progressStep: currentStep, progressPercent: Math.round(((currentStep + 1) / STEPS.length) * 100) });
-        if (res.draft) { setDraftId(res.draft.id); setResumeToken(res.draft.resumeToken); saveDraftLocal(res.draft.id, res.draft.resumeToken); }
-      } catch {}
+        const res = await saveDraft({
+          ...fields,
+          draftId: draftIdRef.current,
+          resumeToken: resumeTokenRef.current,
+          progressStep: currentStep,
+          progressPercent: Math.round(((currentStep + 1) / STEPS.length) * 100),
+        });
+        if (res.draft) {
+          setDraftId(res.draft.id);
+          setResumeToken(res.draft.resumeToken);
+          saveDraftLocal(res.draft.id, res.draft.resumeToken);
+        }
+      } catch {
+        // Local backup already saved above
+      }
       setIsSaving(false);
     }, 800);
-  }, [draftId, resumeToken]);
+  }, [saveFormLocal]);
 
   const updateField = (field: string, value: any) => {
     const next = { ...form, [field]: value };
     setForm(next);
-    // Only validate text fields on step 2 (company/contact info)
     if (step === 2) triggerValidation(next as Partial<OnboardingFormData>);
     triggerDraftSave(next as Partial<OnboardingFormData>, step);
   };
@@ -141,21 +193,34 @@ export default function EnterpriseOnboarding() {
     }
   }, [form.expectedSeats]);
 
+  // Save draft on step change
   useEffect(() => {
-    if (draftId) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    saveFormLocal(form, step);
+    triggerDraftSave(form as Partial<OnboardingFormData>, step);
   }, [step]);
 
-  // Beacon save
+  // Beacon save on page unload
   useEffect(() => {
     const handler = () => {
-      if (form.companyName || form.workEmail) {
+      const f = formRef.current;
+      const s = stepRef.current;
+      // Always save locally
+      try { localStorage.setItem(FORM_KEY, JSON.stringify({ form: f, step: s })); } catch {}
+      // Try server save via beacon
+      if (f.companyName || f.workEmail) {
         navigator.sendBeacon?.('https://api.tivly.se/enterprise/onboarding/draft',
-          new Blob([JSON.stringify({ ...form, countryCode: 'SE', draftId, resumeToken, progressStep: step, progressPercent: Math.round(((step + 1) / STEPS.length) * 100) })], { type: 'application/json' }));
+          new Blob([JSON.stringify({
+            ...f, countryCode: 'SE',
+            draftId: draftIdRef.current,
+            resumeToken: resumeTokenRef.current,
+            progressStep: s,
+            progressPercent: Math.round(((s + 1) / STEPS.length) * 100),
+          })], { type: 'application/json' }));
       }
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [form, step, draftId, resumeToken]);
+  }, []);
 
   const selectedPlan = PLANS.find(p => p.id === form.planType) || PLANS[0];
   const seats = form.expectedSeats || 5;
@@ -181,6 +246,7 @@ export default function EnterpriseOnboarding() {
       setCompleted(true);
       setCompletedEmail(res.invitation?.email || form.workEmail || '');
       clearDraftLocal();
+      try { localStorage.removeItem(FORM_KEY); } catch {}
     } catch (err: any) {
       setSubmitError(err?.message || err?.error || 'Något gick fel. Försök igen.');
     } finally {
