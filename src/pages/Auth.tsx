@@ -297,7 +297,7 @@ export default function Auth() {
           {/* Right panel — auth form */}
           <div
             className={cn(
-              'flex-1 flex flex-col items-center px-5 sm:px-8 py-12 sm:py-16 min-h-[100dvh] lg:min-h-screen lg:justify-center',
+              'flex-1 relative flex flex-col items-center px-5 sm:px-8 py-12 sm:py-16 min-h-[100dvh] lg:min-h-screen lg:justify-center',
               isFieldActive ? 'justify-start pt-8 sm:pt-10 lg:pt-0' : 'justify-center'
             )}
           >
@@ -495,7 +495,7 @@ export default function Auth() {
             </div>
 
             {/* Footer inside the form panel */}
-            <div className={cn('transition-[height,padding,opacity] duration-200', isFieldActive ? 'h-0 pt-0 overflow-hidden opacity-0' : 'mt-auto pt-8 opacity-100')}>
+            <div className={cn('w-full flex justify-center transition-[height,padding,opacity] duration-200 lg:absolute lg:bottom-6 lg:left-0 lg:pt-0', isFieldActive ? 'h-0 pt-0 overflow-hidden opacity-0' : 'pt-8 opacity-100')}>
               <p className="text-[11px] text-muted-foreground/50 text-center">© {new Date().getFullYear()} Tivly AB</p>
             </div>
           </div>
