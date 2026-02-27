@@ -19,6 +19,9 @@ import {
   getDraft,
   subscribeDraft,
   startTrial,
+  sendOnboardingEmailVerification,
+  verifyOnboardingEmail,
+  checkOnboardingEmailVerification,
   type OnboardingFormData,
   type ValidationResponse,
   type CompanyRegistryResult,
@@ -87,6 +90,10 @@ export default function EnterpriseOnboarding() {
   const [setupIntentClientSecret, setSetupIntentClientSecret] = useState<string | null>(null);
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [firstChargeEstimate, setFirstChargeEstimate] = useState<any>(null);
+  const [emailVerifyState, setEmailVerifyState] = useState<'idle' | 'sending' | 'pending' | 'verified'>('idle');
+  const [emailVerifyCode, setEmailVerifyCode] = useState('');
+  const [emailVerifyError, setEmailVerifyError] = useState('');
+  const [emailVerifyCooldown, setEmailVerifyCooldown] = useState(0);
 
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -191,7 +198,6 @@ export default function EnterpriseOnboarding() {
 
   const handleNextFromStep2 = async () => {
     hasUserInteractedRef.current = true;
-    // Basic client-side presence check first
     const missing: string[] = [];
     if (!form.companyName?.trim()) missing.push('companyName');
     if (!form.organizationNumber?.trim()) missing.push('organizationNumber');
@@ -205,7 +211,6 @@ export default function EnterpriseOnboarding() {
       setFieldErrors(prev => ({ ...prev, ...errs }));
       return;
     }
-    // Server-side validation
     setStepValidating(true);
     try {
       const res = await validateOnboarding(form as Partial<OnboardingFormData>);
@@ -220,12 +225,100 @@ export default function EnterpriseOnboarding() {
         setStepValidating(false);
         return;
       }
-      // All good — proceed to confirm step
-      setStep(3);
+      // Save draft to ensure draftId exists for verification
+      const draftRes = await saveDraft({
+        ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
+        progressStep: 2, progressPercent: 50,
+      } as any);
+      if (draftRes.draft) {
+        setDraftId(draftRes.draft.id);
+        setResumeToken(draftRes.draft.resumeToken);
+        saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
+        draftIdRef.current = draftRes.draft.id;
+        resumeTokenRef.current = draftRes.draft.resumeToken;
+      }
+      // Send email verification
+      setEmailVerifyState('sending');
+      setEmailVerifyCode('');
+      setEmailVerifyError('');
+      try {
+        await sendOnboardingEmailVerification({
+          email: form.workEmail!,
+          draftId: draftIdRef.current!,
+          resumeToken: resumeTokenRef.current!,
+        });
+        setEmailVerifyState('pending');
+        setEmailVerifyCooldown(60);
+      } catch (err: any) {
+        setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringskod.');
+        setEmailVerifyState('idle');
+      }
     } catch {
       setFieldErrors(prev => ({ ...prev, _general: 'Validering misslyckades. Försök igen.' }));
     } finally {
       setStepValidating(false);
+    }
+  };
+
+  // Email verification polling — auto-detect when user verifies via link
+  useEffect(() => {
+    if (emailVerifyState !== 'pending' || !draftIdRef.current || !resumeTokenRef.current || !form.workEmail) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await checkOnboardingEmailVerification({
+          email: form.workEmail!,
+          draftId: draftIdRef.current!,
+          resumeToken: resumeTokenRef.current!,
+        });
+        if (res.verified) {
+          setEmailVerifyState('verified');
+          setStep(3);
+        }
+      } catch {}
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [emailVerifyState, form.workEmail]);
+
+  // Email verification cooldown timer
+  useEffect(() => {
+    if (emailVerifyCooldown <= 0) return;
+    const timer = setTimeout(() => setEmailVerifyCooldown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [emailVerifyCooldown]);
+
+  const handleVerifyCode = async () => {
+    if (emailVerifyCode.length !== 6) return;
+    setEmailVerifyError('');
+    try {
+      const res = await verifyOnboardingEmail({
+        email: form.workEmail!,
+        code: emailVerifyCode,
+        draftId: draftIdRef.current!,
+        resumeToken: resumeTokenRef.current!,
+      });
+      if (res.verified) {
+        setEmailVerifyState('verified');
+        setStep(3);
+      } else {
+        setEmailVerifyError('Felaktig kod. Försök igen.');
+      }
+    } catch (err: any) {
+      setEmailVerifyError(err?.message || 'Verifiering misslyckades.');
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (emailVerifyCooldown > 0) return;
+    setEmailVerifyError('');
+    try {
+      const res = await sendOnboardingEmailVerification({
+        email: form.workEmail!,
+        draftId: draftIdRef.current!,
+        resumeToken: resumeTokenRef.current!,
+      });
+      setEmailVerifyCooldown(res.retryAfterMs ? Math.ceil(res.retryAfterMs / 1000) : 60);
+    } catch (err: any) {
+      setEmailVerifyError(err?.message || 'Kunde inte skicka ny kod.');
     }
   };
 
@@ -518,7 +611,20 @@ export default function EnterpriseOnboarding() {
           <main className="flex-1 min-w-0">
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={stepValidating} updateField={updateField} />}
+            {step === 2 && emailVerifyState === 'idle' && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={stepValidating} updateField={updateField} />}
+            {step === 2 && emailVerifyState !== 'idle' && (
+              <StepEmailVerify
+                email={form.workEmail || ''}
+                code={emailVerifyCode}
+                onCodeChange={setEmailVerifyCode}
+                onVerify={handleVerifyCode}
+                onResend={handleResendVerification}
+                onBack={() => { setEmailVerifyState('idle'); setEmailVerifyCode(''); setEmailVerifyError(''); }}
+                error={emailVerifyError}
+                cooldown={emailVerifyCooldown}
+                sending={emailVerifyState === 'sending'}
+              />
+            )}
             {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
             {step === 4 && draftId && resumeToken && (
               <StepCardPayment
@@ -539,7 +645,7 @@ export default function EnterpriseOnboarding() {
             )}
 
             {/* Navigation */}
-            {step < 3 && (
+            {step < 3 && emailVerifyState === 'idle' && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
                 <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
@@ -803,7 +909,7 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
 
   const registryStatusLabel = (status: string) => {
     switch (status) {
-      case 'verified': return { text: 'Verifierat via Allabolag', color: 'text-primary', icon: CheckCircle2 };
+      case 'verified': return { text: 'Företaget verifierat', color: 'text-primary', icon: CheckCircle2 };
       case 'company_name_mismatch': return { text: 'Bolagsnamnet matchar inte organisationsnumret', color: 'text-destructive', icon: AlertCircle };
       case 'organization_not_found': return { text: 'Organisationsnumret hittades inte', color: 'text-destructive', icon: AlertCircle };
       case 'blocked': return { text: 'Företaget kan inte registreras', color: 'text-destructive', icon: AlertCircle };
@@ -849,9 +955,6 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
                   <>
                     <Icon className={cn('h-3.5 w-3.5 shrink-0', s.color)} />
                     <span className={cn('text-xs font-medium', s.color)}>{s.text}</span>
-                    {companyRegistry.url && (
-                      <a href={companyRegistry.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground underline ml-auto shrink-0 hover:text-foreground transition-colors">Visa</a>
-                    )}
                   </>
                 );
               })()}
@@ -889,6 +992,74 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
         <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
           <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
           <p className="text-sm text-destructive">{fieldErrors._general}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* STEP 2.5: Email Verification                            */
+/* ═══════════════════════════════════════════════════════ */
+function StepEmailVerify({ email, code, onCodeChange, onVerify, onResend, onBack, error, cooldown, sending }: {
+  email: string; code: string; onCodeChange: (v: string) => void; onVerify: () => void; onResend: () => void; onBack: () => void;
+  error: string; cooldown: number; sending: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-center">
+        <div className="h-14 w-14 border-2 border-primary/20 flex items-center justify-center">
+          <Mail className="h-7 w-7 text-primary" />
+        </div>
+      </div>
+      <div className="text-center space-y-2">
+        <h2 className="text-lg font-semibold text-foreground">Verifiera din e-post</h2>
+        <p className="text-sm text-muted-foreground">
+          Vi har skickat en 6-siffrig kod till <span className="text-foreground font-medium">{email}</span>
+        </p>
+      </div>
+
+      {sending ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <Input
+              value={code}
+              onChange={(e) => onCodeChange(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
+              placeholder="XXXXXX"
+              maxLength={6}
+              className="text-center text-xl font-mono tracking-[0.5em] rounded-none h-14 max-w-[240px] border-border focus:border-foreground"
+              autoFocus
+            />
+          </div>
+
+          <Button onClick={onVerify} disabled={code.length !== 6} className="w-full rounded-none no-hover-lift">
+            Verifiera
+          </Button>
+
+          <Button onClick={onResend} disabled={cooldown > 0} variant="outline" className="w-full rounded-none no-hover-lift">
+            {cooldown > 0 ? `Skicka ny kod (${cooldown}s)` : 'Skicka ny kod'}
+          </Button>
+
+          {error && (
+            <div className="border border-destructive/30 bg-destructive/5 p-3 flex items-center gap-2">
+              <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+              <p className="text-xs text-destructive">{error}</p>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground text-center">
+            Verifiering sker automatiskt om du klickar på länken i mejlet.
+          </p>
+
+          <div className="pt-2 border-t border-border">
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+              <ChevronLeft className="h-4 w-4" /> Tillbaka
+            </Button>
+          </div>
         </div>
       )}
     </div>
