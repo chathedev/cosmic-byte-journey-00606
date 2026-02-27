@@ -3,7 +3,7 @@ import { apiClient } from '@/lib/api';
 import {
   ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle,
   CheckCircle2, Minus, Plus, Info, Mail, CreditCard, Users, Building2,
-  FileCheck, Clock,
+  FileCheck, Clock, Globe, Phone, User, Hash,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,7 @@ function clearFormLocal() { removeStorageKey(FORM_KEY); }
 function fmt(n: number) { return n.toLocaleString('sv-SE'); }
 function extractSetupIntentClientSecret(p: any): string | null { return p?.billing?.setupIntentClientSecret || p?.setupIntentClientSecret || p?.clientSecret || p?.client_secret || null; }
 function extractStripePublishableKey(p: any): string | null { return p?.billing?.stripePublishableKey || null; }
+function extractFirstChargeEstimate(p: any): any { return p?.billing?.firstChargeEstimate || null; }
 
 export default function EnterpriseOnboarding() {
   const [onboardingEnabled, setOnboardingEnabled] = useState<boolean | null>(null);
@@ -76,6 +77,7 @@ export default function EnterpriseOnboarding() {
   const [resumeToken, setResumeToken] = useState<string | undefined>();
   const [setupIntentClientSecret, setSetupIntentClientSecret] = useState<string | null>(null);
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
+  const [firstChargeEstimate, setFirstChargeEstimate] = useState<any>(null);
 
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -95,7 +97,6 @@ export default function EnterpriseOnboarding() {
     saveStorageJSON(FORM_KEY, { form: f, step: s, touched: hasUserInteractedRef.current, updatedAt: Date.now() });
   }, []);
 
-  // Load draft or local form on mount
   useEffect(() => {
     const hasRestorableProgress = (f: Partial<OnboardingFormData>, s = 0) => {
       const hasRealData = !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
@@ -234,6 +235,7 @@ export default function EnterpriseOnboarding() {
     setIsSubmitting(true);
     setSetupIntentClientSecret(null);
     setStripePublishableKey(null);
+    setFirstChargeEstimate(null);
     try {
       clearTimeout(draftTimer.current);
       const valRes = await validateOnboarding({ ...form, requireCommitments: true } as any);
@@ -265,6 +267,8 @@ export default function EnterpriseOnboarding() {
       const billing = subscribeRes?.billing;
       const secret = extractSetupIntentClientSecret(subscribeRes);
       const pkKey = extractStripePublishableKey(subscribeRes);
+      const fce = extractFirstChargeEstimate(subscribeRes);
+      if (fce) setFirstChargeEstimate(fce);
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
@@ -281,6 +285,8 @@ export default function EnterpriseOnboarding() {
       const code = err?.code || err?.error;
       if (status === 503 && (code === 'stripe_key_mismatch' || code === 'stripe_publishable_key_missing')) {
         setSubmitError('Stripe-konfigurationsfel på serversidan. Kontakta support@tivly.se.');
+      } else if (status === 409 && code === 'payment_method_required_before_trial') {
+        setSubmitError('Betalkort krävs innan trial kan startas.');
       } else {
         setSubmitError(err?.message || err?.error || 'Kunde inte initiera betalningssteget. Försök igen.');
       }
@@ -327,31 +333,36 @@ export default function EnterpriseOnboarding() {
   if (allDone) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full border border-border bg-card p-8 space-y-6">
+        <div className="max-w-lg w-full border border-border bg-card p-8 sm:p-10 space-y-6">
           <div className="flex justify-center">
-            <div className="h-12 w-12 border border-border flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-primary" />
+            <div className="h-14 w-14 border-2 border-primary/20 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-primary" />
             </div>
           </div>
           <div className="text-center space-y-2">
-            <h1 className="text-xl font-semibold text-foreground">Klart</h1>
+            <h1 className="text-xl font-semibold text-foreground">Trial aktiverad</h1>
             <p className="text-sm text-muted-foreground">
-              Trial aktiverad. Debitering sker automatiskt efter 7 dagar.
+              Välkommen till Tivly Enterprise. Debitering sker automatiskt efter 7 dagar.
             </p>
           </div>
           <div className="border border-border divide-y divide-border">
             {[
-              { n: '1', text: <>Öppna inbjudan i <span className="text-foreground font-medium">{completedEmail}</span></> },
-              { n: '2', text: 'Klicka på länken och logga in' },
-              { n: '3', text: 'Bjud in ditt team och börja använda Tivly' },
+              { n: '1', icon: Mail, text: <>Öppna inbjudan i <span className="text-foreground font-medium">{completedEmail}</span></> },
+              { n: '2', icon: ArrowRight, text: 'Klicka på länken för att logga in' },
+              { n: '3', icon: Users, text: 'Bjud in ditt team och börja använda Tivly' },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3 p-4">
-                <span className="text-xs font-mono text-muted-foreground mt-0.5">{item.n}.</span>
+                <item.icon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <span className="text-sm text-muted-foreground">{item.text}</span>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-center text-muted-foreground">© {new Date().getFullYear()} Tivly AB</p>
+          <div className="text-center space-y-3">
+            <a href="/auth" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors">
+              Gå till inloggning <ArrowRight className="h-3.5 w-3.5" />
+            </a>
+            <p className="text-[11px] text-muted-foreground">© {new Date().getFullYear()} Tivly AB</p>
+          </div>
         </div>
       </div>
     );
@@ -360,93 +371,195 @@ export default function EnterpriseOnboarding() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background border-b border-border">
-        <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="text-sm font-semibold tracking-wide text-foreground">Tivly Enterprise</span>
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <a href="/auth" className="text-sm font-semibold tracking-wide text-foreground hover:text-primary transition-colors">Tivly</a>
+            <span className="text-border">|</span>
+            <span className="text-xs text-muted-foreground font-medium">Enterprise</span>
+          </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5 text-muted-foreground"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
       </header>
 
-      {/* Step indicator — minimal bar */}
-      <div className="max-w-xl mx-auto px-4 pt-6 pb-2">
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {STEPS.map((label, i) => {
-            const isActive = i === step;
-            const isDone = i < step;
-            return (
-              <span key={i} className={cn(
-                'transition-colors',
-                isActive && 'text-foreground font-semibold',
-                isDone && 'text-primary',
-                !isActive && !isDone && 'text-muted-foreground/50',
-              )}>
-                {isDone ? <Check className="h-3 w-3 inline mr-0.5" /> : null}
-                {label}
-              </span>
-            );
-          })}
-        </div>
-        <div className="mt-3 h-px bg-border relative">
-          <div
-            className="absolute top-0 left-0 h-px bg-foreground transition-all duration-300"
-            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-          />
+      {/* Step indicator */}
+      <div className="border-b border-border bg-background">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-1 sm:gap-2">
+            {STEPS.map((label, i) => {
+              const isActive = i === step;
+              const isDone = i < step;
+              return (
+                <div key={i} className="flex items-center gap-1 sm:gap-2">
+                  {i > 0 && <div className={cn('h-px w-4 sm:w-8', isDone ? 'bg-foreground' : 'bg-border')} />}
+                  <div className="flex items-center gap-1.5">
+                    <div className={cn(
+                      'h-6 w-6 text-[10px] font-semibold flex items-center justify-center shrink-0 transition-colors',
+                      isDone && 'bg-foreground text-background',
+                      isActive && 'border-2 border-foreground text-foreground',
+                      !isActive && !isDone && 'border border-border text-muted-foreground/50',
+                    )}>
+                      {isDone ? <Check className="h-3 w-3" /> : i + 1}
+                    </div>
+                    <span className={cn(
+                      'text-xs hidden sm:inline transition-colors',
+                      isActive && 'text-foreground font-semibold',
+                      isDone && 'text-foreground',
+                      !isActive && !isDone && 'text-muted-foreground/50',
+                    )}>
+                      {label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <main className="max-w-xl mx-auto px-4 py-6">
-        {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
-        {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-        {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
-        {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
-        {step === 4 && draftId && resumeToken && (
-          <StepCardPayment
-            draftId={draftId}
-            resumeToken={resumeToken}
-            initialClientSecret={setupIntentClientSecret}
-            stripePublishableKey={stripePublishableKey}
-            email={form.workEmail || ''}
-            monthlyTotal={monthlyTotal}
-            planBaseSek={selectedPlan.priceSek}
-            activationFeeSek={selectedPlan.activationSek}
-            includedSeats={selectedPlan.seats}
-            expectedSeats={seats}
-            extraSeats={extraSeats}
-            onCardConfirmed={handleCardConfirmedStartTrial}
-          />
-        )}
+      {/* Main content — two-column on desktop */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left: Form */}
+          <main className="flex-1 min-w-0">
+            {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
+            {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
+            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
+            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 4 && draftId && resumeToken && (
+              <StepCardPayment
+                draftId={draftId}
+                resumeToken={resumeToken}
+                initialClientSecret={setupIntentClientSecret}
+                stripePublishableKey={stripePublishableKey}
+                email={form.workEmail || ''}
+                monthlyTotal={monthlyTotal}
+                planBaseSek={selectedPlan.priceSek}
+                activationFeeSek={selectedPlan.activationSek}
+                includedSeats={selectedPlan.seats}
+                expectedSeats={seats}
+                extraSeats={extraSeats}
+                firstChargeEstimate={firstChargeEstimate}
+                onCardConfirmed={handleCardConfirmedStartTrial}
+              />
+            )}
 
-        {/* Navigation */}
-        {step < 3 && (
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-            <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-              <ChevronLeft className="h-4 w-4" /> Tillbaka
-            </Button>
-            <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 no-hover-lift rounded-none px-6">
-              Nästa <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        {step === 3 && (
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-            <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-              <ChevronLeft className="h-4 w-4" /> Tillbaka
-            </Button>
-            <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
-              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
-            </Button>
-          </div>
-        )}
-      </main>
+            {/* Navigation */}
+            {step < 3 && (
+              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                  <ChevronLeft className="h-4 w-4" /> Tillbaka
+                </Button>
+                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 no-hover-lift rounded-none px-6">
+                  Nästa <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            {step === 3 && (
+              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+                <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                  <ChevronLeft className="h-4 w-4" /> Tillbaka
+                </Button>
+                <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
+                  {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
+                </Button>
+              </div>
+            )}
+          </main>
 
-      <footer className="max-w-xl mx-auto px-4 pb-8 pt-4">
+          {/* Right: Cost sidebar — desktop only */}
+          <aside className="hidden lg:block w-72 shrink-0">
+            <div className="sticky top-[calc(3.5rem+3.5rem+1px)] space-y-4">
+              <CostSidebar
+                selectedPlan={selectedPlan}
+                seats={seats}
+                extraSeats={extraSeats}
+                monthlyTotal={monthlyTotal}
+                step={step}
+                form={form}
+              />
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <footer className="max-w-6xl mx-auto px-4 sm:px-6 pb-8 pt-4">
         <p className="text-[11px] text-muted-foreground text-center">
           © {new Date().getFullYear()} Tivly · <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Villkor</a> · <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Integritet</a>
         </p>
       </footer>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* Cost Sidebar                                            */
+/* ═══════════════════════════════════════════════════════ */
+function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form }: {
+  selectedPlan: typeof PLANS[0]; seats: number; extraSeats: number; monthlyTotal: number; step: number;
+  form: Partial<OnboardingFormData>;
+}) {
+  const trialDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+  return (
+    <div className="border border-border divide-y divide-border">
+      <div className="px-4 py-3 bg-muted/30">
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Sammanfattning</p>
+      </div>
+
+      <div className="px-4 py-3 space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Plan</span>
+          <span className="text-foreground font-medium">{selectedPlan.name}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Användare</span>
+          <span className="text-foreground font-medium">{seats}</span>
+        </div>
+        {extraSeats > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Extra platser</span>
+            <span className="text-foreground font-medium">{extraSeats} st</span>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 py-3 space-y-1.5">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Idag</span>
+          <span className="text-foreground font-semibold">0 kr</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">7 dagars gratis trial</p>
+      </div>
+
+      <div className="px-4 py-3 space-y-1.5">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Från {trialDate}</span>
+          <span className="text-foreground font-semibold">{fmt(monthlyTotal)} kr/mån</span>
+        </div>
+        <div className="flex justify-between text-[11px]">
+          <span className="text-muted-foreground">Aktivering</span>
+          <span className="text-muted-foreground">{fmt(selectedPlan.activationSek)} kr</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
+      </div>
+
+      {step >= 2 && form.companyName && (
+        <div className="px-4 py-3 space-y-1">
+          <p className="text-[11px] text-muted-foreground font-medium">Företag</p>
+          <p className="text-sm text-foreground truncate">{form.companyName}</p>
+          {form.workEmail && <p className="text-[11px] text-muted-foreground truncate">{form.workEmail}</p>}
+        </div>
+      )}
+
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <Shield className="h-3 w-3 shrink-0" />
+          <span>Krypterad · GDPR · ISO 27001</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -463,21 +576,21 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         <p className="text-sm text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
       </div>
 
-      <div className="border border-border p-6">
-        <div className="flex items-center justify-center gap-6">
+      <div className="border border-border p-6 sm:p-8">
+        <div className="flex items-center justify-center gap-6 sm:gap-8">
           <button
             onClick={() => onChange(Math.max(1, seats - 1))}
-            className="h-10 w-10 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
+            className="h-10 w-10 sm:h-12 sm:w-12 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
           >
             <Minus className="h-4 w-4" />
           </button>
-          <div className="text-center min-w-[80px]">
-            <span className="text-5xl font-semibold text-foreground tabular-nums block">{seats}</span>
-            <p className="text-xs text-muted-foreground mt-1.5">användare</p>
+          <div className="text-center min-w-[90px]">
+            <span className="text-5xl sm:text-6xl font-semibold text-foreground tabular-nums block">{seats}</span>
+            <p className="text-xs text-muted-foreground mt-2">användare</p>
           </div>
           <button
             onClick={() => onChange(Math.min(500, seats + 1))}
-            className="h-10 w-10 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
+            className="h-10 w-10 sm:h-12 sm:w-12 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -505,6 +618,7 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         <Info className="h-4 w-4 text-muted-foreground shrink-0" />
         <p className="text-sm text-muted-foreground">
           Rekommenderad plan: <span className="text-foreground font-medium">{seats <= 10 ? 'Small' : 'Standard'}</span>
+          {' — '}{seats <= 10 ? `${fmt(2490)} SEK/mån` : `${fmt(5990)} SEK/mån`}
         </p>
       </div>
     </div>
@@ -532,7 +646,7 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
               key={plan.id}
               onClick={() => updateField('planType', plan.id)}
               className={cn(
-                'text-left border p-5 transition-colors no-hover-lift',
+                'text-left border p-5 sm:p-6 transition-colors no-hover-lift',
                 isSelected
                   ? 'border-foreground'
                   : 'border-border hover:border-muted-foreground',
@@ -553,7 +667,8 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
         })}
       </div>
 
-      <div className="border border-border divide-y divide-border">
+      {/* Cost breakdown — visible on mobile, hidden on desktop (sidebar shows it) */}
+      <div className="border border-border divide-y divide-border lg:hidden">
         <div className="flex justify-between px-4 py-3 text-sm">
           <span className="text-muted-foreground">Plan {selectedPlan.name}</span>
           <span className="text-foreground font-medium">{fmt(selectedPlan.priceSek)} SEK/mån</span>
@@ -591,22 +706,38 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, isValidatin
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Företag & kontakt</h2>
-          <p className="text-sm text-muted-foreground mt-1">Uppgifter om företaget och kontaktpersonen.</p>
+          <p className="text-sm text-muted-foreground mt-1">Uppgifter om ert svenska företag och kontaktperson.</p>
         </div>
         {isValidating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
-      <div className="border border-border p-5 space-y-4">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <FieldInput label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required />
-          <FieldInput label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
+      {/* Company section */}
+      <div className="border border-border">
+        <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center gap-2">
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Företag</span>
         </div>
-        <FieldInput label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
-        <div className="h-px bg-border" />
-        <FieldInput label="Kontaktperson" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required />
-        <div className="grid sm:grid-cols-2 gap-4">
-          <FieldInput label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
-          <FieldInput label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required />
+        <div className="p-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <FieldInput icon={Building2} label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required />
+            <FieldInput icon={Hash} label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
+          </div>
+          <FieldInput icon={Globe} label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
+        </div>
+      </div>
+
+      {/* Contact section */}
+      <div className="border border-border">
+        <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center gap-2">
+          <User className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kontaktperson</span>
+        </div>
+        <div className="p-5 space-y-4">
+          <FieldInput icon={User} label="Namn" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <FieldInput icon={Mail} label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
+            <FieldInput icon={Phone} label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required />
+          </div>
         </div>
       </div>
 
@@ -624,14 +755,17 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, isValidatin
 }
 
 /* ─── Field input ─── */
-function FieldInput({ label, id, placeholder, value, onChange, error, valid, hint, type = 'text', required }: {
+function FieldInput({ label, id, placeholder, value, onChange, error, valid, hint, type = 'text', required, icon: Icon }: {
   label: string; id: string; placeholder: string; value: string; onChange: (v: string) => void;
-  error?: string; valid?: boolean; hint?: string; type?: string; required?: boolean;
+  error?: string; valid?: boolean; hint?: string; type?: string; required?: boolean; icon?: any;
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}{required && ' *'}</Label>
-      <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('rounded-none border-border focus:border-foreground', error && 'border-destructive focus:border-destructive')} />
+      <div className="relative">
+        {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />}
+        <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('rounded-none border-border focus:border-foreground', Icon && 'pl-9', error && 'border-destructive focus:border-destructive')} />
+      </div>
       {error && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3 shrink-0" /> {error}</p>}
       {!error && valid && value && <p className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> OK</p>}
       {!error && !valid && hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -647,15 +781,15 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
   updateField: (f: string, v: any) => void; submitError: string;
 }) {
   const rows = [
-    { label: 'Företag', value: form.companyName || '–' },
-    { label: 'Orgnr', value: form.organizationNumber || '–' },
-    { label: 'Kontakt', value: form.contactName || '–' },
-    { label: 'Mejl', value: form.workEmail || '–' },
-    { label: 'Telefon', value: form.contactPhone || '–' },
-    { label: 'Plan', value: `${selectedPlan.name} – ${fmt(selectedPlan.priceSek)} SEK/mån` },
-    { label: 'Användare', value: String(form.expectedSeats || 0) },
-    ...(extraSeats > 0 ? [{ label: 'Extra platser', value: `${extraSeats} × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån` }] : []),
-    { label: 'Aktivering', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)` },
+    { label: 'Företag', value: form.companyName || '–', icon: Building2 },
+    { label: 'Orgnr', value: form.organizationNumber || '–', icon: Hash },
+    { label: 'Kontakt', value: form.contactName || '–', icon: User },
+    { label: 'Mejl', value: form.workEmail || '–', icon: Mail },
+    { label: 'Telefon', value: form.contactPhone || '–', icon: Phone },
+    { label: 'Plan', value: `${selectedPlan.name} – ${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
+    { label: 'Användare', value: String(form.expectedSeats || 0), icon: Users },
+    ...(extraSeats > 0 ? [{ label: 'Extra platser', value: `${extraSeats} × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån`, icon: Plus }] : []),
+    { label: 'Aktivering', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock },
   ];
 
   return (
@@ -667,9 +801,12 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
 
       <div className="border border-border divide-y divide-border">
         {rows.map((row, i) => (
-          <div key={i} className="flex justify-between px-4 py-3 text-sm">
-            <span className="text-muted-foreground">{row.label}</span>
-            <span className="text-foreground font-medium text-right">{row.value}</span>
+          <div key={i} className="flex items-center justify-between px-4 py-3 text-sm gap-4">
+            <span className="text-muted-foreground flex items-center gap-2">
+              <row.icon className="h-3.5 w-3.5 shrink-0" />
+              {row.label}
+            </span>
+            <span className="text-foreground font-medium text-right truncate">{row.value}</span>
           </div>
         ))}
       </div>
@@ -707,10 +844,10 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 4: Card Payment                                    */
 /* ═══════════════════════════════════════════════════════ */
-function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, onCardConfirmed }: {
+function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, firstChargeEstimate, onCardConfirmed }: {
   draftId: string; resumeToken: string; initialClientSecret: string | null; stripePublishableKey: string | null;
   email: string; monthlyTotal: number; planBaseSek: number; activationFeeSek: number; includedSeats: number; expectedSeats: number; extraSeats: number;
-  onCardConfirmed: () => Promise<void>;
+  firstChargeEstimate: any; onCardConfirmed: () => Promise<void>;
 }) {
   const [loading, setLoading] = useState(!initialClientSecret);
   const [clientSecret, setClientSecret] = useState<string | null>(initialClientSecret);
@@ -721,6 +858,11 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
   const [currentPk, setCurrentPk] = useState<string | null>(stripePublishableKey);
 
   const trialChargeDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' });
+  const fce = firstChargeEstimate;
+  const showActivation = fce?.activationFeeSek ?? activationFeeSek;
+  const showMonthly = fce?.monthlyTotalSek ?? monthlyTotal;
+  const showTotal = fce?.expectedTotalSek ?? (showActivation + showMonthly);
+  const showTrialDays = fce?.trialDays ?? 7;
 
   useEffect(() => { if (currentPk) setResolvedStripePromise(loadStripe(currentPk)); }, [currentPk]);
 
@@ -773,7 +915,7 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-foreground">Registrera betalmetod</h2>
-        <p className="text-sm text-muted-foreground mt-1">Ingen debitering under trial.</p>
+        <p className="text-sm text-muted-foreground mt-1">Ingen debitering under {showTrialDays} dagars trial.</p>
       </div>
 
       {/* Cost breakdown */}
@@ -781,24 +923,24 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
         <div className="flex items-center justify-between px-4 py-4">
           <div>
             <span className="text-sm font-medium text-foreground">Idag</span>
-            <p className="text-xs text-muted-foreground">7 dagars gratis trial</p>
+            <p className="text-xs text-muted-foreground">{showTrialDays} dagars gratis trial</p>
           </div>
           <span className="text-xl font-semibold text-foreground">0 kr</span>
         </div>
         <div className="px-4 py-3 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{trialChargeDate}</span>
-            <span className="text-sm font-semibold text-foreground">{fmt(activationFeeSek + monthlyTotal)} kr</span>
+            <span className="text-sm font-semibold text-foreground">{fmt(showTotal)} kr</span>
           </div>
           <div className="text-xs text-muted-foreground space-y-1">
-            <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(activationFeeSek)} kr</span></div>
+            <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(showActivation)} kr</span></div>
             <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
             {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-sm text-muted-foreground">Därefter/mån</span>
-          <span className="text-sm font-semibold text-foreground">{fmt(monthlyTotal)} kr</span>
+          <span className="text-sm font-semibold text-foreground">{fmt(showMonthly)} kr</span>
         </div>
         <div className="px-4 py-2.5">
           <p className="text-[11px] text-muted-foreground">Exkl. moms · {expectedSeats} användare</p>
@@ -828,7 +970,11 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
 
       {!loading && !error && readyForTrialStart && (
         <div className="border border-border p-5 space-y-4">
-          <p className="text-sm text-foreground">Kort är redan sparat. Du kan starta trial direkt.</p>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <p className="text-sm text-foreground font-medium">Kort sparat</p>
+          </div>
+          <p className="text-sm text-muted-foreground">Betalmetod är registrerad. Du kan starta trial direkt.</p>
           <Button type="button" onClick={handleStartTrialNow} disabled={startingTrial} className="w-full h-11 no-hover-lift rounded-none text-sm font-medium">
             {startingTrial ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</> : 'Starta trial nu'}
           </Button>
@@ -852,33 +998,12 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
               spacingGridRow: '14px',
             },
             rules: {
-              '.Tab': {
-                border: '1px solid hsl(214 32% 91%)',
-                borderRadius: '0px',
-                padding: '10px 12px',
-              },
-              '.Tab--selected': {
-                border: '1px solid hsl(220 10% 15%)',
-                backgroundColor: 'hsl(220 10% 15% / 0.03)',
-              },
-              '.Tab:hover': {
-                border: '1px solid hsl(220 10% 40%)',
-              },
-              '.Input': {
-                border: '1px solid hsl(214 32% 91%)',
-                borderRadius: '0px',
-                padding: '10px 12px',
-              },
-              '.Input:focus': {
-                border: '1px solid hsl(220 10% 15%)',
-                boxShadow: 'none',
-              },
-              '.Label': {
-                fontSize: '12px',
-                fontWeight: '500',
-                color: 'hsl(220 8% 46%)',
-                marginBottom: '4px',
-              },
+              '.Tab': { border: '1px solid hsl(214 32% 91%)', borderRadius: '0px', padding: '10px 12px' },
+              '.Tab--selected': { border: '1px solid hsl(220 10% 15%)', backgroundColor: 'hsl(220 10% 15% / 0.03)' },
+              '.Tab:hover': { border: '1px solid hsl(220 10% 40%)' },
+              '.Input': { border: '1px solid hsl(214 32% 91%)', borderRadius: '0px', padding: '10px 12px' },
+              '.Input:focus': { border: '1px solid hsl(220 10% 15%)', boxShadow: 'none' },
+              '.Label': { fontSize: '12px', fontWeight: '500', color: 'hsl(220 8% 46%)', marginBottom: '4px' },
             },
           },
         }}>
