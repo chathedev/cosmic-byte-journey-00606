@@ -35,7 +35,7 @@ const PLANS = [
   { id: 'enterprise_standard' as const, name: 'Standard', priceSek: 5990, seats: 30, activationSek: 9900 },
 ];
 const EXTRA_SEAT_PRICE = 249;
-const STEPS = ['Team', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalning'];
+const STEPS = ['Team', 'Plan', 'Uppgifter', 'E-post', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -228,7 +228,7 @@ export default function EnterpriseOnboarding() {
       // Save draft to ensure draftId exists for verification
       const draftRes = await saveDraft({
         ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 2, progressPercent: 50,
+        progressStep: 2, progressPercent: 40,
       } as any);
       if (draftRes.draft) {
         setDraftId(draftRes.draft.id);
@@ -237,22 +237,8 @@ export default function EnterpriseOnboarding() {
         draftIdRef.current = draftRes.draft.id;
         resumeTokenRef.current = draftRes.draft.resumeToken;
       }
-      // Send email verification
-      setEmailVerifyState('sending');
-      setEmailVerifyCode('');
-      setEmailVerifyError('');
-      try {
-        await sendOnboardingEmailVerification({
-          email: form.workEmail!,
-          draftId: draftIdRef.current!,
-          resumeToken: resumeTokenRef.current!,
-        });
-        setEmailVerifyState('pending');
-        setEmailVerifyCooldown(60);
-      } catch (err: any) {
-        setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringskod.');
-        setEmailVerifyState('idle');
-      }
+      // Move to email verification step
+      setStep(3);
     } catch {
       setFieldErrors(prev => ({ ...prev, _general: 'Validering misslyckades. Försök igen.' }));
     } finally {
@@ -260,24 +246,42 @@ export default function EnterpriseOnboarding() {
     }
   };
 
-  // Email verification polling — auto-detect when user verifies via link
+  // Send email verification when entering step 3
   useEffect(() => {
-    if (emailVerifyState !== 'pending' || !draftIdRef.current || !resumeTokenRef.current || !form.workEmail) return;
-    const interval = setInterval(async () => {
+    if (step !== 3 || emailVerifyState !== 'idle' || !draftIdRef.current || !form.workEmail) return;
+    const sendVerification = async () => {
+      setEmailVerifyState('sending');
+      setEmailVerifyCode('');
+      setEmailVerifyError('');
       try {
-        const res = await checkOnboardingEmailVerification({
+        await sendOnboardingEmailVerification({
           email: form.workEmail!,
           draftId: draftIdRef.current!,
-          resumeToken: resumeTokenRef.current!,
         });
+        setEmailVerifyState('pending');
+        setEmailVerifyCooldown(60);
+      } catch (err: any) {
+        setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringskod.');
+        setEmailVerifyState('idle');
+      }
+    };
+    sendVerification();
+  }, [step, emailVerifyState, form.workEmail]);
+
+  // Email verification polling — auto-detect when user verifies via link
+  useEffect(() => {
+    if (step !== 3 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await checkOnboardingEmailVerification(draftIdRef.current!);
         if (res.verified) {
           setEmailVerifyState('verified');
-          setStep(3);
+          setStep(4);
         }
       } catch {}
     }, 4000);
     return () => clearInterval(interval);
-  }, [emailVerifyState, form.workEmail]);
+  }, [step, emailVerifyState]);
 
   // Email verification cooldown timer
   useEffect(() => {
@@ -294,11 +298,10 @@ export default function EnterpriseOnboarding() {
         email: form.workEmail!,
         code: emailVerifyCode,
         draftId: draftIdRef.current!,
-        resumeToken: resumeTokenRef.current!,
       });
       if (res.verified) {
         setEmailVerifyState('verified');
-        setStep(3);
+        setStep(4);
       } else {
         setEmailVerifyError('Felaktig kod. Försök igen.');
       }
@@ -314,7 +317,6 @@ export default function EnterpriseOnboarding() {
       const res = await sendOnboardingEmailVerification({
         email: form.workEmail!,
         draftId: draftIdRef.current!,
-        resumeToken: resumeTokenRef.current!,
       });
       setEmailVerifyCooldown(res.retryAfterMs ? Math.ceil(res.retryAfterMs / 1000) : 60);
     } catch (err: any) {
@@ -332,7 +334,7 @@ export default function EnterpriseOnboarding() {
     if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
-    if (step < 4) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step < 5) triggerDraftSave(form as Partial<OnboardingFormData>, step);
   }, [step]);
 
   useEffect(() => {
@@ -382,7 +384,7 @@ export default function EnterpriseOnboarding() {
   const canProceedStep2 = form.companyName && form.organizationNumber && form.contactName && form.workEmail && form.contactPhone
     && !fieldErrors.companyName && !fieldErrors.organizationNumber && !fieldErrors.contactName && !fieldErrors.workEmail && !fieldErrors.contactPhone
     && !orgTaken && !emailTaken;
-  const canProceedStep3 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
+  const canProceedStep4 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
   const handleConfirmAndProceedToCard = async () => {
     setSubmitError('');
@@ -404,7 +406,7 @@ export default function EnterpriseOnboarding() {
       }
       const draftRes = await saveDraft({
         ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 3, progressPercent: 80,
+        progressStep: 4, progressPercent: 80,
       } as any);
       const ensuredDraftId = draftRes.draft?.id;
       const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
@@ -429,14 +431,14 @@ export default function EnterpriseOnboarding() {
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
-        setStep(4);
+        setStep(5);
         return;
       }
       if (!pkKey) { setSubmitError('Stripe-konfigurationsfel (publishable key saknas). Kontakta support.'); setIsSubmitting(false); return; }
       if (!secret) { setSubmitError('Kunde inte initiera kortregistrering. Försök igen.'); setIsSubmitting(false); return; }
       setStripePublishableKey(pkKey);
       setSetupIntentClientSecret(secret);
-      setStep(4);
+      setStep(5);
     } catch (err: any) {
       const status = err?.status;
       const code = err?.code || err?.error;
@@ -561,10 +563,10 @@ export default function EnterpriseOnboarding() {
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {stripeMode === 'test' && (
-              <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-50 text-amber-700 text-[10px] font-semibold uppercase tracking-wider">Test</span>
+              <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider">Test</span>
             )}
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 5 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
       </header>
@@ -611,22 +613,22 @@ export default function EnterpriseOnboarding() {
           <main className="flex-1 min-w-0">
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && emailVerifyState === 'idle' && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={stepValidating} updateField={updateField} />}
-            {step === 2 && emailVerifyState !== 'idle' && (
+            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={stepValidating} updateField={updateField} />}
+            {step === 3 && (
               <StepEmailVerify
                 email={form.workEmail || ''}
                 code={emailVerifyCode}
                 onCodeChange={setEmailVerifyCode}
                 onVerify={handleVerifyCode}
                 onResend={handleResendVerification}
-                onBack={() => { setEmailVerifyState('idle'); setEmailVerifyCode(''); setEmailVerifyError(''); }}
+                onBack={() => { setEmailVerifyState('idle'); setEmailVerifyCode(''); setEmailVerifyError(''); setStep(2); }}
                 error={emailVerifyError}
                 cooldown={emailVerifyCooldown}
                 sending={emailVerifyState === 'sending'}
               />
             )}
-            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
-            {step === 4 && draftId && resumeToken && (
+            {step === 4 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 5 && draftId && resumeToken && (
               <StepCardPayment
                 draftId={draftId}
                 resumeToken={resumeToken}
@@ -645,7 +647,7 @@ export default function EnterpriseOnboarding() {
             )}
 
             {/* Navigation */}
-            {step < 3 && emailVerifyState === 'idle' && (
+            {step < 3 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
                 <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
@@ -661,12 +663,12 @@ export default function EnterpriseOnboarding() {
                 )}
               </div>
             )}
-            {step === 3 && (
+            {step === 4 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
                 <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
-                <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
+                <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep4 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
                   {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
                 </Button>
               </div>
@@ -915,6 +917,7 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
       case 'blocked': return { text: 'Företaget kan inte registreras', color: 'text-destructive', icon: AlertCircle };
       case 'rate_limited': return { text: 'Verifiering tillfälligt otillgänglig, försök igen', color: 'text-muted-foreground', icon: Clock };
       case 'unavailable': return { text: 'Verifiering tillfälligt otillgänglig', color: 'text-muted-foreground', icon: Clock };
+      case 'test_bypass': return { text: 'Testläge — verifiering kringgås', color: 'text-muted-foreground', icon: Info };
       default: return { text: `Verifieringsstatus: ${status}`, color: 'text-muted-foreground', icon: Info };
     }
   };
