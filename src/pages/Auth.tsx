@@ -233,7 +233,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="fixed inset-0 bg-foreground flex flex-col overflow-hidden">
+    <div className="min-h-screen h-[100svh] bg-foreground flex flex-col overflow-x-hidden">
       {/* Top bar */}
       <div className="px-6 py-5 flex items-center justify-between">
         <span className="text-[13px] font-semibold tracking-[0.25em] uppercase text-background/80">Tivly</span>
@@ -243,8 +243,8 @@ export default function Auth() {
       </div>
 
       {/* Center content */}
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="w-full max-w-[360px]">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4">
+        <div className="w-full max-w-[360px] mx-auto min-h-full flex flex-col justify-center py-6 sm:py-10">
           <AnimatePresence mode="wait">
             {/* EMAIL STEP */}
             {viewMode === 'email' && (
@@ -282,7 +282,7 @@ export default function Auth() {
                       disabled={loading}
                       autoComplete="email"
                       autoFocus
-                      className="h-12 text-sm bg-background/5 border-background/10 text-background placeholder:text-background/25 rounded-md focus:border-background/30 focus:ring-0"
+                      className="h-12 text-base bg-background/5 border-background/10 text-background placeholder:text-background/25 rounded-md focus:border-background/30 focus:ring-0 touch-manipulation"
                     />
                   </div>
 
@@ -371,7 +371,7 @@ export default function Auth() {
                     </span>
                   )}
                   {isNavigating && (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-green-400 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-background/70 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" />Klar
                     </span>
                   )}
@@ -419,7 +419,7 @@ export default function Auth() {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-5 flex items-center justify-between">
+      <div className="px-6 py-5 hidden sm:flex items-center justify-between">
         <div className="flex items-center gap-4 text-[10px] text-background/25">
           <span>GDPR</span>
           <span>ISO 27001</span>
