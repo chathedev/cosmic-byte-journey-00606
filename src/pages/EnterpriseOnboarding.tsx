@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/api';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle,
-  CheckCircle2, Minus, Plus, Info, Mail, CreditCard, Users, Building2, Sparkles,
-  FileCheck, Clock, Zap,
+  CheckCircle2, Minus, Plus, Info, Mail, CreditCard, Users, Building2,
+  FileCheck, Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
   validateOnboarding,
@@ -31,7 +29,6 @@ const PLANS = [
 ];
 const EXTRA_SEAT_PRICE = 249;
 const STEPS = ['Team', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalning'];
-const STEP_ICONS = [Users, Zap, Building2, FileCheck, CreditCard];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -56,20 +53,6 @@ function clearFormLocal() { removeStorageKey(FORM_KEY); }
 function fmt(n: number) { return n.toLocaleString('sv-SE'); }
 function extractSetupIntentClientSecret(p: any): string | null { return p?.billing?.setupIntentClientSecret || p?.setupIntentClientSecret || p?.clientSecret || p?.client_secret || null; }
 function extractStripePublishableKey(p: any): string | null { return p?.billing?.stripePublishableKey || null; }
-
-/* ─── Animation variants ─── */
-const fadeSlide = {
-  initial: { opacity: 0, y: 20, scale: 0.98 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const } },
-  exit: { opacity: 0, y: -16, scale: 0.98, transition: { duration: 0.25 } },
-};
-const staggerContainer = {
-  animate: { transition: { staggerChildren: 0.08 } },
-};
-const staggerItem = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } },
-};
 
 export default function EnterpriseOnboarding() {
   const [onboardingEnabled, setOnboardingEnabled] = useState<boolean | null>(null);
@@ -227,7 +210,6 @@ export default function EnterpriseOnboarding() {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  // Check if onboarding is enabled
   useEffect(() => {
     apiClient.getEnterpriseOnboardingAuto()
       .then(data => setOnboardingEnabled(data.enabled))
@@ -323,7 +305,7 @@ export default function EnterpriseOnboarding() {
   if (onboardingEnabled === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -331,8 +313,8 @@ export default function EnterpriseOnboarding() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-3 max-w-sm">
-          <Building2 className="w-12 h-12 mx-auto text-muted-foreground/40" />
-          <h1 className="text-xl font-semibold text-foreground">Onboarding ej tillgänglig</h1>
+          <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40" />
+          <h1 className="text-lg font-semibold text-foreground">Onboarding ej tillgänglig</h1>
           <p className="text-sm text-muted-foreground">
             Self-serve enterprise-onboarding är för tillfället inaktiverad. Kontakta oss för att komma igång.
           </p>
@@ -345,154 +327,123 @@ export default function EnterpriseOnboarding() {
   if (allDone) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="max-w-md w-full">
-          <Card className="border-border/50 shadow-2xl shadow-primary/5 overflow-hidden">
-            {/* Success gradient bar */}
-            <div className="h-1.5 bg-gradient-to-r from-primary via-accent to-primary" />
-            <CardContent className="p-8 space-y-6">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 200 }} className="flex justify-center">
-                <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <CheckCircle2 className="h-8 w-8 text-primary" />
-                </div>
-              </motion.div>
-              <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold text-foreground">Allt klart!</h1>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Trial aktiverad och betalkort sparat. Debitering sker automatiskt efter 7 dagar.
-                </p>
+        <div className="max-w-md w-full border border-border bg-card p-8 space-y-6">
+          <div className="flex justify-center">
+            <div className="h-12 w-12 border border-border flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+          <div className="text-center space-y-2">
+            <h1 className="text-xl font-semibold text-foreground">Klart</h1>
+            <p className="text-sm text-muted-foreground">
+              Trial aktiverad. Debitering sker automatiskt efter 7 dagar.
+            </p>
+          </div>
+          <div className="border border-border divide-y divide-border">
+            {[
+              { n: '1', text: <>Öppna inbjudan i <span className="text-foreground font-medium">{completedEmail}</span></> },
+              { n: '2', text: 'Klicka på länken och logga in' },
+              { n: '3', text: 'Bjud in ditt team och börja använda Tivly' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-3 p-4">
+                <span className="text-xs font-mono text-muted-foreground mt-0.5">{item.n}.</span>
+                <span className="text-sm text-muted-foreground">{item.text}</span>
               </div>
-              <div className="bg-muted/50 rounded-xl p-5 space-y-4">
-                {[
-                  { n: '1', text: <>Öppna inbjudan i din mejl (<span className="text-foreground font-medium">{completedEmail}</span>)</> },
-                  { n: '2', text: 'Klicka på länken och logga in' },
-                  { n: '3', text: 'Bjud in ditt team och börja använda Tivly' },
-                ].map((item, i) => (
-                  <motion.div key={i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + i * 0.1 }} className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {item.n}
-                    </div>
-                    <span className="text-sm text-muted-foreground">{item.text}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          <p className="text-[10px] text-center text-muted-foreground mt-6">© {new Date().getFullYear()} Tivly AB</p>
-        </motion.div>
+            ))}
+          </div>
+          <p className="text-[11px] text-center text-muted-foreground">© {new Date().getFullYear()} Tivly AB</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <motion.header initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50">
-        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <span className="text-sm font-semibold tracking-wide text-foreground">Tivly Enterprise</span>
-          </div>
+      <header className="sticky top-0 z-50 bg-background border-b border-border">
+        <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
+          <span className="text-sm font-semibold tracking-wide text-foreground">Tivly Enterprise</span>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5 text-primary"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5 text-muted-foreground"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
-      </motion.header>
+      </header>
 
-      {/* Step indicator */}
-      <div className="max-w-2xl mx-auto px-4 pt-8 pb-2">
-        <div className="flex items-center gap-1">
+      {/* Step indicator — minimal bar */}
+      <div className="max-w-xl mx-auto px-4 pt-6 pb-2">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {STEPS.map((label, i) => {
-            const Icon = STEP_ICONS[i];
             const isActive = i === step;
             const isDone = i < step;
             return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <motion.div
-                  animate={{
-                    scale: isActive ? 1 : 0.9,
-                    opacity: isActive || isDone ? 1 : 0.4,
-                  }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className={cn(
-                    'h-10 w-10 rounded-xl flex items-center justify-center transition-colors duration-300',
-                    isActive && 'bg-primary text-primary-foreground shadow-lg shadow-primary/25',
-                    isDone && 'bg-primary/10 text-primary',
-                    !isActive && !isDone && 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {isDone ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                </motion.div>
-                <span className={cn('text-[10px] font-medium tracking-wide', isActive ? 'text-foreground' : 'text-muted-foreground/60')}>
-                  {label}
-                </span>
-              </div>
+              <span key={i} className={cn(
+                'transition-colors',
+                isActive && 'text-foreground font-semibold',
+                isDone && 'text-primary',
+                !isActive && !isDone && 'text-muted-foreground/50',
+              )}>
+                {isDone ? <Check className="h-3 w-3 inline mr-0.5" /> : null}
+                {label}
+              </span>
             );
           })}
         </div>
-        {/* Progress bar */}
-        <div className="mt-4 h-1 rounded-full bg-muted overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-            animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        <div className="mt-3 h-px bg-border relative">
+          <div
+            className="absolute top-0 left-0 h-px bg-foreground transition-all duration-300"
+            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
           />
         </div>
       </div>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <AnimatePresence mode="wait">
-          <motion.div key={step} variants={fadeSlide} initial="initial" animate="animate" exit="exit">
-            {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
-            {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
-            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
-            {step === 4 && draftId && resumeToken && (
-              <StepCardPayment
-                draftId={draftId}
-                resumeToken={resumeToken}
-                initialClientSecret={setupIntentClientSecret}
-                stripePublishableKey={stripePublishableKey}
-                email={form.workEmail || ''}
-                monthlyTotal={monthlyTotal}
-                planBaseSek={selectedPlan.priceSek}
-                activationFeeSek={selectedPlan.activationSek}
-                includedSeats={selectedPlan.seats}
-                expectedSeats={seats}
-                extraSeats={extraSeats}
-                onCardConfirmed={handleCardConfirmedStartTrial}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+      <main className="max-w-xl mx-auto px-4 py-6">
+        {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
+        {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
+        {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
+        {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+        {step === 4 && draftId && resumeToken && (
+          <StepCardPayment
+            draftId={draftId}
+            resumeToken={resumeToken}
+            initialClientSecret={setupIntentClientSecret}
+            stripePublishableKey={stripePublishableKey}
+            email={form.workEmail || ''}
+            monthlyTotal={monthlyTotal}
+            planBaseSek={selectedPlan.priceSek}
+            activationFeeSek={selectedPlan.activationSek}
+            includedSeats={selectedPlan.seats}
+            expectedSeats={seats}
+            extraSeats={extraSeats}
+            onCardConfirmed={handleCardConfirmedStartTrial}
+          />
+        )}
 
         {/* Navigation */}
         {step < 3 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex items-center justify-between mt-8">
-            <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift">
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+            <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
               <ChevronLeft className="h-4 w-4" /> Tillbaka
             </Button>
-            <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 no-hover-lift rounded-xl px-6 shadow-lg shadow-primary/20">
+            <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 no-hover-lift rounded-none px-6">
               Nästa <ChevronRight className="h-4 w-4" />
             </Button>
-          </motion.div>
+          </div>
         )}
         {step === 3 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex items-center justify-between mt-8">
-            <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift">
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+            <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
               <ChevronLeft className="h-4 w-4" /> Tillbaka
             </Button>
-            <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] bg-primary text-primary-foreground hover:bg-primary/90 no-hover-lift rounded-xl px-6 shadow-lg shadow-primary/20">
+            <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
               {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
             </Button>
-          </motion.div>
+          </div>
         )}
       </main>
 
-      <footer className="max-w-2xl mx-auto px-4 pb-8 pt-4">
-        <p className="text-[10px] text-muted-foreground text-center">
+      <footer className="max-w-xl mx-auto px-4 pb-8 pt-4">
+        <p className="text-[11px] text-muted-foreground text-center">
           © {new Date().getFullYear()} Tivly · <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Villkor</a> · <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Integritet</a>
         </p>
       </footer>
@@ -506,77 +457,57 @@ export default function EnterpriseOnboarding() {
 function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number) => void }) {
   const presets = [5, 10, 15, 25, 50];
   return (
-    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
-      <motion.div variants={staggerItem}>
-        <h2 className="text-2xl font-bold text-foreground">Hur stort är ert team?</h2>
-        <p className="text-sm text-muted-foreground mt-1.5">Vi rekommenderar en plan baserat på ert behov.</p>
-      </motion.div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Hur stort är ert team?</h2>
+        <p className="text-sm text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
+      </div>
 
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 shadow-lg shadow-primary/5 overflow-hidden">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-center gap-8 py-4">
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={() => onChange(Math.max(1, seats - 1))}
-                className="h-12 w-12 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground transition-colors no-hover-lift"
-              >
-                <Minus className="h-5 w-5" />
-              </motion.button>
-              <div className="text-center min-w-[100px]">
-                <motion.span
-                  key={seats}
-                  initial={{ scale: 1.2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-6xl font-bold text-foreground tabular-nums block"
-                >
-                  {seats}
-                </motion.span>
-                <p className="text-sm text-muted-foreground mt-2">användare</p>
-              </div>
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={() => onChange(Math.min(500, seats + 1))}
-                className="h-12 w-12 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground transition-colors no-hover-lift"
-              >
-                <Plus className="h-5 w-5" />
-              </motion.button>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="border border-border p-6">
+        <div className="flex items-center justify-center gap-6">
+          <button
+            onClick={() => onChange(Math.max(1, seats - 1))}
+            className="h-10 w-10 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <div className="text-center min-w-[80px]">
+            <span className="text-5xl font-semibold text-foreground tabular-nums block">{seats}</span>
+            <p className="text-xs text-muted-foreground mt-1.5">användare</p>
+          </div>
+          <button
+            onClick={() => onChange(Math.min(500, seats + 1))}
+            className="h-10 w-10 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
 
-      <motion.div variants={staggerItem} className="flex items-center justify-center gap-2 flex-wrap">
+      <div className="flex items-center justify-center gap-2 flex-wrap">
         {presets.map(n => (
-          <motion.button
+          <button
             key={n}
-            whileTap={{ scale: 0.95 }}
             onClick={() => onChange(n)}
             className={cn(
-              'px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 no-hover-lift',
+              'px-4 py-2 text-sm font-medium transition-colors no-hover-lift border',
               seats === n
-                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
-                : 'bg-card border border-border text-muted-foreground hover:border-primary/30 hover:text-foreground',
+                ? 'border-foreground bg-foreground text-background'
+                : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground',
             )}
           >
             {n}
-          </motion.button>
+          </button>
         ))}
-      </motion.div>
+      </div>
 
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 bg-muted/30">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Zap className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Rekommenderad plan: <span className="text-foreground font-semibold">{seats <= 10 ? 'Small' : 'Standard'}</span>
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+      <div className="border border-border p-4 flex items-center gap-3">
+        <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+        <p className="text-sm text-muted-foreground">
+          Rekommenderad plan: <span className="text-foreground font-medium">{seats <= 10 ? 'Small' : 'Standard'}</span>
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -587,73 +518,61 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
   form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; extraSeats: number; monthlyTotal: number; updateField: (f: string, v: any) => void;
 }) {
   return (
-    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
-      <motion.div variants={staggerItem}>
-        <h2 className="text-2xl font-bold text-foreground">Välj plan</h2>
-        <p className="text-sm text-muted-foreground mt-1.5">7 dagars kostnadsfri trial. Betalkort krävs innan trial startar.</p>
-      </motion.div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Välj plan</h2>
+        <p className="text-sm text-muted-foreground mt-1">7 dagars kostnadsfri trial. Betalkort krävs.</p>
+      </div>
 
-      <motion.div variants={staggerItem} className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-4">
         {PLANS.map(plan => {
           const isSelected = form.planType === plan.id;
           return (
-            <motion.button
+            <button
               key={plan.id}
-              whileTap={{ scale: 0.98 }}
               onClick={() => updateField('planType', plan.id)}
               className={cn(
-                'text-left rounded-2xl border-2 p-6 transition-all duration-300 no-hover-lift relative overflow-hidden',
+                'text-left border p-5 transition-colors no-hover-lift',
                 isSelected
-                  ? 'border-primary bg-primary/[0.03] shadow-lg shadow-primary/10'
-                  : 'border-border hover:border-primary/30 bg-card',
+                  ? 'border-foreground'
+                  : 'border-border hover:border-muted-foreground',
               )}
             >
-              {isSelected && (
-                <motion.div
-                  layoutId="plan-selected"
-                  className="absolute top-3 right-3 h-6 w-6 rounded-full bg-primary flex items-center justify-center"
-                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                >
-                  <Check className="h-3.5 w-3.5 text-primary-foreground" />
-                </motion.div>
-              )}
-              <p className="font-bold text-lg text-foreground">{plan.name}</p>
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-foreground">{plan.name}</p>
+                {isSelected && <Check className="h-4 w-4 text-foreground" />}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">{plan.seats} användare inkl.</p>
-              <p className="mt-4">
-                <span className="text-3xl font-bold text-foreground">{fmt(plan.priceSek)}</span>
+              <p className="mt-3">
+                <span className="text-2xl font-semibold text-foreground">{fmt(plan.priceSek)}</span>
                 <span className="text-sm text-muted-foreground"> SEK/mån</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-2">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>
-            </motion.button>
+              <p className="text-xs text-muted-foreground mt-1.5">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>
+            </button>
           );
         })}
-      </motion.div>
+      </div>
 
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 shadow-md">
-          <CardContent className="p-5 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Plan {selectedPlan.name}</span>
-              <span className="text-foreground font-medium">{fmt(selectedPlan.priceSek)} SEK/mån</span>
-            </div>
-            {extraSeats > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{extraSeats} extra användare × {fmt(EXTRA_SEAT_PRICE)} SEK</span>
-                <span className="text-foreground font-medium">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK/mån</span>
-              </div>
-            )}
-            <div className="h-px bg-border" />
-            <div className="flex justify-between text-sm font-semibold">
-              <span className="text-foreground">Totalt/mån</span>
-              <span className="text-foreground">{fmt(monthlyTotal)} SEK</span>
-            </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Info className="h-3 w-3 shrink-0" /> Exkl. moms. Slutpris beräknas server-side.
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+      <div className="border border-border divide-y divide-border">
+        <div className="flex justify-between px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Plan {selectedPlan.name}</span>
+          <span className="text-foreground font-medium">{fmt(selectedPlan.priceSek)} SEK/mån</span>
+        </div>
+        {extraSeats > 0 && (
+          <div className="flex justify-between px-4 py-3 text-sm">
+            <span className="text-muted-foreground">{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} SEK</span>
+            <span className="text-foreground font-medium">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK/mån</span>
+          </div>
+        )}
+        <div className="flex justify-between px-4 py-3 text-sm font-semibold">
+          <span className="text-foreground">Totalt/mån</span>
+          <span className="text-foreground">{fmt(monthlyTotal)} SEK</span>
+        </div>
+        <div className="px-4 py-2.5">
+          <p className="text-xs text-muted-foreground">Exkl. moms. Slutpris beräknas server-side.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -661,53 +580,46 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
 /* STEP 2: Details                                         */
 /* ═══════════════════════════════════════════════════════ */
 function StepDetails({ form, fieldErrors, fieldChecks, availability, isValidating, updateField }: {
-  form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>; fieldChecks: Record<string, boolean>;
+  form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>;
+  fieldChecks: Record<string, boolean>;
   availability: ValidationResponse['validation']['availability']; isValidating: boolean; updateField: (f: string, v: any) => void;
 }) {
   const orgTaken = availability?.organizationNumberAvailable === false;
   const emailTaken = availability?.workEmailAvailable === false;
   return (
-    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
-      <motion.div variants={staggerItem} className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Företag & kontakt</h2>
-          <p className="text-sm text-muted-foreground mt-1.5">Uppgifter om företaget och kontaktpersonen.</p>
+          <h2 className="text-lg font-semibold text-foreground">Företag & kontakt</h2>
+          <p className="text-sm text-muted-foreground mt-1">Uppgifter om företaget och kontaktpersonen.</p>
         </div>
-        {isValidating && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-      </motion.div>
+        {isValidating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
 
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 shadow-md">
-          <CardContent className="p-6 space-y-5">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <FieldInput label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required />
-              <FieldInput label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
-            </div>
-            <FieldInput label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
-            <div className="h-px bg-border" />
-            <FieldInput label="Kontaktperson" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required />
-            <div className="grid sm:grid-cols-2 gap-4">
-              <FieldInput label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
-              <FieldInput label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required />
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="border border-border p-5 space-y-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <FieldInput label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required />
+          <FieldInput label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
+        </div>
+        <FieldInput label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
+        <div className="h-px bg-border" />
+        <FieldInput label="Kontaktperson" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <FieldInput label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
+          <FieldInput label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required />
+        </div>
+      </div>
 
       {(orgTaken || emailTaken) && (
-        <motion.div variants={staggerItem}>
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="p-4 flex items-start gap-3">
-              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">
-                {orgTaken && emailTaken ? 'Organisationsnummer och mejl redan registrerade.' : orgTaken ? 'Organisationsnumret redan registrerat.' : 'Mejladressen redan registrerad.'}
-                {' '}Kontakta <a href="mailto:support@tivly.se" className="underline font-medium">support@tivly.se</a>.
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">
+            {orgTaken && emailTaken ? 'Organisationsnummer och mejl redan registrerade.' : orgTaken ? 'Organisationsnumret redan registrerat.' : 'Mejladressen redan registrerad.'}
+            {' '}Kontakta <a href="mailto:support@tivly.se" className="underline font-medium">support@tivly.se</a>.
+          </p>
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -719,7 +631,7 @@ function FieldInput({ label, id, placeholder, value, onChange, error, valid, hin
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}{required && ' *'}</Label>
-      <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('bg-background rounded-xl border-border/80 focus:border-primary', error && 'border-destructive focus:border-destructive')} />
+      <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('rounded-none border-border focus:border-foreground', error && 'border-destructive focus:border-destructive')} />
       {error && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3 shrink-0" /> {error}</p>}
       {!error && valid && value && <p className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> OK</p>}
       {!error && !valid && hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -747,62 +659,48 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
   ];
 
   return (
-    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-6">
-      <motion.div variants={staggerItem}>
-        <h2 className="text-2xl font-bold text-foreground">Bekräfta uppgifter</h2>
-        <p className="text-sm text-muted-foreground mt-1.5">Granska innan du fortsätter till kortregistrering.</p>
-      </motion.div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Bekräfta uppgifter</h2>
+        <p className="text-sm text-muted-foreground mt-1">Granska innan du fortsätter till kortregistrering.</p>
+      </div>
 
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 shadow-md overflow-hidden">
-          <CardContent className="p-0">
-            {rows.map((row, i) => (
-              <div key={i} className={cn('flex justify-between px-5 py-3.5 text-sm', i < rows.length - 1 && 'border-b border-border/50')}>
-                <span className="text-muted-foreground">{row.label}</span>
-                <span className="text-foreground font-medium text-right">{row.value}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="border border-border divide-y divide-border">
+        {rows.map((row, i) => (
+          <div key={i} className="flex justify-between px-4 py-3 text-sm">
+            <span className="text-muted-foreground">{row.label}</span>
+            <span className="text-foreground font-medium text-right">{row.value}</span>
+          </div>
+        ))}
+      </div>
 
-      <motion.div variants={staggerItem} className="space-y-3">
-        <label className="flex items-start gap-3 cursor-pointer group">
-          <Checkbox checked={form.acceptedTerms || false} onCheckedChange={(c) => updateField('acceptedTerms', c === true)} className="mt-0.5" />
-          <span className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
-            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-primary underline">enterprise-villkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary underline">integritetspolicyn</a>.
+      <div className="space-y-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <Checkbox checked={form.acceptedTerms || false} onCheckedChange={(c) => updateField('acceptedTerms', c === true)} className="mt-0.5 rounded-none" />
+          <span className="text-sm text-muted-foreground">
+            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-foreground underline">enterprise-villkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground underline">integritetspolicyn</a>.
           </span>
         </label>
-        <label className="flex items-start gap-3 cursor-pointer group">
-          <Checkbox checked={form.authorizedSignatory || false} onCheckedChange={(c) => updateField('authorizedSignatory', c === true)} className="mt-0.5" />
-          <span className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">Jag är behörig att teckna avtal för {form.companyName || 'företaget'}.</span>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <Checkbox checked={form.authorizedSignatory || false} onCheckedChange={(c) => updateField('authorizedSignatory', c === true)} className="mt-0.5 rounded-none" />
+          <span className="text-sm text-muted-foreground">Jag är behörig att teckna avtal för {form.companyName || 'företaget'}.</span>
         </label>
-      </motion.div>
+      </div>
 
       {submitError && (
-        <motion.div variants={staggerItem}>
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="p-4 flex items-start gap-3">
-              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">{submitError}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">{submitError}</p>
+        </div>
       )}
 
-      <motion.div variants={staggerItem}>
-        <Card className="border-primary/20 bg-primary/[0.03]">
-          <CardContent className="p-4 flex items-start gap-3">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <CreditCard className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden.</strong>
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+      <div className="border border-border p-4 flex items-start gap-3">
+        <CreditCard className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-sm text-muted-foreground">
+          I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden.</strong>
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -872,167 +770,129 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
   };
 
   return (
-    <motion.div variants={staggerContainer} initial="initial" animate="animate" className="space-y-5">
-      <motion.div variants={staggerItem}>
-        <h2 className="text-2xl font-bold text-foreground">Registrera betalmetod</h2>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Kort, Apple Pay, Google Pay eller Klarna. Ingen debitering under trial.
-        </p>
-      </motion.div>
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Registrera betalmetod</h2>
+        <p className="text-sm text-muted-foreground mt-1">Ingen debitering under trial.</p>
+      </div>
 
       {/* Cost breakdown */}
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 shadow-lg overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-primary to-accent" />
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <span className="text-sm font-semibold text-foreground">Idag</span>
-                  <p className="text-xs text-muted-foreground">7 dagars gratis trial</p>
-                </div>
-              </div>
-              <span className="text-2xl font-bold text-primary">0 kr</span>
-            </div>
-
-            <div className="h-px bg-border" />
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{trialChargeDate}</span>
-              <span className="text-lg font-bold text-foreground">{fmt(activationFeeSek + monthlyTotal)} kr</span>
-            </div>
-            <div className="pl-1 space-y-1.5 text-xs text-muted-foreground">
-              <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(activationFeeSek)} kr</span></div>
-              <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
-              {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
-            </div>
-
-            <div className="h-px bg-border" />
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Därefter/mån</span>
-              <span className="text-lg font-bold text-foreground">{fmt(monthlyTotal)} kr</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground">Exkl. moms · {expectedSeats} användare</p>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="border border-border divide-y divide-border">
+        <div className="flex items-center justify-between px-4 py-4">
+          <div>
+            <span className="text-sm font-medium text-foreground">Idag</span>
+            <p className="text-xs text-muted-foreground">7 dagars gratis trial</p>
+          </div>
+          <span className="text-xl font-semibold text-foreground">0 kr</span>
+        </div>
+        <div className="px-4 py-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">{trialChargeDate}</span>
+            <span className="text-sm font-semibold text-foreground">{fmt(activationFeeSek + monthlyTotal)} kr</span>
+          </div>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(activationFeeSek)} kr</span></div>
+            <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
+            {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
+          </div>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-sm text-muted-foreground">Därefter/mån</span>
+          <span className="text-sm font-semibold text-foreground">{fmt(monthlyTotal)} kr</span>
+        </div>
+        <div className="px-4 py-2.5">
+          <p className="text-[11px] text-muted-foreground">Exkl. moms · {expectedSeats} användare</p>
+        </div>
+      </div>
 
       {/* Email notice */}
-      <motion.div variants={staggerItem}>
-        <Card className="border-border/50 bg-muted/30">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Mail className="h-4 w-4 text-primary shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> efter kort sparats.
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="border border-border p-3 flex items-center gap-3">
+        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+        <p className="text-xs text-muted-foreground">
+          Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> efter kort sparats.
+        </p>
+      </div>
 
       {loading && (
-        <motion.div variants={staggerItem} className="flex items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Laddar betalning...</p>
-          </div>
-        </motion.div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
       )}
 
       {error && !loading && (
-        <motion.div variants={staggerItem}>
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="p-4 space-y-3">
-              <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={loadCardSetup} className="rounded-xl">Försök igen</Button>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+          <p className="text-sm text-destructive">{error}</p>
+          <Button variant="outline" size="sm" onClick={loadCardSetup} className="rounded-none">Försök igen</Button>
+        </div>
       )}
 
       {!loading && !error && readyForTrialStart && (
-        <motion.div variants={staggerItem}>
-          <Card className="border-primary/20 bg-primary/[0.03]">
-            <CardContent className="p-5 space-y-4">
-              <p className="text-sm text-foreground">Kort är redan sparat. Du kan starta trial direkt.</p>
-              <Button type="button" onClick={handleStartTrialNow} disabled={startingTrial} className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 no-hover-lift rounded-xl text-sm font-medium shadow-lg shadow-primary/20">
-                {startingTrial ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</> : <><Sparkles className="h-4 w-4 mr-2" /> Starta trial nu</>}
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="border border-border p-5 space-y-4">
+          <p className="text-sm text-foreground">Kort är redan sparat. Du kan starta trial direkt.</p>
+          <Button type="button" onClick={handleStartTrialNow} disabled={startingTrial} className="w-full h-11 no-hover-lift rounded-none text-sm font-medium">
+            {startingTrial ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</> : 'Starta trial nu'}
+          </Button>
+        </div>
       )}
 
       {!loading && !error && !readyForTrialStart && clientSecret && resolvedStripePromise && (
-        <motion.div variants={staggerItem}>
-          <Elements stripe={resolvedStripePromise} options={{
-            clientSecret,
-            appearance: {
-              theme: 'flat',
-              variables: {
-                fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-                fontSizeBase: '14px',
-                borderRadius: '12px',
-                colorPrimary: 'hsl(211 100% 50%)',
-                colorBackground: 'hsl(0 0% 100%)',
-                colorText: 'hsl(220 10% 15%)',
-                colorDanger: 'hsl(0 84% 60%)',
-                spacingUnit: '4px',
-                spacingGridRow: '16px',
+        <Elements stripe={resolvedStripePromise} options={{
+          clientSecret,
+          appearance: {
+            theme: 'flat',
+            variables: {
+              fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+              fontSizeBase: '14px',
+              borderRadius: '0px',
+              colorPrimary: 'hsl(220 10% 15%)',
+              colorBackground: 'hsl(0 0% 100%)',
+              colorText: 'hsl(220 10% 15%)',
+              colorDanger: 'hsl(0 84% 60%)',
+              spacingUnit: '4px',
+              spacingGridRow: '14px',
+            },
+            rules: {
+              '.Tab': {
+                border: '1px solid hsl(214 32% 91%)',
+                borderRadius: '0px',
+                padding: '10px 12px',
               },
-              rules: {
-                '.Tab': {
-                  border: '1.5px solid hsl(214 32% 91%)',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  transition: 'all 0.2s ease',
-                },
-                '.Tab--selected': {
-                  border: '2px solid hsl(211 100% 50%)',
-                  backgroundColor: 'hsl(211 100% 50% / 0.04)',
-                  boxShadow: '0 2px 8px 0 hsl(211 100% 50% / 0.1)',
-                },
-                '.Tab:hover': {
-                  border: '1.5px solid hsl(211 100% 50% / 0.4)',
-                },
-                '.Input': {
-                  border: '1.5px solid hsl(214 32% 91%)',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                },
-                '.Input:focus': {
-                  border: '2px solid hsl(211 100% 50%)',
-                  boxShadow: '0 0 0 3px hsl(211 100% 50% / 0.1)',
-                },
-                '.Label': {
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  color: 'hsl(220 8% 46%)',
-                  marginBottom: '6px',
-                },
+              '.Tab--selected': {
+                border: '1px solid hsl(220 10% 15%)',
+                backgroundColor: 'hsl(220 10% 15% / 0.03)',
+              },
+              '.Tab:hover': {
+                border: '1px solid hsl(220 10% 40%)',
+              },
+              '.Input': {
+                border: '1px solid hsl(214 32% 91%)',
+                borderRadius: '0px',
+                padding: '10px 12px',
+              },
+              '.Input:focus': {
+                border: '1px solid hsl(220 10% 15%)',
+                boxShadow: 'none',
+              },
+              '.Label': {
+                fontSize: '12px',
+                fontWeight: '500',
+                color: 'hsl(220 8% 46%)',
+                marginBottom: '4px',
               },
             },
-          }}>
-            <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
-          </Elements>
-        </motion.div>
+          },
+        }}>
+          <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
+        </Elements>
       )}
 
       {!loading && !error && !readyForTrialStart && !clientSecret && !resolvedStripePromise && (
-        <motion.div variants={staggerItem}>
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="p-4 space-y-3">
-              <p className="text-sm text-destructive">Stripe kunde inte initieras. Kontakta support.</p>
-              <Button variant="outline" size="sm" onClick={loadCardSetup} className="rounded-xl">Försök igen</Button>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <div className="border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+          <p className="text-sm text-destructive">Stripe kunde inte initieras. Kontakta support.</p>
+          <Button variant="outline" size="sm" onClick={loadCardSetup} className="rounded-none">Försök igen</Button>
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -1076,42 +936,38 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Card className="border-border/50 shadow-md overflow-hidden">
-        <CardContent className="p-5">
-          {!useCardFallback && (
-            <PaymentElement
-              onLoadError={(event) => setPaymentElementLoadError(event?.error?.message || 'Kunde inte ladda alla betalmetoder.')}
-              options={{
-                layout: 'tabs',
-                paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
-                wallets: { applePay: 'auto', googlePay: 'auto' },
-                fields: { billingDetails: { email: 'auto' } },
-              }}
-            />
-          )}
-          {useCardFallback && (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-border bg-background px-4 py-4">
-                <CardElement options={{ hidePostalCode: true }} />
-              </div>
-              <p className="text-xs text-muted-foreground">Fler betalmetoder kunde inte laddas. Kortbetalning fungerar.</p>
+      <div className="border border-border p-5">
+        {!useCardFallback && (
+          <PaymentElement
+            onLoadError={(event) => setPaymentElementLoadError(event?.error?.message || 'Kunde inte ladda alla betalmetoder.')}
+            options={{
+              layout: 'tabs',
+              paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
+              wallets: { applePay: 'auto', googlePay: 'auto' },
+              fields: { billingDetails: { email: 'auto' } },
+            }}
+          />
+        )}
+        {useCardFallback && (
+          <div className="space-y-3">
+            <div className="border border-border px-4 py-4">
+              <CardElement options={{ hidePostalCode: true }} />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-xs text-muted-foreground">Fler betalmetoder kunde inte laddas.</p>
+          </div>
+        )}
+      </div>
 
       {error && (
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-3">
-            <p className="text-xs text-destructive font-medium">{error}</p>
-          </CardContent>
-        </Card>
+        <div className="border border-destructive/30 bg-destructive/5 p-3">
+          <p className="text-xs text-destructive font-medium">{error}</p>
+        </div>
       )}
 
       <Button
         type="submit"
         disabled={!stripe || submitting}
-        className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 no-hover-lift text-sm font-medium shadow-lg shadow-primary/20"
+        className="w-full h-11 rounded-none no-hover-lift text-sm font-medium"
       >
         {submitting && phase === 'card' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar betalmetod...</>}
         {submitting && phase === 'starting' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</>}
@@ -1119,7 +975,7 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
       </Button>
 
       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        <Shield className="h-3.5 w-3.5 text-primary" />
+        <Shield className="h-3.5 w-3.5" />
         <span>Krypterad betalning · 0 kr under trial</span>
       </div>
     </form>
