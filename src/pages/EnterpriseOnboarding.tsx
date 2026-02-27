@@ -35,7 +35,7 @@ const PLANS = [
   { id: 'enterprise_standard' as const, name: 'Standard', priceSek: 5990, seats: 30, activationSek: 9900 },
 ];
 const EXTRA_SEAT_PRICE = 249;
-const STEPS = ['Team', 'Plan', 'Uppgifter', 'E-post', 'Bekräfta', 'Betalning'];
+const STEPS = ['Team', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -90,6 +90,8 @@ export default function EnterpriseOnboarding() {
   const [setupIntentClientSecret, setSetupIntentClientSecret] = useState<string | null>(null);
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [firstChargeEstimate, setFirstChargeEstimate] = useState<any>(null);
+  
+  // Email verification state (inline in step 2)
   const [emailVerifyState, setEmailVerifyState] = useState<'idle' | 'sending' | 'pending' | 'verified'>('idle');
   const [emailVerifyCode, setEmailVerifyCode] = useState('');
   const [emailVerifyError, setEmailVerifyError] = useState('');
@@ -127,7 +129,7 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
           const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
-          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 3);
+          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 2);
           if (hasRestorableProgress(restored, restoredStep)) {
             hasUserInteractedRef.current = true;
             setForm(restored);
@@ -139,28 +141,13 @@ export default function EnterpriseOnboarding() {
     function restoreFromLocal() {
       const parsed = readStorageJSON<{ form?: Partial<OnboardingFormData>; step?: number; touched?: boolean }>(FORM_KEY);
       if (!parsed?.form) return;
-      const restoredStep = Math.min(parsed.step ?? 0, 3);
+      const restoredStep = Math.min(parsed.step ?? 0, 2);
       if (hasRestorableProgress(parsed.form, restoredStep)) {
         hasUserInteractedRef.current = true;
         setForm(prev => ({ ...prev, ...parsed.form }));
         if (restoredStep > 0) setStep(restoredStep);
       }
     }
-  }, []);
-
-  const triggerValidation = useCallback((fields: Partial<OnboardingFormData>) => {
-    clearTimeout(validateTimer.current);
-    validateTimer.current = setTimeout(async () => {
-      setIsValidating(true);
-      try {
-        const res = await validateOnboarding(fields);
-        setFieldErrors(res.validation?.errors || {});
-        setFieldChecks(res.validation?.checks || {});
-        setAvailability(res.validation?.availability || {});
-        setCompanyRegistry(res.validation?.companyRegistry || null);
-      } catch {}
-      setIsValidating(false);
-    }, 400);
   }, []);
 
   const triggerDraftSave = useCallback((fields: Partial<OnboardingFormData>, currentStep: number) => {
@@ -187,15 +174,21 @@ export default function EnterpriseOnboarding() {
     hasUserInteractedRef.current = true;
     const next = { ...form, [field]: value };
     setForm(next);
-    // Clear field-level error on edit so user gets fresh feedback on next validate
     if (fieldErrors[field]) {
       setFieldErrors(prev => { const copy = { ...prev }; delete copy[field]; return copy; });
+    }
+    // Reset email verification if email changes
+    if (field === 'workEmail' && emailVerifyState !== 'idle') {
+      setEmailVerifyState('idle');
+      setEmailVerifyCode('');
+      setEmailVerifyError('');
     }
     triggerDraftSave(next as Partial<OnboardingFormData>, step);
   };
 
   const [stepValidating, setStepValidating] = useState(false);
 
+  // Step 2: validate → save draft → send email verification
   const handleNextFromStep2 = async () => {
     hasUserInteractedRef.current = true;
     const missing: string[] = [];
@@ -211,6 +204,13 @@ export default function EnterpriseOnboarding() {
       setFieldErrors(prev => ({ ...prev, ...errs }));
       return;
     }
+    
+    // If email is already verified, go straight to next step
+    if (emailVerifyState === 'verified') {
+      setStep(3);
+      return;
+    }
+    
     setStepValidating(true);
     try {
       const res = await validateOnboarding(form as Partial<OnboardingFormData>);
@@ -237,19 +237,7 @@ export default function EnterpriseOnboarding() {
         draftIdRef.current = draftRes.draft.id;
         resumeTokenRef.current = draftRes.draft.resumeToken;
       }
-      // Move to email verification step
-      setStep(3);
-    } catch {
-      setFieldErrors(prev => ({ ...prev, _general: 'Validering misslyckades. Försök igen.' }));
-    } finally {
-      setStepValidating(false);
-    }
-  };
-
-  // Send email verification when entering step 3
-  useEffect(() => {
-    if (step !== 3 || emailVerifyState !== 'idle' || !draftIdRef.current || !form.workEmail) return;
-    const sendVerification = async () => {
+      // Send email verification inline
       setEmailVerifyState('sending');
       setEmailVerifyCode('');
       setEmailVerifyError('');
@@ -264,19 +252,22 @@ export default function EnterpriseOnboarding() {
         setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringskod.');
         setEmailVerifyState('idle');
       }
-    };
-    sendVerification();
-  }, [step, emailVerifyState, form.workEmail]);
+    } catch {
+      setFieldErrors(prev => ({ ...prev, _general: 'Validering misslyckades. Försök igen.' }));
+    } finally {
+      setStepValidating(false);
+    }
+  };
 
-  // Email verification polling — auto-detect when user verifies via link
+  // Email verification polling — auto-detect when user verifies via link in another tab
   useEffect(() => {
-    if (step !== 3 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
+    if (step !== 2 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
     const interval = setInterval(async () => {
       try {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
         if (res.verified) {
           setEmailVerifyState('verified');
-          setStep(4);
+          setStep(3); // advance to Bekräfta
         }
       } catch {}
     }, 4000);
@@ -301,7 +292,7 @@ export default function EnterpriseOnboarding() {
       });
       if (res.verified) {
         setEmailVerifyState('verified');
-        setStep(4);
+        setStep(3); // advance to Bekräfta
       } else {
         setEmailVerifyError('Felaktig kod. Försök igen.');
       }
@@ -334,7 +325,7 @@ export default function EnterpriseOnboarding() {
     if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
-    if (step < 5) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step < 4) triggerDraftSave(form as Partial<OnboardingFormData>, step);
   }, [step]);
 
   useEffect(() => {
@@ -384,7 +375,7 @@ export default function EnterpriseOnboarding() {
   const canProceedStep2 = form.companyName && form.organizationNumber && form.contactName && form.workEmail && form.contactPhone
     && !fieldErrors.companyName && !fieldErrors.organizationNumber && !fieldErrors.contactName && !fieldErrors.workEmail && !fieldErrors.contactPhone
     && !orgTaken && !emailTaken;
-  const canProceedStep4 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
+  const canProceedStep3 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
   const handleConfirmAndProceedToCard = async () => {
     setSubmitError('');
@@ -406,7 +397,7 @@ export default function EnterpriseOnboarding() {
       }
       const draftRes = await saveDraft({
         ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 4, progressPercent: 80,
+        progressStep: 3, progressPercent: 80,
       } as any);
       const ensuredDraftId = draftRes.draft?.id;
       const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
@@ -431,14 +422,14 @@ export default function EnterpriseOnboarding() {
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
-        setStep(5);
+        setStep(4);
         return;
       }
       if (!pkKey) { setSubmitError('Stripe-konfigurationsfel (publishable key saknas). Kontakta support.'); setIsSubmitting(false); return; }
       if (!secret) { setSubmitError('Kunde inte initiera kortregistrering. Försök igen.'); setIsSubmitting(false); return; }
       setStripePublishableKey(pkKey);
       setSetupIntentClientSecret(secret);
-      setStep(5);
+      setStep(4);
     } catch (err: any) {
       const status = err?.status;
       const code = err?.code || err?.error;
@@ -566,7 +557,7 @@ export default function EnterpriseOnboarding() {
               <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider">Test</span>
             )}
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 5 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
       </header>
@@ -613,22 +604,26 @@ export default function EnterpriseOnboarding() {
           <main className="flex-1 min-w-0">
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={stepValidating} updateField={updateField} />}
-            {step === 3 && (
-              <StepEmailVerify
-                email={form.workEmail || ''}
-                code={emailVerifyCode}
+            {step === 2 && (
+              <StepDetails
+                form={form}
+                fieldErrors={fieldErrors}
+                fieldChecks={fieldChecks}
+                availability={availability}
+                companyRegistry={companyRegistry}
+                isValidating={stepValidating}
+                updateField={updateField}
+                emailVerifyState={emailVerifyState}
+                emailVerifyCode={emailVerifyCode}
+                emailVerifyError={emailVerifyError}
+                emailVerifyCooldown={emailVerifyCooldown}
                 onCodeChange={setEmailVerifyCode}
                 onVerify={handleVerifyCode}
                 onResend={handleResendVerification}
-                onBack={() => { setEmailVerifyState('idle'); setEmailVerifyCode(''); setEmailVerifyError(''); setStep(2); }}
-                error={emailVerifyError}
-                cooldown={emailVerifyCooldown}
-                sending={emailVerifyState === 'sending'}
               />
             )}
-            {step === 4 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
-            {step === 5 && draftId && resumeToken && (
+            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 4 && draftId && resumeToken && (
               <StepCardPayment
                 draftId={draftId}
                 resumeToken={resumeToken}
@@ -647,28 +642,34 @@ export default function EnterpriseOnboarding() {
             )}
 
             {/* Navigation */}
-            {step < 3 && (
+            {step < 2 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
                 <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
-                {step === 2 ? (
+                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
+                  Nästa <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            {step === 2 && (
+              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                  <ChevronLeft className="h-4 w-4" /> Tillbaka
+                </Button>
+                {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && (
                   <Button size="sm" onClick={handleNextFromStep2} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
                     {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
-                  </Button>
-                ) : (
-                  <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
-                    Nästa <ChevronRight className="h-4 w-4" />
                   </Button>
                 )}
               </div>
             )}
-            {step === 4 && (
+            {step === 3 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
                 <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
-                <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep4 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
+                <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
                   {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
                 </Button>
               </div>
@@ -897,14 +898,23 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 2: Details                                         */
+/* STEP 2: Details + Inline Email Verification             */
 /* ═══════════════════════════════════════════════════════ */
-function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, isValidating, updateField }: {
+function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, isValidating, updateField,
+  emailVerifyState, emailVerifyCode, emailVerifyError, emailVerifyCooldown, onCodeChange, onVerify, onResend,
+}: {
   form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>;
   fieldChecks: Record<string, boolean>;
   availability: ValidationResponse['validation']['availability'];
   companyRegistry: CompanyRegistryResult | null;
   isValidating: boolean; updateField: (f: string, v: any) => void;
+  emailVerifyState: 'idle' | 'sending' | 'pending' | 'verified';
+  emailVerifyCode: string;
+  emailVerifyError: string;
+  emailVerifyCooldown: number;
+  onCodeChange: (v: string) => void;
+  onVerify: () => void;
+  onResend: () => void;
 }) {
   const orgTaken = availability?.organizationNumberAvailable === false;
   const emailTaken = availability?.workEmailAvailable === false;
@@ -921,6 +931,8 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
       default: return { text: `Verifieringsstatus: ${status}`, color: 'text-muted-foreground', icon: Info };
     }
   };
+
+  const showVerification = emailVerifyState === 'sending' || emailVerifyState === 'pending' || emailVerifyState === 'verified';
 
   return (
     <div className="space-y-6">
@@ -940,10 +952,10 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
         </div>
         <div className="p-5 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
-            <FieldInput icon={Building2} label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required />
-            <FieldInput icon={Hash} label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
+            <FieldInput icon={Building2} label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required disabled={showVerification} />
+            <FieldInput icon={Hash} label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required disabled={showVerification} />
           </div>
-          <FieldInput icon={Globe} label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
+          <FieldInput icon={Globe} label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} disabled={showVerification} />
 
           {/* Company registry verification status */}
           {companyRegistry?.checked && (
@@ -973,13 +985,81 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kontaktperson</span>
         </div>
         <div className="p-5 space-y-4">
-          <FieldInput icon={User} label="Namn" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required />
+          <FieldInput icon={User} label="Namn" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required disabled={showVerification} />
           <div className="grid sm:grid-cols-2 gap-4">
-            <FieldInput icon={Mail} label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
-            <FieldInput icon={Phone} label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required />
+            <FieldInput icon={Mail} label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required disabled={showVerification} />
+            <FieldInput icon={Phone} label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required disabled={showVerification} />
           </div>
         </div>
       </div>
+
+      {/* Inline email verification */}
+      {showVerification && (
+        <div className="border border-border overflow-hidden">
+          <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center gap-2">
+            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">E-postverifiering</span>
+          </div>
+          <div className="p-5">
+            {emailVerifyState === 'sending' && (
+              <div className="flex items-center justify-center py-6 gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Skickar verifieringskod…</span>
+              </div>
+            )}
+
+            {emailVerifyState === 'verified' && (
+              <div className="flex items-center gap-2 py-2">
+                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm text-foreground font-medium">E-post verifierad</span>
+              </div>
+            )}
+
+            {emailVerifyState === 'pending' && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  En 6-siffrig kod har skickats till <span className="text-foreground font-medium">{form.workEmail}</span>
+                </p>
+
+                <div className="flex items-center gap-3">
+                  <Input
+                    value={emailVerifyCode}
+                    onChange={(e) => onCodeChange(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
+                    placeholder="XXXXXX"
+                    maxLength={6}
+                    className="text-center text-lg font-mono tracking-[0.4em] rounded-none h-12 max-w-[200px] border-border focus:border-foreground"
+                    autoFocus
+                  />
+                  <Button onClick={onVerify} disabled={emailVerifyCode.length !== 6} size="sm" className="rounded-none no-hover-lift h-12 px-5">
+                    Verifiera
+                  </Button>
+                </div>
+
+                {emailVerifyError && (
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                    <p className="text-xs text-destructive">{emailVerifyError}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={onResend}
+                    disabled={emailVerifyCooldown > 0}
+                    className={cn(
+                      'text-xs transition-colors',
+                      emailVerifyCooldown > 0 ? 'text-muted-foreground/50 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground underline',
+                    )}
+                  >
+                    {emailVerifyCooldown > 0 ? `Skicka ny kod (${emailVerifyCooldown}s)` : 'Skicka ny kod'}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground">Verifiering sker automatiskt via mejllänk</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {(orgTaken || emailTaken) && (
         <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
@@ -1001,85 +1081,17 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
   );
 }
 
-/* ═══════════════════════════════════════════════════════ */
-/* STEP 2.5: Email Verification                            */
-/* ═══════════════════════════════════════════════════════ */
-function StepEmailVerify({ email, code, onCodeChange, onVerify, onResend, onBack, error, cooldown, sending }: {
-  email: string; code: string; onCodeChange: (v: string) => void; onVerify: () => void; onResend: () => void; onBack: () => void;
-  error: string; cooldown: number; sending: boolean;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-center">
-        <div className="h-14 w-14 border-2 border-primary/20 flex items-center justify-center">
-          <Mail className="h-7 w-7 text-primary" />
-        </div>
-      </div>
-      <div className="text-center space-y-2">
-        <h2 className="text-lg font-semibold text-foreground">Verifiera din e-post</h2>
-        <p className="text-sm text-muted-foreground">
-          Vi har skickat en 6-siffrig kod till <span className="text-foreground font-medium">{email}</span>
-        </p>
-      </div>
-
-      {sending ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-center">
-            <Input
-              value={code}
-              onChange={(e) => onCodeChange(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
-              placeholder="XXXXXX"
-              maxLength={6}
-              className="text-center text-xl font-mono tracking-[0.5em] rounded-none h-14 max-w-[240px] border-border focus:border-foreground"
-              autoFocus
-            />
-          </div>
-
-          <Button onClick={onVerify} disabled={code.length !== 6} className="w-full rounded-none no-hover-lift">
-            Verifiera
-          </Button>
-
-          <Button onClick={onResend} disabled={cooldown > 0} variant="outline" className="w-full rounded-none no-hover-lift">
-            {cooldown > 0 ? `Skicka ny kod (${cooldown}s)` : 'Skicka ny kod'}
-          </Button>
-
-          {error && (
-            <div className="border border-destructive/30 bg-destructive/5 p-3 flex items-center gap-2">
-              <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
-              <p className="text-xs text-destructive">{error}</p>
-            </div>
-          )}
-
-          <p className="text-xs text-muted-foreground text-center">
-            Verifiering sker automatiskt om du klickar på länken i mejlet.
-          </p>
-
-          <div className="pt-2 border-t border-border">
-            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-              <ChevronLeft className="h-4 w-4" /> Tillbaka
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ─── Field input ─── */
-function FieldInput({ label, id, placeholder, value, onChange, error, valid, hint, type = 'text', required, icon: Icon }: {
+function FieldInput({ label, id, placeholder, value, onChange, error, valid, hint, type = 'text', required, icon: Icon, disabled }: {
   label: string; id: string; placeholder: string; value: string; onChange: (v: string) => void;
-  error?: string; valid?: boolean; hint?: string; type?: string; required?: boolean; icon?: any;
+  error?: string; valid?: boolean; hint?: string; type?: string; required?: boolean; icon?: any; disabled?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}{required && ' *'}</Label>
       <div className="relative">
-        {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />}
-        <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('rounded-none border-border focus:border-foreground', Icon && 'pl-9', error && 'border-destructive focus:border-destructive')} />
+        {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none z-10" />}
+        <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={cn('rounded-none border-border focus:border-foreground', Icon && 'pl-9', error && 'border-destructive focus:border-destructive', disabled && 'opacity-60')} />
       </div>
       {error && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3 shrink-0" /> {error}</p>}
       {!error && valid && value && <p className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> OK</p>}
@@ -1419,8 +1431,8 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
       </Button>
 
       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        <Shield className="h-3.5 w-3.5" />
-        <span>Krypterad betalning · 0 kr under trial</span>
+        <Shield className="h-3 w-3" />
+        <span>Krypterad anslutning via Stripe</span>
       </div>
     </form>
   );
