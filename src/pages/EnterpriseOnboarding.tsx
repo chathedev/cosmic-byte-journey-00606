@@ -16,10 +16,10 @@ import {
   type OnboardingFormData,
   type ValidationResponse,
 } from '@/lib/enterpriseOnboardingApi';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe('pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu');
+/* ─── No hardcoded Stripe key — loaded from backend response ─── */
 
 const PLANS = [
   { id: 'enterprise_small' as const, name: 'Small', priceSek: 2490, seats: 10, activationSek: 4900 },
@@ -77,6 +77,10 @@ function extractSetupIntentClientSecret(payload: any): string | null {
   );
 }
 
+function extractStripePublishableKey(payload: any): string | null {
+  return payload?.billing?.stripePublishableKey || null;
+}
+
 export default function EnterpriseOnboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Partial<OnboardingFormData>>({
@@ -97,6 +101,7 @@ export default function EnterpriseOnboarding() {
   const [draftId, setDraftId] = useState<string | undefined>();
   const [resumeToken, setResumeToken] = useState<string | undefined>();
   const [setupIntentClientSecret, setSetupIntentClientSecret] = useState<string | null>(null);
+  const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
 
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -251,6 +256,7 @@ export default function EnterpriseOnboarding() {
     setSubmitError('');
     setIsSubmitting(true);
     setSetupIntentClientSecret(null);
+    setStripePublishableKey(null);
 
     try {
       clearTimeout(draftTimer.current);
@@ -274,18 +280,11 @@ export default function EnterpriseOnboarding() {
         progressPercent: 80,
       } as any);
 
-      // Backend returns resumeToken only on creation; on update, keep existing one
       const ensuredDraftId = draftRes.draft?.id;
       const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
 
-      if (!ensuredDraftId) {
-        setSubmitError('Kunde inte spara onboarding (inget draft-id). Försök igen.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!ensuredResumeToken) {
-        setSubmitError('Kunde inte spara onboarding (saknar resume-token). Försök igen.');
+      if (!ensuredDraftId || !ensuredResumeToken) {
+        setSubmitError('Kunde inte spara onboarding. Försök igen.');
         setIsSubmitting(false);
         return;
       }
@@ -296,34 +295,50 @@ export default function EnterpriseOnboarding() {
       draftIdRef.current = ensuredDraftId;
       resumeTokenRef.current = ensuredResumeToken;
 
-      // CRITICAL: Initialize payment subscription step before rendering card form
+      // Call /enterprise/onboarding/subscribe (draft-level, pre-trial)
       const subscribeRes = await subscribeDraft(ensuredDraftId, ensuredResumeToken);
       const billing = subscribeRes?.billing;
       const secret = extractSetupIntentClientSecret(subscribeRes);
+      const pkKey = extractStripePublishableKey(subscribeRes);
 
-      // If card is already saved for this draft, skip card capture and allow direct trial start in step 4
+      // If card is already saved, skip to trial start
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
+        setStripePublishableKey(pkKey);
         setStep(4);
         return;
       }
 
-      if (!secret) {
-        setSubmitError('Kunde inte initiera kortregistrering. Uppdatera sidan och försök igen.');
+      // Stripe key-pair mismatch check
+      if (!pkKey) {
+        setSubmitError('Stripe-konfigurationsfel (publishable key saknas i svaret). Kontakta support.');
         setIsSubmitting(false);
         return;
       }
 
+      if (!secret) {
+        setSubmitError('Kunde inte initiera kortregistrering. Försök igen.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setStripePublishableKey(pkKey);
       setSetupIntentClientSecret(secret);
       setStep(4);
     } catch (err: any) {
-      setSubmitError(err?.message || err?.error || 'Kunde inte initiera betalningssteget. Försök igen.');
+      const status = err?.status;
+      const code = err?.code || err?.error;
+      if (status === 503 && (code === 'stripe_key_mismatch' || code === 'stripe_publishable_key_missing')) {
+        setSubmitError('Stripe-konfigurationsfel på serversidan. Kontakta support@tivly.se.');
+      } else {
+        setSubmitError(err?.message || err?.error || 'Kunde inte initiera betalningssteget. Försök igen.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Called by StepCard after card is confirmed — starts trial
+  // Called after card confirmed — starts trial
   const handleCardConfirmedStartTrial = async () => {
     try {
       const res = await startTrial({ ...(form as OnboardingFormData), draftId, resumeToken });
@@ -332,7 +347,6 @@ export default function EnterpriseOnboarding() {
       clearFormLocal();
       setAllDone(true);
     } catch (err: any) {
-      // If 409 payment_method_required, card wasn't actually ready — show error in card step
       throw err;
     }
   };
@@ -421,6 +435,7 @@ export default function EnterpriseOnboarding() {
                 draftId={draftId}
                 resumeToken={resumeToken}
                 initialClientSecret={setupIntentClientSecret}
+                stripePublishableKey={stripePublishableKey}
                 email={form.workEmail || ''}
                 monthlyTotal={monthlyTotal}
                 planBaseSek={selectedPlan.priceSek}
@@ -530,16 +545,29 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
                 <span className="text-2xl font-bold text-foreground">{fmt(plan.priceSek)}</span>
                 <span className="text-[13px] text-muted-foreground"> SEK/mån</span>
               </p>
-              <p className="text-[11px] text-muted-foreground mt-1">Aktivering {fmt(plan.activationSek)} SEK</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Aktivering {fmt(plan.activationSek)} SEK (engångsavgift)</p>
             </button>
           );
         })}
       </div>
+
+      {/* Cost summary */}
       <div className="rounded-lg border border-border p-4 space-y-2 text-[13px]">
-        <div className="flex justify-between"><span className="text-muted-foreground">{selectedPlan.name} ({selectedPlan.seats} anv.)</span><span className="text-foreground">{fmt(selectedPlan.priceSek)} SEK</span></div>
-        {extraSeats > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{extraSeats} extra × {EXTRA_SEAT_PRICE} SEK</span><span className="text-foreground">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK</span></div>}
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Plan {selectedPlan.name}</span>
+          <span className="text-foreground">{fmt(selectedPlan.priceSek)} SEK/mån</span>
+        </div>
+        {extraSeats > 0 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{extraSeats} extra användare × {fmt(EXTRA_SEAT_PRICE)} SEK</span>
+            <span className="text-foreground">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK/mån</span>
+          </div>
+        )}
         <Separator />
-        <div className="flex justify-between font-medium"><span className="text-foreground">Totalt/mån</span><span className="text-foreground">{fmt(monthlyTotal)} SEK</span></div>
+        <div className="flex justify-between font-medium">
+          <span className="text-foreground">Totalt/mån</span>
+          <span className="text-foreground">{fmt(monthlyTotal)} SEK</span>
+        </div>
         <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" /> Exkl. moms. Slutpris beräknas server-side.</p>
       </div>
     </div>
@@ -621,9 +649,9 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
         <Row label="Kontakt" value={form.contactName || '–'} />
         <Row label="Mejl" value={form.workEmail || '–'} />
         <Row label="Telefon" value={form.contactPhone || '–'} />
-        <Row label="Plan" value={`${selectedPlan.name} – ${fmt(monthlyTotal)} SEK/mån`} />
+        <Row label="Plan" value={`${selectedPlan.name} – ${fmt(selectedPlan.priceSek)} SEK/mån`} />
         <Row label="Användare" value={String(form.expectedSeats || 0)} />
-        {extraSeats > 0 && <Row label="Extra platser" value={`${extraSeats} × ${EXTRA_SEAT_PRICE} SEK`} />}
+        {extraSeats > 0 && <Row label="Extra platser" value={`${extraSeats} × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån`} />}
         <Row label="Aktivering" value={`${fmt(selectedPlan.activationSek)} SEK (efter trial)`} />
       </div>
       <div className="space-y-3">
@@ -664,10 +692,11 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /* ─── STEP 4: Card (Stripe SetupIntent via draft-level subscribe) ─── */
-function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, onCardConfirmed }: {
+function StepCard({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, onCardConfirmed }: {
   draftId: string;
   resumeToken: string;
   initialClientSecret: string | null;
+  stripePublishableKey: string | null;
   email: string;
   monthlyTotal: number;
   planBaseSek: number;
@@ -682,8 +711,9 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
   const [error, setError] = useState('');
   const [readyForTrialStart, setReadyForTrialStart] = useState(false);
   const [paymentMethodSaved, setPaymentMethodSaved] = useState(false);
-  const [setupIntentStatus, setSetupIntentStatus] = useState<string | null>(null);
   const [startingTrial, setStartingTrial] = useState(false);
+  const [resolvedStripePromise, setResolvedStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [currentPk, setCurrentPk] = useState<string | null>(stripePublishableKey);
 
   const trialChargeDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE', {
     day: 'numeric',
@@ -691,45 +721,25 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
     year: 'numeric',
   });
 
-  const verifyClientSecret = useCallback(async (secret: string): Promise<{ ok: boolean; reason?: string; status?: string }> => {
-    try {
-      const stripe = await stripePromise;
-      if (!stripe) return { ok: true };
-
-      const { error: setupError, setupIntent } = await stripe.retrieveSetupIntent(secret);
-      if (setupError || !setupIntent) {
-        return {
-          ok: false,
-          reason: 'Ogiltig kortsession från backend (client_secret). Kontrollera att backend och frontend använder samma Stripe-miljö (test/live).',
-        };
-      }
-
-      if (setupIntent.status === 'canceled') {
-        return {
-          ok: false,
-          reason: 'Kortsessionen har avbrutits/utgått. Klicka på "Försök igen" för att skapa en ny session.',
-          status: setupIntent.status,
-        };
-      }
-
-      return { ok: true, status: setupIntent.status };
-    } catch {
-      return {
-        ok: false,
-        reason: 'Kunde inte verifiera kortsessionen. Försök igen.',
-      };
+  // Resolve Stripe promise from backend-provided publishable key
+  useEffect(() => {
+    if (currentPk) {
+      setResolvedStripePromise(loadStripe(currentPk));
     }
-  }, []);
+  }, [currentPk]);
 
   const applySubscribeResponse = useCallback((res: any) => {
     const billing = res?.billing || {};
     const ready = !!billing?.readyForTrialStart;
     const saved = !!billing?.paymentMethodSaved;
-    const status = typeof billing?.setupIntentStatus === 'string' ? billing.setupIntentStatus : null;
+    const pk = extractStripePublishableKey(res);
 
     setReadyForTrialStart(ready);
     setPaymentMethodSaved(saved);
-    setSetupIntentStatus(status);
+
+    if (pk && pk !== currentPk) {
+      setCurrentPk(pk);
+    }
 
     const secret = extractSetupIntentClientSecret(res);
 
@@ -739,83 +749,51 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
       return;
     }
 
+    if (!pk) {
+      setClientSecret(null);
+      setError('Stripe publishable key saknas i svaret. Kontakta support.');
+      return;
+    }
+
     if (!secret) {
       setClientSecret(null);
-      setError('Kortsetup kunde inte initieras. Klicka på "Försök igen" för att skapa en ny kortsession.');
+      setError('Kortsetup kunde inte initieras. Klicka på "Försök igen".');
       return;
     }
 
     setClientSecret(secret);
     setError('');
-  }, []);
+  }, [currentPk]);
 
   const loadCardSetup = useCallback(async () => {
     setError('');
     setLoading(true);
     try {
       const res = await subscribeDraft(draftId, resumeToken);
-      const billing: any = res?.billing || {};
-      const secret = extractSetupIntentClientSecret(res);
-
-      if (!billing?.readyForTrialStart && !billing?.paymentMethodSaved && secret) {
-        const verification = await verifyClientSecret(secret);
-        if (!verification.ok) {
-          setClientSecret(null);
-          setError(verification.reason || 'Ogiltig kortsession. Försök igen.');
-          setLoading(false);
-          return;
-        }
-
-        if (verification.status === 'succeeded') {
-          setReadyForTrialStart(true);
-          setPaymentMethodSaved(true);
-          setSetupIntentStatus('succeeded');
-          setClientSecret(null);
-          setError('');
-          setLoading(false);
-          return;
-        }
-      }
-
       applySubscribeResponse(res);
     } catch (err: any) {
-      const msg = err?.message || err?.error || err?.detail ||
-        (typeof err === 'string' ? err : 'Kunde inte ladda kortsteget just nu.');
-      setError(msg);
+      const status = err?.status;
+      const code = err?.code || err?.error;
+      if (status === 503 && (code === 'stripe_key_mismatch' || code === 'stripe_publishable_key_missing')) {
+        setError('Stripe-konfigurationsfel på serversidan. Kontakta support@tivly.se.');
+      } else {
+        const msg = err?.message || err?.error || err?.detail ||
+          (typeof err === 'string' ? err : 'Kunde inte ladda kortsteget just nu.');
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
-  }, [draftId, resumeToken, applySubscribeResponse, verifyClientSecret]);
+  }, [draftId, resumeToken, applySubscribeResponse]);
 
   useEffect(() => {
     if (initialClientSecret) {
-      setLoading(true);
-      verifyClientSecret(initialClientSecret)
-        .then((verification) => {
-          if (!verification.ok) {
-            setClientSecret(null);
-            setError(verification.reason || 'Ogiltig kortsession.');
-            return;
-          }
-
-          if (verification.status === 'succeeded') {
-            setReadyForTrialStart(true);
-            setPaymentMethodSaved(true);
-            setSetupIntentStatus('succeeded');
-            setClientSecret(null);
-            setError('');
-            return;
-          }
-
-          setClientSecret(initialClientSecret);
-          setError('');
-        })
-        .finally(() => setLoading(false));
+      setLoading(false);
+      setClientSecret(initialClientSecret);
       return;
     }
-
     loadCardSetup();
-  }, [initialClientSecret, loadCardSetup, verifyClientSecret]);
+  }, [initialClientSecret, loadCardSetup]);
 
   const handleStartTrialNow = async () => {
     setStartingTrial(true);
@@ -838,6 +816,7 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
         </p>
       </div>
 
+      {/* Cost breakdown */}
       <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-[13px]">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Idag</span>
@@ -858,7 +837,7 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
           <span className="text-muted-foreground">Därefter/mån</span>
           <span className="text-foreground font-medium">{fmt(monthlyTotal)} kr</span>
         </div>
-        <p className="text-[10px] text-muted-foreground pt-1">Exkl. moms · Valda användare: {expectedSeats}</p>
+        <p className="text-[10px] text-muted-foreground pt-1">Exkl. moms · {expectedSeats} användare</p>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
@@ -867,10 +846,6 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
           Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> när kortet är sparat och trial startad.
         </p>
       </div>
-
-      {setupIntentStatus && (
-        <p className="text-[11px] text-muted-foreground">Kortstatus: {setupIntentStatus}{paymentMethodSaved ? ' · kort sparat' : ''}</p>
-      )}
 
       {loading && (
         <div className="flex items-center justify-center py-12">
@@ -896,8 +871,8 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
         </div>
       )}
 
-      {!loading && !error && !readyForTrialStart && clientSecret && (
-        <Elements stripe={stripePromise} options={{
+      {!loading && !error && !readyForTrialStart && clientSecret && resolvedStripePromise && (
+        <Elements stripe={resolvedStripePromise} options={{
           clientSecret,
           appearance: {
             theme: 'stripe',
@@ -906,6 +881,15 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
         }}>
           <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
         </Elements>
+      )}
+
+      {!loading && !error && !readyForTrialStart && !clientSecret && !resolvedStripePromise && (
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-3">
+          <p className="text-[13px] text-destructive">Stripe kunde inte initieras (ingen publishable key). Kontakta support.</p>
+          <Button variant="outline" size="sm" onClick={loadCardSetup} className="text-[12px]">
+            Försök igen
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -987,7 +971,7 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
             <CardElement options={{ hidePostalCode: true }} />
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Fler betalmetoder kunde inte laddas i denna session. Kortbetalning fungerar fortfarande.
+            Fler betalmetoder kunde inte laddas. Kortbetalning fungerar.
           </p>
         </div>
       )}
