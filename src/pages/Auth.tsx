@@ -442,271 +442,166 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
-        <motion.div 
-          className="absolute top-20 -left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div 
-          className="absolute bottom-20 -right-20 w-96 h-96 bg-accent/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
-      
-      <Card className="w-full max-w-md relative z-10 shadow-2xl border-2 backdrop-blur-xl bg-card/98">
-        <AnimatePresence mode="wait">
-          {viewMode === 'welcome' && (
-            <motion.div
-              key="welcome"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-            >
-              <CardHeader className="space-y-6 text-center pb-8 pt-12">
-                <motion.div 
-                  className="mx-auto w-32 h-32"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, duration: 0.3 }}
-                >
-                  <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-                </motion.div>
-                
-                <motion.div 
-                  className="space-y-3"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15, duration: 0.3 }}
-                >
-                  <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    Välkommen till Tivly
-                  </CardTitle>
-                  <CardDescription className="text-lg">
-                    Säker och enkel inloggning med e-postkod
-                  </CardDescription>
-                </motion.div>
-              </CardHeader>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Clean header */}
+        <div className="mb-8 text-center">
+          <p className="text-sm font-semibold tracking-widest uppercase text-foreground">TIVLY</p>
+        </div>
 
-              <CardContent className="pb-12 space-y-6">
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                    <div className="flex items-start gap-3">
-                      <Mail className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Kod via e-post</p>
-                        <p className="text-xs text-muted-foreground">
-                          Få en 6-siffrig kod direkt i din inkorg
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+        <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
+          <AnimatePresence mode="wait">
+            {viewMode === 'welcome' && (
+              <motion.div
+                key="welcome"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h1 className="text-2xl font-bold text-foreground mb-2">
+                  Välkommen till Tivly
+                </h1>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Hej! Logga in för att komma igång.
+                </p>
 
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                    <div className="flex items-start gap-3">
-                      <Shield className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Banksäker säkerhet</p>
-                        <p className="text-xs text-muted-foreground">
-                          Krypterad autentisering som skyddar dina uppgifter
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                    <div className="flex items-start gap-3">
-                      <Sparkles className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Snabbt och smidigt</p>
-                        <p className="text-xs text-muted-foreground">
-                          Logga in på sekunder utan att komma ihåg lösenord
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-sm font-medium text-foreground mb-3">
+                  Tivly hjälper dig med:
+                </p>
+                <ul className="space-y-1.5 mb-8 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-foreground">–</span>
+                    AI-transkribering av möten
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-foreground">–</span>
+                    Automatiska sammanfattningar
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-foreground">–</span>
+                    Action points och uppföljning
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-foreground">–</span>
+                    Export till Word/PDF
+                  </li>
+                </ul>
 
                 <Button 
                   onClick={handleGetStarted}
-                  className="w-full h-12 text-base font-medium"
+                  className="w-full h-11 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 no-hover-lift"
                   size="lg"
                 >
                   Kom igång
                 </Button>
-              </CardContent>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {viewMode === 'email' && (
-            <motion.div
-              key="email"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-            >
-              <CardHeader className="space-y-4 text-center pb-6">
-                <motion.div 
-                  className="mx-auto w-20 h-20"
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <img src={tivlyLogo} alt="Tivly Logo" className="w-full h-full object-contain" />
-                </motion.div>
-                
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl font-bold">
-                    {platform === 'ios' ? 'Tivly Enterprise' : 'Logga in'}
-                  </CardTitle>
-                  <CardDescription>
-                    {platform === 'ios' 
-                      ? 'Appen är endast tillgänglig för Enterprise-konton'
-                      : 'Ange din e-post för att fortsätta'}
-                  </CardDescription>
-                </div>
+            {viewMode === 'email' && (
+              <motion.div
+                key="email"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h1 className="text-2xl font-bold text-foreground mb-1">
+                  {platform === 'ios' ? 'Tivly Enterprise' : 'Logga in'}
+                </h1>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {platform === 'ios' 
+                    ? 'Appen är tillgänglig för Enterprise-konton'
+                    : 'Ange din e-post så skickar vi en verifieringskod.'}
+                </p>
 
-                {/* Progress indicator */}
-                <div className="flex gap-1.5 justify-center pt-2">
-                  <div className="h-1.5 w-8 rounded-full bg-primary" />
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary/30" />
-                </div>
-              </CardHeader>
-
-              <CardContent className="pb-8 space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-postadress</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="din@email.se"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleRequestCode();
-                      }
-                    }}
-                    disabled={loading}
-                    autoComplete="email"
-                    autoFocus
-                    className="h-12"
-                  />
-                </div>
-
-                <Button
-                  onClick={handleRequestCode}
-                  disabled={loading || !email.trim()}
-                  className="w-full h-12 relative"
-                  type="button"
-                >
-                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {loading ? 'Skickar kod...' : 'Skicka verifieringskod'}
-                </Button>
-
-                <AnimatePresence>
-                  {authError && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
-                    >
-                      <p className="text-sm text-destructive text-center font-medium">
-                        {authError}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Only show back button on web (not iOS app) */}
-                {!isAppDomain() && !isIoDomain() && (
-                  <Button
-                    variant="ghost"
-                    onClick={handleBackToWelcome}
-                    className="w-full"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Tillbaka
-                  </Button>
-                )}
-
-                {/* iOS app notice - enterprise only */}
-                {isIoDomain() && (
-                  <p className="text-xs text-center text-muted-foreground pt-2">
-                    Endast för Enterprise-användare
-                  </p>
-                )}
-              </CardContent>
-            </motion.div>
-          )}
-
-          {viewMode === 'code-entry' && (
-            <motion.div
-              key="code-entry"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-            >
-              <CardHeader className="space-y-4 text-center pb-4">
-                <motion.div 
-                  className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                >
-                  {verifying ? (
-                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  ) : isNavigating ? (
-                    <CheckCircle2 className="w-8 h-8 text-green-500" />
-                  ) : (
-                    <Mail className="w-8 h-8 text-primary" />
-                  )}
-                </motion.div>
-                
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl font-bold">
-                    {isNavigating ? 'Inloggad!' : verifying ? 'Verifierar...' : 'Ange kod'}
-                  </CardTitle>
-                  <CardDescription>
-                    {isNavigating 
-                      ? 'Du loggas in...'
-                      : verifying 
-                        ? 'Vänta medan vi verifierar din kod'
-                        : `Koden skickades till ${email}`
-                    }
-                  </CardDescription>
-                </div>
-
-                {/* Progress indicator */}
-                <div className="flex gap-1.5 justify-center pt-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary/30" />
-                  <div className="h-1.5 w-8 rounded-full bg-primary" />
-                </div>
-              </CardHeader>
-
-              <CardContent className="pb-8 space-y-5">
-                {/* Code input */}
                 <div className="space-y-4">
-                  <motion.div 
-                    className="flex justify-center"
-                    initial={{ scale: 0.95, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-sm font-medium text-foreground">E-postadress</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="din@email.se"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleRequestCode();
+                        }
+                      }}
+                      disabled={loading}
+                      autoComplete="email"
+                      autoFocus
+                      className="h-11"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleRequestCode}
+                    disabled={loading || !email.trim()}
+                    className="w-full h-11 text-sm font-medium bg-foreground text-background hover:bg-foreground/90 no-hover-lift"
+                    type="button"
                   >
+                    {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {loading ? 'Skickar kod...' : 'Skicka verifieringskod'}
+                  </Button>
+
+                  <AnimatePresence>
+                    {authError && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="rounded-md bg-destructive/10 border border-destructive/20 p-3"
+                      >
+                        <p className="text-sm text-destructive text-center font-medium">
+                          {authError}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {!isAppDomain() && !isIoDomain() && (
+                    <button
+                      onClick={handleBackToWelcome}
+                      className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-center py-2"
+                    >
+                      ← Tillbaka
+                    </button>
+                  )}
+
+                  {isIoDomain() && (
+                    <p className="text-xs text-center text-muted-foreground pt-1">
+                      Endast för Enterprise-användare
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {viewMode === 'code-entry' && (
+              <motion.div
+                key="code-entry"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h1 className="text-2xl font-bold text-foreground mb-1">
+                  {isNavigating ? 'Inloggad!' : verifying ? 'Verifierar...' : 'Ange kod'}
+                </h1>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {isNavigating 
+                    ? 'Du loggas in...'
+                    : verifying 
+                      ? 'Vänta medan vi verifierar din kod'
+                      : `Vi skickade en 6-siffrig kod till ${email}`
+                  }
+                </p>
+
+                <div className="space-y-5">
+                  <div className="flex justify-center">
                     <InputOTP
                       maxLength={6}
                       value={pinCode}
@@ -728,99 +623,92 @@ export default function Auth() {
                         <InputOTPSlot index={5} />
                       </InputOTPGroup>
                     </InputOTP>
-                  </motion.div>
+                  </div>
 
-                  {/* Status message */}
-                  <div className="text-center space-y-2">
+                  {/* Status */}
+                  <div className="text-center">
                     {verifying && (
-                      <motion.p 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-sm text-primary font-medium"
-                      >
-                        Verifierar din kod...
-                      </motion.p>
+                      <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Verifierar...
+                      </p>
                     )}
-                    
                     {isNavigating && (
-                      <motion.p 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-sm text-green-600 font-medium"
-                      >
+                      <p className="text-sm text-foreground font-medium flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         Inloggning lyckades!
-                      </motion.p>
+                      </p>
                     )}
-
                     {!verifying && !isNavigating && codeExpiry > 0 && (
-                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                        <Clock className="h-3 w-3" />
+                      <p className="text-xs text-muted-foreground">
                         Koden giltig i {formatTime(codeExpiry)}
                       </p>
                     )}
-
                     {!verifying && !isNavigating && codeExpiry === 0 && (
                       <p className="text-xs text-destructive font-medium">
                         Koden har gått ut. Begär en ny kod.
                       </p>
                     )}
                   </div>
-                </div>
 
-                {/* Error message */}
-                <AnimatePresence>
-                  {authError && !verifying && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
-                    >
-                      <div className="flex items-center gap-2 justify-center">
-                        <AlertCircle className="w-4 h-4 text-destructive" />
-                        <p className="text-sm text-destructive font-medium">
-                          {authError}
-                        </p>
-                      </div>
-                    </motion.div>
+                  <AnimatePresence>
+                    {authError && !verifying && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="rounded-md bg-destructive/10 border border-destructive/20 p-3"
+                      >
+                        <div className="flex items-center gap-2 justify-center">
+                          <AlertCircle className="w-4 h-4 text-destructive" />
+                          <p className="text-sm text-destructive font-medium">
+                            {authError}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {!isNavigating && (
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        onClick={handleStartOver}
+                        disabled={verifying}
+                        className="flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 disabled:opacity-50"
+                      >
+                        ← Ändra e-post
+                      </button>
+                      <button
+                        onClick={handleResendCode}
+                        disabled={verifying || loading}
+                        className="flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 disabled:opacity-50"
+                      >
+                        {loading ? 'Skickar...' : 'Skicka ny kod'}
+                      </button>
+                    </div>
                   )}
-                </AnimatePresence>
 
-                {/* Action buttons */}
-                {!isNavigating && (
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      onClick={handleStartOver}
-                      disabled={verifying}
-                      className="flex-1"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Ändra e-post
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={handleResendCode}
-                      disabled={verifying || loading}
-                      className="flex-1"
-                    >
-                      {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Skicka ny kod
-                    </Button>
-                  </div>
-                )}
+                  {!verifying && !isNavigating && (
+                    <p className="text-xs text-center text-muted-foreground">
+                      Hittar du inte koden? Kolla i skräpposten.
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-                {/* Help text */}
-                {!verifying && !isNavigating && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    Hittar du inte koden? Kolla i skräpposten.
-                  </p>
-                )}
-              </CardContent>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Card>
+        {/* Footer */}
+        <div className="mt-6 text-center space-y-1">
+          <p className="text-xs text-muted-foreground">
+            Frågor? Kontakta oss på support@tivly.se
+          </p>
+          <p className="text-xs text-muted-foreground">
+            © {new Date().getFullYear()} Tivly
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
