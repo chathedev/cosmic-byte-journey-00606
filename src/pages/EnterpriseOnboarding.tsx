@@ -11,12 +11,10 @@ import {
   validateOnboarding,
   saveDraft,
   getDraft,
+  subscribeDraft,
   startTrial,
-  subscribeOnboarding,
-  getOnboardingStatus,
   type OnboardingFormData,
   type ValidationResponse,
-  type OnboardingAuthOpts,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -29,7 +27,7 @@ const PLANS = [
 ];
 
 const EXTRA_SEAT_PRICE = 249;
-const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta & Betala'];
+const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalkort'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -84,11 +82,8 @@ export default function EnterpriseOnboarding() {
   const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [trialStarted, setTrialStarted] = useState(false);
+  const [allDone, setAllDone] = useState(false);
   const [completedEmail, setCompletedEmail] = useState('');
-  const [completedCompanyId, setCompletedCompanyId] = useState('');
-  const [cardDone, setCardDone] = useState(false);
-  const [setupToken, setSetupToken] = useState<string | undefined>();
   const [draftId, setDraftId] = useState<string | undefined>();
   const [resumeToken, setResumeToken] = useState<string | undefined>();
 
@@ -126,7 +121,7 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
           const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
-          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 3); // max step 3 for restore
+          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 3);
           if (hasRestorableProgress(restored, restoredStep)) {
             hasUserInteractedRef.current = true;
             setForm(restored);
@@ -238,15 +233,13 @@ export default function EnterpriseOnboarding() {
   const canProceedStep2 = form.companyName && form.organizationNumber && form.contactName && form.workEmail && form.contactPhone
     && !fieldErrors.companyName && !fieldErrors.organizationNumber && !fieldErrors.contactName && !fieldErrors.workEmail && !fieldErrors.contactPhone
     && !orgTaken && !emailTaken;
-  const canSubmit = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
+  const canProceedStep3 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
-  const authOpts: OnboardingAuthOpts = setupToken ? { setupToken } : draftId && resumeToken ? { draftId, resumeToken } : {};
-
-  const handleStartTrialAndCard = async () => {
+  // Step 3 → Step 4: validate + save draft, then advance to card step
+  const handleConfirmAndProceedToCard = async () => {
     setSubmitError('');
     setIsSubmitting(true);
     try {
-      // Final validation
       const valRes = await validateOnboarding({ ...form, requireCommitments: true } as any);
       if (!valRes.valid) {
         setFieldErrors(valRes.validation?.errors || {});
@@ -256,14 +249,19 @@ export default function EnterpriseOnboarding() {
         setIsSubmitting(false);
         return;
       }
-      // Start trial
-      const res = await startTrial({ ...(form as OnboardingFormData), draftId, resumeToken });
-      setTrialStarted(true);
-      setCompletedEmail(res.invitation?.email || form.workEmail || '');
-      setCompletedCompanyId(res.company?.id || '');
-      if (res.billing?.setupToken) setSetupToken(res.billing.setupToken);
-      clearDraftLocal();
-      clearFormLocal();
+      // Ensure draft is saved with latest data
+      if (!draftId) {
+        const draftRes = await saveDraft({
+          ...form, countryCode: 'SE',
+          progressStep: 3, progressPercent: 80,
+        } as any);
+        if (draftRes.draft) {
+          setDraftId(draftRes.draft.id);
+          setResumeToken(draftRes.draft.resumeToken);
+          saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
+        }
+      }
+      setStep(4);
     } catch (err: any) {
       setSubmitError(err?.message || err?.error || 'Något gick fel. Försök igen.');
     } finally {
@@ -271,8 +269,22 @@ export default function EnterpriseOnboarding() {
     }
   };
 
+  // Called by StepCard after card is confirmed — starts trial
+  const handleCardConfirmedStartTrial = async () => {
+    try {
+      const res = await startTrial({ ...(form as OnboardingFormData), draftId, resumeToken });
+      setCompletedEmail(res.invitation?.email || form.workEmail || '');
+      clearDraftLocal();
+      clearFormLocal();
+      setAllDone(true);
+    } catch (err: any) {
+      // If 409 payment_method_required, card wasn't actually ready — show error in card step
+      throw err;
+    }
+  };
+
   // Final done screen
-  if (cardDone) {
+  if (allDone) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="max-w-md w-full">
@@ -286,7 +298,7 @@ export default function EnterpriseOnboarding() {
               </div>
             </div>
             <div className="text-center">
-              <h1 className="text-xl font-semibold text-foreground">Allt klart</h1>
+              <h1 className="text-xl font-semibold text-foreground">Allt klart!</h1>
               <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed">
                 Trial aktiverad och betalkort sparat. Debitering sker automatiskt efter 7 dagar.
               </p>
@@ -349,12 +361,19 @@ export default function EnterpriseOnboarding() {
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
             {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
-            {step === 3 && !trialStarted && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
-            {step === 3 && trialStarted && <StepCard companyId={completedCompanyId} email={completedEmail} authOpts={authOpts} onComplete={() => setCardDone(true)} onSkip={() => setCardDone(true)} />}
+            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 4 && draftId && resumeToken && (
+              <StepCard
+                draftId={draftId}
+                resumeToken={resumeToken}
+                email={form.workEmail || ''}
+                onCardConfirmed={handleCardConfirmedStartTrial}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
 
-        {/* Navigation */}
+        {/* Navigation — steps 0-2 */}
         {step < 3 && (
           <div className="flex items-center justify-between mt-10">
             <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift">
@@ -365,13 +384,14 @@ export default function EnterpriseOnboarding() {
             </Button>
           </div>
         )}
-        {step === 3 && !trialStarted && (
+        {/* Navigation — step 3 (confirm → card) */}
+        {step === 3 && (
           <div className="flex items-center justify-between mt-10">
             <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift">
               <ChevronLeft className="h-4 w-4" /> Tillbaka
             </Button>
-            <Button size="sm" onClick={handleStartTrialAndCard} disabled={!canSubmit || isSubmitting} className="gap-1.5 min-w-[160px] bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
-              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Skapar konto...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
+            <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[160px] bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
+              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Fortsätt till betalning <ArrowRight className="h-4 w-4" /></>}
             </Button>
           </div>
         )}
@@ -429,7 +449,7 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">Välj plan</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">7 dagars kostnadsfri trial. Betalkort i nästa steg.</p>
+        <p className="text-[13px] text-muted-foreground mt-1">7 dagars kostnadsfri trial. Betalkort krävs innan trial startar.</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
         {PLANS.map(plan => {
@@ -531,8 +551,8 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Bekräfta & starta trial</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">Granska och starta din 7-dagars kostnadsfria trial.</p>
+        <h2 className="text-xl font-semibold text-foreground">Bekräfta uppgifter</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Granska innan du fortsätter till kortregistrering.</p>
       </div>
       <div className="rounded-lg border border-border divide-y divide-border text-[13px]">
         <Row label="Företag" value={form.companyName || '–'} />
@@ -566,7 +586,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
         <CreditCard className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-[13px] text-muted-foreground">
-          I nästa steg registrerar du ett betalkort. Ingen debitering sker under trial-perioden.
+          I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden.</strong> Trial startar först efter att kortet sparats.
         </p>
       </div>
     </div>
@@ -582,44 +602,41 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* ─── STEP 3b: Card (Stripe SetupIntent) ─── */
-function StepCard({ companyId, email, authOpts, onComplete, onSkip }: { companyId: string; email: string; authOpts?: OnboardingAuthOpts; onComplete: () => void; onSkip: () => void }) {
+/* ─── STEP 4: Card (Stripe SetupIntent via draft-level subscribe) ─── */
+function StepCard({ draftId, resumeToken, email, onCardConfirmed }: {
+  draftId: string; resumeToken: string; email: string;
+  onCardConfirmed: () => Promise<void>;
+}) {
   const [loading, setLoading] = useState(true);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!companyId) {
-      setError('Inget company-ID. Kontot kanske inte skapades korrekt.');
-      setLoading(false);
-      return;
-    }
-    subscribeOnboarding(companyId, authOpts)
+    subscribeDraft(draftId, resumeToken)
       .then(res => {
-        setClientSecret(res.setupIntentClientSecret);
+        setClientSecret(res.billing.setupIntentClientSecret);
         setLoading(false);
       })
       .catch(err => {
         setError(err?.message || err?.error || 'Kunde inte ladda betalningsformuläret.');
         setLoading(false);
       });
-  }, [companyId]);
+  }, [draftId, resumeToken]);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">Registrera betalkort</h2>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Ingen debitering under trial. Kortet sparas för automatisk debitering efter 7 dagar.
+          Kortet sparas säkert. <strong className="text-foreground">Ingen debitering sker under trial.</strong> Trial startar automatiskt efter att kortet sparats.
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
-        <CheckCircle2 className="h-4 w-4 text-foreground shrink-0 mt-0.5" />
-        <div className="text-[13px] text-muted-foreground space-y-0.5">
-          <p className="text-foreground font-medium">Konto skapat</p>
-          <p>Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> när kortet sparats.</p>
-        </div>
+        <Mail className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-[13px] text-muted-foreground">
+          Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> efter att kortet sparats och trial startats.
+        </p>
       </div>
 
       {loading && (
@@ -629,30 +646,26 @@ function StepCard({ companyId, email, authOpts, onComplete, onSkip }: { companyI
       )}
 
       {error && !loading && (
-        <div className="space-y-4">
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-            <p className="text-[13px] text-destructive">{error}</p>
-          </div>
-          <Button onClick={onSkip} variant="outline" className="w-full no-hover-lift text-[13px]">
-            Hoppa över – lägg till kort senare
-          </Button>
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+          <p className="text-[13px] text-destructive">{error}</p>
         </div>
       )}
 
       {!loading && !error && clientSecret && (
         <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#000', fontFamily: 'inherit', borderRadius: '8px' } } }}>
-          <CardFormInner companyId={companyId} authOpts={authOpts} onComplete={onComplete} onSkip={onSkip} />
+          <CardFormInner onCardConfirmed={onCardConfirmed} />
         </Elements>
       )}
     </div>
   );
 }
 
-function CardFormInner({ companyId, authOpts, onComplete, onSkip }: { companyId: string; authOpts?: OnboardingAuthOpts; onComplete: () => void; onSkip: () => void }) {
+function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<void> }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [phase, setPhase] = useState<'card' | 'starting'>('card');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -660,6 +673,7 @@ function CardFormInner({ companyId, authOpts, onComplete, onSkip }: { companyId:
     setSubmitting(true);
     setError('');
 
+    // 1) Confirm SetupIntent with Stripe
     const result = await stripe.confirmSetup({
       elements,
       confirmParams: { return_url: window.location.href },
@@ -672,21 +686,16 @@ function CardFormInner({ companyId, authOpts, onComplete, onSkip }: { companyId:
       return;
     }
 
-    let attempts = 0;
-    const poll = async () => {
-      attempts++;
-      try {
-        const status = await getOnboardingStatus(companyId, authOpts);
-        if (status.billingSetup?.autoChargeReady) {
-          setSubmitting(false);
-          onComplete();
-          return;
-        }
-      } catch {}
-      if (attempts < 10) setTimeout(poll, 2000);
-      else { setSubmitting(false); onComplete(); }
-    };
-    poll();
+    // 2) Card confirmed — now start the trial
+    setPhase('starting');
+    try {
+      await onCardConfirmed();
+    } catch (err: any) {
+      const msg = err?.message || err?.error || 'Kunde inte starta trial. Kontakta support.';
+      setError(msg);
+      setPhase('card');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -698,13 +707,10 @@ function CardFormInner({ companyId, authOpts, onComplete, onSkip }: { companyId:
         </div>
       )}
       <Button type="submit" disabled={!stripe || submitting} className="w-full h-10 bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px]">
-        {submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar kort...</> : <>
-          <CreditCard className="h-4 w-4 mr-2" /> Spara betalkort & starta trial
-        </>}
+        {submitting && phase === 'card' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar kort...</>}
+        {submitting && phase === 'starting' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</>}
+        {!submitting && <><CreditCard className="h-4 w-4 mr-2" /> Spara kort & starta trial</>}
       </Button>
-      <button type="button" onClick={onSkip} className="w-full text-[12px] text-muted-foreground hover:text-foreground transition-colors py-2">
-        Hoppa över – lägg till kort senare via inställningar
-      </button>
       <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
         <Shield className="w-3 h-3" />
         Säker betalning via Stripe · Ingen debitering under trial
@@ -712,5 +718,3 @@ function CardFormInner({ companyId, authOpts, onComplete, onSkip }: { companyId:
     </form>
   );
 }
-
-export { StepCard as StripeSetupForm };
