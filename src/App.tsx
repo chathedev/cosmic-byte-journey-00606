@@ -420,18 +420,22 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
   if (!isPublic) return <>{children}</>;
 
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      }
-    >
-      <Routes>
-        <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
-        <Route path="/free-trial" element={<FreeTrial />} />
-      </Routes>
-    </Suspense>
+    <AuthProvider>
+      <SubscriptionProvider>
+        <Suspense
+          fallback={
+            <div className="min-h-screen bg-background flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
+            <Route path="/free-trial" element={<FreeTrial />} />
+          </Routes>
+        </Suspense>
+      </SubscriptionProvider>
+    </AuthProvider>
   );
 };
 
