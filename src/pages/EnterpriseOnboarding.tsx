@@ -17,7 +17,7 @@ import {
   type ValidationResponse,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 const stripePromise = loadStripe('pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu');
 
@@ -763,23 +763,27 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 text-[13px]">
-        <div className="flex items-start justify-between gap-4">
-          <span className="text-muted-foreground">Debiteras nu</span>
-          <span className="text-foreground font-semibold">0 SEK</span>
+      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-[13px]">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Idag</span>
+          <span className="text-foreground font-semibold">0 kr</span>
         </div>
-        <div className="flex items-start justify-between gap-4">
-          <span className="text-muted-foreground">Efter 7 dagar ({trialChargeDate})</span>
-          <span className="text-foreground font-semibold">{fmt(activationFeeSek + monthlyTotal)} SEK</span>
+        <Separator className="!my-1.5" />
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{trialChargeDate}</span>
+          <span className="text-foreground font-medium">{fmt(activationFeeSek + monthlyTotal)} kr</span>
         </div>
-        <div className="flex items-start justify-between gap-4">
-          <span className="text-muted-foreground">Varje månad därefter</span>
-          <span className="text-foreground font-semibold">{fmt(monthlyTotal)} SEK/mån</span>
+        <div className="pl-3 space-y-0.5 text-[11px] text-muted-foreground">
+          <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(activationFeeSek)} kr</span></div>
+          <div className="flex justify-between"><span>{includedSeats} anv. × {fmt(Math.round(monthlyTotal / Math.max(1, expectedSeats)))} kr</span><span>{fmt(monthlyTotal - extraSeats * 249)} kr</span></div>
+          {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × 249 kr</span><span>{fmt(extraSeats * 249)} kr</span></div>}
         </div>
-        <Separator />
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Inkluderar {includedSeats} användare. Valda användare: {expectedSeats}. {extraSeats > 0 ? `Extra användare (${extraSeats}) ingår i månadspriset ovan.` : 'Inga extra användare valda.'} Alla belopp visas exkl. moms.
-        </p>
+        <Separator className="!my-1.5" />
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Därefter/mån</span>
+          <span className="text-foreground font-medium">{fmt(monthlyTotal)} kr</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground pt-1">Exkl. moms · Avsluta när som helst</p>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
@@ -818,15 +822,21 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTot
       )}
 
       {!loading && !error && !readyForTrialStart && clientSecret && (
-        <Elements stripe={stripePromise} options={{ appearance: { theme: 'stripe', variables: { fontFamily: 'inherit', borderRadius: '8px' } } }}>
-          <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
+        <Elements stripe={stripePromise} options={{
+          clientSecret,
+          appearance: {
+            theme: 'stripe',
+            variables: { fontFamily: 'inherit', borderRadius: '8px' },
+          },
+        }}>
+          <CardFormInner onCardConfirmed={onCardConfirmed} />
         </Elements>
       )}
     </div>
   );
 }
 
-function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret: string; email: string; onCardConfirmed: () => Promise<void> }) {
+function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<void> }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -836,43 +846,32 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
-
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      setError('Kortfältet kunde inte laddas. Försök igen.');
-      return;
-    }
-
     setSubmitting(true);
     setError('');
 
-    // 1) Confirm SetupIntent with Stripe via CardElement (avoids flaky PaymentElement session errors)
-    const result = await stripe.confirmCardSetup(clientSecret, {
-      payment_method: {
-        card: cardElement,
-        billing_details: email ? { email } : undefined,
-      },
+    const result = await stripe.confirmSetup({
+      elements,
+      confirmParams: { return_url: window.location.href },
+      redirect: 'if_required',
     });
 
     if (result.error) {
-      setError(result.error.message || 'Kortet kunde inte sparas.');
+      setError(result.error.message || 'Betalmetoden kunde inte sparas.');
       setSubmitting(false);
       return;
     }
 
     if (result.setupIntent?.status !== 'succeeded') {
-      setError('Kortet kunde inte bekräftas. Försök igen.');
+      setError('Betalmetoden kunde inte bekräftas. Försök igen.');
       setSubmitting(false);
       return;
     }
 
-    // 2) Card confirmed — now start the trial
     setPhase('starting');
     try {
       await onCardConfirmed();
     } catch (err: any) {
-      const msg = err?.message || err?.error || 'Kunde inte starta trial. Kontakta support.';
-      setError(msg);
+      setError(err?.message || err?.error || 'Kunde inte starta trial. Kontakta support.');
       setPhase('card');
       setSubmitting(false);
     }
@@ -880,23 +879,24 @@ function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret:
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="rounded-lg border border-border bg-background px-3 py-3">
-        <CardElement options={{ hidePostalCode: true }} />
-      </div>
+      <PaymentElement options={{
+        layout: 'tabs',
+        paymentMethodOrder: ['card', 'klarna', 'apple_pay', 'google_pay'],
+        wallets: { applePay: 'auto', googlePay: 'auto' },
+      }} />
       {error && (
         <div className="rounded bg-destructive/8 border border-destructive/15 px-3 py-2.5">
           <p className="text-[12px] text-destructive font-medium">{error}</p>
         </div>
       )}
       <Button type="submit" disabled={!stripe || submitting} className="w-full h-10 bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px]">
-        {submitting && phase === 'card' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar kort...</>}
+        {submitting && phase === 'card' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar...</>}
         {submitting && phase === 'starting' && <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</>}
-        {!submitting && <><CreditCard className="h-4 w-4 mr-2" /> Spara kort & starta trial</>}
+        {!submitting && <><Shield className="h-4 w-4 mr-2" /> Spara & starta trial</>}
       </Button>
-      <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
-        <Shield className="w-3 h-3" />
-        Säker betalning via Stripe · 0 SEK under trial
-      </div>
+      <p className="text-center text-[10px] text-muted-foreground">
+        Krypterad betalning via Stripe · 0 kr under trial
+      </p>
     </form>
   );
 }
