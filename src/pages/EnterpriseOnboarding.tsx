@@ -235,11 +235,14 @@ export default function EnterpriseOnboarding() {
     && !orgTaken && !emailTaken;
   const canProceedStep3 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
-  // Step 3 → Step 4: validate + save draft, then advance to card step
+  // Step 3 → Step 4: validate + always ensure draft saved, then advance to card step
   const handleConfirmAndProceedToCard = async () => {
     setSubmitError('');
     setIsSubmitting(true);
     try {
+      // Cancel any pending debounced draft save
+      clearTimeout(draftTimer.current);
+
       const valRes = await validateOnboarding({ ...form, requireCommitments: true } as any);
       if (!valRes.valid) {
         setFieldErrors(valRes.validation?.errors || {});
@@ -249,17 +252,23 @@ export default function EnterpriseOnboarding() {
         setIsSubmitting(false);
         return;
       }
-      // Ensure draft is saved with latest data
-      if (!draftId) {
-        const draftRes = await saveDraft({
-          ...form, countryCode: 'SE',
-          progressStep: 3, progressPercent: 80,
-        } as any);
-        if (draftRes.draft) {
-          setDraftId(draftRes.draft.id);
-          setResumeToken(draftRes.draft.resumeToken);
-          saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
-        }
+      // Always save draft with latest data to ensure draftId + resumeToken exist
+      const draftRes = await saveDraft({
+        ...form, countryCode: 'SE',
+        draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
+        progressStep: 3, progressPercent: 80,
+      } as any);
+      if (draftRes.draft) {
+        setDraftId(draftRes.draft.id);
+        setResumeToken(draftRes.draft.resumeToken);
+        saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
+        draftIdRef.current = draftRes.draft.id;
+        resumeTokenRef.current = draftRes.draft.resumeToken;
+      }
+      if (!draftRes.draft?.id || !draftRes.draft?.resumeToken) {
+        setSubmitError('Kunde inte spara utkast. Försök igen.');
+        setIsSubmitting(false);
+        return;
       }
       setStep(4);
     } catch (err: any) {
