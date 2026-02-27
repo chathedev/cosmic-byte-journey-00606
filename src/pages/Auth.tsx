@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Shield, Mic, FileText, ListChecks, FileOutput } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Shield, Mic, FileText, ListChecks, FileOutput, ArrowRight, Quote, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoAppAccessScreen from '@/components/NoAppAccessScreen';
+import { Card, CardContent } from '@/components/ui/card';
 
 declare global {
   interface Window {
@@ -53,6 +53,26 @@ function hasAppAccess(userData: any): boolean {
   return false;
 }
 
+const FEATURES = [
+  { label: 'Realtidstranskribering', desc: 'Automatisk text från ljud i realtid', Icon: Mic },
+  { label: 'AI-protokoll', desc: 'Genererade mötesprotokoll på sekunder', Icon: FileText },
+  { label: 'Action points', desc: 'Uppgifter och beslut automatiskt', Icon: ListChecks },
+  { label: 'Export', desc: 'Word, PDF och enkel delning', Icon: FileOutput },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: 'Tivly har sparat oss timmar varje vecka. Protokollen skriver sig själva.',
+    author: 'Maria L.',
+    role: 'Projektledare',
+  },
+  {
+    quote: 'Äntligen slipper vi manuella mötesanteckningar. Helt fantastiskt verktyg.',
+    author: 'Erik S.',
+    role: 'IT-chef',
+  },
+];
+
 export default function Auth() {
   const navigate = useNavigate();
   const { user, isLoading, refreshUser } = useAuth();
@@ -73,11 +93,19 @@ export default function Auth() {
   const [platform, setPlatform] = useState<'ios' | 'web'>('web');
   const [codeSent, setCodeSent] = useState(false);
   const verifyingRef = useRef(false);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveTestimonial(prev => (prev + 1) % TESTIMONIALS.length);
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -124,11 +152,7 @@ export default function Auth() {
   const handleRequestCode = async () => {
     const sanitized = sanitizeEmail(email);
     setAuthError(null);
-    if (!sanitized) {
-      setAuthError('Ange en giltig e-postadress.');
-      return;
-    }
-
+    if (!sanitized) { setAuthError('Ange en giltig e-postadress.'); return; }
     if (sanitized === 'demo@tivly.se') {
       setLoading(true);
       const demoToken = 'demo-token-' + Date.now();
@@ -146,13 +170,11 @@ export default function Auth() {
       setLoading(false);
       return;
     }
-
     setLoading(true);
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const authBaseUrl = getAuthBaseUrl();
-      const response = await fetch(`${authBaseUrl}/auth/totp/setup`, {
+      const response = await fetch(`${getAuthBaseUrl()}/auth/totp/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         credentials: 'include',
@@ -175,26 +197,19 @@ export default function Auth() {
     }
   };
 
-  const handleResendCode = async () => {
-    setAuthError(null);
-    setPinCode('');
-    await handleRequestCode();
-  };
+  const handleResendCode = async () => { setAuthError(null); setPinCode(''); await handleRequestCode(); };
 
   const handleVerifyPin = async () => {
     if (pinCode.length !== 6 || !/^\d{6}$/.test(pinCode) || verifyingRef.current) return;
     const sanitized = sanitizeEmail(email);
     if (!sanitized) return;
-
     verifyingRef.current = true;
     setVerifying(true);
     setAuthError(null);
-
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const authBaseUrl = getAuthBaseUrl();
-      const response = await fetch(`${authBaseUrl}/auth/totp/login`, {
+      const response = await fetch(`${getAuthBaseUrl()}/auth/totp/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         credentials: 'include',
@@ -203,7 +218,6 @@ export default function Auth() {
       });
       clearTimeout(timeoutId);
       const responseText = await response.text().catch(() => '');
-
       if (response.ok) {
         let userData = null;
         if (responseText && responseText.trim().length > 0) {
@@ -226,7 +240,6 @@ export default function Auth() {
         await refreshUser();
         return;
       }
-
       if (!responseText || responseText.trim() === '') {
         setAuthError('Fel kod. Försök igen.');
       } else {
@@ -245,341 +258,332 @@ export default function Auth() {
     }
   };
 
-  const handleStartOver = () => {
-    setViewMode('email');
-    setPinCode('');
-    setCodeExpiry(600);
-    setCodeSent(false);
-    setAuthError(null);
-  };
-
-  const handleBackToWelcome = () => {
-    setViewMode('welcome');
-    setEmail('');
-    setPinCode('');
-    setCodeExpiry(600);
-    setCodeSent(false);
-    setAuthError(null);
-  };
-
-  const handleGetStarted = () => {
-    localStorage.setItem('tivly_seen_welcome', 'true');
-    setViewMode('email');
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${String(secs).padStart(2, '0')}`;
-  };
+  const handleStartOver = () => { setViewMode('email'); setPinCode(''); setCodeExpiry(600); setCodeSent(false); setAuthError(null); };
+  const handleBackToWelcome = () => { setViewMode('welcome'); setEmail(''); setPinCode(''); setCodeExpiry(600); setCodeSent(false); setAuthError(null); };
+  const handleGetStarted = () => { localStorage.setItem('tivly_seen_welcome', 'true'); setViewMode('email'); };
+  const formatTime = (seconds: number) => { const m = Math.floor(seconds / 60); const s = seconds % 60; return `${m}:${String(s).padStart(2, '0')}`; };
 
   if (viewMode === 'no-access') {
     return <NoAppAccessScreen onLogout={() => { setViewMode('email'); setEmail(''); setPinCode(''); }} />;
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12 relative">
-      {/* Subtle grid texture */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.015]" style={{
-        backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
-        backgroundSize: '24px 24px',
-      }} />
+    <div className="min-h-screen bg-background flex">
+      {/* ─── LEFT: Branding panel (hidden on mobile) ─── */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary/[0.06] via-background to-accent/[0.04]">
+        {/* Subtle pattern */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{
+          backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+        }} />
 
-      <div className="w-full max-w-sm relative z-10">
-        {/* Wordmark */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-10"
-        >
-          <span className="text-[11px] font-semibold tracking-[0.4em] uppercase text-foreground">
-            Tivly
-          </span>
-        </motion.div>
+        <div className="relative z-10 flex flex-col justify-between p-12 xl:p-16 w-full">
+          {/* Top: Logo + tagline */}
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <span className="text-xs font-semibold tracking-[0.3em] uppercase text-foreground">Tivly</span>
+          </motion.div>
 
-        {/* Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.05 }}
-          className="border border-border bg-card rounded-lg overflow-hidden"
-        >
-          {/* Step indicator */}
-          <div className="flex">
-            <div className={`h-0.5 flex-1 transition-colors duration-300 ${viewMode === 'welcome' || viewMode === 'email' || viewMode === 'code-entry' ? 'bg-foreground' : 'bg-border'}`} />
-            <div className={`h-0.5 flex-1 transition-colors duration-300 ${viewMode === 'email' || viewMode === 'code-entry' ? 'bg-foreground' : 'bg-border'}`} />
-            <div className={`h-0.5 flex-1 transition-colors duration-300 ${viewMode === 'code-entry' ? 'bg-foreground' : 'bg-border'}`} />
-          </div>
-
-          <div className="p-8">
-            <AnimatePresence mode="wait">
-              {/* WELCOME */}
-              {viewMode === 'welcome' && (
-                <motion.div
-                  key="welcome"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="space-y-7"
-                >
-                  <div className="space-y-2">
-                    <h1 className="text-lg font-semibold text-foreground">
-                      Mötesdokumentation med AI
-                    </h1>
-                    <p className="text-[13px] text-muted-foreground leading-relaxed">
-                      Transkribera, sammanfatta och exportera – automatiskt.
-                    </p>
-                  </div>
-
-                  <div className="space-y-0 divide-y divide-border">
-                    {[
-                      { label: 'Realtidstranskribering', desc: 'Automatisk text från ljud', Icon: Mic },
-                      { label: 'AI-protokoll', desc: 'Genererade mötesprotokoll', Icon: FileText },
-                      { label: 'Action points', desc: 'Uppgifter och beslut', Icon: ListChecks },
-                      { label: 'Export', desc: 'Word, PDF och delning', Icon: FileOutput },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center gap-4 py-3.5">
-                        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0">
-                          <item.Icon className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-foreground">{item.label}</p>
-                          <p className="text-[11px] text-muted-foreground">{item.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button
-                    onClick={handleGetStarted}
-                    className="w-full h-10 text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 rounded-md no-hover-lift"
-                  >
-                    Kom igång
-                  </Button>
-                </motion.div>
-              )}
-
-              {/* EMAIL */}
-              {viewMode === 'email' && (
-                <motion.div
-                  key="email"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="space-y-6"
-                >
-                  <div className="space-y-1.5">
-                    <h1 className="text-lg font-semibold text-foreground">
-                      {platform === 'ios' ? 'Enterprise-inloggning' : 'Logga in'}
-                    </h1>
-                    <p className="text-[13px] text-muted-foreground">
-                      {platform === 'ios'
-                        ? 'Appen kräver ett Enterprise-konto.'
-                        : 'Vi skickar en engångskod till din e-post.'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="email" className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                        E-post
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="namn@foretag.se"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
-                        disabled={loading}
-                        autoComplete="email"
-                        autoFocus
-                        className="h-10 text-[13px] bg-background border-border rounded-md"
-                      />
-                    </div>
-
-                    <Button
-                      onClick={handleRequestCode}
-                      disabled={loading || !email.trim()}
-                      className="w-full h-10 text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 rounded-md no-hover-lift"
-                      type="button"
-                    >
-                      {loading ? (
-                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</>
-                      ) : (
-                        'Fortsätt'
-                      )}
-                    </Button>
-                  </div>
-
-                  <AnimatePresence>
-                    {authError && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="rounded-md bg-destructive/8 border border-destructive/15 px-3 py-2.5"
-                      >
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                          <p className="text-[12px] text-destructive font-medium">{authError}</p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {!isAppDomain() && !isIoDomain() && (
-                    <button
-                      onClick={handleBackToWelcome}
-                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors mx-auto"
-                    >
-                      <ArrowLeft className="w-3 h-3" />
-                      Tillbaka
-                    </button>
-                  )}
-                </motion.div>
-              )}
-
-              {/* CODE ENTRY */}
-              {viewMode === 'code-entry' && (
-                <motion.div
-                  key="code-entry"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="space-y-6"
-                >
-                  <div className="space-y-1.5">
-                    <h1 className="text-lg font-semibold text-foreground">
-                      {isNavigating ? 'Välkommen!' : verifying ? 'Verifierar...' : 'Verifiering'}
-                    </h1>
-                    <p className="text-[13px] text-muted-foreground">
-                      {isNavigating
-                        ? 'Du loggas in...'
-                        : verifying
-                          ? 'Kontrollerar koden...'
-                          : <>Kod skickad till <span className="font-medium text-foreground">{email}</span></>
-                      }
-                    </p>
-                  </div>
-
-                  <div className="flex justify-center py-1">
-                    <InputOTP
-                      maxLength={6}
-                      value={pinCode}
-                      onChange={(value) => {
-                        if (!verifying && !isNavigating) {
-                          setPinCode(value);
-                          setAuthError(null);
-                        }
-                      }}
-                      disabled={verifying || isNavigating}
-                      autoFocus
-                    >
-                      <InputOTPGroup className="gap-1.5">
-                        {[0, 1, 2, 3, 4, 5].map((i) => (
-                          <InputOTPSlot key={i} index={i} className="w-10 h-11 rounded-md border-border text-base" />
-                        ))}
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-
-                  {/* Status */}
-                  <div className="text-center min-h-[28px]">
-                    {verifying && (
-                      <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Verifierar
-                      </span>
-                    )}
-                    {isNavigating && (
-                      <span className="inline-flex items-center gap-1.5 text-[12px] text-foreground font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Inloggning lyckades
-                      </span>
-                    )}
-                    {!verifying && !isNavigating && codeExpiry > 0 && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Giltig i {formatTime(codeExpiry)}
-                      </p>
-                    )}
-                    {!verifying && !isNavigating && codeExpiry === 0 && (
-                      <p className="text-[11px] text-destructive font-medium">Koden har gått ut</p>
-                    )}
-                  </div>
-
-                  <AnimatePresence>
-                    {authError && !verifying && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="rounded-md bg-destructive/8 border border-destructive/15 px-3 py-2.5"
-                      >
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                          <p className="text-[12px] text-destructive font-medium">{authError}</p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {!isNavigating && (
-                    <div className="flex items-center justify-between pt-1">
-                      <button
-                        onClick={handleStartOver}
-                        disabled={verifying}
-                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-                      >
-                        <ArrowLeft className="w-3 h-3" />
-                        Ändra e-post
-                      </button>
-                      <button
-                        onClick={handleResendCode}
-                        disabled={verifying || loading}
-                        className="text-[11px] font-medium text-foreground hover:text-foreground/70 transition-colors disabled:opacity-40"
-                      >
-                        {loading ? 'Skickar...' : 'Skicka ny kod'}
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Footer */}
-          <div className="px-8 pb-6">
-            <Separator className="mb-4" />
-            <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Shield className="w-3 h-3" />
-                Krypterad
-              </span>
-              <span className="w-px h-2.5 bg-border" />
-              <span>GDPR</span>
-              <span className="w-px h-2.5 bg-border" />
-              <span>ISO 27001</span>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Below card */}
-        <div className="text-center mt-8 space-y-3">
-          <a
-            href="/enterprise/onboarding"
-            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-foreground hover:text-foreground/70 transition-colors"
+          {/* Center: Hero content */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+            className="space-y-10"
           >
-            Starta Enterprise-trial
-            <ArrowLeft className="w-3 h-3 rotate-180" />
-          </a>
-          <p className="text-[10px] text-muted-foreground/50">
-            © {new Date().getFullYear()} Tivly AB
-          </p>
+            <div className="space-y-4">
+              <h1 className="text-4xl xl:text-5xl font-bold text-foreground leading-[1.15] tracking-tight">
+                Mötesdokumentation<br />
+                <span className="text-primary">med AI</span>
+              </h1>
+              <p className="text-base text-muted-foreground max-w-md leading-relaxed">
+                Transkribera, sammanfatta och exportera — automatiskt. Sparar timmar varje vecka för ditt team.
+              </p>
+            </div>
+
+            {/* Features */}
+            <div className="grid grid-cols-2 gap-4">
+              {FEATURES.map((item, i) => (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + i * 0.08 }}
+                  className="flex items-start gap-3"
+                >
+                  <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <item.Icon className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Bottom: Testimonial carousel */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTestimonial}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                  <CardContent className="p-5">
+                    <Quote className="h-4 w-4 text-primary/40 mb-2" />
+                    <p className="text-sm text-foreground leading-relaxed italic">
+                      "{TESTIMONIALS[activeTestimonial].quote}"
+                    </p>
+                    <div className="flex items-center justify-between mt-4">
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{TESTIMONIALS[activeTestimonial].author}</p>
+                        <p className="text-[10px] text-muted-foreground">{TESTIMONIALS[activeTestimonial].role}</p>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="h-3 w-3 fill-primary/80 text-primary/80" />
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Testimonial dots */}
+            <div className="flex justify-center gap-1.5 mt-3">
+              {TESTIMONIALS.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveTestimonial(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 no-hover-lift ${
+                    i === activeTestimonial ? 'w-6 bg-primary' : 'w-1.5 bg-border hover:bg-muted-foreground/30'
+                  }`}
+                />
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* ─── RIGHT: Form panel ─── */}
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-4 sm:px-8 py-12 relative">
+        {/* Mobile-only pattern */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.012] lg:hidden" style={{
+          backgroundImage: 'radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }} />
+
+        <div className="w-full max-w-sm relative z-10">
+          {/* Logo */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="text-center mb-8">
+            <span className="text-xs font-semibold tracking-[0.3em] uppercase text-foreground lg:hidden">Tivly</span>
+          </motion.div>
+
+          {/* Auth card */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.05 }}
+          >
+            <Card className="border-border/50 shadow-lg shadow-primary/5 overflow-hidden">
+              {/* Progress bar */}
+              <div className="flex">
+                <div className={`h-1 flex-1 rounded-bl transition-colors duration-300 ${viewMode === 'welcome' || viewMode === 'email' || viewMode === 'code-entry' ? 'bg-primary' : 'bg-border'}`} />
+                <div className={`h-1 flex-1 transition-colors duration-300 ${viewMode === 'email' || viewMode === 'code-entry' ? 'bg-primary' : 'bg-border'}`} />
+                <div className={`h-1 flex-1 rounded-br transition-colors duration-300 ${viewMode === 'code-entry' ? 'bg-primary' : 'bg-border'}`} />
+              </div>
+
+              <CardContent className="p-8">
+                <AnimatePresence mode="wait">
+                  {/* WELCOME */}
+                  {viewMode === 'welcome' && (
+                    <motion.div key="welcome" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="space-y-6">
+                      <div className="space-y-2">
+                        <h1 className="text-xl font-bold text-foreground">Välkommen</h1>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          AI-driven mötesdokumentation för moderna team.
+                        </p>
+                      </div>
+
+                      {/* Features list — visible on mobile since left panel is hidden */}
+                      <div className="space-y-0 divide-y divide-border/50 lg:hidden">
+                        {FEATURES.map((item) => (
+                          <div key={item.label} className="flex items-center gap-3 py-3">
+                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <item.Icon className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{item.label}</p>
+                              <p className="text-xs text-muted-foreground">{item.desc}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop welcome — simpler since features are on the left */}
+                      <div className="hidden lg:block space-y-3">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Logga in eller skapa ett konto för att börja transkribera, generera protokoll och exportera — helt automatiskt.
+                        </p>
+                      </div>
+
+                      <Button
+                        onClick={handleGetStarted}
+                        className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl no-hover-lift shadow-md shadow-primary/15"
+                      >
+                        Kom igång
+                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                      </Button>
+                    </motion.div>
+                  )}
+
+                  {/* EMAIL */}
+                  {viewMode === 'email' && (
+                    <motion.div key="email" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="space-y-6">
+                      <div className="space-y-1.5">
+                        <h1 className="text-xl font-bold text-foreground">
+                          {platform === 'ios' ? 'Enterprise-inloggning' : 'Logga in'}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                          {platform === 'ios' ? 'Appen kräver ett Enterprise-konto.' : 'Vi skickar en engångskod till din e-post.'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">E-post</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="namn@foretag.se"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
+                            disabled={loading}
+                            autoComplete="email"
+                            autoFocus
+                            className="h-11 text-sm bg-background rounded-xl"
+                          />
+                        </div>
+
+                        <Button
+                          onClick={handleRequestCode}
+                          disabled={loading || !email.trim()}
+                          className="w-full h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl no-hover-lift shadow-md shadow-primary/15"
+                          type="button"
+                        >
+                          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</> : 'Fortsätt'}
+                        </Button>
+                      </div>
+
+                      <AnimatePresence>
+                        {authError && (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                            <Card className="border-destructive/20 bg-destructive/5">
+                              <CardContent className="p-3 flex items-center gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                <p className="text-xs text-destructive font-medium">{authError}</p>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {!isAppDomain() && !isIoDomain() && (
+                        <button onClick={handleBackToWelcome} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto">
+                          <ArrowLeft className="w-3 h-3" /> Tillbaka
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* CODE ENTRY */}
+                  {viewMode === 'code-entry' && (
+                    <motion.div key="code-entry" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="space-y-6">
+                      <div className="space-y-1.5">
+                        <h1 className="text-xl font-bold text-foreground">
+                          {isNavigating ? 'Välkommen!' : verifying ? 'Verifierar...' : 'Verifiering'}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                          {isNavigating ? 'Du loggas in...' : verifying ? 'Kontrollerar koden...' : <>Kod skickad till <span className="font-medium text-foreground">{email}</span></>}
+                        </p>
+                      </div>
+
+                      <div className="flex justify-center py-2">
+                        <InputOTP maxLength={6} value={pinCode} onChange={(value) => { if (!verifying && !isNavigating) { setPinCode(value); setAuthError(null); } }} disabled={verifying || isNavigating} autoFocus>
+                          <InputOTPGroup className="gap-2">
+                            {[0, 1, 2, 3, 4, 5].map((i) => (
+                              <InputOTPSlot key={i} index={i} className="w-11 h-12 rounded-xl border-border text-base font-medium" />
+                            ))}
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+
+                      <div className="text-center min-h-[28px]">
+                        {verifying && <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" />Verifierar</span>}
+                        {isNavigating && <span className="inline-flex items-center gap-1.5 text-xs text-primary font-medium"><CheckCircle2 className="w-3.5 h-3.5" />Inloggning lyckades</span>}
+                        {!verifying && !isNavigating && codeExpiry > 0 && <p className="text-xs text-muted-foreground">Giltig i {formatTime(codeExpiry)}</p>}
+                        {!verifying && !isNavigating && codeExpiry === 0 && <p className="text-xs text-destructive font-medium">Koden har gått ut</p>}
+                      </div>
+
+                      <AnimatePresence>
+                        {authError && !verifying && (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                            <Card className="border-destructive/20 bg-destructive/5">
+                              <CardContent className="p-3 flex items-center gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                <p className="text-xs text-destructive font-medium">{authError}</p>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {!isNavigating && (
+                        <div className="flex items-center justify-between pt-1">
+                          <button onClick={handleStartOver} disabled={verifying} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40">
+                            <ArrowLeft className="w-3 h-3" /> Ändra e-post
+                          </button>
+                          <button onClick={handleResendCode} disabled={verifying || loading} className="text-xs font-medium text-primary hover:text-primary/70 transition-colors disabled:opacity-40">
+                            {loading ? 'Skickar...' : 'Skicka ny kod'}
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
+
+              {/* Footer */}
+              <div className="px-8 pb-6">
+                <div className="h-px bg-border/50 mb-4" />
+                <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-primary/50" />Krypterad</span>
+                  <span className="w-px h-2.5 bg-border" />
+                  <span>GDPR</span>
+                  <span className="w-px h-2.5 bg-border" />
+                  <span>ISO 27001</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Below card */}
+          <div className="text-center mt-8 space-y-3">
+            <a href="/enterprise/onboarding" className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/70 transition-colors">
+              Starta Enterprise-trial <ArrowRight className="w-3 h-3" />
+            </a>
+            <p className="text-[10px] text-muted-foreground/50">© {new Date().getFullYear()} Tivly AB</p>
+          </div>
         </div>
       </div>
     </div>
