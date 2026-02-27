@@ -264,7 +264,7 @@ export default function Auth() {
           </div>
 
           {/* Right panel — auth form */}
-          <div className="flex-1 flex flex-col items-center justify-center px-5 sm:px-8 py-12 sm:py-16 min-h-[100dvh] lg:min-h-0">
+          <div className="flex-1 flex flex-col items-center justify-center px-5 sm:px-8 py-12 sm:py-16 min-h-[100dvh] lg:min-h-screen">
             
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
