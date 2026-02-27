@@ -233,7 +233,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-foreground flex flex-col">
+    <div className="fixed inset-0 bg-foreground flex flex-col overflow-hidden">
       {/* Top bar */}
       <div className="px-6 py-5 flex items-center justify-between">
         <span className="text-[13px] font-semibold tracking-[0.25em] uppercase text-background/80">Tivly</span>

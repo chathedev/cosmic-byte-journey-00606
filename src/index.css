@@ -320,14 +320,16 @@ All colors MUST be HSL.
     animation-duration: 500ms;
   }
 
-  /* Button hover effects */
-  button:not([disabled]) {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+  /* Button hover effects - desktop only to prevent mobile ghost taps */
+  @media (hover: hover) {
+    button:not([disabled]) {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
-  button:hover:not(:disabled):not(.no-hover-lift) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px -2px hsl(var(--primary) / 0.2);
+    button:hover:not(:disabled):not(.no-hover-lift) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px -2px hsl(var(--primary) / 0.2);
+    }
   }
 
   button:active:not(:disabled) {
@@ -339,16 +341,13 @@ All colors MUST be HSL.
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Input focus effects */
-  input:focus,
-  textarea:focus {
-    transform: scale(1.01);
-    transition: transform 0.2s ease-out;
-  }
-
-  /* Smooth scrolling */
-  * {
-    scroll-behavior: smooth;
+  /* Input focus effects - desktop only, prevents mobile scroll glitches */
+  @media (hover: hover) {
+    input:focus,
+    textarea:focus {
+      transform: scale(1.01);
+      transition: transform 0.2s ease-out;
+    }
   }
   
   
