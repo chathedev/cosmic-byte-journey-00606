@@ -668,7 +668,7 @@ function StepConfirm({
             className="mt-0.5"
           />
           <span className="text-sm text-muted-foreground leading-relaxed">
-            Jag godkänner <a href="https://tivly.se/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline">villkoren</a> och <a href="https://tivly.se/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline">integritetspolicyn</a>.
+            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-primary underline">enterprise-villkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary underline">integritetspolicyn</a>.
           </span>
         </label>
         <label className="flex items-start gap-3 cursor-pointer">
