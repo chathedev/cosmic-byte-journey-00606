@@ -210,9 +210,23 @@ export async function saveDraft(
     progressPercent?: number;
   }
 ): Promise<DraftResponse> {
+  const draftId = typeof data.draftId === 'string' ? data.draftId.trim() : '';
+  const resumeToken = typeof data.resumeToken === 'string' ? data.resumeToken.trim() : '';
+
+  // Backend requires BOTH draftId + resumeToken for updates.
+  // If one is missing, create a new draft instead of sending a broken update payload.
+  const payload: Record<string, any> = { ...data, countryCode: 'SE' };
+  if (draftId && resumeToken) {
+    payload.draftId = draftId;
+    payload.resumeToken = resumeToken;
+  } else {
+    delete payload.draftId;
+    delete payload.resumeToken;
+  }
+
   return apiFetch('/enterprise/onboarding/draft', {
     method: 'POST',
-    body: JSON.stringify({ ...data, countryCode: 'SE' }),
+    body: JSON.stringify(payload),
   });
 }
 
