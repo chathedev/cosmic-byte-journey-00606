@@ -67,6 +67,16 @@ function clearFormLocal() { removeStorageKey(FORM_KEY); }
 
 function fmt(n: number) { return n.toLocaleString('sv-SE'); }
 
+function extractSetupIntentClientSecret(payload: any): string | null {
+  return (
+    payload?.billing?.setupIntentClientSecret ||
+    payload?.setupIntentClientSecret ||
+    payload?.clientSecret ||
+    payload?.client_secret ||
+    null
+  );
+}
+
 export default function EnterpriseOnboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Partial<OnboardingFormData>>({
@@ -86,6 +96,7 @@ export default function EnterpriseOnboarding() {
   const [completedEmail, setCompletedEmail] = useState('');
   const [draftId, setDraftId] = useState<string | undefined>();
   const [resumeToken, setResumeToken] = useState<string | undefined>();
+  const [setupIntentClientSecret, setSetupIntentClientSecret] = useState<string | null>(null);
 
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -235,12 +246,13 @@ export default function EnterpriseOnboarding() {
     && !orgTaken && !emailTaken;
   const canProceedStep3 = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
-  // Step 3 → Step 4: validate + always ensure draft saved, then advance to card step
+  // Step 3 → Step 4: validate + save + subscribe payment + then show card form
   const handleConfirmAndProceedToCard = async () => {
     setSubmitError('');
     setIsSubmitting(true);
+    setSetupIntentClientSecret(null);
+
     try {
-      // Cancel any pending debounced draft save
       clearTimeout(draftTimer.current);
 
       const valRes = await validateOnboarding({ ...form, requireCommitments: true } as any);
@@ -252,27 +264,45 @@ export default function EnterpriseOnboarding() {
         setIsSubmitting(false);
         return;
       }
-      // Always save draft with latest data to ensure draftId + resumeToken exist
+
       const draftRes = await saveDraft({
-        ...form, countryCode: 'SE',
-        draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 3, progressPercent: 80,
+        ...form,
+        countryCode: 'SE',
+        draftId: draftIdRef.current,
+        resumeToken: resumeTokenRef.current,
+        progressStep: 3,
+        progressPercent: 80,
       } as any);
-      if (draftRes.draft) {
-        setDraftId(draftRes.draft.id);
-        setResumeToken(draftRes.draft.resumeToken);
-        saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
-        draftIdRef.current = draftRes.draft.id;
-        resumeTokenRef.current = draftRes.draft.resumeToken;
-      }
-      if (!draftRes.draft?.id || !draftRes.draft?.resumeToken) {
-        setSubmitError('Kunde inte spara utkast. Försök igen.');
+
+      const ensuredDraftId = draftRes.draft?.id;
+      const ensuredResumeToken = draftRes.draft?.resumeToken;
+
+      if (!ensuredDraftId || !ensuredResumeToken) {
+        setSubmitError('Kunde inte spara onboarding. Försök igen.');
         setIsSubmitting(false);
         return;
       }
+
+      setDraftId(ensuredDraftId);
+      setResumeToken(ensuredResumeToken);
+      saveDraftLocal(ensuredDraftId, ensuredResumeToken);
+      draftIdRef.current = ensuredDraftId;
+      resumeTokenRef.current = ensuredResumeToken;
+
+      // CRITICAL: Initialize payment subscription step before rendering card form
+      const subscribeRes = await subscribeDraft(ensuredDraftId, ensuredResumeToken);
+      const secret = extractSetupIntentClientSecret(subscribeRes);
+
+      if (!secret) {
+        setSubmitError('Betalningssteget kunde inte initieras (saknar client secret).');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setSetupIntentClientSecret(secret);
       setStep(4);
     } catch (err: any) {
-      setSubmitError(err?.message || err?.error || 'Något gick fel. Försök igen.');
+      setSubmitError(err?.message || err?.error || 'Kunde inte initiera betalningssteget. Försök igen.');
     } finally {
       setIsSubmitting(false);
     }
@@ -375,6 +405,7 @@ export default function EnterpriseOnboarding() {
               <StepCard
                 draftId={draftId}
                 resumeToken={resumeToken}
+                initialClientSecret={setupIntentClientSecret}
                 email={form.workEmail || ''}
                 onCardConfirmed={handleCardConfirmedStartTrial}
               />
@@ -612,27 +643,26 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /* ─── STEP 4: Card (Stripe SetupIntent via draft-level subscribe) ─── */
-function StepCard({ draftId, resumeToken, email, onCardConfirmed }: {
-  draftId: string; resumeToken: string; email: string;
+function StepCard({ draftId, resumeToken, initialClientSecret, email, onCardConfirmed }: {
+  draftId: string; resumeToken: string; initialClientSecret: string | null; email: string;
   onCardConfirmed: () => Promise<void>;
 }) {
-  const [loading, setLoading] = useState(true);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!initialClientSecret);
+  const [clientSecret, setClientSecret] = useState<string | null>(initialClientSecret);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    console.log('[StepCard] Calling subscribeDraft with', { draftId, resumeToken: resumeToken?.slice(0, 8) + '...' });
+    if (initialClientSecret) {
+      setClientSecret(initialClientSecret);
+      setLoading(false);
+      return;
+    }
+
     subscribeDraft(draftId, resumeToken)
       .then(res => {
-        console.log('[StepCard] subscribeDraft response:', JSON.stringify(res, null, 2));
-        // Handle multiple possible response shapes
-        const secret =
-          res?.billing?.setupIntentClientSecret ||
-          (res as any)?.setupIntentClientSecret ||
-          (res as any)?.clientSecret ||
-          (res as any)?.client_secret;
+        const secret = extractSetupIntentClientSecret(res);
         if (!secret) {
-          setError('Inget client secret mottogs från servern. Kontakta support.');
+          setError('Betalningssteget kunde inte initieras (saknar client secret).');
           setLoading(false);
           return;
         }
@@ -640,13 +670,12 @@ function StepCard({ draftId, resumeToken, email, onCardConfirmed }: {
         setLoading(false);
       })
       .catch(err => {
-        console.error('[StepCard] subscribeDraft error:', err);
-        const msg = err?.message || err?.error || err?.detail || 
+        const msg = err?.message || err?.error || err?.detail ||
           (typeof err === 'string' ? err : 'Kunde inte ladda betalningsformuläret.');
         setError(msg);
         setLoading(false);
       });
-  }, [draftId, resumeToken]);
+  }, [draftId, resumeToken, initialClientSecret]);
 
   return (
     <div className="space-y-6">
@@ -673,7 +702,31 @@ function StepCard({ draftId, resumeToken, email, onCardConfirmed }: {
       {error && !loading && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-3">
           <p className="text-[13px] text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => { setError(''); setLoading(true); subscribeDraft(draftId, resumeToken).then(res => { const secret = res?.billing?.setupIntentClientSecret || (res as any)?.setupIntentClientSecret || (res as any)?.clientSecret || (res as any)?.client_secret; if (!secret) { setError('Inget client secret mottogs.'); setLoading(false); return; } setClientSecret(secret); setLoading(false); }).catch(err => { setError(err?.message || err?.error || 'Försök igen.'); setLoading(false); }); }} className="text-[12px]">Försök igen</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setError('');
+              setLoading(true);
+              try {
+                const res = await subscribeDraft(draftId, resumeToken);
+                const secret = extractSetupIntentClientSecret(res);
+                if (!secret) {
+                  setError('Betalningssteget kunde inte initieras (saknar client secret).');
+                  setLoading(false);
+                  return;
+                }
+                setClientSecret(secret);
+                setLoading(false);
+              } catch (err: any) {
+                setError(err?.message || err?.error || 'Försök igen.');
+                setLoading(false);
+              }
+            }}
+            className="text-[12px]"
+          >
+            Försök igen
+          </Button>
         </div>
       )}
 
