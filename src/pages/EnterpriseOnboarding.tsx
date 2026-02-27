@@ -274,11 +274,18 @@ export default function EnterpriseOnboarding() {
         progressPercent: 80,
       } as any);
 
+      // Backend returns resumeToken only on creation; on update, keep existing one
       const ensuredDraftId = draftRes.draft?.id;
-      const ensuredResumeToken = draftRes.draft?.resumeToken;
+      const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
 
-      if (!ensuredDraftId || !ensuredResumeToken) {
-        setSubmitError('Kunde inte spara onboarding. Försök igen.');
+      if (!ensuredDraftId) {
+        setSubmitError('Kunde inte spara onboarding (inget draft-id). Försök igen.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!ensuredResumeToken) {
+        setSubmitError('Kunde inte spara onboarding (saknar resume-token). Försök igen.');
         setIsSubmitting(false);
         return;
       }
