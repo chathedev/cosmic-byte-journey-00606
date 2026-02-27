@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Mail, User, Phone, Globe, Users, ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle, CheckCircle2, Minus, Plus } from 'lucide-react';
+import { Mail, ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle, CheckCircle2, Minus, Plus, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
   validateOnboarding,
@@ -13,6 +12,7 @@ import {
   getDraft,
   startTrial,
   type OnboardingFormData,
+  type ValidationResponse,
 } from '@/lib/enterpriseOnboardingApi';
 
 const PLANS = [
@@ -33,10 +33,9 @@ const PLANS = [
 ];
 
 const EXTRA_SEAT_PRICE = 249;
-
 const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta'];
-
 const DRAFT_KEY = 'tivly_enterprise_draft';
+const FORM_KEY = 'tivly_enterprise_form';
 
 function saveDraftLocal(draftId: string, resumeToken: string) {
   try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ draftId, resumeToken })); } catch {}
@@ -68,19 +67,21 @@ export default function EnterpriseOnboarding() {
     authorizedSignatory: false,
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [fieldChecks, setFieldChecks] = useState<Record<string, boolean>>({});
+  const [availability, setAvailability] = useState<ValidationResponse['validation']['availability']>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [completed, setCompleted] = useState(false);
   const [completedEmail, setCompletedEmail] = useState('');
   const [draftId, setDraftId] = useState<string | undefined>();
   const [resumeToken, setResumeToken] = useState<string | undefined>();
-  const [validatedFields, setValidatedFields] = useState<Set<string>>(new Set());
 
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Use refs to avoid stale closures in callbacks/effects
+  // Refs for stale closure prevention
   const draftIdRef = useRef(draftId);
   const resumeTokenRef = useRef(resumeToken);
   const formRef = useRef(form);
@@ -91,8 +92,6 @@ export default function EnterpriseOnboarding() {
   useEffect(() => { formRef.current = form; }, [form]);
   useEffect(() => { stepRef.current = step; }, [step]);
 
-  // Persist form locally as fallback
-  const FORM_KEY = 'tivly_enterprise_form';
   const saveFormLocal = useCallback((f: Partial<OnboardingFormData>, s: number) => {
     try { localStorage.setItem(FORM_KEY, JSON.stringify({ form: f, step: s })); } catch {}
   }, []);
@@ -136,25 +135,24 @@ export default function EnterpriseOnboarding() {
     }
   }, []);
 
+  // Validate via backend API (debounced)
   const triggerValidation = useCallback((fields: Partial<OnboardingFormData>) => {
     clearTimeout(validateTimer.current);
     validateTimer.current = setTimeout(async () => {
+      setIsValidating(true);
       try {
         const res = await validateOnboarding(fields);
         setFieldErrors(res.validation?.errors || {});
-        const passed = new Set<string>();
-        for (const f of ['companyName', 'workEmail', 'organizationNumber', 'contactName', 'contactPhone', 'websiteUrl']) {
-          if ((fields as any)[f] && !(res.validation?.errors || {})[f]) passed.add(f);
-        }
-        setValidatedFields(passed);
+        setFieldChecks(res.validation?.checks || {});
+        setAvailability(res.validation?.availability || {});
       } catch {}
+      setIsValidating(false);
     }, 400);
   }, []);
 
+  // Save draft to server (debounced)
   const triggerDraftSave = useCallback((fields: Partial<OnboardingFormData>, currentStep: number) => {
-    // Always save locally immediately
     saveFormLocal(fields, currentStep);
-
     clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(async () => {
       setIsSaving(true);
@@ -171,9 +169,7 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           saveDraftLocal(res.draft.id, res.draft.resumeToken);
         }
-      } catch {
-        // Local backup already saved above
-      }
+      } catch {}
       setIsSaving(false);
     }, 800);
   }, [saveFormLocal]);
@@ -181,7 +177,10 @@ export default function EnterpriseOnboarding() {
   const updateField = (field: string, value: any) => {
     const next = { ...form, [field]: value };
     setForm(next);
-    if (step === 2) triggerValidation(next as Partial<OnboardingFormData>);
+    // Validate on step 2 (details) or whenever key fields change
+    if (step >= 2) {
+      triggerValidation(next as Partial<OnboardingFormData>);
+    }
     triggerDraftSave(next as Partial<OnboardingFormData>, step);
   };
 
@@ -195,20 +194,21 @@ export default function EnterpriseOnboarding() {
     }
   }, [form.expectedSeats]);
 
-  // Save draft on step change
+  // Save draft on step change & validate on step 2+
   useEffect(() => {
     saveFormLocal(form, step);
     triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step >= 2) {
+      triggerValidation(form as Partial<OnboardingFormData>);
+    }
   }, [step]);
 
-  // Beacon save on page unload
+  // Beacon save on unload
   useEffect(() => {
     const handler = () => {
       const f = formRef.current;
       const s = stepRef.current;
-      // Always save locally
       try { localStorage.setItem(FORM_KEY, JSON.stringify({ form: f, step: s })); } catch {}
-      // Try server save via beacon
       if (f.companyName || f.workEmail) {
         navigator.sendBeacon?.('https://api.tivly.se/enterprise/onboarding/draft',
           new Blob([JSON.stringify({
@@ -229,17 +229,25 @@ export default function EnterpriseOnboarding() {
   const extraSeats = Math.max(0, seats - selectedPlan.seats);
   const monthlyTotal = selectedPlan.priceSek + extraSeats * EXTRA_SEAT_PRICE;
 
+  // Availability blockers
+  const orgTaken = availability?.organizationNumberAvailable === false;
+  const emailTaken = availability?.workEmailAvailable === false;
+
   const canProceedStep2 = form.companyName && form.organizationNumber && form.contactName && form.workEmail && form.contactPhone
-    && !fieldErrors.companyName && !fieldErrors.organizationNumber && !fieldErrors.contactName && !fieldErrors.workEmail && !fieldErrors.contactPhone;
+    && !fieldErrors.companyName && !fieldErrors.organizationNumber && !fieldErrors.contactName && !fieldErrors.workEmail && !fieldErrors.contactPhone
+    && !orgTaken && !emailTaken;
   const canSubmit = form.acceptedTerms && form.authorizedSignatory && canProceedStep2;
 
   const handleSubmit = async () => {
     setSubmitError('');
     setIsSubmitting(true);
     try {
+      // Final validation with commitments
       const valRes = await validateOnboarding({ ...form, requireCommitments: true } as any);
       if (!valRes.valid) {
         setFieldErrors(valRes.validation?.errors || {});
+        setFieldChecks(valRes.validation?.checks || {});
+        setAvailability(valRes.validation?.availability || {});
         setSubmitError('Vänligen korrigera felen innan du fortsätter.');
         setIsSubmitting(false);
         return;
@@ -260,7 +268,7 @@ export default function EnterpriseOnboarding() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Minimal header */}
+      {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
           <span className="text-sm font-semibold text-foreground">Tivly Enterprise</span>
@@ -291,10 +299,7 @@ export default function EnterpriseOnboarding() {
             transition={{ duration: 0.2 }}
           >
             {step === 0 && (
-              <StepTeamSize
-                seats={seats}
-                onChange={(v) => updateField('expectedSeats', v)}
-              />
+              <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />
             )}
             {step === 1 && (
               <StepPlan
@@ -309,7 +314,9 @@ export default function EnterpriseOnboarding() {
               <StepDetails
                 form={form}
                 fieldErrors={fieldErrors}
-                validatedFields={validatedFields}
+                fieldChecks={fieldChecks}
+                availability={availability}
+                isValidating={isValidating}
                 updateField={updateField}
               />
             )}
@@ -369,7 +376,6 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         <p className="text-sm text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
       </div>
 
-      {/* Counter */}
       <div className="flex items-center justify-center gap-6 py-8">
         <button
           onClick={() => onChange(Math.max(1, seats - 1))}
@@ -389,7 +395,6 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         </button>
       </div>
 
-      {/* Quick presets */}
       <div className="flex items-center justify-center gap-2">
         {presets.map(n => (
           <button
@@ -407,7 +412,6 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         ))}
       </div>
 
-      {/* Recommendation hint */}
       <p className="text-center text-sm text-muted-foreground">
         {seats <= 10
           ? 'Vi rekommenderar Small-planen för ert team.'
@@ -486,7 +490,9 @@ function StepPlan({
           <span className="text-foreground">Totalt/mån</span>
           <span className="text-foreground">{fmt(monthlyTotal)} SEK</span>
         </div>
-        <p className="text-xs text-muted-foreground">Exkl. moms. Slutpris beräknas server-side.</p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Info className="h-3 w-3" /> Exkl. moms. Slutpris beräknas av servern.
+        </p>
       </div>
     </div>
   );
@@ -497,19 +503,29 @@ function StepPlan({
 function StepDetails({
   form,
   fieldErrors,
-  validatedFields,
+  fieldChecks,
+  availability,
+  isValidating,
   updateField,
 }: {
   form: Partial<OnboardingFormData>;
   fieldErrors: Record<string, string>;
-  validatedFields: Set<string>;
+  fieldChecks: Record<string, boolean>;
+  availability: ValidationResponse['validation']['availability'];
+  isValidating: boolean;
   updateField: (f: string, v: any) => void;
 }) {
+  const orgTaken = availability?.organizationNumberAvailable === false;
+  const emailTaken = availability?.workEmailAvailable === false;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">Företag & kontakt</h2>
-        <p className="text-sm text-muted-foreground mt-1">Fyll i uppgifter om ert företag och kontaktperson.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Företag & kontakt</h2>
+          <p className="text-sm text-muted-foreground mt-1">Fyll i uppgifter om ert företag och kontaktperson.</p>
+        </div>
+        {isValidating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
       <div className="grid gap-4">
@@ -521,7 +537,7 @@ function StepDetails({
             value={form.companyName || ''}
             onChange={(v) => updateField('companyName', v)}
             error={fieldErrors.companyName}
-            valid={validatedFields.has('companyName')}
+            valid={fieldChecks.companyNameValid}
             required
           />
           <FieldInput
@@ -530,8 +546,8 @@ function StepDetails({
             placeholder="556016-0680"
             value={form.organizationNumber || ''}
             onChange={(v) => updateField('organizationNumber', v)}
-            error={fieldErrors.organizationNumber}
-            valid={validatedFields.has('organizationNumber')}
+            error={orgTaken ? 'Detta organisationsnummer är redan registrerat.' : fieldErrors.organizationNumber}
+            valid={fieldChecks.organizationNumberValid && !orgTaken}
             hint="XXXXXX-XXXX"
             required
           />
@@ -543,7 +559,7 @@ function StepDetails({
           value={form.websiteUrl || ''}
           onChange={(v) => updateField('websiteUrl', v)}
           error={fieldErrors.websiteUrl}
-          valid={validatedFields.has('websiteUrl')}
+          valid={fieldChecks.websiteUrlValid}
         />
 
         <div className="border-t border-border pt-4 mt-2" />
@@ -555,7 +571,7 @@ function StepDetails({
           value={form.contactName || ''}
           onChange={(v) => updateField('contactName', v)}
           error={fieldErrors.contactName}
-          valid={validatedFields.has('contactName')}
+          valid={fieldChecks.contactNameValid}
           required
         />
         <div className="grid sm:grid-cols-2 gap-4">
@@ -566,8 +582,8 @@ function StepDetails({
             placeholder="anna@acme.se"
             value={form.workEmail || ''}
             onChange={(v) => updateField('workEmail', v)}
-            error={fieldErrors.workEmail}
-            valid={validatedFields.has('workEmail')}
+            error={emailTaken ? 'Denna e-postadress är redan registrerad.' : fieldErrors.workEmail}
+            valid={fieldChecks.workEmailValid && !emailTaken}
             hint="Ingen gratismail"
             required
           />
@@ -578,11 +594,25 @@ function StepDetails({
             value={form.contactPhone || ''}
             onChange={(v) => updateField('contactPhone', v)}
             error={fieldErrors.contactPhone}
-            valid={validatedFields.has('contactPhone')}
+            valid={fieldChecks.contactPhoneValid}
             required
           />
         </div>
       </div>
+
+      {(orgTaken || emailTaken) && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">
+            {orgTaken && emailTaken
+              ? 'Både organisationsnumret och e-postadressen är redan registrerade.'
+              : orgTaken
+                ? 'Organisationsnumret är redan registrerat. Kontakta support om du behöver hjälp.'
+                : 'E-postadressen är redan registrerad. Kontakta support om du behöver hjälp.'}
+            {' '}<a href="mailto:support@tivly.se" className="underline">support@tivly.se</a>
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -614,7 +644,7 @@ function FieldInput({
           <AlertCircle className="h-3 w-3 shrink-0" /> {error}
         </p>
       )}
-      {!error && valid && (
+      {!error && valid && value && (
         <p className="text-xs text-primary flex items-center gap-1 mt-1">
           <CheckCircle2 className="h-3 w-3" /> OK
         </p>
@@ -658,6 +688,8 @@ function StepConfirm({
         <Row label="Telefon" value={form.contactPhone || '–'} />
         <Row label="Plan" value={`${selectedPlan.name} – ${fmt(monthlyTotal)} SEK/mån`} />
         <Row label="Användare" value={String(form.expectedSeats || 0)} />
+        {extraSeats > 0 && <Row label="Extra platser" value={`${extraSeats} × ${EXTRA_SEAT_PRICE} SEK`} />}
+        <Row label="Aktivering" value={`${fmt(selectedPlan.activationSek)} SEK (efter trial)`} />
       </div>
 
       <div className="space-y-3">

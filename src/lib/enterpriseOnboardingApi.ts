@@ -14,21 +14,43 @@ export interface OnboardingFormData {
   authorizedSignatory: boolean;
 }
 
-export interface ValidationError {
-  field: string;
-  message: string;
-}
-
 export interface ValidationResponse {
+  success: boolean;
   valid: boolean;
   validation: {
+    ok: boolean;
     errors: Record<string, string>;
-    normalized?: Record<string, any>;
-    availability?: {
-      organizationNumber?: { available: boolean; message?: string };
-      workEmail?: { available: boolean; message?: string };
-      activeDraft?: { exists: boolean; draftId?: string };
+    normalized?: {
+      companyName?: string;
+      workEmail?: string;
+      workEmailDomain?: string;
+      planType?: string;
+      organizationNumber?: string;
+      organizationNumberDisplay?: string;
+      organizationNumberVat?: string;
+      countryCode?: string;
+      contactName?: string;
+      contactPhone?: string;
+      websiteUrl?: string;
+      websiteDomain?: string;
+      expectedSeats?: number;
+      acceptedTerms?: boolean;
+      authorizedSignatory?: boolean;
+      title?: string | null;
+      domain?: string;
     };
+    checks?: Record<string, boolean>;
+    requirements?: {
+      commitmentsRequired?: boolean;
+    };
+    availability?: {
+      organizationNumberAvailable?: boolean;
+      workEmailAvailable?: boolean;
+      existingCompanyByOrganizationNumber?: any;
+      existingCompanyByContactEmail?: any;
+      existingDraft?: any;
+    };
+    timestamp?: string;
   };
 }
 
@@ -51,6 +73,10 @@ export interface StartResponse {
   invitation: {
     email: string;
     sent: boolean;
+  };
+  draftLink?: {
+    linked: boolean;
+    reason?: string;
   };
   nextStep: string;
   company: Record<string, any>;
