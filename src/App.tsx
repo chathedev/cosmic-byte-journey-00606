@@ -50,7 +50,7 @@ import AdminEmailCampaigns from "./pages/AdminEmailCampaigns";
 import AdminEnterprise from "./pages/AdminEnterprise";
 import AdminEnterpriseBilling from "./pages/AdminEnterpriseBilling";
 import AdminEnterpriseCompanyDetail from "./pages/AdminEnterpriseCompanyDetail";
-import SISRequired from "./pages/SISRequired";
+
 import AdminAICosts from "./pages/AdminAICosts";
 import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
@@ -212,10 +212,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isMagicLoginPage = location.pathname === '/magic-login';
   const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/enterprise/onboarding';
   const isRecordingPage = location.pathname === '/recording';
-  const isSISRequiredPage = location.pathname === '/sis-required';
   const isNative = isNativeApp();
 
-  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage || isSISRequiredPage) {
+  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage) {
     return <>{children}</>;
   }
 
@@ -269,48 +268,6 @@ const EnterpriseAccessCheck = () => {
   );
 };
 
-// SIS Required Gate - blocks enterprise users who haven't submitted voice sample when SIS is enabled
-const EnterpriseSISGate = ({ children }: { children: React.ReactNode }) => {
-  const { enterpriseMembership, isAdmin } = useSubscription();
-  const { user } = useAuth();
-  const location = useLocation();
-  
-  // Skip check on auth routes
-  if (location.pathname === '/auth' || location.pathname === '/magic-login' || location.pathname === '/sis-required') {
-    return <>{children}</>;
-  }
-  
-  // Skip for non-authenticated users
-  if (!user) {
-    return <>{children}</>;
-  }
-  
-  // Skip for admins
-  if (isAdmin) {
-    return <>{children}</>;
-  }
-  
-  // Check if user is enterprise member with SIS enabled
-  if (!enterpriseMembership?.isMember || !enterpriseMembership.company) {
-    return <>{children}</>;
-  }
-  
-  // Check if SIS is enabled for the company
-  const sisEnabled = enterpriseMembership.company.speakerIdentificationEnabled;
-  if (!sisEnabled) {
-    return <>{children}</>;
-  }
-  
-  // Check if user has a valid SIS sample
-  const hasSample = enterpriseMembership.sisSample?.status === 'ready';
-  if (hasSample) {
-    return <>{children}</>;
-  }
-  
-  // User needs to submit SIS sample - redirect to SIS required page
-  console.log('[EnterpriseSISGate] 🎤 SIS required but no sample - blocking access');
-  return <Navigate to="/sis-required" replace />;
-};
 
 // Preferred Name Gate removed - now handled via auto-opening Settings in AppSidebar
 
@@ -333,7 +290,6 @@ const AppContent = () => {
       <IOSAppPromoDialog />
       <OpenInAppBanner />
       <WelcomeGate>
-        <EnterpriseSISGate>
           <AppLayout>
             <Suspense
               fallback={
@@ -346,7 +302,7 @@ const AppContent = () => {
                 <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
                 <Route path="/auth/handoff" element={<AuthHandoff />} />
                 <Route path="/magic-login" element={<MagicLogin />} />
-                <Route path="/sis-required" element={<ProtectedRoute><SISRequired /></ProtectedRoute>} />
+                
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/free-trial" element={<FreeTrial />} />
                 <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
@@ -379,7 +335,6 @@ const AppContent = () => {
               </Routes>
             </Suspense>
           </AppLayout>
-        </EnterpriseSISGate>
       </WelcomeGate>
     </PlanGate>
   );
