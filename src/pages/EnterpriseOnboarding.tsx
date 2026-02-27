@@ -621,13 +621,29 @@ function StepCard({ draftId, resumeToken, email, onCardConfirmed }: {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    console.log('[StepCard] Calling subscribeDraft with', { draftId, resumeToken: resumeToken?.slice(0, 8) + '...' });
     subscribeDraft(draftId, resumeToken)
       .then(res => {
-        setClientSecret(res.billing.setupIntentClientSecret);
+        console.log('[StepCard] subscribeDraft response:', JSON.stringify(res, null, 2));
+        // Handle multiple possible response shapes
+        const secret =
+          res?.billing?.setupIntentClientSecret ||
+          (res as any)?.setupIntentClientSecret ||
+          (res as any)?.clientSecret ||
+          (res as any)?.client_secret;
+        if (!secret) {
+          setError('Inget client secret mottogs från servern. Kontakta support.');
+          setLoading(false);
+          return;
+        }
+        setClientSecret(secret);
         setLoading(false);
       })
       .catch(err => {
-        setError(err?.message || err?.error || 'Kunde inte ladda betalningsformuläret.');
+        console.error('[StepCard] subscribeDraft error:', err);
+        const msg = err?.message || err?.error || err?.detail || 
+          (typeof err === 'string' ? err : 'Kunde inte ladda betalningsformuläret.');
+        setError(msg);
         setLoading(false);
       });
   }, [draftId, resumeToken]);
@@ -655,8 +671,9 @@ function StepCard({ draftId, resumeToken, email, onCardConfirmed }: {
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-3">
           <p className="text-[13px] text-destructive">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => { setError(''); setLoading(true); subscribeDraft(draftId, resumeToken).then(res => { const secret = res?.billing?.setupIntentClientSecret || (res as any)?.setupIntentClientSecret || (res as any)?.clientSecret || (res as any)?.client_secret; if (!secret) { setError('Inget client secret mottogs.'); setLoading(false); return; } setClientSecret(secret); setLoading(false); }).catch(err => { setError(err?.message || err?.error || 'Försök igen.'); setLoading(false); }); }} className="text-[12px]">Försök igen</Button>
         </div>
       )}
 
