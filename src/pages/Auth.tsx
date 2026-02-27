@@ -461,10 +461,10 @@ export default function Auth() {
                     <motion.div key="email" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="space-y-6">
                       <div className="space-y-1.5">
                         <h1 className="text-xl font-bold text-foreground">
-                          {platform === 'ios' ? 'Enterprise-inloggning' : isSignup ? 'Skapa konto' : 'Logga in'}
+                          {isSignup ? 'Skapa konto' : 'Logga in'}
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                          {platform === 'ios' ? 'Appen kräver ett Enterprise-konto.' : isSignup ? 'Ange din e-post så skapar vi ditt konto.' : 'Vi skickar en engångskod till din e-post.'}
+                          {isSignup ? 'Ange din e-post så skapar vi ditt konto.' : 'Vi skickar en engångskod till din e-post.'}
                         </p>
                       </div>
 
