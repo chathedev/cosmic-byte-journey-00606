@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
 import { CompanyBillingSection } from '@/components/CompanyBillingSection';
+import { AdminOnboardingAutoToggle } from '@/components/AdminOnboardingAutoToggle';
 
 interface CompanyMember {
   email: string;
@@ -649,6 +650,9 @@ export default function AdminEnterprise() {
             </Button>
           </div>
         </div>
+
+        {/* Onboarding Auto Toggle */}
+        <AdminOnboardingAutoToggle />
 
         {/* Statistik */}
         <div className="grid gap-4 md:grid-cols-3">

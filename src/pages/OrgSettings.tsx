@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Building2, Users } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
+import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -60,6 +61,13 @@ export default function OrgSettings() {
                 <span className="text-sm text-muted-foreground">Aktiv</span>
               </div>
             </div>
+          </section>
+
+          <Separator />
+
+          {/* Invite Members (admin/owner only) */}
+          <section>
+            <EnterpriseInvitePanel />
           </section>
 
           <Separator />
