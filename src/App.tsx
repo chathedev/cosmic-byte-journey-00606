@@ -62,6 +62,7 @@ import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
 import AttribrConnect from "./pages/AttribrConnect";
 import AuthHandoff from "./pages/AuthHandoff";
 import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
+import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -210,7 +211,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
-  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/enterprise/onboarding';
+  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/enterprise/onboarding' || location.pathname === '/enterprise/onboarding/verify-email';
   const isRecordingPage = location.pathname === '/recording';
   const isNative = isNativeApp();
 
@@ -243,7 +244,7 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
 
   // Skip welcome screen for auth-related and public routes
   const isAuthRoute = location.pathname === '/auth' || location.pathname === '/magic-login';
-  const isPublicRoute = location.pathname === '/enterprise/onboarding' || location.pathname === '/free-trial';
+  const isPublicRoute = location.pathname === '/enterprise/onboarding' || location.pathname === '/enterprise/onboarding/verify-email' || location.pathname === '/free-trial';
   
   if (!hasSeenWelcome && !isAuthRoute && !isPublicRoute) {
     return <IOSWelcomeScreen onComplete={handleWelcomeComplete} />;
@@ -307,6 +308,7 @@ const AppContent = () => {
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/free-trial" element={<FreeTrial />} />
                 <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
+                <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
                 <Route path="/generate-protocol" element={<GenerateProtocol />} />
                 <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
                 <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
@@ -414,7 +416,7 @@ const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
 // Renders fully public pages (no auth required) before any auth providers
 const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
-  const publicPaths = ['/enterprise/onboarding', '/free-trial'];
+  const publicPaths = ['/enterprise/onboarding', '/enterprise/onboarding/verify-email', '/free-trial'];
   const isPublic = publicPaths.includes(location.pathname);
 
   if (!isPublic) return <>{children}</>;
@@ -431,6 +433,7 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
         >
           <Routes>
             <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
+            <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
             <Route path="/free-trial" element={<FreeTrial />} />
           </Routes>
         </Suspense>

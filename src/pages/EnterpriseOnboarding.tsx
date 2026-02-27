@@ -20,7 +20,6 @@ import {
   subscribeDraft,
   startTrial,
   sendOnboardingEmailVerification,
-  verifyOnboardingEmail,
   checkOnboardingEmailVerification,
   type OnboardingFormData,
   type ValidationResponse,
@@ -91,9 +90,8 @@ export default function EnterpriseOnboarding() {
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [firstChargeEstimate, setFirstChargeEstimate] = useState<any>(null);
   
-  // Email verification state (inline in step 2)
+  // Email verification state (inline in step 2) — link-based, no OTP
   const [emailVerifyState, setEmailVerifyState] = useState<'idle' | 'sending' | 'pending' | 'verified'>('idle');
-  const [emailVerifyCode, setEmailVerifyCode] = useState('');
   const [emailVerifyError, setEmailVerifyError] = useState('');
   const [emailVerifyCooldown, setEmailVerifyCooldown] = useState(0);
 
@@ -180,7 +178,6 @@ export default function EnterpriseOnboarding() {
     // Reset email verification if email changes
     if (field === 'workEmail' && emailVerifyState !== 'idle') {
       setEmailVerifyState('idle');
-      setEmailVerifyCode('');
       setEmailVerifyError('');
     }
     triggerDraftSave(next as Partial<OnboardingFormData>, step);
@@ -237,9 +234,8 @@ export default function EnterpriseOnboarding() {
         draftIdRef.current = draftRes.draft.id;
         resumeTokenRef.current = draftRes.draft.resumeToken;
       }
-      // Send email verification inline
+      // Send email verification link
       setEmailVerifyState('sending');
-      setEmailVerifyCode('');
       setEmailVerifyError('');
       try {
         await sendOnboardingEmailVerification({
@@ -249,7 +245,7 @@ export default function EnterpriseOnboarding() {
         setEmailVerifyState('pending');
         setEmailVerifyCooldown(60);
       } catch (err: any) {
-        setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringskod.');
+        setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringsmail.');
         setEmailVerifyState('idle');
       }
     } catch {
@@ -280,26 +276,6 @@ export default function EnterpriseOnboarding() {
     const timer = setTimeout(() => setEmailVerifyCooldown(c => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [emailVerifyCooldown]);
-
-  const handleVerifyCode = async () => {
-    if (emailVerifyCode.length !== 6) return;
-    setEmailVerifyError('');
-    try {
-      const res = await verifyOnboardingEmail({
-        email: form.workEmail!,
-        code: emailVerifyCode,
-        draftId: draftIdRef.current!,
-      });
-      if (res.verified) {
-        setEmailVerifyState('verified');
-        setStep(3); // advance to Bekräfta
-      } else {
-        setEmailVerifyError('Felaktig kod. Försök igen.');
-      }
-    } catch (err: any) {
-      setEmailVerifyError(err?.message || 'Verifiering misslyckades.');
-    }
-  };
 
   const handleResendVerification = async () => {
     if (emailVerifyCooldown > 0) return;
@@ -614,11 +590,8 @@ export default function EnterpriseOnboarding() {
                 isValidating={stepValidating}
                 updateField={updateField}
                 emailVerifyState={emailVerifyState}
-                emailVerifyCode={emailVerifyCode}
                 emailVerifyError={emailVerifyError}
                 emailVerifyCooldown={emailVerifyCooldown}
-                onCodeChange={setEmailVerifyCode}
-                onVerify={handleVerifyCode}
                 onResend={handleResendVerification}
               />
             )}
@@ -901,7 +874,7 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
 /* STEP 2: Details + Inline Email Verification             */
 /* ═══════════════════════════════════════════════════════ */
 function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, isValidating, updateField,
-  emailVerifyState, emailVerifyCode, emailVerifyError, emailVerifyCooldown, onCodeChange, onVerify, onResend,
+  emailVerifyState, emailVerifyError, emailVerifyCooldown, onResend,
 }: {
   form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>;
   fieldChecks: Record<string, boolean>;
@@ -909,11 +882,8 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
   companyRegistry: CompanyRegistryResult | null;
   isValidating: boolean; updateField: (f: string, v: any) => void;
   emailVerifyState: 'idle' | 'sending' | 'pending' | 'verified';
-  emailVerifyCode: string;
   emailVerifyError: string;
   emailVerifyCooldown: number;
-  onCodeChange: (v: string) => void;
-  onVerify: () => void;
   onResend: () => void;
 }) {
   const orgTaken = availability?.organizationNumberAvailable === false;
@@ -1004,7 +974,7 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
             {emailVerifyState === 'sending' && (
               <div className="flex items-center justify-center py-6 gap-2">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Skickar verifieringskod…</span>
+                <span className="text-sm text-muted-foreground">Skickar verifieringsmail…</span>
               </div>
             )}
 
@@ -1017,22 +987,21 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
 
             {emailVerifyState === 'pending' && (
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  En 6-siffrig kod har skickats till <span className="text-foreground font-medium">{form.workEmail}</span>
-                </p>
-
                 <div className="flex items-center gap-3">
-                  <Input
-                    value={emailVerifyCode}
-                    onChange={(e) => onCodeChange(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6))}
-                    placeholder="XXXXXX"
-                    maxLength={6}
-                    className="text-center text-lg font-mono tracking-[0.4em] rounded-none h-12 max-w-[200px] border-border focus:border-foreground"
-                    autoFocus
-                  />
-                  <Button onClick={onVerify} disabled={emailVerifyCode.length !== 6} size="sm" className="rounded-none no-hover-lift h-12 px-5">
-                    Verifiera
-                  </Button>
+                  <div className="h-10 w-10 border border-border flex items-center justify-center shrink-0">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-foreground font-medium">Kontrollera din inkorg</p>
+                    <p className="text-xs text-muted-foreground">
+                      En verifieringslänk har skickats till <span className="text-foreground">{form.workEmail}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-4 py-3 border border-border bg-muted/30">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Väntar på att du klickar länken i mailet…</span>
                 </div>
 
                 {emailVerifyError && (
@@ -1042,19 +1011,16 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
                   </div>
                 )}
 
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={onResend}
-                    disabled={emailVerifyCooldown > 0}
-                    className={cn(
-                      'text-xs transition-colors',
-                      emailVerifyCooldown > 0 ? 'text-muted-foreground/50 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground underline',
-                    )}
-                  >
-                    {emailVerifyCooldown > 0 ? `Skicka ny kod (${emailVerifyCooldown}s)` : 'Skicka ny kod'}
-                  </button>
-                  <p className="text-[11px] text-muted-foreground">Verifiering sker automatiskt via mejllänk</p>
-                </div>
+                <button
+                  onClick={onResend}
+                  disabled={emailVerifyCooldown > 0}
+                  className={cn(
+                    'text-xs transition-colors',
+                    emailVerifyCooldown > 0 ? 'text-muted-foreground/50 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground underline',
+                  )}
+                >
+                  {emailVerifyCooldown > 0 ? `Skicka nytt mail (${emailVerifyCooldown}s)` : 'Skicka nytt mail'}
+                </button>
               </div>
             )}
           </div>
