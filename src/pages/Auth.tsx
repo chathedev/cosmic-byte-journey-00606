@@ -397,7 +397,7 @@ export default function Auth() {
                         E-postadress
                       </Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 z-10 pointer-events-none" />
                         <Input
                           id="email"
                           type="email"
@@ -408,7 +408,7 @@ export default function Auth() {
                           disabled={loading}
                           autoComplete="email"
                           autoFocus
-                          className="h-11 text-sm bg-secondary/40 border-border/60 pl-10 rounded-xl focus:bg-background transition-colors"
+                          className="h-11 text-sm bg-secondary/40 border-border/60 pl-10 rounded-xl focus:bg-background transition-colors relative"
                         />
                       </div>
                     </div>
