@@ -307,7 +307,10 @@ export async function activateOnboarding(companyId: string, opts?: OnboardingAut
 }
 
 // 10) Send email verification for onboarding work email
-export async function sendOnboardingEmailVerification(data: { email: string; draftId: string; resumeToken: string }): Promise<{ sent: boolean; retryAfterMs?: number; message?: string }> {
+export async function sendOnboardingEmailVerification(data: { email: string; draftId: string }): Promise<{
+  sent?: boolean; retryAfterMs?: number; message?: string;
+  emailVerification?: { status: string; expiresAt?: string };
+}> {
   return apiFetch('/enterprise/onboarding/verify-email/send', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -315,7 +318,7 @@ export async function sendOnboardingEmailVerification(data: { email: string; dra
 }
 
 // 11) Confirm email verification code
-export async function verifyOnboardingEmail(data: { email: string; code: string; draftId: string; resumeToken: string }): Promise<{ verified: boolean; message?: string }> {
+export async function verifyOnboardingEmail(data: { email: string; code: string; draftId: string }): Promise<{ verified: boolean; message?: string }> {
   return apiFetch('/enterprise/onboarding/verify-email/confirm', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -323,6 +326,6 @@ export async function verifyOnboardingEmail(data: { email: string; code: string;
 }
 
 // 12) Poll email verification status (real-time check)
-export async function checkOnboardingEmailVerification(data: { email: string; draftId: string; resumeToken: string }): Promise<{ verified: boolean }> {
-  return apiFetch(`/enterprise/onboarding/verify-email/status?email=${encodeURIComponent(data.email)}&draftId=${encodeURIComponent(data.draftId)}&resumeToken=${encodeURIComponent(data.resumeToken)}`);
+export async function checkOnboardingEmailVerification(draftId: string): Promise<{ verified: boolean; emailVerification?: { status: string } }> {
+  return apiFetch(`/enterprise/onboarding/verify-email/status?draftId=${encodeURIComponent(draftId)}`);
 }
