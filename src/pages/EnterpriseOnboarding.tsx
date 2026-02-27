@@ -21,6 +21,7 @@ import {
   startTrial,
   type OnboardingFormData,
   type ValidationResponse,
+  type CompanyRegistryResult,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -73,6 +74,8 @@ export default function EnterpriseOnboarding() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [fieldChecks, setFieldChecks] = useState<Record<string, boolean>>({});
   const [availability, setAvailability] = useState<ValidationResponse['validation']['availability']>({});
+  const [companyRegistry, setCompanyRegistry] = useState<CompanyRegistryResult | null>(null);
+  const [stripeMode, setStripeMode] = useState<'test' | 'live' | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,6 +150,7 @@ export default function EnterpriseOnboarding() {
         setFieldErrors(res.validation?.errors || {});
         setFieldChecks(res.validation?.checks || {});
         setAvailability(res.validation?.availability || {});
+        setCompanyRegistry(res.validation?.companyRegistry || null);
       } catch {}
       setIsValidating(false);
     }, 400);
@@ -256,6 +260,7 @@ export default function EnterpriseOnboarding() {
         setFieldErrors(valRes.validation?.errors || {});
         setFieldChecks(valRes.validation?.checks || {});
         setAvailability(valRes.validation?.availability || {});
+        setCompanyRegistry(valRes.validation?.companyRegistry || null);
         setSubmitError('Vänligen korrigera felen innan du fortsätter.');
         setIsSubmitting(false);
         return;
@@ -282,6 +287,8 @@ export default function EnterpriseOnboarding() {
       const pkKey = extractStripePublishableKey(subscribeRes);
       const fce = extractFirstChargeEstimate(subscribeRes);
       if (fce) setFirstChargeEstimate(fce);
+      const mode = billing?.stripePublishableKeyMode;
+      if (mode) setStripeMode(mode);
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
@@ -308,10 +315,13 @@ export default function EnterpriseOnboarding() {
     }
   };
 
+  const [completedBilling, setCompletedBilling] = useState<any>(null);
+
   const handleCardConfirmedStartTrial = async () => {
     try {
       const res = await startTrial({ ...(form as OnboardingFormData), draftId, resumeToken });
       setCompletedEmail(res.invitation?.email || form.workEmail || '');
+      if ((res as any).billing?.firstCharge) setCompletedBilling((res as any).billing.firstCharge);
       clearDraftLocal();
       clearFormLocal();
       setAllDone(true);
@@ -346,7 +356,7 @@ export default function EnterpriseOnboarding() {
   if (allDone) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-lg w-full border border-border bg-card p-8 sm:p-10 space-y-6">
+      <div className="max-w-lg w-full border border-border bg-card p-8 sm:p-10 space-y-6">
           <div className="flex justify-center">
             <div className="h-14 w-14 border-2 border-primary/20 flex items-center justify-center">
               <CheckCircle2 className="h-7 w-7 text-primary" />
@@ -358,6 +368,27 @@ export default function EnterpriseOnboarding() {
               Välkommen till Tivly Enterprise. Debitering sker automatiskt efter 7 dagar.
             </p>
           </div>
+
+          {completedBilling && (
+            <div className="border border-border divide-y divide-border">
+              {completedBilling.activationFeeSek != null && (
+                <div className="flex justify-between px-4 py-2.5 text-xs">
+                  <span className="text-muted-foreground">Aktiveringsavgift (efter trial)</span>
+                  <span className="text-foreground font-medium">{fmt(completedBilling.activationFeeSek)} kr</span>
+                </div>
+              )}
+              {completedBilling.monthlyTotalSek != null && (
+                <div className="flex justify-between px-4 py-2.5 text-xs">
+                  <span className="text-muted-foreground">Månadsavgift</span>
+                  <span className="text-foreground font-medium">{fmt(completedBilling.monthlyTotalSek)} kr/mån</span>
+                </div>
+              )}
+              <div className="px-4 py-2">
+                <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
+              </div>
+            </div>
+          )}
+
           <div className="border border-border divide-y divide-border">
             {[
               { n: '1', icon: Mail, text: <>Öppna inbjudan i <span className="text-foreground font-medium">{completedEmail}</span></> },
@@ -392,6 +423,9 @@ export default function EnterpriseOnboarding() {
             <span className="text-xs text-muted-foreground font-medium">Enterprise</span>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {stripeMode === 'test' && (
+              <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-50 text-amber-700 text-[10px] font-semibold uppercase tracking-wider">Test</span>
+            )}
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
             {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
@@ -440,7 +474,7 @@ export default function EnterpriseOnboarding() {
           <main className="flex-1 min-w-0">
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
+            {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} companyRegistry={companyRegistry} isValidating={isValidating} updateField={updateField} />}
             {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
             {step === 4 && draftId && resumeToken && (
               <StepCardPayment
@@ -707,13 +741,28 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 2: Details                                         */
 /* ═══════════════════════════════════════════════════════ */
-function StepDetails({ form, fieldErrors, fieldChecks, availability, isValidating, updateField }: {
+function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, isValidating, updateField }: {
   form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>;
   fieldChecks: Record<string, boolean>;
-  availability: ValidationResponse['validation']['availability']; isValidating: boolean; updateField: (f: string, v: any) => void;
+  availability: ValidationResponse['validation']['availability'];
+  companyRegistry: CompanyRegistryResult | null;
+  isValidating: boolean; updateField: (f: string, v: any) => void;
 }) {
   const orgTaken = availability?.organizationNumberAvailable === false;
   const emailTaken = availability?.workEmailAvailable === false;
+
+  const registryStatusLabel = (status: string) => {
+    switch (status) {
+      case 'verified': return { text: 'Verifierat via Allabolag', color: 'text-primary', icon: CheckCircle2 };
+      case 'company_name_mismatch': return { text: 'Bolagsnamnet matchar inte organisationsnumret', color: 'text-destructive', icon: AlertCircle };
+      case 'organization_not_found': return { text: 'Organisationsnumret hittades inte', color: 'text-destructive', icon: AlertCircle };
+      case 'blocked': return { text: 'Företaget kan inte registreras', color: 'text-destructive', icon: AlertCircle };
+      case 'rate_limited': return { text: 'Verifiering tillfälligt otillgänglig, försök igen', color: 'text-muted-foreground', icon: Clock };
+      case 'unavailable': return { text: 'Verifiering tillfälligt otillgänglig', color: 'text-muted-foreground', icon: Clock };
+      default: return { text: `Verifieringsstatus: ${status}`, color: 'text-muted-foreground', icon: Info };
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -736,6 +785,28 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, isValidatin
             <FieldInput icon={Hash} label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
           </div>
           <FieldInput icon={Globe} label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
+
+          {/* Company registry verification status */}
+          {companyRegistry?.checked && (
+            <div className={cn(
+              'flex items-center gap-2 px-4 py-2.5 border',
+              companyRegistry.ok ? 'border-primary/20 bg-primary/5' : 'border-destructive/20 bg-destructive/5',
+            )}>
+              {(() => {
+                const s = registryStatusLabel(companyRegistry.status);
+                const Icon = s.icon;
+                return (
+                  <>
+                    <Icon className={cn('h-3.5 w-3.5 shrink-0', s.color)} />
+                    <span className={cn('text-xs font-medium', s.color)}>{s.text}</span>
+                    {companyRegistry.url && (
+                      <a href={companyRegistry.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground underline ml-auto shrink-0 hover:text-foreground transition-colors">Visa</a>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
