@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import {
   ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle,
@@ -56,6 +59,9 @@ function extractStripePublishableKey(p: any): string | null { return p?.billing?
 function extractFirstChargeEstimate(p: any): any { return p?.billing?.firstChargeEstimate || null; }
 
 export default function EnterpriseOnboarding() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { enterpriseMembership } = useSubscription();
   const [onboardingEnabled, setOnboardingEnabled] = useState<boolean | null>(null);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Partial<OnboardingFormData>>({
@@ -216,6 +222,13 @@ export default function EnterpriseOnboarding() {
       .then(data => setOnboardingEnabled(data.enabled))
       .catch(() => setOnboardingEnabled(false));
   }, []);
+
+  // Redirect users who already have an enterprise company
+  useEffect(() => {
+    if (enterpriseMembership?.isMember && enterpriseMembership.company?.id) {
+      navigate('/', { replace: true });
+    }
+  }, [enterpriseMembership, navigate]);
 
   const selectedPlan = PLANS.find(p => p.id === form.planType) || PLANS[0];
   const seats = form.expectedSeats || 5;
