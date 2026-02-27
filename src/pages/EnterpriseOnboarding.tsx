@@ -37,14 +37,43 @@ const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
+function saveStorageJSON(key: string, value: unknown) {
+  const serialized = JSON.stringify(value);
+  try { localStorage.setItem(key, serialized); } catch {}
+  try { sessionStorage.setItem(key, serialized); } catch {}
+}
+
+function readStorageJSON<T>(key: string): T | null {
+  try {
+    const local = localStorage.getItem(key);
+    if (local) return JSON.parse(local) as T;
+  } catch {}
+  try {
+    const session = sessionStorage.getItem(key);
+    if (session) return JSON.parse(session) as T;
+  } catch {}
+  return null;
+}
+
+function removeStorageKey(key: string) {
+  try { localStorage.removeItem(key); } catch {}
+  try { sessionStorage.removeItem(key); } catch {}
+}
+
 function saveDraftLocal(draftId: string, resumeToken: string) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ draftId, resumeToken })); } catch {}
+  saveStorageJSON(DRAFT_KEY, { draftId, resumeToken });
 }
+
 function loadDraftLocal(): { draftId: string; resumeToken: string } | null {
-  try { const r = localStorage.getItem(DRAFT_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+  return readStorageJSON<{ draftId: string; resumeToken: string }>(DRAFT_KEY);
 }
+
 function clearDraftLocal() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+  removeStorageKey(DRAFT_KEY);
+}
+
+function clearFormLocal() {
+  removeStorageKey(FORM_KEY);
 }
 
 function fmt(n: number) {
@@ -86,6 +115,7 @@ export default function EnterpriseOnboarding() {
   const resumeTokenRef = useRef(resumeToken);
   const formRef = useRef(form);
   const stepRef = useRef(step);
+  const hasUserInteractedRef = useRef(false);
 
   useEffect(() => { draftIdRef.current = draftId; }, [draftId]);
   useEffect(() => { resumeTokenRef.current = resumeToken; }, [resumeToken]);
@@ -93,13 +123,16 @@ export default function EnterpriseOnboarding() {
   useEffect(() => { stepRef.current = step; }, [step]);
 
   const saveFormLocal = useCallback((f: Partial<OnboardingFormData>, s: number) => {
-    try { localStorage.setItem(FORM_KEY, JSON.stringify({ form: f, step: s })); } catch {}
+    saveStorageJSON(FORM_KEY, { form: f, step: s, touched: hasUserInteractedRef.current, updatedAt: Date.now() });
   }, []);
 
   // Load draft or local form on mount
   useEffect(() => {
-    const hasRealData = (f: Partial<OnboardingFormData>) =>
-      !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
+    const hasRestorableProgress = (f: Partial<OnboardingFormData>, s = 0) => {
+      const hasRealData = !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
+      const changedFromDefaults = Number(f.expectedSeats ?? 5) !== 5 || (f.planType && f.planType !== 'enterprise_small') || !!f.acceptedTerms || !!f.authorizedSignatory;
+      return hasRealData || changedFromDefaults || s > 0;
+    };
 
     const local = loadDraftLocal();
     if (local) {
@@ -109,9 +142,11 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
           const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
-          if (hasRealData(restored)) {
+          const restoredStep = Math.min(res.draft.progress?.step ?? 0, STEPS.length - 1);
+
+          if (hasRestorableProgress(restored, restoredStep)) {
             setForm(restored);
-            if (res.draft.progress?.step) setStep(Math.min(res.draft.progress.step, STEPS.length - 1));
+            if (restoredStep > 0) setStep(restoredStep);
           }
         })
         .catch(() => {
@@ -123,15 +158,14 @@ export default function EnterpriseOnboarding() {
     }
 
     function restoreFromLocal() {
-      try {
-        const saved = localStorage.getItem(FORM_KEY);
-        if (!saved) return;
-        const parsed = JSON.parse(saved);
-        if (parsed.form && hasRealData(parsed.form)) {
-          setForm(prev => ({ ...prev, ...parsed.form }));
-          if (parsed.step > 0) setStep(Math.min(parsed.step, STEPS.length - 1));
-        }
-      } catch {}
+      const parsed = readStorageJSON<{ form?: Partial<OnboardingFormData>; step?: number; touched?: boolean }>(FORM_KEY);
+      if (!parsed?.touched || !parsed.form) return;
+
+      const restoredStep = Math.min(parsed.step ?? 0, STEPS.length - 1);
+      if (hasRestorableProgress(parsed.form, restoredStep)) {
+        setForm(prev => ({ ...prev, ...parsed.form }));
+        if (restoredStep > 0) setStep(restoredStep);
+      }
     }
   }, []);
 
@@ -175,6 +209,7 @@ export default function EnterpriseOnboarding() {
   }, [saveFormLocal]);
 
   const updateField = (field: string, value: any) => {
+    hasUserInteractedRef.current = true;
     const next = { ...form, [field]: value };
     setForm(next);
     // Validate on step 2 (details) or whenever key fields change
@@ -208,7 +243,7 @@ export default function EnterpriseOnboarding() {
     const handler = () => {
       const f = formRef.current;
       const s = stepRef.current;
-      try { localStorage.setItem(FORM_KEY, JSON.stringify({ form: f, step: s })); } catch {}
+      saveStorageJSON(FORM_KEY, { form: f, step: s, touched: hasUserInteractedRef.current, updatedAt: Date.now() });
       if (f.companyName || f.workEmail) {
         navigator.sendBeacon?.('https://api.tivly.se/enterprise/onboarding/draft',
           new Blob([JSON.stringify({
@@ -256,7 +291,7 @@ export default function EnterpriseOnboarding() {
       setCompleted(true);
       setCompletedEmail(res.invitation?.email || form.workEmail || '');
       clearDraftLocal();
-      try { localStorage.removeItem(FORM_KEY); } catch {}
+      clearFormLocal();
     } catch (err: any) {
       setSubmitError(err?.message || err?.error || 'Något gick fel. Försök igen.');
     } finally {
@@ -335,14 +370,14 @@ export default function EnterpriseOnboarding() {
 
         {/* Navigation */}
         <div className="flex items-center justify-between mt-10">
-          <Button variant="ghost" size="sm" onClick={() => setStep(s => s - 1)} disabled={step === 0} className="gap-1.5 text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground">
             <ChevronLeft className="h-4 w-4" /> Tillbaka
           </Button>
 
           {step < STEPS.length - 1 ? (
             <Button
               size="sm"
-              onClick={() => setStep(s => s + 1)}
+              onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }}
               disabled={step === 2 && !canProceedStep2}
               className="gap-1.5"
             >
