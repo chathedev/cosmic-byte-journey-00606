@@ -233,43 +233,53 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen h-[100svh] bg-foreground flex flex-col overflow-x-hidden">
-      {/* Top bar */}
-      <div className="px-6 py-5 flex items-center justify-between">
-        <span className="text-[13px] font-semibold tracking-[0.25em] uppercase text-background/80">Tivly</span>
-        <a href="/enterprise/onboarding" className="text-[11px] text-background/40 hover:text-background/70 transition-colors">
-          Enterprise →
-        </a>
-      </div>
+    <div className="relative min-h-screen h-[100svh] bg-background overflow-x-hidden flex flex-col">
+      <div
+        className="absolute inset-0 pointer-events-none opacity-60"
+        style={{
+          backgroundImage:
+            'linear-gradient(180deg, hsl(var(--primary) / 0.08) 0%, transparent 45%), radial-gradient(circle at 15% 20%, hsl(var(--accent) / 0.12), transparent 35%)',
+        }}
+      />
 
-      {/* Center content */}
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4">
-        <div className="w-full max-w-[360px] mx-auto min-h-full flex flex-col justify-center py-6 sm:py-10">
+      <header className="relative z-10 px-4 sm:px-6 pt-5 pb-3">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <span className="text-[12px] font-semibold tracking-[0.26em] uppercase text-foreground/80">Tivly</span>
+          <a
+            href="/enterprise/onboarding"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Enterprise
+          </a>
+        </div>
+      </header>
+
+      <main className="relative z-10 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6">
+        <div className="w-full max-w-md mx-auto min-h-full flex items-center py-6 sm:py-10">
           <AnimatePresence mode="wait">
-            {/* EMAIL STEP */}
             {viewMode === 'email' && (
               <motion.div
                 key="email"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="space-y-8"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="w-full border border-border/70 bg-card shadow-xl shadow-primary/10 rounded-2xl p-6 sm:p-7 space-y-6"
               >
-                <div className="space-y-2">
-                  <h1 className="text-2xl font-bold text-background tracking-tight">
+                <div className="space-y-1.5">
+                  <h1 className="text-2xl font-bold text-card-foreground tracking-tight">
                     {isSignup ? 'Skapa konto' : 'Logga in'}
                   </h1>
-                  <p className="text-sm text-background/50">
+                  <p className="text-sm text-muted-foreground">
                     {isSignup
-                      ? 'Ange din e-post för att komma igång.'
-                      : 'Vi skickar en engångskod till dig.'}
+                      ? 'Ange e-post så skapar vi ditt konto direkt.'
+                      : 'Vi skickar en engångskod till din e-post.'}
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-[11px] font-medium text-background/40 uppercase tracking-wider">
+                    <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       E-post
                     </Label>
                     <Input
@@ -282,14 +292,14 @@ export default function Auth() {
                       disabled={loading}
                       autoComplete="email"
                       autoFocus
-                      className="h-12 text-base bg-background/5 border-background/10 text-background placeholder:text-background/25 rounded-md focus:border-background/30 focus:ring-0 touch-manipulation"
+                      className="h-12 text-base rounded-xl bg-background touch-manipulation"
                     />
                   </div>
 
                   <Button
                     onClick={handleRequestCode}
                     disabled={loading || !email.trim()}
-                    className="w-full h-12 text-sm font-medium bg-background text-foreground hover:bg-background/90 rounded-md no-hover-lift"
+                    className="w-full h-12 rounded-xl text-sm font-medium no-hover-lift"
                     type="button"
                   >
                     {loading ? (
@@ -302,8 +312,8 @@ export default function Auth() {
 
                 <AnimatePresence>
                   {authError && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      <div className="flex items-center gap-2 p-3 border border-destructive/30 rounded-md bg-destructive/10">
+                    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+                      <div className="flex items-center gap-2 p-3 border border-destructive/20 rounded-xl bg-destructive/5">
                         <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
                         <p className="text-xs text-destructive font-medium">{authError}</p>
                       </div>
@@ -311,40 +321,39 @@ export default function Auth() {
                   )}
                 </AnimatePresence>
 
-                <div className="pt-4 border-t border-background/10">
-                  <p className="text-center text-xs text-background/40">
+                <div className="pt-3 border-t border-border/60">
+                  <p className="text-center text-xs text-muted-foreground">
                     {isSignup ? (
-                      <>Har redan ett konto?{' '}<button onClick={() => setIsSignup(false)} className="text-background/70 font-medium hover:text-background transition-colors">Logga in</button></>
+                      <>Har redan konto?{' '}<button onClick={() => setIsSignup(false)} className="text-foreground font-medium hover:text-primary transition-colors">Logga in</button></>
                     ) : (
-                      <>Inget konto?{' '}<button onClick={() => setIsSignup(true)} className="text-background/70 font-medium hover:text-background transition-colors">Skapa gratis</button></>
+                      <>Inget konto?{' '}<button onClick={() => setIsSignup(true)} className="text-foreground font-medium hover:text-primary transition-colors">Skapa gratis</button></>
                     )}
                   </p>
                 </div>
               </motion.div>
             )}
 
-            {/* CODE ENTRY STEP */}
             {viewMode === 'code-entry' && (
               <motion.div
                 key="code-entry"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="space-y-8"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="w-full border border-border/70 bg-card shadow-xl shadow-primary/10 rounded-2xl p-6 sm:p-7 space-y-6"
               >
-                <div className="space-y-2">
-                  <h1 className="text-2xl font-bold text-background tracking-tight">
-                    {isNavigating ? 'Välkommen' : verifying ? 'Verifierar' : 'Ange kod'}
+                <div className="space-y-1.5">
+                  <h1 className="text-2xl font-bold text-card-foreground tracking-tight">
+                    {isNavigating ? 'Välkommen!' : verifying ? 'Verifierar' : 'Ange kod'}
                   </h1>
-                  <p className="text-sm text-background/50">
+                  <p className="text-sm text-muted-foreground">
                     {isNavigating ? 'Du loggas in...' : verifying ? 'Kontrollerar koden...' : (
-                      <>Skickad till <span className="text-background/80">{email}</span></>
+                      <>Kod skickad till <span className="font-medium text-card-foreground">{email}</span></>
                     )}
                   </p>
                 </div>
 
-                <div className="flex justify-center">
+                <div className="flex justify-center py-1">
                   <InputOTP
                     maxLength={6}
                     value={pinCode}
@@ -357,7 +366,7 @@ export default function Auth() {
                         <InputOTPSlot
                           key={i}
                           index={i}
-                          className="w-12 h-14 rounded-md border-background/15 bg-background/5 text-background text-lg font-medium"
+                          className="w-11 h-12 rounded-xl border-border text-base font-medium"
                         />
                       ))}
                     </InputOTPGroup>
@@ -366,17 +375,17 @@ export default function Auth() {
 
                 <div className="text-center min-h-[24px]">
                   {verifying && (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-background/50">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Loader2 className="w-3 h-3 animate-spin" />Verifierar
                     </span>
                   )}
                   {isNavigating && (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-background/70 font-medium">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-primary font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" />Klar
                     </span>
                   )}
                   {!verifying && !isNavigating && codeExpiry > 0 && (
-                    <p className="text-xs text-background/30">{formatTime(codeExpiry)}</p>
+                    <p className="text-xs text-muted-foreground">Giltig i {formatTime(codeExpiry)}</p>
                   )}
                   {!verifying && !isNavigating && codeExpiry === 0 && (
                     <p className="text-xs text-destructive font-medium">Koden har gått ut</p>
@@ -385,8 +394,8 @@ export default function Auth() {
 
                 <AnimatePresence>
                   {authError && !verifying && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      <div className="flex items-center gap-2 p-3 border border-destructive/30 rounded-md bg-destructive/10">
+                    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+                      <div className="flex items-center gap-2 p-3 border border-destructive/20 rounded-xl bg-destructive/5">
                         <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
                         <p className="text-xs text-destructive font-medium">{authError}</p>
                       </div>
@@ -395,18 +404,18 @@ export default function Auth() {
                 </AnimatePresence>
 
                 {!isNavigating && (
-                  <div className="flex items-center justify-between pt-4 border-t border-background/10">
+                  <div className="flex items-center justify-between pt-3 border-t border-border/60">
                     <button
                       onClick={handleStartOver}
                       disabled={verifying}
-                      className="flex items-center gap-1 text-xs text-background/40 hover:text-background/70 transition-colors disabled:opacity-40"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
                     >
                       <ArrowLeft className="w-3 h-3" /> Ändra e-post
                     </button>
                     <button
                       onClick={handleResendCode}
                       disabled={verifying || loading}
-                      className="text-xs font-medium text-background/60 hover:text-background transition-colors disabled:opacity-40"
+                      className="text-xs font-medium text-primary hover:text-primary/70 transition-colors disabled:opacity-40"
                     >
                       {loading ? 'Skickar...' : 'Skicka ny kod'}
                     </button>
@@ -416,17 +425,18 @@ export default function Auth() {
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </main>
 
-      {/* Footer */}
-      <div className="px-6 py-5 hidden sm:flex items-center justify-between">
-        <div className="flex items-center gap-4 text-[10px] text-background/25">
-          <span>GDPR</span>
-          <span>ISO 27001</span>
-          <span>Krypterad</span>
+      <footer className="relative z-10 px-4 sm:px-6 pb-5 pt-3 hidden sm:block">
+        <div className="max-w-md mx-auto flex items-center justify-between text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <span>GDPR</span>
+            <span>ISO 27001</span>
+            <span>Krypterad</span>
+          </div>
+          <p>© {new Date().getFullYear()} Tivly AB</p>
         </div>
-        <p className="text-[10px] text-background/20">© {new Date().getFullYear()} Tivly AB</p>
-      </div>
+      </footer>
     </div>
   );
 }
