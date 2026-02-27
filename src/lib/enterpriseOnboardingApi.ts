@@ -14,6 +14,16 @@ export interface OnboardingFormData {
   authorizedSignatory: boolean;
 }
 
+export interface CompanyRegistryResult {
+  provider: string;
+  status: 'verified' | 'company_name_mismatch' | 'organization_not_found' | 'blocked' | 'rate_limited' | 'unavailable' | string;
+  ok: boolean;
+  checked: boolean;
+  required: boolean;
+  url?: string;
+  timestamp?: string;
+}
+
 export interface ValidationResponse {
   success: boolean;
   valid: boolean;
@@ -40,6 +50,7 @@ export interface ValidationResponse {
       domain?: string;
     };
     checks?: Record<string, boolean>;
+    companyRegistry?: CompanyRegistryResult;
     requirements?: {
       commitmentsRequired?: boolean;
     };
@@ -86,6 +97,15 @@ export interface DraftSubscribeResponse {
     setupIntentStatus: string;
     paymentMethodSaved: boolean;
     readyForTrialStart: boolean;
+    firstChargeEstimate?: {
+      activationFeeSek: number;
+      monthlyTotalSek: number;
+      expectedTotalSek: number;
+      trialDays: number;
+    };
+    stripePublishableKey?: string;
+    stripePublishableKeyMode?: 'test' | 'live';
+    stripeKeyPairCompatible?: boolean;
   };
 }
 
