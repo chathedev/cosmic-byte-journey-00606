@@ -411,6 +411,30 @@ const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
   return <AppOnlyAccess />;
 };
 
+// Renders fully public pages (no auth required) before any auth providers
+const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  const publicPaths = ['/enterprise/onboarding', '/free-trial'];
+  const isPublic = publicPaths.includes(location.pathname);
+
+  if (!isPublic) return <>{children}</>;
+
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <Routes>
+        <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
+        <Route path="/free-trial" element={<FreeTrial />} />
+      </Routes>
+    </Suspense>
+  );
+};
+
 const App = () => {
   // Block web browser access to io.tivly.se domain (with admin bypass)
   if (isWebBrowserOnAppDomain()) {
@@ -421,16 +445,17 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <AuthProvider>
-                <SubscriptionProvider>
-                  <SupportProvider>
-                    <AdminBypassGate>
-                      {/* If admin bypassed, render full app */}
-                      <AppContent />
-                    </AdminBypassGate>
-                  </SupportProvider>
-                </SubscriptionProvider>
-              </AuthProvider>
+              <PublicPagesShell>
+                <AuthProvider>
+                  <SubscriptionProvider>
+                    <SupportProvider>
+                      <AdminBypassGate>
+                        <AppContent />
+                      </AdminBypassGate>
+                    </SupportProvider>
+                  </SubscriptionProvider>
+                </AuthProvider>
+              </PublicPagesShell>
             </BrowserRouter>
           </TooltipProvider>
         </ErrorBoundary>
@@ -442,8 +467,6 @@ const App = () => {
   if (isNativeAppOnWebDomain()) {
     return <WebOnlyAccess />;
   }
-
-  // Note: billing.tivly.se is deprecated, billing is now at /billing/* routes in main app
 
   // Routes for auth.tivly.se - only verification endpoints
   if (isAuthDomain()) {
@@ -512,13 +535,15 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <AuthProvider>
-              <SubscriptionProvider>
-                <SupportProvider>
-                  <AppContent />
-                </SupportProvider>
-              </SubscriptionProvider>
-            </AuthProvider>
+            <PublicPagesShell>
+              <AuthProvider>
+                <SubscriptionProvider>
+                  <SupportProvider>
+                    <AppContent />
+                  </SupportProvider>
+                </SubscriptionProvider>
+              </AuthProvider>
+            </PublicPagesShell>
           </BrowserRouter>
         </TooltipProvider>
       </ErrorBoundary>
