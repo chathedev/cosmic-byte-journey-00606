@@ -261,7 +261,7 @@ export default function EnterpriseOnboarding() {
     const interval = setInterval(async () => {
       try {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
-        if (res.verified) {
+        if (res.emailVerification?.status === 'verified') {
           setEmailVerifyState('verified');
           setStep(3); // advance to Bekräfta
         }
