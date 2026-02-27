@@ -4,8 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Mail, Shield } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, Mail, Shield, Mic, FileText, ListChecks, FileOutput } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import tivlyLogo from '@/assets/tivly-logo.png';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -293,9 +294,7 @@ export default function Auth() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-4">
-              <span className="text-lg font-bold text-primary">T</span>
-            </div>
+            <img src={tivlyLogo} alt="Tivly" className="w-10 h-10 mx-auto mb-3" />
             <h2 className="text-[11px] font-semibold tracking-[0.35em] uppercase text-muted-foreground">
               Tivly
             </h2>
@@ -348,18 +347,18 @@ export default function Auth() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: 'Realtidstranskribering', icon: '🎙️' },
-                      { label: 'Automatiska protokoll', icon: '📋' },
-                      { label: 'Action points', icon: '✅' },
-                      { label: 'Export Word & PDF', icon: '📄' },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-secondary/60 border border-border/50">
-                        <span className="text-sm">{item.icon}</span>
-                        <span className="text-[12px] text-foreground font-medium leading-tight">{item.label}</span>
-                      </div>
-                    ))}
+                   <div className="grid grid-cols-2 gap-3">
+                     {[
+                       { label: 'Realtidstranskribering', Icon: Mic },
+                       { label: 'Automatiska protokoll', Icon: FileText },
+                       { label: 'Action points', Icon: ListChecks },
+                       { label: 'Export Word & PDF', Icon: FileOutput },
+                     ].map((item) => (
+                       <div key={item.label} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-secondary/60 border border-border/50">
+                         <item.Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                         <span className="text-[12px] text-foreground font-medium leading-tight">{item.label}</span>
+                       </div>
+                     ))}
                   </div>
 
                   <Button
