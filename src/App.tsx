@@ -241,10 +241,11 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
     setHasSeenWelcome(true);
   };
 
-  // Skip welcome screen for auth-related routes
+  // Skip welcome screen for auth-related and public routes
   const isAuthRoute = location.pathname === '/auth' || location.pathname === '/magic-login';
+  const isPublicRoute = location.pathname === '/enterprise/onboarding' || location.pathname === '/free-trial';
   
-  if (!hasSeenWelcome && !isAuthRoute) {
+  if (!hasSeenWelcome && !isAuthRoute && !isPublicRoute) {
     return <IOSWelcomeScreen onComplete={handleWelcomeComplete} />;
   }
 
