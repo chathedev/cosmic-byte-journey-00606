@@ -17,7 +17,7 @@ import {
   type ValidationResponse,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 const stripePromise = loadStripe('pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu');
 
@@ -298,10 +298,18 @@ export default function EnterpriseOnboarding() {
 
       // CRITICAL: Initialize payment subscription step before rendering card form
       const subscribeRes = await subscribeDraft(ensuredDraftId, ensuredResumeToken);
+      const billing = subscribeRes?.billing;
       const secret = extractSetupIntentClientSecret(subscribeRes);
 
+      // If card is already saved for this draft, skip card capture and allow direct trial start in step 4
+      if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
+        setSetupIntentClientSecret(null);
+        setStep(4);
+        return;
+      }
+
       if (!secret) {
-        setSubmitError('Betalningssteget kunde inte initieras (saknar client secret).');
+        setSubmitError('Kunde inte initiera kortregistrering. Uppdatera sidan och försök igen.');
         setIsSubmitting(false);
         return;
       }
@@ -414,6 +422,11 @@ export default function EnterpriseOnboarding() {
                 resumeToken={resumeToken}
                 initialClientSecret={setupIntentClientSecret}
                 email={form.workEmail || ''}
+                monthlyTotal={monthlyTotal}
+                activationFeeSek={selectedPlan.activationSek}
+                includedSeats={selectedPlan.seats}
+                expectedSeats={seats}
+                extraSeats={extraSeats}
                 onCardConfirmed={handleCardConfirmedStartTrial}
               />
             )}
@@ -650,13 +663,74 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /* ─── STEP 4: Card (Stripe SetupIntent via draft-level subscribe) ─── */
-function StepCard({ draftId, resumeToken, initialClientSecret, email, onCardConfirmed }: {
-  draftId: string; resumeToken: string; initialClientSecret: string | null; email: string;
+function StepCard({ draftId, resumeToken, initialClientSecret, email, monthlyTotal, activationFeeSek, includedSeats, expectedSeats, extraSeats, onCardConfirmed }: {
+  draftId: string;
+  resumeToken: string;
+  initialClientSecret: string | null;
+  email: string;
+  monthlyTotal: number;
+  activationFeeSek: number;
+  includedSeats: number;
+  expectedSeats: number;
+  extraSeats: number;
   onCardConfirmed: () => Promise<void>;
 }) {
   const [loading, setLoading] = useState(!initialClientSecret);
   const [clientSecret, setClientSecret] = useState<string | null>(initialClientSecret);
   const [error, setError] = useState('');
+  const [readyForTrialStart, setReadyForTrialStart] = useState(false);
+  const [paymentMethodSaved, setPaymentMethodSaved] = useState(false);
+  const [setupIntentStatus, setSetupIntentStatus] = useState<string | null>(null);
+  const [startingTrial, setStartingTrial] = useState(false);
+
+  const trialChargeDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const applySubscribeResponse = useCallback((res: any) => {
+    const billing = res?.billing || {};
+    const ready = !!billing?.readyForTrialStart;
+    const saved = !!billing?.paymentMethodSaved;
+    const status = typeof billing?.setupIntentStatus === 'string' ? billing.setupIntentStatus : null;
+
+    setReadyForTrialStart(ready);
+    setPaymentMethodSaved(saved);
+    setSetupIntentStatus(status);
+
+    const secret = extractSetupIntentClientSecret(res);
+
+    if (ready || saved) {
+      setClientSecret(null);
+      setError('');
+      return;
+    }
+
+    if (!secret) {
+      setClientSecret(null);
+      setError('Kortsetup kunde inte initieras. Klicka på "Försök igen" för att skapa en ny kortsession.');
+      return;
+    }
+
+    setClientSecret(secret);
+    setError('');
+  }, []);
+
+  const loadCardSetup = useCallback(async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await subscribeDraft(draftId, resumeToken);
+      applySubscribeResponse(res);
+    } catch (err: any) {
+      const msg = err?.message || err?.error || err?.detail ||
+        (typeof err === 'string' ? err : 'Kunde inte ladda kortsteget just nu.');
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [draftId, resumeToken, applySubscribeResponse]);
 
   useEffect(() => {
     if (initialClientSecret) {
@@ -665,40 +739,59 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, onCardConf
       return;
     }
 
-    subscribeDraft(draftId, resumeToken)
-      .then(res => {
-        const secret = extractSetupIntentClientSecret(res);
-        if (!secret) {
-          setError('Betalningssteget kunde inte initieras (saknar client secret).');
-          setLoading(false);
-          return;
-        }
-        setClientSecret(secret);
-        setLoading(false);
-      })
-      .catch(err => {
-        const msg = err?.message || err?.error || err?.detail ||
-          (typeof err === 'string' ? err : 'Kunde inte ladda betalningsformuläret.');
-        setError(msg);
-        setLoading(false);
-      });
-  }, [draftId, resumeToken, initialClientSecret]);
+    loadCardSetup();
+  }, [initialClientSecret, loadCardSetup]);
+
+  const handleStartTrialNow = async () => {
+    setStartingTrial(true);
+    setError('');
+    try {
+      await onCardConfirmed();
+    } catch (err: any) {
+      setError(err?.message || err?.error || 'Kunde inte starta trial. Försök igen.');
+    } finally {
+      setStartingTrial(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">Registrera betalkort</h2>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Kortet sparas säkert. <strong className="text-foreground">Ingen debitering sker under trial.</strong> Trial startar automatiskt efter att kortet sparats.
+          Trial startar först när kortet är bekräftat.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 text-[13px]">
+        <div className="flex items-start justify-between gap-4">
+          <span className="text-muted-foreground">Debiteras nu</span>
+          <span className="text-foreground font-semibold">0 SEK</span>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <span className="text-muted-foreground">Efter 7 dagar ({trialChargeDate})</span>
+          <span className="text-foreground font-semibold">{fmt(activationFeeSek + monthlyTotal)} SEK</span>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <span className="text-muted-foreground">Varje månad därefter</span>
+          <span className="text-foreground font-semibold">{fmt(monthlyTotal)} SEK/mån</span>
+        </div>
+        <Separator />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Inkluderar {includedSeats} användare. Valda användare: {expectedSeats}. {extraSeats > 0 ? `Extra användare (${extraSeats}) ingår i månadspriset ovan.` : 'Inga extra användare valda.'} Alla belopp visas exkl. moms.
         </p>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
         <Mail className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-[13px] text-muted-foreground">
-          Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> efter att kortet sparats och trial startats.
+          Inbjudan skickas till <span className="text-foreground font-medium">{email}</span> när kortet är sparat och trial startad.
         </p>
       </div>
+
+      {setupIntentStatus && (
+        <p className="text-[11px] text-muted-foreground">Kortstatus: {setupIntentStatus}{paymentMethodSaved ? ' · kort sparat' : ''}</p>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-12">
@@ -709,44 +802,31 @@ function StepCard({ draftId, resumeToken, initialClientSecret, email, onCardConf
       {error && !loading && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-3">
           <p className="text-[13px] text-destructive">{error}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              setError('');
-              setLoading(true);
-              try {
-                const res = await subscribeDraft(draftId, resumeToken);
-                const secret = extractSetupIntentClientSecret(res);
-                if (!secret) {
-                  setError('Betalningssteget kunde inte initieras (saknar client secret).');
-                  setLoading(false);
-                  return;
-                }
-                setClientSecret(secret);
-                setLoading(false);
-              } catch (err: any) {
-                setError(err?.message || err?.error || 'Försök igen.');
-                setLoading(false);
-              }
-            }}
-            className="text-[12px]"
-          >
+          <Button variant="outline" size="sm" onClick={loadCardSetup} className="text-[12px]">
             Försök igen
           </Button>
         </div>
       )}
 
-      {!loading && !error && clientSecret && (
-        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#000', fontFamily: 'inherit', borderRadius: '8px' } } }}>
-          <CardFormInner onCardConfirmed={onCardConfirmed} />
+      {!loading && !error && readyForTrialStart && (
+        <div className="space-y-3 rounded-lg border border-border p-4 bg-background">
+          <p className="text-[13px] text-foreground">Kort är redan sparat för detta utkast. Du kan starta trial direkt.</p>
+          <Button type="button" onClick={handleStartTrialNow} disabled={startingTrial} className="w-full h-10 bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px]">
+            {startingTrial ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Startar trial...</> : <><CreditCard className="h-4 w-4 mr-2" /> Starta trial nu</>}
+          </Button>
+        </div>
+      )}
+
+      {!loading && !error && !readyForTrialStart && clientSecret && (
+        <Elements stripe={stripePromise} options={{ appearance: { theme: 'stripe', variables: { fontFamily: 'inherit', borderRadius: '8px' } } }}>
+          <CardFormInner clientSecret={clientSecret} email={email} onCardConfirmed={onCardConfirmed} />
         </Elements>
       )}
     </div>
   );
 }
 
-function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<void> }) {
+function CardFormInner({ clientSecret, email, onCardConfirmed }: { clientSecret: string; email: string; onCardConfirmed: () => Promise<void> }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -756,18 +836,32 @@ function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<voi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      setError('Kortfältet kunde inte laddas. Försök igen.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
-    // 1) Confirm SetupIntent with Stripe
-    const result = await stripe.confirmSetup({
-      elements,
-      confirmParams: { return_url: window.location.href },
-      redirect: 'if_required',
+    // 1) Confirm SetupIntent with Stripe via CardElement (avoids flaky PaymentElement session errors)
+    const result = await stripe.confirmCardSetup(clientSecret, {
+      payment_method: {
+        card: cardElement,
+        billing_details: email ? { email } : undefined,
+      },
     });
 
     if (result.error) {
       setError(result.error.message || 'Kortet kunde inte sparas.');
+      setSubmitting(false);
+      return;
+    }
+
+    if (result.setupIntent?.status !== 'succeeded') {
+      setError('Kortet kunde inte bekräftas. Försök igen.');
       setSubmitting(false);
       return;
     }
@@ -786,7 +880,9 @@ function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<voi
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <PaymentElement />
+      <div className="rounded-lg border border-border bg-background px-3 py-3">
+        <CardElement options={{ hidePostalCode: true }} />
+      </div>
       {error && (
         <div className="rounded bg-destructive/8 border border-destructive/15 px-3 py-2.5">
           <p className="text-[12px] text-destructive font-medium">{error}</p>
@@ -799,7 +895,7 @@ function CardFormInner({ onCardConfirmed }: { onCardConfirmed: () => Promise<voi
       </Button>
       <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
         <Shield className="w-3 h-3" />
-        Säker betalning via Stripe · Ingen debitering under trial
+        Säker betalning via Stripe · 0 SEK under trial
       </div>
     </form>
   );
