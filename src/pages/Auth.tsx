@@ -78,6 +78,10 @@ export default function Auth() {
 
   const scrollInputIntoView = (target: HTMLElement) => {
     if (window.innerWidth >= 1024) return;
+    const ua = navigator.userAgent;
+    const isChrome = /Chrome|CriOS/.test(ua) && !/Edg|OPR/.test(ua);
+    if (isChrome) return;
+
     window.scrollTo({ top: 0, behavior: 'auto' });
     window.setTimeout(() => {
       target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
@@ -242,7 +246,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative min-h-[100dvh] bg-background overflow-x-hidden flex flex-col">
+    <div className="relative min-h-[100svh] md:min-h-[100dvh] bg-background overflow-x-hidden flex flex-col">
       {/* Main area — NO fixed height, allows natural scroll on mobile */}
       <main className="relative z-10 flex-1 flex flex-col">
         {/* Desktop: two-column, Mobile: single centered */}
@@ -272,7 +276,7 @@ export default function Auth() {
           </div>
 
           {/* Right panel — auth form */}
-          <div className="flex-1 relative flex flex-col items-center px-5 sm:px-8 py-10 sm:py-12 min-h-[100dvh] lg:min-h-screen justify-start lg:justify-center">
+          <div className="flex-1 relative flex flex-col items-center px-5 sm:px-8 py-10 sm:py-12 min-h-[100svh] md:min-h-[100dvh] lg:min-h-screen justify-start lg:justify-center">
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
               <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
