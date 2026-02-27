@@ -109,6 +109,7 @@ export default function EnterpriseOnboarding() {
 
   const validateTimer = useRef<ReturnType<typeof setTimeout>>();
   const draftTimer = useRef<ReturnType<typeof setTimeout>>();
+  const initialMountRef = useRef(true);
 
   // Refs for stale closure prevention
   const draftIdRef = useRef(draftId);
@@ -233,8 +234,9 @@ export default function EnterpriseOnboarding() {
     }
   }, [form.expectedSeats]);
 
-  // Save draft on step change & validate on step 2+
+  // Save draft on step change & validate on step 2+ (skip initial mount)
   useEffect(() => {
+    if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
     triggerDraftSave(form as Partial<OnboardingFormData>, step);
@@ -243,8 +245,12 @@ export default function EnterpriseOnboarding() {
     }
   }, [step]);
 
-  // Always persist entered data locally/session on every form change
+  // Always persist entered data locally/session on every form change (skip initial mount)
   useEffect(() => {
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+      return;
+    }
     if (!hasUserInteractedRef.current) return;
     saveFormLocal(form, step);
   }, [form, step, saveFormLocal]);
