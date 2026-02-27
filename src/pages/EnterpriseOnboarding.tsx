@@ -145,8 +145,11 @@ export default function EnterpriseOnboarding() {
           const restoredStep = Math.min(res.draft.progress?.step ?? 0, STEPS.length - 1);
 
           if (hasRestorableProgress(restored, restoredStep)) {
+            hasUserInteractedRef.current = true;
             setForm(restored);
             if (restoredStep > 0) setStep(restoredStep);
+          } else {
+            restoreFromLocal();
           }
         })
         .catch(() => {
@@ -159,10 +162,11 @@ export default function EnterpriseOnboarding() {
 
     function restoreFromLocal() {
       const parsed = readStorageJSON<{ form?: Partial<OnboardingFormData>; step?: number; touched?: boolean }>(FORM_KEY);
-      if (!parsed?.touched || !parsed.form) return;
+      if (!parsed?.form) return;
 
       const restoredStep = Math.min(parsed.step ?? 0, STEPS.length - 1);
       if (hasRestorableProgress(parsed.form, restoredStep)) {
+        hasUserInteractedRef.current = true;
         setForm(prev => ({ ...prev, ...parsed.form }));
         if (restoredStep > 0) setStep(restoredStep);
       }
@@ -231,12 +235,19 @@ export default function EnterpriseOnboarding() {
 
   // Save draft on step change & validate on step 2+
   useEffect(() => {
+    hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
     triggerDraftSave(form as Partial<OnboardingFormData>, step);
     if (step >= 2) {
       triggerValidation(form as Partial<OnboardingFormData>);
     }
   }, [step]);
+
+  // Always persist entered data locally/session on every form change
+  useEffect(() => {
+    if (!hasUserInteractedRef.current) return;
+    saveFormLocal(form, step);
+  }, [form, step, saveFormLocal]);
 
   // Beacon save on unload
   useEffect(() => {
