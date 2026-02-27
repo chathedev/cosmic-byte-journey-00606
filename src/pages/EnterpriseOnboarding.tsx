@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import {
   validateOnboarding,
@@ -15,14 +16,10 @@ import {
   getOnboardingStatus,
   type OnboardingFormData,
   type ValidationResponse,
-  type StartResponse,
-  type SubscribeResponse,
-  type OnboardingStatusResponse,
 } from '@/lib/enterpriseOnboardingApi';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-// Enterprise billing uses the Tivly Enterprise Stripe account
 const stripePromise = loadStripe('pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu');
 
 const PLANS = [
@@ -31,7 +28,7 @@ const PLANS = [
 ];
 
 const EXTRA_SEAT_PRICE = 249;
-const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta'];
+const STEPS = ['Teamstorlek', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalkort'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -86,9 +83,10 @@ export default function EnterpriseOnboarding() {
   const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [completed, setCompleted] = useState(false);
+  const [trialStarted, setTrialStarted] = useState(false);
   const [completedEmail, setCompletedEmail] = useState('');
   const [completedCompanyId, setCompletedCompanyId] = useState('');
+  const [cardDone, setCardDone] = useState(false);
   const [draftId, setDraftId] = useState<string | undefined>();
   const [resumeToken, setResumeToken] = useState<string | undefined>();
 
@@ -126,7 +124,7 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
           const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
-          const restoredStep = Math.min(res.draft.progress?.step ?? 0, STEPS.length - 1);
+          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 3); // max step 3 for restore
           if (hasRestorableProgress(restored, restoredStep)) {
             hasUserInteractedRef.current = true;
             setForm(restored);
@@ -139,7 +137,7 @@ export default function EnterpriseOnboarding() {
     function restoreFromLocal() {
       const parsed = readStorageJSON<{ form?: Partial<OnboardingFormData>; step?: number; touched?: boolean }>(FORM_KEY);
       if (!parsed?.form) return;
-      const restoredStep = Math.min(parsed.step ?? 0, STEPS.length - 1);
+      const restoredStep = Math.min(parsed.step ?? 0, 3);
       if (hasRestorableProgress(parsed.form, restoredStep)) {
         hasUserInteractedRef.current = true;
         setForm(prev => ({ ...prev, ...parsed.form }));
@@ -200,8 +198,8 @@ export default function EnterpriseOnboarding() {
     if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
-    triggerDraftSave(form as Partial<OnboardingFormData>, step);
-    if (step >= 2) triggerValidation(form as Partial<OnboardingFormData>);
+    if (step < 4) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step >= 2 && step < 4) triggerValidation(form as Partial<OnboardingFormData>);
   }, [step]);
 
   useEffect(() => {
@@ -254,11 +252,13 @@ export default function EnterpriseOnboarding() {
         return;
       }
       const res = await startTrial({ ...(form as OnboardingFormData), draftId, resumeToken });
-      setCompleted(true);
+      setTrialStarted(true);
       setCompletedEmail(res.invitation?.email || form.workEmail || '');
       setCompletedCompanyId(res.company?.id || '');
       clearDraftLocal();
       clearFormLocal();
+      // Auto-advance to card step
+      setStep(4);
     } catch (err: any) {
       setSubmitError(err?.message || err?.error || 'Något gick fel. Försök igen.');
     } finally {
@@ -266,17 +266,57 @@ export default function EnterpriseOnboarding() {
     }
   };
 
-  if (completed) return <CompletionScreen email={completedEmail} companyId={completedCompanyId} />;
+  // Final done screen
+  if (cardDone) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <span className="text-[11px] font-semibold tracking-[0.3em] uppercase text-foreground">Tivly Enterprise</span>
+          </div>
+          <div className="border border-border bg-card rounded-lg p-8 space-y-6">
+            <div className="flex justify-center">
+              <div className="h-12 w-12 rounded-full bg-foreground/5 border border-border flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-foreground" />
+              </div>
+            </div>
+            <div className="text-center">
+              <h1 className="text-xl font-semibold text-foreground">Allt klart</h1>
+              <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed">
+                Trial aktiverad och betalkort sparat. Debitering sker automatiskt efter 7 dagar.
+              </p>
+            </div>
+            <Separator />
+            <div className="space-y-2.5 text-[13px] text-muted-foreground">
+              <div className="flex items-start gap-3">
+                <span className="text-foreground font-semibold text-sm">1</span>
+                <span>Öppna inbjudan i din mejl (<span className="text-foreground font-medium">{completedEmail}</span>)</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-foreground font-semibold text-sm">2</span>
+                <span>Klicka på länken och logga in</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-foreground font-semibold text-sm">3</span>
+                <span>Bjud in ditt team och börja använda Tivly</span>
+              </div>
+            </div>
+          </div>
+          <p className="text-[10px] text-center text-muted-foreground mt-6">© {new Date().getFullYear()} Tivly AB</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="text-xs font-semibold tracking-widest uppercase text-foreground">TIVLY ENTERPRISE</span>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="text-[11px] font-semibold tracking-[0.3em] uppercase text-foreground">Tivly Enterprise</span>
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
             {isSaving && <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && <span className="flex items-center gap-1"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1"><Check className="h-3 w-3" />Sparat</span>}
             <span className="text-muted-foreground/60">Steg {step + 1}/{STEPS.length}</span>
           </div>
         </div>
@@ -285,8 +325,15 @@ export default function EnterpriseOnboarding() {
       {/* Progress bar */}
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <div className="flex gap-1.5">
-          {STEPS.map((_, i) => (
-            <div key={i} className={cn('h-1 flex-1 rounded-full transition-colors', i <= step ? 'bg-foreground' : 'bg-border')} />
+          {STEPS.map((label, i) => (
+            <div key={i} className={cn('h-0.5 flex-1 rounded-full transition-colors', i <= step ? 'bg-foreground' : 'bg-border')} />
+          ))}
+        </div>
+        <div className="flex justify-between mt-2">
+          {STEPS.map((label, i) => (
+            <span key={i} className={cn('text-[10px] tracking-wide', i <= step ? 'text-foreground font-medium' : 'text-muted-foreground/50')}>
+              {label}
+            </span>
           ))}
         </div>
       </div>
@@ -298,28 +345,31 @@ export default function EnterpriseOnboarding() {
             {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
             {step === 2 && <StepDetails form={form} fieldErrors={fieldErrors} fieldChecks={fieldChecks} availability={availability} isValidating={isValidating} updateField={updateField} />}
             {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 4 && <StepCard companyId={completedCompanyId} email={completedEmail} onComplete={() => setCardDone(true)} onSkip={() => setCardDone(true)} />}
           </motion.div>
         </AnimatePresence>
 
-        <div className="flex items-center justify-between mt-10">
-          <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift">
-            <ChevronLeft className="h-4 w-4" /> Tillbaka
-          </Button>
-          {step < STEPS.length - 1 ? (
-            <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
-              Nästa <ChevronRight className="h-4 w-4" />
+        {/* Navigation - hide on card step */}
+        {step < 4 && (
+          <div className="flex items-center justify-between mt-10">
+            <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift">
+              <ChevronLeft className="h-4 w-4" /> Tillbaka
             </Button>
-          ) : (
-            <Button size="sm" onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="gap-1.5 min-w-[160px] bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
-              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Startar...</> : <>Starta trial <ArrowRight className="h-4 w-4" /></>}
-            </Button>
-          )}
-        </div>
+            {step < 3 ? (
+              <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} disabled={step === 2 && !canProceedStep2} className="gap-1.5 bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
+                Nästa <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="gap-1.5 min-w-[160px] bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
+                {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Startar...</> : <>Starta trial <ArrowRight className="h-4 w-4" /></>}
+              </Button>
+            )}
+          </div>
+        )}
       </main>
 
-      {/* Footer */}
       <footer className="max-w-2xl mx-auto px-4 pb-8 pt-4">
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-[10px] text-muted-foreground text-center">
           © {new Date().getFullYear()} Tivly · <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="underline">Villkor</a> · <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline">Integritet</a>
         </p>
       </footer>
@@ -333,8 +383,8 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Hur stort är ert team?</h2>
-        <p className="text-sm text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
+        <h2 className="text-xl font-semibold text-foreground">Hur stort är ert team?</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
       </div>
       <div className="flex items-center justify-center gap-6 py-8">
         <button onClick={() => onChange(Math.max(1, seats - 1))} className="h-10 w-10 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors no-hover-lift">
@@ -342,7 +392,7 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         </button>
         <div className="text-center">
           <span className="text-5xl font-bold text-foreground tabular-nums">{seats}</span>
-          <p className="text-sm text-muted-foreground mt-1">användare</p>
+          <p className="text-[13px] text-muted-foreground mt-1">användare</p>
         </div>
         <button onClick={() => onChange(Math.min(500, seats + 1))} className="h-10 w-10 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors no-hover-lift">
           <Plus className="h-4 w-4" />
@@ -350,13 +400,13 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
       </div>
       <div className="flex items-center justify-center gap-2">
         {presets.map(n => (
-          <button key={n} onClick={() => onChange(n)} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-colors border no-hover-lift', seats === n ? 'bg-foreground text-background border-foreground' : 'bg-card border-border text-muted-foreground hover:border-foreground/30')}>
+          <button key={n} onClick={() => onChange(n)} className={cn('px-4 py-2 rounded-lg text-[13px] font-medium transition-colors border no-hover-lift', seats === n ? 'bg-foreground text-background border-foreground' : 'bg-card border-border text-muted-foreground hover:border-foreground/30')}>
             {n}
           </button>
         ))}
       </div>
-      <p className="text-center text-sm text-muted-foreground">
-        {seats <= 10 ? 'Vi rekommenderar Small-planen för ert team.' : 'Vi rekommenderar Standard-planen för ert team.'}
+      <p className="text-center text-[13px] text-muted-foreground">
+        {seats <= 10 ? 'Rekommenderad plan: Small' : 'Rekommenderad plan: Standard'}
       </p>
     </div>
   );
@@ -369,18 +419,18 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Välj plan</h2>
-        <p className="text-sm text-muted-foreground mt-1">7 dagars kostnadsfri trial. Ingen betalning nu.</p>
+        <h2 className="text-xl font-semibold text-foreground">Välj plan</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">7 dagars kostnadsfri trial. Betalkort i nästa steg.</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
         {PLANS.map(plan => {
           const isSelected = form.planType === plan.id;
           return (
-            <button key={plan.id} onClick={() => updateField('planType', plan.id)} className={cn('text-left rounded-lg border p-5 transition-all no-hover-lift', isSelected ? 'border-foreground bg-foreground/5' : 'border-border hover:border-foreground/30')}>
+            <button key={plan.id} onClick={() => updateField('planType', plan.id)} className={cn('text-left rounded-lg border p-5 transition-all no-hover-lift', isSelected ? 'border-foreground bg-foreground/[0.03]' : 'border-border hover:border-foreground/30')}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-semibold text-foreground">{plan.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{plan.seats} användare inkl.</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">{plan.seats} användare inkl.</p>
                 </div>
                 <div className={cn('h-5 w-5 rounded-full border-2 flex items-center justify-center', isSelected ? 'border-foreground' : 'border-border')}>
                   {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-foreground" />}
@@ -388,18 +438,19 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
               </div>
               <p className="mt-3">
                 <span className="text-2xl font-bold text-foreground">{fmt(plan.priceSek)}</span>
-                <span className="text-sm text-muted-foreground"> SEK/mån</span>
+                <span className="text-[13px] text-muted-foreground"> SEK/mån</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Aktivering {fmt(plan.activationSek)} SEK</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Aktivering {fmt(plan.activationSek)} SEK</p>
             </button>
           );
         })}
       </div>
-      <div className="rounded-lg border border-border p-4 space-y-2 text-sm">
+      <div className="rounded-lg border border-border p-4 space-y-2 text-[13px]">
         <div className="flex justify-between"><span className="text-muted-foreground">{selectedPlan.name} ({selectedPlan.seats} anv.)</span><span className="text-foreground">{fmt(selectedPlan.priceSek)} SEK</span></div>
         {extraSeats > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{extraSeats} extra × {EXTRA_SEAT_PRICE} SEK</span><span className="text-foreground">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK</span></div>}
-        <div className="flex justify-between pt-2 border-t border-border font-medium"><span className="text-foreground">Totalt/mån</span><span className="text-foreground">{fmt(monthlyTotal)} SEK</span></div>
-        <p className="text-xs text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" /> Exkl. moms. Slutpris beräknas av servern.</p>
+        <Separator />
+        <div className="flex justify-between font-medium"><span className="text-foreground">Totalt/mån</span><span className="text-foreground">{fmt(monthlyTotal)} SEK</span></div>
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" /> Exkl. moms. Slutpris beräknas server-side.</p>
       </div>
     </div>
   );
@@ -416,29 +467,29 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, isValidatin
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Företag & kontakt</h2>
-          <p className="text-sm text-muted-foreground mt-1">Fyll i uppgifter om ert företag och kontaktperson.</p>
+          <h2 className="text-xl font-semibold text-foreground">Företag & kontakt</h2>
+          <p className="text-[13px] text-muted-foreground mt-1">Uppgifter om företaget och kontaktpersonen.</p>
         </div>
         {isValidating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
       <div className="grid gap-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <FieldInput label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required />
-          <FieldInput label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Detta organisationsnummer är redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
+          <FieldInput label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required />
         </div>
         <FieldInput label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} />
-        <div className="border-t border-border pt-4 mt-2" />
+        <Separator />
         <FieldInput label="Kontaktperson" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required />
         <div className="grid sm:grid-cols-2 gap-4">
-          <FieldInput label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Denna e-postadress är redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
+          <FieldInput label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required />
           <FieldInput label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required />
         </div>
       </div>
       {(orgTaken || emailTaken) && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 flex items-start gap-2">
           <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-          <p className="text-sm text-destructive">
-            {orgTaken && emailTaken ? 'Både organisationsnumret och e-postadressen är redan registrerade.' : orgTaken ? 'Organisationsnumret är redan registrerat.' : 'E-postadressen är redan registrerad.'}
+          <p className="text-[13px] text-destructive">
+            {orgTaken && emailTaken ? 'Organisationsnummer och mejl redan registrerade.' : orgTaken ? 'Organisationsnumret redan registrerat.' : 'Mejladressen redan registrerad.'}
             {' '}Kontakta <a href="mailto:support@tivly.se" className="underline">support@tivly.se</a>.
           </p>
         </div>
@@ -454,11 +505,11 @@ function FieldInput({ label, id, placeholder, value, onChange, error, valid, hin
 }) {
   return (
     <div>
-      <Label htmlFor={id} className="text-xs font-medium">{label}{required && ' *'}</Label>
-      <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('mt-1', error && 'border-destructive')} />
-      {error && <p className="text-xs text-destructive flex items-center gap-1 mt-1"><AlertCircle className="h-3 w-3 shrink-0" /> {error}</p>}
-      {!error && valid && value && <p className="text-xs text-foreground flex items-center gap-1 mt-1"><CheckCircle2 className="h-3 w-3" /> OK</p>}
-      {!error && !valid && hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
+      <Label htmlFor={id} className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}{required && ' *'}</Label>
+      <Input id={id} type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className={cn('mt-1 text-[13px] bg-background', error && 'border-destructive')} />
+      {error && <p className="text-[11px] text-destructive flex items-center gap-1 mt-1"><AlertCircle className="h-3 w-3 shrink-0" /> {error}</p>}
+      {!error && valid && value && <p className="text-[11px] text-foreground flex items-center gap-1 mt-1"><CheckCircle2 className="h-3 w-3" /> OK</p>}
+      {!error && !valid && hint && <p className="text-[11px] text-muted-foreground mt-1">{hint}</p>}
     </div>
   );
 }
@@ -471,10 +522,10 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Bekräfta</h2>
-        <p className="text-sm text-muted-foreground mt-1">Granska och starta din kostnadsfria trial.</p>
+        <h2 className="text-xl font-semibold text-foreground">Bekräfta & starta trial</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Granska och starta din 7-dagars kostnadsfria trial.</p>
       </div>
-      <div className="rounded-lg border border-border divide-y divide-border text-sm">
+      <div className="rounded-lg border border-border divide-y divide-border text-[13px]">
         <Row label="Företag" value={form.companyName || '–'} />
         <Row label="Orgnr" value={form.organizationNumber || '–'} />
         <Row label="Kontakt" value={form.contactName || '–'} />
@@ -488,27 +539,26 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
       <div className="space-y-3">
         <label className="flex items-start gap-3 cursor-pointer">
           <Checkbox checked={form.acceptedTerms || false} onCheckedChange={(c) => updateField('acceptedTerms', c === true)} className="mt-0.5" />
-          <span className="text-sm text-muted-foreground leading-relaxed">
+          <span className="text-[13px] text-muted-foreground leading-relaxed">
             Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-foreground underline">enterprise-villkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground underline">integritetspolicyn</a>.
           </span>
         </label>
         <label className="flex items-start gap-3 cursor-pointer">
           <Checkbox checked={form.authorizedSignatory || false} onCheckedChange={(c) => updateField('authorizedSignatory', c === true)} className="mt-0.5" />
-          <span className="text-sm text-muted-foreground leading-relaxed">Jag är behörig att teckna avtal för {form.companyName || 'företaget'}.</span>
+          <span className="text-[13px] text-muted-foreground leading-relaxed">Jag är behörig att teckna avtal för {form.companyName || 'företaget'}.</span>
         </label>
       </div>
       {submitError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 flex items-start gap-2">
           <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-          <p className="text-sm text-destructive">{submitError}</p>
+          <p className="text-[13px] text-destructive">{submitError}</p>
         </div>
       )}
       <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
-        <Shield className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        <div className="text-sm text-muted-foreground space-y-1">
-          <p>Ingen betalning krävs nu. Trial varar 7 dagar.</p>
-          <p>Du får en inbjudan via e-post. Efter inloggning kan du lägga till betalkort så debitering sker automatiskt.</p>
-        </div>
+        <CreditCard className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-[13px] text-muted-foreground">
+          I nästa steg registrerar du ett betalkort. Ingen debitering sker under trial-perioden.
+        </p>
       </div>
     </div>
   );
@@ -523,51 +573,18 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* ─── Completion Screen ─── */
-function CompletionScreen({ email, companyId }: { email: string; companyId: string }) {
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <p className="text-xs font-semibold tracking-widest uppercase text-foreground">TIVLY ENTERPRISE</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-8 space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Kolla din e-post</h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              Vi har skickat en inbjudan till <strong className="text-foreground">{email}</strong>.
-            </p>
-          </div>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p className="flex items-start gap-3"><span className="text-foreground font-semibold">1.</span> Öppna mejlet och klicka på aktiveringslänken.</p>
-            <p className="flex items-start gap-3"><span className="text-foreground font-semibold">2.</span> Logga in med din verifieringskod.</p>
-            <p className="flex items-start gap-3"><span className="text-foreground font-semibold">3.</span> Lägg till betalkort för att aktivera efter trial.</p>
-          </div>
-          <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
-            <CreditCard className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-sm text-muted-foreground">
-              Under trial-perioden (7 dagar) kan du registrera ett betalkort. Debitering sker automatiskt när trial slutar.
-            </p>
-          </div>
-        </div>
-        <p className="text-xs text-center text-muted-foreground mt-6">
-          Hittar du inte mejlet? Kolla skräpposten eller mejla <a href="mailto:support@tivly.se" className="underline">support@tivly.se</a>.
-        </p>
-        <p className="text-xs text-center text-muted-foreground mt-2">
-          © {new Date().getFullYear()} Tivly
-        </p>
-      </motion.div>
-    </div>
-  );
-}
-
-/* ─── Stripe Setup Form (used post-login for trial card collection) ─── */
-export function StripeSetupForm({ companyId, onComplete }: { companyId: string; onComplete: () => void }) {
+/* ─── STEP 4: Card (Stripe SetupIntent) ─── */
+function StepCard({ companyId, email, onComplete, onSkip }: { companyId: string; email: string; onComplete: () => void; onSkip: () => void }) {
   const [loading, setLoading] = useState(true);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!companyId) {
+      setError('Inget company-ID. Trial kanske inte skapades korrekt.');
+      setLoading(false);
+      return;
+    }
     subscribeOnboarding(companyId)
       .then(res => {
         setClientSecret(res.setupIntentClientSecret);
@@ -579,35 +596,55 @@ export function StripeSetupForm({ companyId, onComplete }: { companyId: string; 
       });
   }, [companyId]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (error || !clientSecret) {
-    return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-        <p className="text-sm text-destructive">{error || 'Något gick fel.'}</p>
-      </div>
-    );
-  }
-
   return (
-    <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#000' } } }}>
-      <SetupFormInner companyId={companyId} onComplete={onComplete} />
-    </Elements>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-foreground">Registrera betalkort</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">
+          Ingen debitering under trial. Kortet sparas för automatisk debitering efter 7 dagar.
+        </p>
+      </div>
+
+      {/* Trial confirmation banner */}
+      <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
+        <CheckCircle2 className="h-4 w-4 text-foreground shrink-0 mt-0.5" />
+        <div className="text-[13px] text-muted-foreground space-y-0.5">
+          <p className="text-foreground font-medium">Trial startad!</p>
+          <p>Inbjudan skickad till <span className="text-foreground font-medium">{email}</span></p>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+            <p className="text-[13px] text-destructive">{error}</p>
+          </div>
+          <Button onClick={onSkip} variant="outline" className="w-full no-hover-lift text-[13px]">
+            Hoppa över – lägg till kort senare
+          </Button>
+        </div>
+      )}
+
+      {!loading && !error && clientSecret && (
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#000', fontFamily: 'inherit', borderRadius: '8px' } } }}>
+          <CardFormInner companyId={companyId} onComplete={onComplete} onSkip={onSkip} />
+        </Elements>
+      )}
+    </div>
   );
 }
 
-function SetupFormInner({ companyId, onComplete }: { companyId: string; onComplete: () => void }) {
+function CardFormInner({ companyId, onComplete, onSkip }: { companyId: string; onComplete: () => void; onSkip: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -627,53 +664,47 @@ function SetupFormInner({ companyId, onComplete }: { companyId: string; onComple
       return;
     }
 
-    // Poll status until autoChargeReady
+    // Poll status
     let attempts = 0;
     const poll = async () => {
       attempts++;
       try {
         const status = await getOnboardingStatus(companyId);
         if (status.billingSetup?.autoChargeReady) {
-          setSuccess(true);
           setSubmitting(false);
           onComplete();
           return;
         }
       } catch {}
       if (attempts < 10) setTimeout(poll, 2000);
-      else { setSubmitting(false); setSuccess(true); onComplete(); }
+      else { setSubmitting(false); onComplete(); }
     };
     poll();
   };
 
-  if (success) {
-    return (
-      <div className="text-center py-8 space-y-3">
-        <CheckCircle2 className="h-10 w-10 text-foreground mx-auto" />
-        <h3 className="text-lg font-semibold text-foreground">Kort sparat</h3>
-        <p className="text-sm text-muted-foreground">Debitering sker automatiskt när trial slutar.</p>
-      </div>
-    );
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-foreground mb-1">Lägg till betalkort</h3>
-        <p className="text-sm text-muted-foreground">Kortet debiteras först efter trial-perioden (7 dagar).</p>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
       <PaymentElement />
       {error && (
-        <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-          <p className="text-sm text-destructive">{error}</p>
+        <div className="rounded bg-destructive/8 border border-destructive/15 px-3 py-2.5">
+          <p className="text-[12px] text-destructive font-medium">{error}</p>
         </div>
       )}
-      <Button type="submit" disabled={!stripe || submitting} className="w-full h-11 bg-foreground text-background hover:bg-foreground/90 no-hover-lift">
-        {submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar kort...</> : 'Spara betalkort'}
+      <Button type="submit" disabled={!stripe || submitting} className="w-full h-10 bg-foreground text-background hover:bg-foreground/90 no-hover-lift text-[13px]">
+        {submitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sparar kort...</> : <>
+          <CreditCard className="h-4 w-4 mr-2" /> Spara betalkort
+        </>}
       </Button>
-      <p className="text-xs text-center text-muted-foreground">
-        Säker betalning via Stripe. Ingen debitering under trial.
-      </p>
+      <button type="button" onClick={onSkip} className="w-full text-[12px] text-muted-foreground hover:text-foreground transition-colors py-2">
+        Hoppa över – lägg till kort senare via inställningar
+      </button>
+      <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
+        <Shield className="w-3 h-3" />
+        Säker betalning via Stripe · Ingen debitering under trial
+      </div>
     </form>
   );
 }
+
+/* ─── Exported for use elsewhere ─── */
+export { StepCard as StripeSetupForm };
