@@ -61,6 +61,7 @@ import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
 import AttribrConnect from "./pages/AttribrConnect";
 import AuthHandoff from "./pages/AuthHandoff";
+import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -209,7 +210,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
-  const isPublicPage = location.pathname === '/free-trial';
+  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/enterprise/onboarding';
   const isRecordingPage = location.pathname === '/recording';
   const isSISRequiredPage = location.pathname === '/sis-required';
   const isNative = isNativeApp();
@@ -348,6 +349,7 @@ const AppContent = () => {
                 <Route path="/sis-required" element={<ProtectedRoute><SISRequired /></ProtectedRoute>} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/free-trial" element={<FreeTrial />} />
+                <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
                 <Route path="/generate-protocol" element={<GenerateProtocol />} />
                 <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
                 <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
