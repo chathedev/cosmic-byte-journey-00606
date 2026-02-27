@@ -69,33 +69,11 @@ export default function Auth() {
   const [codeSent, setCodeSent] = useState(false);
   const verifyingRef = useRef(false);
   const [isSignup, setIsSignup] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const viewport = window.visualViewport;
-    const updateViewport = () => {
-      const nextHeight = Math.round(viewport?.height ?? window.innerHeight);
-      setViewportHeight(nextHeight);
-      const keyboardDelta = window.innerHeight - nextHeight;
-      setIsKeyboardOpen(keyboardDelta > 140);
-    };
-    updateViewport();
-    viewport?.addEventListener('resize', updateViewport);
-    viewport?.addEventListener('scroll', updateViewport);
-    window.addEventListener('orientationchange', updateViewport);
-    return () => {
-      viewport?.removeEventListener('resize', updateViewport);
-      viewport?.removeEventListener('scroll', updateViewport);
-      window.removeEventListener('orientationchange', updateViewport);
-    };
   }, []);
 
   useEffect(() => {
@@ -256,17 +234,14 @@ export default function Auth() {
   }
 
   return (
-    <div
-      className="relative min-h-screen bg-background overflow-x-hidden flex flex-col"
-      style={viewportHeight ? { height: `${viewportHeight}px` } : { minHeight: '100dvh' }}
-    >
-      {/* Main area */}
-      <main className="relative z-10 flex-1 overflow-y-auto overscroll-contain touch-pan-y flex flex-col">
+    <div className="relative min-h-[100dvh] bg-background overflow-x-hidden flex flex-col">
+      {/* Main area — NO fixed height, allows natural scroll on mobile */}
+      <main className="relative z-10 flex-1 flex flex-col">
         {/* Desktop: two-column, Mobile: single centered */}
         <div className="flex-1 flex flex-col lg:flex-row">
 
           {/* Left panel — branding (desktop only) */}
-          <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12">
+          <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12 min-h-screen sticky top-0">
             <div className="max-w-sm space-y-8">
               <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
               <div className="space-y-3">
@@ -289,14 +264,14 @@ export default function Auth() {
           </div>
 
           {/* Right panel — auth form */}
-          <div className={`flex-1 flex flex-col ${isKeyboardOpen ? 'justify-start pt-4' : 'justify-center'} px-5 sm:px-8 py-8 sm:py-12`}>
+          <div className="flex-1 flex flex-col items-center justify-center px-5 sm:px-8 py-12 sm:py-16 min-h-[100dvh] lg:min-h-0">
             
             {/* Mobile logo */}
-            <div className={`lg:hidden flex justify-center mb-8 ${isKeyboardOpen ? 'hidden' : ''}`}>
+            <div className="lg:hidden flex justify-center mb-8">
               <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
             </div>
 
-            <div className="w-full max-w-[420px] mx-auto">
+            <div className="w-full max-w-[380px] mx-auto">
               <AnimatePresence mode="wait">
                 {viewMode === 'email' && (
                   <motion.div
@@ -307,7 +282,7 @@ export default function Auth() {
                     transition={{ duration: 0.18 }}
                     className="space-y-6"
                   >
-                    <div className="space-y-1.5">
+                    <div className="text-center space-y-1.5">
                       <h1 className="text-2xl font-semibold text-foreground tracking-tight">
                         {isSignup ? 'Skapa konto' : 'Välkommen tillbaka'}
                       </h1>
@@ -376,7 +351,7 @@ export default function Auth() {
                     </div>
 
                     {/* Enterprise link — mobile only */}
-                    <div className={`lg:hidden text-center pt-2 ${isKeyboardOpen ? 'hidden' : ''}`}>
+                    <div className="lg:hidden text-center pt-2">
                       <a
                         href="/enterprise/onboarding"
                         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -396,7 +371,7 @@ export default function Auth() {
                     transition={{ duration: 0.18 }}
                     className="space-y-6"
                   >
-                    <div className="space-y-1.5">
+                    <div className="text-center space-y-1.5">
                       <h1 className="text-2xl font-semibold text-foreground tracking-tight">
                         {isNavigating ? 'Välkommen!' : verifying ? 'Verifierar...' : 'Ange kod'}
                       </h1>
@@ -479,14 +454,14 @@ export default function Auth() {
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Footer inside the form panel */}
+            <div className="mt-auto pt-8">
+              <p className="text-[11px] text-muted-foreground/50 text-center">© {new Date().getFullYear()} Tivly AB</p>
+            </div>
           </div>
         </div>
       </main>
-
-      {/* Footer — small copyright only */}
-      <footer className={`relative z-10 px-5 pb-4 pt-2 text-center ${isKeyboardOpen ? 'hidden' : ''}`}>
-        <p className="text-[11px] text-muted-foreground/60">© {new Date().getFullYear()} Tivly AB</p>
-      </footer>
     </div>
   );
 }

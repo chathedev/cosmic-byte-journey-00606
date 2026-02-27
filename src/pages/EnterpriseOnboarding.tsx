@@ -780,16 +780,20 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
   form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; monthlyTotal: number; extraSeats: number;
   updateField: (f: string, v: any) => void; submitError: string;
 }) {
+  const seats = form.expectedSeats || 0;
+  const planLabel = selectedPlan.name === 'Small' ? 'Enterprise Small' : 'Enterprise Standard';
   const rows = [
     { label: 'Företag', value: form.companyName || '–', icon: Building2 },
     { label: 'Orgnr', value: form.organizationNumber || '–', icon: Hash },
     { label: 'Kontakt', value: form.contactName || '–', icon: User },
     { label: 'Mejl', value: form.workEmail || '–', icon: Mail },
     { label: 'Telefon', value: form.contactPhone || '–', icon: Phone },
-    { label: 'Plan', value: `${selectedPlan.name} – ${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
-    { label: 'Användare', value: String(form.expectedSeats || 0), icon: Users },
-    ...(extraSeats > 0 ? [{ label: 'Extra platser', value: `${extraSeats} × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån`, icon: Plus }] : []),
-    { label: 'Aktivering', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock },
+    { label: 'Plan', value: planLabel, icon: CreditCard },
+    { label: 'Månadsavgift', value: `${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
+    { label: 'Inkluderade användare', value: `${selectedPlan.seats} st`, icon: Users },
+    { label: 'Totalt antal användare', value: `${seats} st`, icon: Users },
+    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån`, icon: Plus }] : []),
+    { label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock },
   ];
 
   return (
