@@ -2641,6 +2641,52 @@ class ApiClient {
     return response.json();
   }
 
+  // Enterprise Onboarding Auto feature flag
+  async getEnterpriseOnboardingAuto(): Promise<{ enabled: boolean; updatedAt?: string }> {
+    const response = await fetch(`${API_BASE_URL}/enterprise/onboarding/auto`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error('Failed to fetch onboarding auto state');
+    const data = await response.json();
+    return data.enterpriseOnboardingAuto || { enabled: false };
+  }
+
+  async toggleEnterpriseOnboardingAuto(): Promise<{ enabled: boolean; updatedAt?: string }> {
+    const response = await this.fetchWithAuth(`/admin/enterprise/onboarding/auto/toggle`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to toggle onboarding auto');
+    const data = await response.json();
+    return data.enterpriseOnboardingAuto || { enabled: data.enabled };
+  }
+
+  async setEnterpriseOnboardingAuto(enabled: boolean): Promise<{ enabled: boolean; updatedAt?: string }> {
+    const response = await this.fetchWithAuth(`/admin/enterprise/onboarding/auto`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    });
+    if (!response.ok) throw new Error('Failed to set onboarding auto');
+    const data = await response.json();
+    return data.enterpriseOnboardingAuto || { enabled: data.enabled };
+  }
+
+  // Enterprise admin - invite member to own company (non-admin endpoint)
+  async inviteEnterpriseCompanyMember(companyId: string, data: {
+    email: string;
+    role?: string;
+    preferredName?: string;
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Failed to invite member');
+    }
+    return response.json();
+  }
+
   async getEnterpriseCompanyStats(companyId: string): Promise<{
     company: any;
     scope: { type: string; memberCount: number };
