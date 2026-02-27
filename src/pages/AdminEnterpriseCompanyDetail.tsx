@@ -673,9 +673,8 @@ export default function AdminEnterpriseCompanyDetail() {
   }
 
   const activeMembers = company.members.filter(m => m.status === 'active').length;
-  const sisEnabled = company.preferences?.speakerIdentificationEnabled ?? false;
+  const sisEnabled = false; // SIS permanently disabled
   const specialPerkEnabled = company.preferences?.specialPerkEnabled ?? false;
-  const sisReadyCount = company.members.filter(m => m.sisSample?.status === 'ready').length;
 
   // Billing status helpers
   const hasUnpaidInvoice = company.billingHistory?.some(b => b.status === 'open' || b.status === 'draft');
@@ -870,26 +869,6 @@ export default function AdminEnterpriseCompanyDetail() {
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">SIS</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-2xl font-bold">
-                      {sisEnabled ? `${sisReadyCount}/${company.members.length}` : 'Av'}
-                    </p>
-                    <Switch
-                      checked={sisEnabled}
-                      onCheckedChange={handleToggleSIS}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                </div>
-                <Volume2 className="h-8 w-8 text-muted-foreground/30" />
-              </div>
-            </CardContent>
-          </Card>
           
           <Card className={specialPerkEnabled ? 'border-green-500/50 bg-green-500/5' : ''}>
             <CardContent className="pt-4">
