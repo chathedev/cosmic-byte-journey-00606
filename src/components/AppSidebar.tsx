@@ -21,7 +21,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -46,6 +46,7 @@ export function AppSidebar() {
   const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
+  const [orgExpanded, setOrgExpanded] = useState(false);
   const isNative = isNativeApp();
   
   const scrollYRef = useRef(0);
@@ -117,6 +118,9 @@ export function AppSidebar() {
     else if (path === "/feedback") setSelected("Feedback");
     else if (path === "/settings") setSelected("Inställningar");
     else if (path === "/enterprise/stats") setSelected("Översikt");
+    else if (path === "/org/settings") setSelected("Team");
+    else if (path === "/org/billing") setSelected("Fakturering");
+    else if (path === "/billing/invoices") setSelected("Fakturor");
     else if (path.startsWith("/admin")) {
       if (path === "/admin/users") setSelected("Användare");
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
@@ -125,6 +129,11 @@ export function AppSidebar() {
       else if (path === "/admin/enterprise") setSelected("Enterprise");
       else if (path === "/admin/enterprise/billing") setSelected("Enterprise Billing");
       else if (path === "/admin/ai-costs") setSelected("AI Kostnader");
+    }
+
+    // Auto-expand org section if on an org page
+    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices'].some(p => path.startsWith(p))) {
+      setOrgExpanded(true);
     }
   }, [location.pathname]);
 
@@ -171,10 +180,17 @@ export function AppSidebar() {
     { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
     { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
-    ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats", locked: false }] : []),
-    ...(enterpriseMembership?.isMember ? [{ Icon: Users, title: "Organisation", path: "/org/settings", locked: false }] : []),
-    ...(enterpriseMembership?.isMember ? [{ Icon: CreditCard, title: "Fakturering", path: "/billing/invoices", locked: false }] : []),
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
+  ];
+
+  const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
+    (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
+
+  const orgSubItems = [
+    ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
+    { Icon: Users, title: "Team", path: "/org/settings" },
+    { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
+    { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
   ];
 
   const adminItems = [
@@ -363,6 +379,56 @@ export function AppSidebar() {
                 )}
               </button>
             ))}
+
+            {/* Enterprise Organisation Section */}
+            {enterpriseMembership?.isMember && !collapsed && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <button
+                  onClick={() => setOrgExpanded(!orgExpanded)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                >
+                  <Users className="text-lg shrink-0" />
+                  <span className="text-sm flex-1 text-left">Organisation</span>
+                  <FiChevronDown
+                    className={`text-base shrink-0 transition-transform duration-200 ${
+                      orgExpanded ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {orgExpanded && (
+                  <div className="mt-1 space-y-1 pl-2">
+                    {orgSubItems.map((item) => (
+                      <button
+                        key={item.title}
+                        onClick={() => handleNavigation(item.path, item.title)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+                          selected === item.title
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        }`}
+                      >
+                        <item.Icon className="text-base shrink-0" />
+                        <span className="text-sm truncate">{item.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Enterprise Org Icon Only - Collapsed State */}
+            {enterpriseMembership?.isMember && collapsed && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <button
+                  onClick={() => { setCollapsed(false); setOrgExpanded(true); }}
+                  className="w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                  title="Organisation"
+                >
+                  <Users className="text-lg shrink-0" />
+                </button>
+              </div>
+            )}
 
             {/* Admin Section */}
             {isAdmin && !collapsed && (
