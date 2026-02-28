@@ -17,6 +17,7 @@ import { uploadRecordingToAsr } from "@/lib/asrRecordingUpload";
 import { apiClient } from "@/lib/api";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
 import { digitalRecordingStreams } from "@/lib/digitalRecordingStreams";
+import { noSleep } from "@/lib/noSleep";
 
 interface MeetingRecorderProps {
   meetingId: string;
@@ -216,6 +217,7 @@ export const MeetingRecorder = ({
       stopMediaRecorder();
       stopSpeechRecognition();
       releaseWakeLock();
+      noSleep.disable();
     };
   }, []);
 
@@ -334,6 +336,7 @@ export const MeetingRecorder = ({
 
       setIsRecording(true);
       await requestWakeLock();
+      noSleep.enable();
       
       // Start auto-save backup for reliability
       startAutoSave();
@@ -599,7 +602,7 @@ export const MeetingRecorder = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col h-full">
       {/* Always-on-screen Recording Indicator */}
       <RecordingIndicator
         isRecording={isRecording}
@@ -640,46 +643,44 @@ export const MeetingRecorder = ({
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Digital recording indicator */}
               {isDigitalRecording && (
                 <div className="flex items-center gap-1 text-primary">
                   <Monitor className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-medium hidden sm:inline">Digitalt</span>
                 </div>
               )}
-              {/* Backup indicator in header */}
               {isBackupEnabled && chunksSaved > 0 && (
                 <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                   <Shield className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-medium hidden sm:inline">Säkrad</span>
                 </div>
               )}
-                <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-muted-foreground" />
-                  <span className="font-mono text-[10px]">
-                    {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
-                  </span>
-                </div>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-muted-foreground" />
+                <span className="font-mono text-[10px]">
+                  {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
+                </span>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-3 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-3 min-h-0 overflow-auto">
         <div className="flex-shrink-0">
           <MinimalAudioAnalyzer
             stream={streamRef.current}
             isActive={isRecording && !isPaused}
-            size={Math.min(180, window.innerWidth - 48)}
+            size={Math.min(160, window.innerWidth - 64)}
           />
         </div>
 
-        <div className="mt-4 text-center flex-shrink-0">
-          <div className="font-mono text-xl md:text-2xl tracking-tight text-foreground/80">
+        <div className="mt-3 text-center flex-shrink-0">
+          <div className="font-mono text-2xl md:text-3xl tracking-tight text-foreground/80">
             {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
           </div>
-          <p className="mt-1 text-xs md:text-sm text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground">
             {isPaused ? 'Pausad' : 'Spelar in'}
           </p>
         </div>
@@ -688,7 +689,7 @@ export const MeetingRecorder = ({
 
         {/* Live Transcript Display (Free/Pro only) */}
         {!useAsrMode && (liveTranscript || interimText) && (
-          <div className="mt-3 w-full max-w-md flex-1 min-h-0 max-h-[25vh] md:max-h-[30vh]">
+          <div className="mt-3 w-full max-w-md flex-shrink min-h-0 max-h-[20vh]">
             <ScrollArea className="h-full rounded-xl bg-card/60 backdrop-blur-sm border border-border/30">
               <div ref={transcriptScrollRef} className="p-3 text-sm leading-relaxed">
                 <span className="text-foreground">{liveTranscript}</span>
@@ -701,23 +702,25 @@ export const MeetingRecorder = ({
         )}
       </div>
 
-      {/* Bottom Controls */}
-      <div className={`flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg ${isNative ? 'pb-safe' : ''}`}>
-        <div className="max-w-5xl mx-auto px-3 py-3">
-          <div className="flex items-center justify-center gap-2">
-            <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-10 px-3">
+      {/* Bottom Controls - Safe area aware */}
+      <div className="flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg"
+        style={{ paddingBottom: isNative ? 'max(env(safe-area-inset-bottom, 16px), 16px)' : '16px' }}
+      >
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-11 px-3">
               Avbryt
             </Button>
 
-            <Button onClick={togglePause} variant="outline" size="sm" className="h-10 px-3">
+            <Button onClick={togglePause} variant="outline" size="sm" className="h-11 px-4">
               {isPaused ? (
                 <>
-                  <Play className="w-4 h-4 sm:mr-1" />
+                  <Play className="w-4 h-4 sm:mr-1.5" />
                   <span className="hidden sm:inline">Återuppta</span>
                 </>
               ) : (
                 <>
-                  <Pause className="w-4 h-4 sm:mr-1" />
+                  <Pause className="w-4 h-4 sm:mr-1.5" />
                   <span className="hidden sm:inline">Pausa</span>
                 </>
               )}
@@ -726,9 +729,9 @@ export const MeetingRecorder = ({
             <Button
               onClick={handleStopRecording}
               size="sm"
-              className="h-10 px-4 bg-primary hover:bg-primary/90 font-semibold"
+              className="h-11 px-5 bg-primary hover:bg-primary/90 font-semibold"
             >
-              <Square className="w-4 h-4 mr-1" />
+              <Square className="w-4 h-4 mr-1.5" />
               Färdig
             </Button>
           </div>

@@ -15,6 +15,7 @@ import { RecordingIndicator } from "./RecordingIndicator";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
+import { noSleep } from "@/lib/noSleep";
 import { apiClient } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
@@ -333,6 +334,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       stopMediaRecorder();
       stopSpeechRecognition();
       releaseWakeLock();
+      noSleep.disable();
     };
   }, [user]);
 
@@ -416,6 +418,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       startAutoSave();
       setIsRecording(true);
       await requestWakeLock();
+      noSleep.enable();
       
       // Start browser speech recognition for Free/Pro plans
       if (!useAsrMode) {
@@ -842,7 +845,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
   // Recording View
   if (viewState === 'recording') {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col overflow-hidden">
+      <div className="h-[100dvh] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
         {/* Always-on-screen Recording Indicator - Floating, persistent */}
         <RecordingIndicator
           isRecording={isRecording}
@@ -883,7 +886,6 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                 )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {/* Backup indicator in header */}
                 {isBackupEnabled && chunksSaved > 0 && (
                   <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                     <Shield className="w-3.5 h-3.5" />
@@ -901,32 +903,32 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           </div>
         </div>
 
-        {/* Main Content - Responsive */}
-        <div className="flex-1 flex flex-col items-center justify-center p-3 min-h-0 overflow-hidden">
+        {/* Main Content - Fills available space between header and controls */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-3 min-h-0 overflow-auto">
           {/* Audio Analyzer Visualization */}
           <div className="flex-shrink-0">
             <MinimalAudioAnalyzer
               stream={streamRef.current}
               isActive={isRecording && !isPaused}
-              size={Math.min(180, window.innerWidth - 48)}
+              size={Math.min(160, window.innerWidth - 64)}
             />
           </div>
 
           {/* Minimal Status */}
-          <div className="mt-4 text-center flex-shrink-0">
-            <div className="font-mono text-xl md:text-2xl tracking-tight text-foreground/80">
+          <div className="mt-3 text-center flex-shrink-0">
+            <div className="font-mono text-2xl md:text-3xl tracking-tight text-foreground/80">
               {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
             </div>
-            <p className="mt-1 text-xs md:text-sm text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
 
           <VoiceNamePrompt />
 
-          {/* Live Transcript Display (Free/Pro only) - Responsive height */}
+          {/* Live Transcript Display (Free/Pro only) */}
           {!useAsrMode && (liveTranscript || interimText) && (
-            <div className="mt-3 w-full max-w-md flex-1 min-h-0 max-h-[25vh] md:max-h-[30vh]">
+            <div className="mt-3 w-full max-w-md flex-shrink min-h-0 max-h-[20vh]">
               <ScrollArea className="h-full rounded-xl bg-card/60 backdrop-blur-sm border border-border/30">
                 <div ref={transcriptScrollRef} className="p-3 text-sm leading-relaxed">
                   <span className="text-foreground">{liveTranscript}</span>
@@ -939,24 +941,26 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           )}
         </div>
 
-        {/* Bottom Controls - Compact for mobile */}
-        <div className={`flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg ${isNative ? 'pb-safe' : ''}`}>
-          <div className="max-w-5xl mx-auto px-3 py-3">
-            <div className="flex items-center justify-center gap-2">
-              <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-10 px-3">
+        {/* Bottom Controls - Fixed at bottom, safe area aware */}
+        <div className={`flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg`}
+          style={{ paddingBottom: isNative ? 'max(env(safe-area-inset-bottom, 16px), 16px)' : '16px' }}
+        >
+          <div className="max-w-5xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-center gap-3">
+              <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-11 px-3">
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Tillbaka</span>
               </Button>
               
-              <Button onClick={togglePause} variant="outline" size="sm" className="h-10 px-3">
+              <Button onClick={togglePause} variant="outline" size="sm" className="h-11 px-4">
                 {isPaused ? (
                   <>
-                    <Play className="w-4 h-4 sm:mr-1" />
+                    <Play className="w-4 h-4 sm:mr-1.5" />
                     <span className="hidden sm:inline">Återuppta</span>
                   </>
                 ) : (
                   <>
-                    <Pause className="w-4 h-4 sm:mr-1" />
+                    <Pause className="w-4 h-4 sm:mr-1.5" />
                     <span className="hidden sm:inline">Pausa</span>
                   </>
                 )}
@@ -965,9 +969,9 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
               <Button 
                 onClick={handleStopRecording} 
                 size="sm" 
-                className="h-10 px-4 bg-primary hover:bg-primary/90 font-semibold"
+                className="h-11 px-5 bg-primary hover:bg-primary/90 font-semibold"
               >
-                <Square className="w-4 h-4 mr-1" />
+                <Square className="w-4 h-4 mr-1.5" />
                 Färdig
               </Button>
             </div>
