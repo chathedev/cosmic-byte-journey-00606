@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, FileText } from 'lucide-react';
 
 interface LiveTranscriptViewProps {
   liveTranscript: string;
@@ -13,11 +13,11 @@ interface LiveTranscriptViewProps {
 }
 
 const stageLabels: Record<string, string> = {
-  uploading: 'Laddar upp ljudfil',
-  queued: 'Förbereder transkription',
+  uploading: 'Laddar upp',
+  queued: 'Förbereder',
   transcribing: 'Transkriberar',
   sis_processing: 'Identifierar talare',
-  processing_speakers: 'Förbättrar talaridentifiering',
+  processing_speakers: 'Identifierar talare',
   done: 'Klar',
 };
 
@@ -29,8 +29,7 @@ const getStageLabel = (stage: string | null, progress: number) => {
 
 /**
  * Word-buffer approach: incoming text is diffed against what we've already queued.
- * New words go into a queue that drains at a fixed rate (~40ms/word) for a smooth
- * typewriter effect, regardless of how large the backend chunks are.
+ * New words go into a queue that drains at a fixed rate for a smooth typewriter effect.
  */
 export const LiveTranscriptView = memo(({
   liveTranscript,
@@ -60,18 +59,16 @@ export const LiveTranscriptView = memo(({
     const incomingWords = liveTranscript.split(/\s+/).filter(Boolean);
     const prevLen = allWordsRef.current.length;
 
-    if (incomingWords.length <= prevLen) return; // no new words
+    if (incomingWords.length <= prevLen) return;
 
     allWordsRef.current = incomingWords;
     targetCountRef.current = incomingWords.length;
 
-    // Start drain if not running
     if (!drainTimerRef.current) {
       drainTimerRef.current = setInterval(() => {
         setVisibleWords(prev => {
           const next = prev.length + 1;
           if (next >= targetCountRef.current) {
-            // Caught up — stop draining until more words arrive
             if (drainTimerRef.current) {
               clearInterval(drainTimerRef.current);
               drainTimerRef.current = null;
@@ -80,7 +77,7 @@ export const LiveTranscriptView = memo(({
           }
           return allWordsRef.current.slice(0, next);
         });
-      }, 12); // 12ms per word ≈ 83 words/sec — very fast stream
+      }, 12);
     }
   }, [liveTranscript]);
 
@@ -110,7 +107,7 @@ export const LiveTranscriptView = memo(({
     el.scrollTop = el.scrollHeight;
   }, [visibleWords.length, isDone]);
 
-  // Smooth scroll interval for in-between renders
+  // Smooth scroll interval
   useEffect(() => {
     if (isDone || visibleWords.length === 0) return;
     const interval = setInterval(() => {
@@ -156,8 +153,8 @@ export const LiveTranscriptView = memo(({
   const hasContent = visibleWords.length > 0;
 
   return (
-    <div className="flex flex-col gap-3 w-full">
-      {/* Minimal status bar */}
+    <div className="flex flex-col gap-2 w-full">
+      {/* Minimal status chip */}
       <div className="flex items-center gap-2 px-1">
         {!isDone && (
           <div className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse flex-shrink-0" />
@@ -165,17 +162,9 @@ export const LiveTranscriptView = memo(({
         <p className="text-xs text-muted-foreground">
           {stageLabel}
           {totalChunks > 0 && !isDone && (
-            <span className="ml-1 tabular-nums">{completedChunks}/{totalChunks}</span>
+            <span className="ml-1 tabular-nums text-muted-foreground/60">{completedChunks}/{totalChunks}</span>
           )}
         </p>
-        {!isDone && progress > 0 && (
-          <div className="flex-1 h-[2px] rounded-full bg-muted overflow-hidden ml-2">
-            <div
-              className="h-full rounded-full bg-primary/50 transition-all duration-500 ease-out"
-              style={{ width: `${Math.min(progress, 100)}%` }}
-            />
-          </div>
-        )}
       </div>
 
       {/* Transcript area */}
@@ -183,7 +172,7 @@ export const LiveTranscriptView = memo(({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-card px-5 py-4"
+            className="max-h-[55vh] overflow-y-auto rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm px-4 py-3"
             style={{ overscrollBehavior: 'contain' }}
           >
             <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
@@ -214,8 +203,8 @@ export const LiveTranscriptView = memo(({
         </div>
       ) : (
         /* Empty / waiting state */
-        <div className="flex flex-col items-center justify-center py-14 gap-3 rounded-lg border border-dashed border-border bg-card/50">
-          <div className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-pulse" />
+        <div className="flex flex-col items-center justify-center py-10 gap-3 rounded-xl border border-dashed border-border/40 bg-card/40">
+          <FileText className="w-5 h-5 text-muted-foreground/40" />
           <p className="text-xs text-muted-foreground">
             Transkriptet visas här i realtid
           </p>
