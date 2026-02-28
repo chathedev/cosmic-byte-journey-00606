@@ -59,6 +59,7 @@ import OrgSettings from "./pages/OrgSettings";
 import NotFound from "./pages/NotFound";
 import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
+import EnterpriseBilling from "./pages/EnterpriseBilling";
 import AttribrConnect from "./pages/AttribrConnect";
 import AuthHandoff from "./pages/AuthHandoff";
 import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
@@ -329,6 +330,7 @@ const AppContent = () => {
                 <Route path="/admin/speaker-profiles" element={<AdminRoute><AdminSpeakerProfiles /></AdminRoute>} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                 <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
+                <Route path="/org/billing" element={<ProtectedRoute><EnterpriseBilling /></ProtectedRoute>} />
                 <Route path="/billing/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
                 <Route path="/billing/invoices/:invoiceId" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
