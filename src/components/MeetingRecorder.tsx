@@ -607,24 +607,18 @@ export const MeetingRecorder = ({
 
   return (
     <div className="relative flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-      {/* Always-on-screen Recording Indicator */}
-      <RecordingIndicator
-        isRecording={isRecording}
-        isPaused={isPaused}
-        durationSec={durationSec}
-        isBackupEnabled={isBackupEnabled}
-        chunksSaved={chunksSaved}
-        compact={true}
-      />
-
-      {/* Header */}
-      <div className={`border-b bg-background/95 backdrop-blur-sm flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
-        <div className="max-w-5xl mx-auto px-3 py-1.5">
-          <div className="flex items-center justify-between gap-2">
+      {/* Unified compact header bar */}
+      <div className={`bg-background/95 backdrop-blur-md border-b border-border/50 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
+        <div className="max-w-5xl mx-auto px-3 py-1">
+          <div className="flex items-center justify-between gap-2 h-9">
+            {/* Left: recording dot + title */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className={`w-2.5 h-2.5 flex-shrink-0 rounded-full transition-all ${
-                !isPaused ? 'bg-destructive animate-pulse shadow-lg shadow-destructive/50' : 'bg-muted-foreground/40'
-              }`} />
+              <div className="relative flex-shrink-0">
+                <div className={`w-2 h-2 rounded-full ${!isPaused ? 'bg-destructive' : 'bg-muted-foreground/40'}`} />
+                {!isPaused && (
+                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-destructive animate-ping" />
+                )}
+              </div>
               {isEditingName ? (
                 <div className="flex gap-1 items-center flex-1 min-w-0">
                   <Input
@@ -633,38 +627,31 @@ export const MeetingRecorder = ({
                     onBlur={handleTitleSave}
                     onKeyDown={(e) => e.key === "Enter" && handleTitleSave()}
                     autoFocus
-                    className="h-7 text-xs flex-1"
+                    className="h-6 text-xs flex-1"
                   />
-                  <Button onClick={handleTitleSave} size="sm" variant="ghost" className="h-7 w-7 p-0 flex-shrink-0">
+                  <Button onClick={handleTitleSave} size="sm" variant="ghost" className="h-6 w-6 p-0 flex-shrink-0">
                     <Check className="w-3 h-3" />
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 group cursor-pointer flex-1 min-w-0" onClick={() => setIsEditingName(true)}>
-                  <h1 className="text-xs font-medium truncate">{localTitle}</h1>
-                  <Edit2 className="w-3 h-3 flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-1 group cursor-pointer flex-1 min-w-0" onClick={() => setIsEditingName(true)}>
+                  <span className="text-xs font-medium truncate">{localTitle}</span>
+                  <Edit2 className="w-2.5 h-2.5 flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+
+            {/* Right: badges + time */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               {isDigitalRecording && (
-                <div className="flex items-center gap-1 text-primary">
-                  <Monitor className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-medium hidden sm:inline">Digitalt</span>
-                </div>
+                <Monitor className="w-3 h-3 text-primary" />
               )}
               {isBackupEnabled && chunksSaved > 0 && (
-                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-medium hidden sm:inline">Säkrad</span>
-                </div>
+                <Shield className="w-3 h-3 text-green-500" />
               )}
-              <div className="flex items-center gap-1">
-                <Clock className="w-3 h-3 text-muted-foreground" />
-                <span className="font-mono text-[10px]">
-                  {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
+              <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+                {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
+              </span>
             </div>
           </div>
         </div>
