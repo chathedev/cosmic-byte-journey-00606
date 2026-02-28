@@ -601,8 +601,12 @@ export const MeetingRecorder = ({
     );
   }
 
+  const analyzerSize = typeof window !== 'undefined'
+    ? Math.max(84, Math.min(108, window.innerWidth - 220))
+    : 96;
+
   return (
-    <div className="flex-1 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden">
+    <div className="relative flex-1 flex flex-col h-full min-h-0 overflow-hidden">
       {/* Always-on-screen Recording Indicator */}
       <RecordingIndicator
         isRecording={isRecording}
@@ -614,8 +618,8 @@ export const MeetingRecorder = ({
       />
 
       {/* Header */}
-      <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
-        <div className="max-w-5xl mx-auto px-3 py-2">
+      <div className={`border-b bg-background/95 backdrop-blur-sm flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
+        <div className="max-w-5xl mx-auto px-3 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <div className={`w-2.5 h-2.5 flex-shrink-0 rounded-full transition-all ${
@@ -667,30 +671,32 @@ export const MeetingRecorder = ({
       </div>
 
       {/* Main Content - no scroll */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-3 pb-1 min-h-0 overflow-hidden gap-1.5">
         <div className="flex-shrink-0">
           <MinimalAudioAnalyzer
             stream={streamRef.current}
             isActive={isRecording && !isPaused}
-            size={Math.min(120, window.innerWidth - 80)}
+            size={analyzerSize}
           />
         </div>
 
-        <div className="mt-2 text-center flex-shrink-0">
-          <div className="font-mono text-2xl tracking-tight text-foreground/80">
+        <div className="text-center flex-shrink-0">
+          <div className="font-mono text-xl tracking-tight text-foreground/80">
             {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {isPaused ? 'Pausad' : 'Spelar in'}
           </p>
         </div>
 
-        <VoiceNamePrompt />
+        <div className="w-full max-w-md flex-shrink-0">
+          <VoiceNamePrompt />
+        </div>
 
         {/* Live Transcript Display (Free/Pro only) - capped height */}
         {!useAsrMode && (liveTranscript || interimText) && (
-          <div className="mt-2 w-full max-w-md flex-shrink min-h-0 overflow-hidden" style={{ maxHeight: 'clamp(60px, 15vh, 120px)' }}>
-            <div ref={transcriptScrollRef} className="h-full overflow-hidden rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 p-3 text-sm leading-relaxed">
+          <div className="mt-1 w-full max-w-md flex-shrink min-h-0 overflow-hidden" style={{ maxHeight: 'clamp(44px, 10svh, 88px)' }}>
+            <div ref={transcriptScrollRef} className="h-full overflow-hidden rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 p-2.5 text-xs sm:text-sm leading-relaxed">
               <span className="text-foreground">{liveTranscript}</span>
               {interimText && (
                 <span className="text-muted-foreground/60 italic">{interimText}</span>
@@ -701,25 +707,26 @@ export const MeetingRecorder = ({
       </div>
 
       {/* Bottom Controls - Safe area aware */}
-      <div className="flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg"
-        style={{ paddingBottom: isNative ? 'max(env(safe-area-inset-bottom, 16px), 16px)' : '16px' }}
+      <div
+        className="sticky bottom-0 z-20 flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg"
+        style={{ paddingBottom: isNative ? 'max(env(safe-area-inset-bottom, 6px), 8px)' : '8px' }}
       >
-        <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-center gap-3">
-            <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-11 px-3">
+        <div className="max-w-5xl mx-auto px-3 py-2">
+          <div className="grid grid-cols-3 items-center gap-2">
+            <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-10 px-2.5 text-xs sm:text-sm sm:px-3">
               Avbryt
             </Button>
 
-            <Button onClick={togglePause} variant="outline" size="sm" className="h-11 px-4">
+            <Button onClick={togglePause} variant="outline" size="sm" className="h-10 px-2.5 text-xs sm:text-sm sm:px-3">
               {isPaused ? (
                 <>
-                  <Play className="w-4 h-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Återuppta</span>
+                  <Play className="w-4 h-4 mr-1" />
+                  Starta
                 </>
               ) : (
                 <>
-                  <Pause className="w-4 h-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Pausa</span>
+                  <Pause className="w-4 h-4 mr-1" />
+                  Pausa
                 </>
               )}
             </Button>
@@ -727,9 +734,9 @@ export const MeetingRecorder = ({
             <Button
               onClick={handleStopRecording}
               size="sm"
-              className="h-11 px-5 bg-primary hover:bg-primary/90 font-semibold"
+              className="h-10 px-3 text-xs sm:text-sm bg-primary hover:bg-primary/90 font-semibold"
             >
-              <Square className="w-4 h-4 mr-1.5" />
+              <Square className="w-4 h-4 mr-1" />
               Färdig
             </Button>
           </div>
