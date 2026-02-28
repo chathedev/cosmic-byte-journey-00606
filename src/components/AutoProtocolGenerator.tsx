@@ -1166,20 +1166,22 @@ export const AutoProtocolGenerator = ({
 
           </div>
 
-          {/* Footer */}
-          <div className="mt-12 pt-6 border-t border-border/40">
-            <p className="text-center text-xs text-muted-foreground/50">
-              dokumenterat av{' '}
-              <a 
-                href="https://tivly.se" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors"
-              >
-                tivly.se
-              </a>
-            </p>
-          </div>
+          {/* Footer — only for non-enterprise */}
+          {!isEnterprise && (
+            <div className="mt-12 pt-6 border-t border-border/40">
+              <p className="text-center text-xs text-muted-foreground/50">
+                dokumenterat av{' '}
+                <a 
+                  href="https://tivly.se" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors"
+                >
+                  tivly.se
+                </a>
+              </p>
+            </div>
+          )}
         </Card>
       </div>
 
