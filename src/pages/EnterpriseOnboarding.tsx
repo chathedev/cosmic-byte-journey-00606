@@ -95,6 +95,10 @@ export default function EnterpriseOnboarding() {
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [firstChargeEstimate, setFirstChargeEstimate] = useState<any>(null);
   
+  // Company connection verification state (popup step before email verification)
+  const [companyConnState, setCompanyConnState] = useState<'idle' | 'verifying' | 'verified' | 'failed'>('idle');
+  const [companyConnError, setCompanyConnError] = useState('');
+
   // Email verification state (inline in step 2) — link-based, no OTP
   const [emailVerifyState, setEmailVerifyState] = useState<'idle' | 'sending' | 'pending' | 'verified'>('idle');
   const [emailVerifyError, setEmailVerifyError] = useState('');
@@ -180,17 +184,23 @@ export default function EnterpriseOnboarding() {
     if (fieldErrors[field]) {
       setFieldErrors(prev => { const copy = { ...prev }; delete copy[field]; return copy; });
     }
-    // Reset email verification if email changes
-    if (field === 'workEmail' && emailVerifyState !== 'idle') {
-      setEmailVerifyState('idle');
-      setEmailVerifyError('');
+    // Reset verification states if key fields change
+    if (['workEmail', 'websiteUrl', 'companyName', 'organizationNumber'].includes(field)) {
+      if (companyConnState !== 'idle') {
+        setCompanyConnState('idle');
+        setCompanyConnError('');
+      }
+      if (field === 'workEmail' && emailVerifyState !== 'idle') {
+        setEmailVerifyState('idle');
+        setEmailVerifyError('');
+      }
     }
     triggerDraftSave(next as Partial<OnboardingFormData>, step);
   };
 
   const [stepValidating, setStepValidating] = useState(false);
 
-  // Step 2: validate → save draft → send email verification
+  // Step 2: validate → company connection popup → email verification popup
   const handleNextFromStep2 = async () => {
     hasUserInteractedRef.current = true;
     const missing: string[] = [];
@@ -207,13 +217,14 @@ export default function EnterpriseOnboarding() {
       return;
     }
     
-    // If email is already verified, go straight to next step
-    if (emailVerifyState === 'verified') {
+    // If both already verified, go straight to next step
+    if (companyConnState === 'verified' && emailVerifyState === 'verified') {
       setStep(3);
       return;
     }
     
     setStepValidating(true);
+    if (companyConnState !== 'verified') setCompanyConnState('verifying');
     try {
       const res = await validateOnboarding(form as Partial<OnboardingFormData>);
       setFieldErrors(res.validation?.errors || {});
@@ -226,57 +237,86 @@ export default function EnterpriseOnboarding() {
       const emailTakenNow = res.validation?.availability?.workEmailAvailable === false;
       const domainTrialBlocked = res.validation?.availability?.domainTrialAvailable === false;
       if (hasErrors || orgTakenNow || emailTakenNow || domainTrialBlocked) {
+        setCompanyConnState('idle');
         setStepValidating(false);
         return;
       }
-      // Gate: companyRegistry, companyConnection, and domain must all be valid before email verification
+      // Gate: companyRegistry must be valid
       const checks = res.validation?.checks || {};
       if (!checks.companyRegistryValid) {
+        setCompanyConnState('idle');
         setFieldErrors(prev => ({ ...prev, _general: 'Företaget kunde inte verifieras mot bolagsregistret. Kontrollera företagsnamn och organisationsnummer.' }));
         setStepValidating(false);
         return;
       }
-      if (!checks.companyConnectionValid) {
-        const connMsg = res.validation?.companyConnection?.message || 'Webbplats och arbetsmail kunde inte kopplas till företaget. Kontrollera att webbplatsen och mejlen hör till samma bolag.';
-        setFieldErrors(prev => ({ ...prev, _general: connMsg }));
-        setStepValidating(false);
-        return;
-      }
       if (!checks.domainValid) {
+        setCompanyConnState('idle');
         setFieldErrors(prev => ({ ...prev, _general: res.validation?.errors?.domain || 'Mejldomänen matchar inte webbplatsens domän.' }));
         setStepValidating(false);
         return;
       }
-      // Save draft to ensure draftId exists for verification
-      const draftRes = await saveDraft({
-        ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 2, progressPercent: 40,
-      } as any);
-      if (draftRes.draft) {
-        setDraftId(draftRes.draft.id);
-        setResumeToken(draftRes.draft.resumeToken);
-        saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
-        draftIdRef.current = draftRes.draft.id;
-        resumeTokenRef.current = draftRes.draft.resumeToken;
-      }
-      // Send email verification link
-      setEmailVerifyState('sending');
-      setEmailVerifyError('');
-      try {
-        await sendOnboardingEmailVerification({
-          email: form.workEmail!,
-          draftId: draftIdRef.current!,
-        });
-        setEmailVerifyState('pending');
-        setEmailVerifyCooldown(60);
-      } catch (err: any) {
-        setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringsmail.');
-        setEmailVerifyState('idle');
+
+      // Show company connection verification popup
+      if (companyConnState !== 'verified') {
+        if (checks.companyConnectionValid) {
+          // Show verified popup briefly, then proceed to email
+          setCompanyConnState('verified');
+          setTimeout(async () => {
+            await proceedToEmailVerification();
+          }, 1500);
+        } else {
+          // Failed — reset to idle and show error inline
+          setCompanyConnState('idle');
+          const connMsg = res.validation?.companyConnection?.message ||
+            'Webbplats och arbetsmail kunde inte kopplas till företaget. Kontrollera att webbplatsen och mejlen hör till samma bolag.';
+          setCompanyConnError(connMsg);
+          setFieldErrors(prev => ({ ...prev, _companyConnection: connMsg }));
+        }
+      } else {
+        // Company connection already verified — go to email
+        await proceedToEmailVerification();
       }
     } catch {
+      setCompanyConnState('idle');
       setFieldErrors(prev => ({ ...prev, _general: 'Validering misslyckades. Försök igen.' }));
     } finally {
       setStepValidating(false);
+    }
+  };
+
+  // Separate function to proceed to email verification (called after company connection is verified)
+  const proceedToEmailVerification = async () => {
+    // If email already verified, go to next step
+    if (emailVerifyState === 'verified') {
+      setStep(3);
+      return;
+    }
+
+    // Save draft to ensure draftId exists for verification
+    const draftRes = await saveDraft({
+      ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
+      progressStep: 2, progressPercent: 40,
+    } as any);
+    if (draftRes.draft) {
+      setDraftId(draftRes.draft.id);
+      setResumeToken(draftRes.draft.resumeToken);
+      saveDraftLocal(draftRes.draft.id, draftRes.draft.resumeToken);
+      draftIdRef.current = draftRes.draft.id;
+      resumeTokenRef.current = draftRes.draft.resumeToken;
+    }
+    // Send email verification link
+    setEmailVerifyState('sending');
+    setEmailVerifyError('');
+    try {
+      await sendOnboardingEmailVerification({
+        email: form.workEmail!,
+        draftId: draftIdRef.current!,
+      });
+      setEmailVerifyState('pending');
+      setEmailVerifyCooldown(60);
+    } catch (err: any) {
+      setEmailVerifyError(err?.message || 'Kunde inte skicka verifieringsmail.');
+      setEmailVerifyState('idle');
     }
   };
 
@@ -632,6 +672,8 @@ export default function EnterpriseOnboarding() {
                 availability={availability}
                 companyRegistry={companyRegistry}
                 companyConnection={companyConnection}
+                companyConnState={companyConnState}
+                companyConnError={companyConnError}
                 isValidating={stepValidating}
                 updateField={updateField}
                 emailVerifyState={emailVerifyState}
@@ -675,7 +717,7 @@ export default function EnterpriseOnboarding() {
                 <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
-                {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && (
+                {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && companyConnState !== 'verifying' && companyConnState !== 'verified' && (
                   <Button size="sm" onClick={handleNextFromStep2} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
                     {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
                   </Button>
@@ -925,7 +967,9 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 2: Details + Inline Email Verification             */
 /* ═══════════════════════════════════════════════════════ */
-function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, companyConnection, isValidating, updateField,
+function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, companyConnection,
+  companyConnState, companyConnError,
+  isValidating, updateField,
   emailVerifyState, emailVerifyError, emailVerifyCooldown, onResend,
 }: {
   form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>;
@@ -933,6 +977,8 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
   availability: ValidationResponse['validation']['availability'];
   companyRegistry: CompanyRegistryResult | null;
   companyConnection: CompanyConnectionResult | null;
+  companyConnState: 'idle' | 'verifying' | 'verified' | 'failed';
+  companyConnError: string;
   isValidating: boolean; updateField: (f: string, v: any) => void;
   emailVerifyState: 'idle' | 'sending' | 'pending' | 'verified';
   emailVerifyError: string;
@@ -955,7 +1001,9 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
     }
   };
 
+  const showCompanyConnDialog = companyConnState === 'verifying' || companyConnState === 'verified';
   const showVerification = emailVerifyState === 'sending' || emailVerifyState === 'pending' || emailVerifyState === 'verified';
+  const fieldsLocked = showCompanyConnDialog || showVerification;
 
   return (
     <div className="space-y-6">
@@ -975,10 +1023,10 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
         </div>
         <div className="p-5 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
-            <FieldInput icon={Building2} label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required disabled={showVerification} />
-            <FieldInput icon={Hash} label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required disabled={showVerification} />
+            <FieldInput icon={Building2} label="Företagsnamn" id="companyName" placeholder="Acme AB" value={form.companyName || ''} onChange={(v) => updateField('companyName', v)} error={fieldErrors.companyName} valid={fieldChecks.companyNameValid} required disabled={fieldsLocked} />
+            <FieldInput icon={Hash} label="Organisationsnummer" id="organizationNumber" placeholder="556016-0680" value={form.organizationNumber || ''} onChange={(v) => updateField('organizationNumber', v)} error={orgTaken ? 'Redan registrerat.' : fieldErrors.organizationNumber} valid={fieldChecks.organizationNumberValid && !orgTaken} hint="XXXXXX-XXXX" required disabled={fieldsLocked} />
           </div>
-          <FieldInput icon={Globe} label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} disabled={showVerification} />
+          <FieldInput icon={Globe} label="Webbplats" id="websiteUrl" placeholder="https://acme.se" value={form.websiteUrl || ''} onChange={(v) => updateField('websiteUrl', v)} error={fieldErrors.websiteUrl} valid={fieldChecks.websiteUrlValid} disabled={fieldsLocked} />
 
           {/* Company registry verification status */}
           {companyRegistry?.checked && (
@@ -1039,13 +1087,44 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kontaktperson</span>
         </div>
         <div className="p-5 space-y-4">
-          <FieldInput icon={User} label="Namn" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required disabled={showVerification} />
+          <FieldInput icon={User} label="Namn" id="contactName" placeholder="Anna Andersson" value={form.contactName || ''} onChange={(v) => updateField('contactName', v)} error={fieldErrors.contactName} valid={fieldChecks.contactNameValid} required disabled={fieldsLocked} />
           <div className="grid sm:grid-cols-2 gap-4">
-            <FieldInput icon={Mail} label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required disabled={showVerification} />
-            <FieldInput icon={Phone} label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required disabled={showVerification} />
+            <FieldInput icon={Mail} label="Jobbmejl" id="workEmail" type="email" placeholder="anna@acme.se" value={form.workEmail || ''} onChange={(v) => updateField('workEmail', v)} error={emailTaken ? 'Redan registrerad.' : fieldErrors.workEmail} valid={fieldChecks.workEmailValid && !emailTaken} hint="Ingen gratismail" required disabled={fieldsLocked} />
+            <FieldInput icon={Phone} label="Telefon" id="contactPhone" placeholder="+46 70 123 45 67" value={form.contactPhone || ''} onChange={(v) => updateField('contactPhone', v)} error={fieldErrors.contactPhone} valid={fieldChecks.contactPhoneValid} required disabled={fieldsLocked} />
           </div>
         </div>
       </div>
+
+      {/* Company connection verification dialog */}
+      <Dialog open={showCompanyConnDialog && !showVerification} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-sm rounded-none" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-center text-base">
+              {companyConnState === 'verifying' && 'Verifierar företagskoppling…'}
+              {companyConnState === 'verified' && 'Företagskoppling verifierad'}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {companyConnState === 'verifying' && 'Vi kontrollerar att webbplatsen och arbetsmailen hör till samma företag.'}
+              {companyConnState === 'verified' && (
+                <>Webbplats och mejl har kopplats till <span className="text-foreground font-medium">{form.companyName}</span>.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {companyConnState === 'verifying' && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {companyConnState === 'verified' && (
+            <div className="flex items-center justify-center gap-2 py-3">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Går vidare till e-postverifiering…</span>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Email verification dialog */}
       <Dialog open={showVerification} onOpenChange={() => {}}>
@@ -1128,6 +1207,19 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
             {availability.domainTrialLock.lockExpiresAt && ` (spärrad till ${new Date(availability.domainTrialLock.lockExpiresAt).toLocaleDateString('sv-SE')})`}.
             {' '}Kontakta <a href="mailto:support@tivly.se" className="underline font-medium">support@tivly.se</a>.
           </p>
+        </div>
+      )}
+
+      {fieldErrors._companyConnection && (
+        <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-destructive font-medium">Företagskoppling kunde inte verifieras</p>
+            <p className="text-xs text-destructive/80 mt-1">{fieldErrors._companyConnection}</p>
+            {companyConnection?.websiteDomain && (
+              <p className="text-[11px] text-muted-foreground mt-1.5">Webbdomän: {companyConnection.websiteDomain} · Mejldomän: {companyConnection.workEmailDomain || '–'}</p>
+            )}
+          </div>
         </div>
       )}
 
