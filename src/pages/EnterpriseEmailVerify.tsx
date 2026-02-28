@@ -94,7 +94,7 @@ export default function EnterpriseEmailVerify() {
           )}
         </AnimatePresence>
 
-        <p className="text-[11px] text-muted-foreground">© {new Date().getFullYear()} Tivly AB</p>
+        <p className="text-[11px] text-muted-foreground">© {new Date().getFullYear()} <a href="https://lyrio.se" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Lyrio AB</a></p>
       </div>
     </div>
   );

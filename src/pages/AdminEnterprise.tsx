@@ -798,7 +798,7 @@ export default function AdminEnterprise() {
             <div className="space-y-4 py-4">
               <div>
                 <Label htmlFor="name">Företagsnamn *</Label>
-                <Input id="name" name="name" required placeholder="ex. Tivly AB" />
+                <Input id="name" name="name" required placeholder="ex. Acme AB" />
               </div>
               <div>
                 <Label htmlFor="contactEmail">Kontakt E-post</Label>
