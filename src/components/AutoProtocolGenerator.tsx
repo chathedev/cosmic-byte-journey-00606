@@ -739,25 +739,27 @@ export const AutoProtocolGenerator = ({
       );
     }
 
-    // Minimal branding footer — clean enterprise banner
-    documentChildren.push(
-      new Paragraph({
-        text: "",
-        spacing: { before: 800 },
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: "dokumenterat av tivly.se",
-            color: "AAAAAA",
-            size: 14,
-            font: "Helvetica",
-          }),
-        ],
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 400 },
-      })
-    );
+    // Branding footer — only for non-enterprise users
+    if (!isEnterprise) {
+      documentChildren.push(
+        new Paragraph({
+          text: "",
+          spacing: { before: 800 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "dokumenterat av tivly.se",
+              color: "AAAAAA",
+              size: 14,
+              font: "Helvetica",
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400 },
+        })
+      );
+    }
 
     const doc = new Document({
       sections: [{

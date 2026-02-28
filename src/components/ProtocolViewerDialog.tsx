@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Share2, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmailDialog } from "@/components/EmailDialog";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import mammoth from "mammoth";
 
 interface ProtocolViewerDialogProps {
@@ -31,6 +32,8 @@ export const ProtocolViewerDialog = ({
   const [loading, setLoading] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const { toast } = useToast();
+  const { userPlan, enterpriseMembership } = useSubscription();
+  const isEnterprise = userPlan?.plan === 'enterprise' || enterpriseMembership?.isMember === true;
 
   // Load preview when dialog opens
   useEffect(() => {
@@ -198,28 +201,30 @@ export const ProtocolViewerDialog = ({
                     }}
                   >
                     <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-                    <div style={{ 
-                      marginTop: '4rem', 
-                      paddingTop: '1.5rem', 
-                      borderTop: '1px solid #e5e5e5',
-                      textAlign: 'center' 
-                    }}>
-                      <a 
-                        href="https://tivly.se" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ 
-                          color: '#aaaaaa', 
-                          fontSize: '11px', 
-                          fontFamily: 'Helvetica, Arial, sans-serif',
-                          textDecoration: 'none',
-                          borderBottom: '1px solid #cccccc',
-                          paddingBottom: '1px',
-                        }}
-                      >
-                        dokumenterat av tivly.se
-                      </a>
-                    </div>
+                    {!isEnterprise && (
+                      <div style={{ 
+                        marginTop: '4rem', 
+                        paddingTop: '1.5rem', 
+                        borderTop: '1px solid #e5e5e5',
+                        textAlign: 'center' 
+                      }}>
+                        <a 
+                          href="https://tivly.se" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ 
+                            color: '#aaaaaa', 
+                            fontSize: '11px', 
+                            fontFamily: 'Helvetica, Arial, sans-serif',
+                            textDecoration: 'none',
+                            borderBottom: '1px solid #cccccc',
+                            paddingBottom: '1px',
+                          }}
+                        >
+                          dokumenterat av tivly.se
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
