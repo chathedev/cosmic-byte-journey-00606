@@ -903,40 +903,38 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           </div>
         </div>
 
-        {/* Main Content - Fills available space between header and controls */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-3 min-h-0 overflow-auto">
+        {/* Main Content - Fills available space, no scroll */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0 overflow-hidden">
           {/* Audio Analyzer Visualization */}
           <div className="flex-shrink-0">
             <MinimalAudioAnalyzer
               stream={streamRef.current}
               isActive={isRecording && !isPaused}
-              size={Math.min(160, window.innerWidth - 64)}
+              size={Math.min(120, window.innerWidth - 80)}
             />
           </div>
 
           {/* Minimal Status */}
-          <div className="mt-3 text-center flex-shrink-0">
-            <div className="font-mono text-2xl md:text-3xl tracking-tight text-foreground/80">
+          <div className="mt-2 text-center flex-shrink-0">
+            <div className="font-mono text-2xl tracking-tight text-foreground/80">
               {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
 
           <VoiceNamePrompt />
 
-          {/* Live Transcript Display (Free/Pro only) */}
+          {/* Live Transcript Display (Free/Pro only) - capped height */}
           {!useAsrMode && (liveTranscript || interimText) && (
-            <div className="mt-3 w-full max-w-md flex-shrink min-h-0 max-h-[20vh]">
-              <ScrollArea className="h-full rounded-xl bg-card/60 backdrop-blur-sm border border-border/30">
-                <div ref={transcriptScrollRef} className="p-3 text-sm leading-relaxed">
-                  <span className="text-foreground">{liveTranscript}</span>
-                  {interimText && (
-                    <span className="text-muted-foreground/60 italic">{interimText}</span>
-                  )}
-                </div>
-              </ScrollArea>
+            <div className="mt-2 w-full max-w-md flex-shrink min-h-0 overflow-hidden" style={{ maxHeight: 'clamp(60px, 15vh, 120px)' }}>
+              <div ref={transcriptScrollRef} className="h-full overflow-y-auto rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 p-3 text-sm leading-relaxed">
+                <span className="text-foreground">{liveTranscript}</span>
+                {interimText && (
+                  <span className="text-muted-foreground/60 italic">{interimText}</span>
+                )}
+              </div>
             </div>
           )}
         </div>
