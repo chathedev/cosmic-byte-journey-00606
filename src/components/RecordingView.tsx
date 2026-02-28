@@ -671,7 +671,7 @@ export const RecordingView = ({ onFinish, onBack, continuedMeeting, isFreeTrialM
         // Notify user that recording continues
         if (isRecording && !isPaused) {
           toast({
-            title: "📱 Inspelning fortsätter",
+            title: "Inspelning fortsätter",
             description: "Din inspelning fortsätter i bakgrunden. Återvänd när mötet är klart.",
             duration: 5000,
           });
