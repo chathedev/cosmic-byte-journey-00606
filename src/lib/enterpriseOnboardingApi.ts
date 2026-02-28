@@ -24,6 +24,22 @@ export interface CompanyRegistryResult {
   timestamp?: string;
 }
 
+export interface CompanyConnectionResult {
+  provider: string;
+  status: 'verified' | 'likely_verified' | 'ai_verified' | 'ai_rejected' | 'insufficient_evidence' | 'website_unreachable' | 'disabled' | 'skipped' | 'test_bypass' | string;
+  ok: boolean;
+  checked: boolean;
+  required: boolean;
+  reason?: string;
+  message?: string;
+  score?: number;
+  timestamp?: string;
+  websiteUrl?: string;
+  websiteDomain?: string;
+  workEmail?: string;
+  workEmailDomain?: string;
+}
+
 export interface ValidationResponse {
   success: boolean;
   valid: boolean;
@@ -51,6 +67,7 @@ export interface ValidationResponse {
     };
     checks?: Record<string, boolean>;
     companyRegistry?: CompanyRegistryResult;
+    companyConnection?: CompanyConnectionResult;
     requirements?: {
       commitmentsRequired?: boolean;
     };
@@ -60,6 +77,13 @@ export interface ValidationResponse {
       existingCompanyByOrganizationNumber?: any;
       existingCompanyByContactEmail?: any;
       existingDraft?: any;
+      domainTrialAvailable?: boolean;
+      domainTrialLock?: {
+        domain?: string;
+        trialStartedAt?: string;
+        lockExpiresAt?: string;
+        company?: string;
+      };
     };
     timestamp?: string;
   };
