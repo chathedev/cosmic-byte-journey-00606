@@ -329,34 +329,63 @@ const MeetingDetail = () => {
     const htmlEl = document.documentElement;
     const bodyEl = document.body;
     const mainEl = document.querySelector('main');
+    const scrollY = window.scrollY;
 
     const prevHtmlOverflow = htmlEl.style.overflow;
+    const prevHtmlOverscroll = htmlEl.style.overscrollBehavior;
+
     const prevBodyOverflow = bodyEl.style.overflow;
     const prevBodyHeight = bodyEl.style.height;
+    const prevBodyPosition = bodyEl.style.position;
+    const prevBodyTop = bodyEl.style.top;
+    const prevBodyWidth = bodyEl.style.width;
+    const prevBodyOverscroll = bodyEl.style.overscrollBehavior;
 
     htmlEl.style.overflow = 'hidden';
+    htmlEl.style.overscrollBehavior = 'none';
+
     bodyEl.style.overflow = 'hidden';
-    bodyEl.style.height = '100dvh';
+    bodyEl.style.height = '100svh';
+    bodyEl.style.position = 'fixed';
+    bodyEl.style.top = `-${scrollY}px`;
+    bodyEl.style.width = '100%';
+    bodyEl.style.overscrollBehavior = 'none';
 
     let prevMainOverflow = '';
     let prevMainPaddingTop = '';
+    let prevMainHeight = '';
+    let prevMainMaxHeight = '';
+
     if (mainEl instanceof HTMLElement) {
       prevMainOverflow = mainEl.style.overflow;
       prevMainPaddingTop = mainEl.style.paddingTop;
+      prevMainHeight = mainEl.style.height;
+      prevMainMaxHeight = mainEl.style.maxHeight;
       mainEl.style.overflow = 'hidden';
       mainEl.style.paddingTop = '0px';
+      mainEl.style.height = '100svh';
+      mainEl.style.maxHeight = '100svh';
     }
 
     return () => {
       htmlEl.style.overflow = prevHtmlOverflow;
+      htmlEl.style.overscrollBehavior = prevHtmlOverscroll;
+
       bodyEl.style.overflow = prevBodyOverflow;
       bodyEl.style.height = prevBodyHeight;
-      
+      bodyEl.style.position = prevBodyPosition;
+      bodyEl.style.top = prevBodyTop;
+      bodyEl.style.width = prevBodyWidth;
+      bodyEl.style.overscrollBehavior = prevBodyOverscroll;
 
       if (mainEl instanceof HTMLElement) {
         mainEl.style.overflow = prevMainOverflow;
         mainEl.style.paddingTop = prevMainPaddingTop;
+        mainEl.style.height = prevMainHeight;
+        mainEl.style.maxHeight = prevMainMaxHeight;
       }
+
+      window.scrollTo(0, scrollY);
     };
   }, [isRecordingMode]);
 
@@ -2207,7 +2236,7 @@ const MeetingDetail = () => {
   // Recording mode view - full-screen recorder
   if (isRecordingMode && id) {
     return (
-      <div className="h-[100dvh] max-h-[100dvh] overflow-hidden overscroll-none bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+      <div className="fixed inset-0 z-[80] h-[100svh] max-h-[100svh] overflow-hidden overscroll-none bg-gradient-to-br from-background via-background to-primary/5 flex flex-col md:h-[100dvh] md:max-h-[100dvh]">
         <MeetingRecorder
           meetingId={id}
           meetingTitle={meetingTitle}
