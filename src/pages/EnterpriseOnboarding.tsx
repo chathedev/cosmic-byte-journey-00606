@@ -989,68 +989,37 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
 
       {/* Email verification dialog */}
       <Dialog open={showVerification} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-          <DialogHeader className="text-center items-center">
-            <div className="mx-auto mb-2">
-              <AnimatePresence mode="wait">
-                {emailVerifyState === 'sending' && (
-                  <motion.div
-                    key="sending"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center"
-                  >
-                    <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
-                  </motion.div>
-                )}
-                {emailVerifyState === 'pending' && (
-                  <motion.div
-                    key="pending"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center"
-                  >
-                    <Mail className="h-7 w-7 text-primary" />
-                  </motion.div>
-                )}
-                {emailVerifyState === 'verified' && (
-                  <motion.div
-                    key="verified"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', duration: 0.5 }}
-                    className="h-16 w-16 rounded-full bg-primary/15 flex items-center justify-center"
-                  >
-                    <CheckCircle2 className="h-7 w-7 text-primary" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            <DialogTitle className="text-center">
+        <DialogContent className="sm:max-w-sm rounded-none" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-center text-base">
               {emailVerifyState === 'sending' && 'Skickar verifieringsmail…'}
               {emailVerifyState === 'pending' && 'Verifiera din e-post'}
-              {emailVerifyState === 'verified' && 'E-post verifierad!'}
+              {emailVerifyState === 'verified' && 'E-post verifierad'}
             </DialogTitle>
             <DialogDescription className="text-center">
               {emailVerifyState === 'sending' && 'Vänta medan vi skickar ett mail till dig.'}
               {emailVerifyState === 'pending' && (
-                <>Klicka på länken vi skickat till <span className="text-foreground font-medium">{form.workEmail}</span> för att verifiera din företagsmail.</>
+                <>En verifieringslänk har skickats till <span className="text-foreground font-medium">{form.workEmail}</span></>
               )}
               {emailVerifyState === 'verified' && 'Din företagsmail har bekräftats. Vi går vidare…'}
             </DialogDescription>
           </DialogHeader>
 
+          {emailVerifyState === 'sending' && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
           {emailVerifyState === 'pending' && (
-            <div className="space-y-4 mt-2">
-              <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-muted/40 border border-border">
+            <div className="space-y-3 mt-1">
+              <div className="flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/30">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground">Väntar på verifiering…</span>
+                <span className="text-xs text-muted-foreground">Väntar på att du klickar länken i mailet…</span>
               </div>
 
               {emailVerifyError && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20">
+                <div className="flex items-center gap-2 px-3 py-2 border border-destructive/20 bg-destructive/5">
                   <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                   <p className="text-xs text-destructive">{emailVerifyError}</p>
                 </div>
@@ -1059,7 +1028,7 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full"
+                className="w-full rounded-none"
                 onClick={onResend}
                 disabled={emailVerifyCooldown > 0}
               >
@@ -1073,13 +1042,10 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
           )}
 
           {emailVerifyState === 'verified' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex justify-center mt-1"
-            >
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </motion.div>
+            <div className="flex items-center justify-center gap-2 py-3">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Går vidare…</span>
+            </div>
           )}
         </DialogContent>
       </Dialog>
