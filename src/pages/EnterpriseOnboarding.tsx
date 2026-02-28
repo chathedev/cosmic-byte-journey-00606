@@ -709,7 +709,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
   return (
     <div className="border border-border divide-y divide-border">
       <div className="px-4 py-3 bg-muted/30">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Sammanfattning</p>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Prisöversikt</p>
       </div>
 
       <div className="px-4 py-3 space-y-2">
@@ -718,13 +718,13 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
           <span className="text-foreground font-medium">{selectedPlan.name}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Användare</span>
-          <span className="text-foreground font-medium">{seats}</span>
+          <span className="text-muted-foreground">Inkluderade platser</span>
+          <span className="text-foreground font-medium">{selectedPlan.seats} st</span>
         </div>
         {extraSeats > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Extra platser</span>
-            <span className="text-foreground font-medium">{extraSeats} st</span>
+            <span className="text-foreground font-medium">{extraSeats} × {fmt(EXTRA_SEAT_PRICE)} kr</span>
           </div>
         )}
       </div>
@@ -743,7 +743,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
           <span className="text-foreground font-semibold">{fmt(monthlyTotal)} kr/mån</span>
         </div>
         <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Aktivering</span>
+          <span className="text-muted-foreground">Aktivering (engång)</span>
           <span className="text-muted-foreground">{fmt(selectedPlan.activationSek)} kr</span>
         </div>
         <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
@@ -817,11 +817,16 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         ))}
       </div>
 
-      <div className="border border-border p-4 flex items-center gap-3">
-        <Info className="h-4 w-4 text-muted-foreground shrink-0" />
-        <p className="text-sm text-muted-foreground">
-          Rekommenderad plan: <span className="text-foreground font-medium">{seats <= 10 ? 'Small' : 'Standard'}</span>
-          {' — '}{seats <= 10 ? `${fmt(2490)} SEK/mån` : `${fmt(5990)} SEK/mån`}
+      <div className="border border-border p-4 space-y-1">
+        <div className="flex items-center gap-3">
+          <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            Rekommenderad plan: <span className="text-foreground font-medium">{seats <= 10 ? 'Small' : 'Standard'}</span>
+            {' — '}{seats <= 10 ? `${fmt(2490)} SEK/mån (upp till 10 platser inkl.)` : `${fmt(5990)} SEK/mån (upp till 30 platser inkl.)`}
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground pl-7">
+          Behöver ni fler platser? Lägg till extra för {fmt(EXTRA_SEAT_PRICE)} kr/plats/mån.
         </p>
       </div>
     </div>
