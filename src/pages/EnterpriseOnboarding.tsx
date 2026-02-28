@@ -346,8 +346,9 @@ export default function EnterpriseOnboarding() {
 
   const selectedPlan = PLANS.find(p => p.id === form.planType) || PLANS[0];
   const seats = form.expectedSeats || 5;
-  const extraSeats = Math.max(0, seats - selectedPlan.seats);
-  const monthlyTotal = selectedPlan.priceSek + extraSeats * EXTRA_SEAT_PRICE;
+  // Seats from step 0 is only a recommendation — no extra seats in onboarding
+  const extraSeats = 0;
+  const monthlyTotal = selectedPlan.priceSek;
 
   const orgTaken = availability?.organizationNumberAvailable === false;
   const emailTaken = availability?.workEmailAvailable === false;
@@ -820,11 +821,11 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
           <Info className="h-4 w-4 text-muted-foreground shrink-0" />
           <p className="text-sm text-muted-foreground">
             Rekommenderad plan: <span className="text-foreground font-medium">{seats <= 10 ? 'Small' : 'Standard'}</span>
-            {' — '}{seats <= 10 ? `${fmt(2490)} SEK/mån (upp till 10 platser inkl.)` : `${fmt(5990)} SEK/mån (upp till 30 platser inkl.)`}
+            {' — '}{seats <= 10 ? `${fmt(2490)} SEK/mån (upp till 10 platser)` : `${fmt(5990)} SEK/mån (upp till 30 platser)`}
           </p>
         </div>
         <p className="text-xs text-muted-foreground pl-7">
-          Behöver ni fler platser? Lägg till extra för {fmt(EXTRA_SEAT_PRICE)} kr/plats/mån.
+          Fler platser kan läggas till efter onboarding.
         </p>
       </div>
     </div>
