@@ -25,6 +25,7 @@ import {
   type OnboardingFormData,
   type ValidationResponse,
   type CompanyRegistryResult,
+  type CompanyConnectionResult,
 } from '@/lib/enterpriseOnboardingApi';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { toast } from '@/hooks/use-toast';
@@ -80,6 +81,7 @@ export default function EnterpriseOnboarding() {
   const [fieldChecks, setFieldChecks] = useState<Record<string, boolean>>({});
   const [availability, setAvailability] = useState<ValidationResponse['validation']['availability']>({});
   const [companyRegistry, setCompanyRegistry] = useState<CompanyRegistryResult | null>(null);
+  const [companyConnection, setCompanyConnection] = useState<CompanyConnectionResult | null>(null);
   const [stripeMode, setStripeMode] = useState<'test' | 'live' | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -218,10 +220,30 @@ export default function EnterpriseOnboarding() {
       setFieldChecks(res.validation?.checks || {});
       setAvailability(res.validation?.availability || {});
       setCompanyRegistry(res.validation?.companyRegistry || null);
+      setCompanyConnection(res.validation?.companyConnection || null);
       const hasErrors = Object.keys(res.validation?.errors || {}).length > 0;
       const orgTakenNow = res.validation?.availability?.organizationNumberAvailable === false;
       const emailTakenNow = res.validation?.availability?.workEmailAvailable === false;
-      if (hasErrors || orgTakenNow || emailTakenNow) {
+      const domainTrialBlocked = res.validation?.availability?.domainTrialAvailable === false;
+      if (hasErrors || orgTakenNow || emailTakenNow || domainTrialBlocked) {
+        setStepValidating(false);
+        return;
+      }
+      // Gate: companyRegistry, companyConnection, and domain must all be valid before email verification
+      const checks = res.validation?.checks || {};
+      if (!checks.companyRegistryValid) {
+        setFieldErrors(prev => ({ ...prev, _general: 'Företaget kunde inte verifieras mot bolagsregistret. Kontrollera företagsnamn och organisationsnummer.' }));
+        setStepValidating(false);
+        return;
+      }
+      if (!checks.companyConnectionValid) {
+        const connMsg = res.validation?.companyConnection?.message || 'Webbplats och arbetsmail kunde inte kopplas till företaget. Kontrollera att webbplatsen och mejlen hör till samma bolag.';
+        setFieldErrors(prev => ({ ...prev, _general: connMsg }));
+        setStepValidating(false);
+        return;
+      }
+      if (!checks.domainValid) {
+        setFieldErrors(prev => ({ ...prev, _general: res.validation?.errors?.domain || 'Mejldomänen matchar inte webbplatsens domän.' }));
         setStepValidating(false);
         return;
       }
@@ -372,6 +394,7 @@ export default function EnterpriseOnboarding() {
         setFieldChecks(valRes.validation?.checks || {});
         setAvailability(valRes.validation?.availability || {});
         setCompanyRegistry(valRes.validation?.companyRegistry || null);
+        setCompanyConnection(valRes.validation?.companyConnection || null);
         setSubmitError('Vänligen korrigera felen innan du fortsätter.');
         setIsSubmitting(false);
         return;
@@ -608,6 +631,7 @@ export default function EnterpriseOnboarding() {
                 fieldChecks={fieldChecks}
                 availability={availability}
                 companyRegistry={companyRegistry}
+                companyConnection={companyConnection}
                 isValidating={stepValidating}
                 updateField={updateField}
                 emailVerifyState={emailVerifyState}
@@ -901,13 +925,14 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 2: Details + Inline Email Verification             */
 /* ═══════════════════════════════════════════════════════ */
-function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, isValidating, updateField,
+function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, companyConnection, isValidating, updateField,
   emailVerifyState, emailVerifyError, emailVerifyCooldown, onResend,
 }: {
   form: Partial<OnboardingFormData>; fieldErrors: Record<string, string>;
   fieldChecks: Record<string, boolean>;
   availability: ValidationResponse['validation']['availability'];
   companyRegistry: CompanyRegistryResult | null;
+  companyConnection: CompanyConnectionResult | null;
   isValidating: boolean; updateField: (f: string, v: any) => void;
   emailVerifyState: 'idle' | 'sending' | 'pending' | 'verified';
   emailVerifyError: string;
@@ -971,6 +996,37 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
                   </>
                 );
               })()}
+            </div>
+          )}
+
+          {/* Company connection verification status */}
+          {companyConnection?.checked && (
+            <div className={cn(
+              'flex items-start gap-2 px-4 py-2.5 border',
+              companyConnection.ok ? 'border-primary/20 bg-primary/5' : 'border-destructive/20 bg-destructive/5',
+            )}>
+              {companyConnection.ok ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+                  <div>
+                    <span className="text-xs font-medium text-primary">Företagskoppling verifierad</span>
+                    {companyConnection.reason && <p className="text-[11px] text-muted-foreground mt-0.5">{companyConnection.reason}</p>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive mt-0.5" />
+                  <div>
+                    <span className="text-xs font-medium text-destructive">
+                      {companyConnection.status === 'website_unreachable' ? 'Webbplatsen kunde inte nås' :
+                       companyConnection.status === 'ai_rejected' ? 'Webbplats och mejl kunde inte kopplas till företaget' :
+                       companyConnection.status === 'insufficient_evidence' ? 'Otillräcklig evidens för företagskoppling' :
+                       'Företagskoppling kunde inte verifieras'}
+                    </span>
+                    {companyConnection.message && <p className="text-[11px] text-muted-foreground mt-0.5">{companyConnection.message}</p>}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1059,6 +1115,17 @@ function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegi
           <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
           <p className="text-sm text-destructive">
             {orgTaken && emailTaken ? 'Organisationsnummer och mejl redan registrerade.' : orgTaken ? 'Organisationsnumret redan registrerat.' : 'Mejladressen redan registrerad.'}
+            {' '}Kontakta <a href="mailto:support@tivly.se" className="underline font-medium">support@tivly.se</a>.
+          </p>
+        </div>
+      )}
+
+      {availability?.domainTrialAvailable === false && availability?.domainTrialLock && (
+        <div className="border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">
+            Domänen <span className="font-medium">{availability.domainTrialLock.domain}</span> har redan en aktiv trial
+            {availability.domainTrialLock.lockExpiresAt && ` (spärrad till ${new Date(availability.domainTrialLock.lockExpiresAt).toLocaleDateString('sv-SE')})`}.
             {' '}Kontakta <a href="mailto:support@tivly.se" className="underline font-medium">support@tivly.se</a>.
           </p>
         </div>
