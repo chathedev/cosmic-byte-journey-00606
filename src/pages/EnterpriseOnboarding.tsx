@@ -669,19 +669,21 @@ export default function EnterpriseOnboarding() {
             )}
           </main>
 
-          {/* Right: Cost sidebar — desktop only */}
-          <aside className="hidden lg:block w-72 shrink-0">
-            <div className="sticky top-[calc(3.5rem+3.5rem+1px)] space-y-4">
-              <CostSidebar
-                selectedPlan={selectedPlan}
-                seats={seats}
-                extraSeats={extraSeats}
-                monthlyTotal={monthlyTotal}
-                step={step}
-                form={form}
-              />
-            </div>
-          </aside>
+          {/* Right: Cost sidebar — desktop only, visible from step 1 (after plan chosen) */}
+          {step >= 1 && (
+            <aside className="hidden lg:block w-72 shrink-0">
+              <div className="sticky top-[calc(3.5rem+3.5rem+1px)] space-y-4">
+                <CostSidebar
+                  selectedPlan={selectedPlan}
+                  seats={seats}
+                  extraSeats={extraSeats}
+                  monthlyTotal={monthlyTotal}
+                  step={step}
+                  form={form}
+                />
+              </div>
+            </aside>
+          )}
         </div>
       </div>
 
