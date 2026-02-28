@@ -232,7 +232,31 @@ export default function Auth() {
       } else {
         try {
           const error = JSON.parse(responseText);
-          setAuthError(error.error || error.message || 'Fel kod. Försök igen.');
+          const rawError = error.error || error.message || '';
+          // Map backend error codes to user-friendly Swedish messages
+          const errorMap: Record<string, string> = {
+            'invalid_token': 'Koden är ogiltig. Kontrollera att du angett rätt kod och försök igen.',
+            'token_expired': 'Koden har gått ut. Begär en ny kod och försök igen.',
+            'expired_token': 'Koden har gått ut. Begär en ny kod och försök igen.',
+            'invalid_code': 'Koden är ogiltig. Kontrollera att du angett rätt kod och försök igen.',
+            'code_expired': 'Koden har gått ut. Begär en ny kod och försök igen.',
+            'too_many_attempts': 'För många försök. Vänta en stund och begär sedan en ny kod.',
+            'max_attempts_exceeded': 'Maximalt antal försök har uppnåtts. Begär en ny kod.',
+            'user_not_found': 'Inget konto hittades med denna e-postadress.',
+            'account_locked': 'Kontot är tillfälligt låst. Kontakta support om problemet kvarstår.',
+            'account_disabled': 'Kontot är inaktiverat. Kontakta din organisations administratör.',
+            'forbidden': 'Åtkomst nekad. Kontakta din organisations administratör.',
+            'insufficient_permissions': 'Du har inte behörighet att utföra denna åtgärd.',
+            'rate_limited': 'För många förfrågningar. Vänta en stund och försök igen.',
+            'server_error': 'Ett tekniskt fel uppstod. Försök igen om en stund.',
+          };
+          const friendlyMessage = errorMap[rawError.toLowerCase()] 
+            || errorMap[rawError.replace(/\s+/g, '_').toLowerCase()]
+            || (rawError.toLowerCase().includes('invalid') ? 'Koden är ogiltig. Kontrollera och försök igen.'
+            : rawError.toLowerCase().includes('expir') ? 'Koden har gått ut. Begär en ny kod.'
+            : rawError.toLowerCase().includes('attempt') ? 'För många försök. Begär en ny kod.'
+            : 'Fel kod. Kontrollera och försök igen.');
+          setAuthError(friendlyMessage);
         } catch { setAuthError('Fel kod. Försök igen.'); }
       }
       setPinCode('');
