@@ -579,7 +579,7 @@ export default function EnterpriseOnboarding() {
             <a href="/auth" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors">
               Gå till inloggning <ArrowRight className="h-3.5 w-3.5" />
             </a>
-            <p className="text-[11px] text-muted-foreground">© {new Date().getFullYear()} Tivly AB</p>
+            <p className="text-[11px] text-muted-foreground">© {new Date().getFullYear()} <a href="https://lyrio.se" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Lyrio AB</a></p>
           </div>
         </div>
       </div>
