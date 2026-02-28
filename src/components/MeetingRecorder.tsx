@@ -2,7 +2,7 @@
 // Records audio directly on the meeting page, then uploads to /asr/recording-upload
 
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, Clock, AlertTriangle, Shield, Monitor } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, AlertTriangle, Shield, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { VoiceNamePrompt } from "./VoiceNamePrompt";
-import { RecordingIndicator } from "./RecordingIndicator";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { uploadRecordingToAsr } from "@/lib/asrRecordingUpload";
 import { apiClient } from "@/lib/api";
@@ -608,7 +607,10 @@ export const MeetingRecorder = ({
   return (
     <div className="relative flex-1 flex flex-col h-full min-h-0 overflow-hidden">
       {/* Unified compact header bar */}
-      <div className={`bg-background/95 backdrop-blur-md border-b border-border/50 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
+      <div
+        className="bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm flex-shrink-0"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="max-w-5xl mx-auto px-3 py-1">
           <div className="flex items-center justify-between gap-2 h-9">
             {/* Left: recording dot + title */}
@@ -647,7 +649,7 @@ export const MeetingRecorder = ({
                 <Monitor className="w-3 h-3 text-primary" />
               )}
               {isBackupEnabled && chunksSaved > 0 && (
-                <Shield className="w-3 h-3 text-green-500" />
+                <Shield className="w-3 h-3 text-primary" />
               )}
               <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
                 {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}

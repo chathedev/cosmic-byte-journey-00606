@@ -347,9 +347,10 @@ const MeetingDetail = () => {
     bodyEl.style.overflow = 'hidden';
     bodyEl.style.height = '100svh';
     bodyEl.style.position = 'fixed';
-    bodyEl.style.top = `-${scrollY}px`;
+    bodyEl.style.top = '0px';
     bodyEl.style.width = '100%';
     bodyEl.style.overscrollBehavior = 'none';
+    window.scrollTo(0, 0);
 
     let prevMainOverflow = '';
     let prevMainPaddingTop = '';
