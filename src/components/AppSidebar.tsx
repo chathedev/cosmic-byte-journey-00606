@@ -33,6 +33,7 @@ import { isNativeApp } from "@/utils/capacitorDetection";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { isMobileDevice } from "@/utils/mobileDetection";
+import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import tivlyLogo from "@/assets/tivly-logo.png";
 
 export function AppSidebar() {
@@ -42,6 +43,7 @@ export function AppSidebar() {
   const [selected, setSelected] = useState("Hem");
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [showAdminSupport, setShowAdminSupport] = useState(false);
+  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
   const isNative = isNativeApp();
@@ -276,7 +278,19 @@ export function AppSidebar() {
 
         {/* Header */}
         <div className="shrink-0 px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-3">
+          <button
+            className={`w-full flex items-center gap-3 text-left rounded-lg transition-colors ${
+              enterpriseMembership?.memberships && enterpriseMembership.memberships.length > 1
+                ? 'hover:bg-accent/50 cursor-pointer p-1 -m-1'
+                : ''
+            }`}
+            onClick={() => {
+              if (enterpriseMembership?.memberships && enterpriseMembership.memberships.length > 1) {
+                setShowOrgSwitcher(true);
+              }
+            }}
+            disabled={!enterpriseMembership?.memberships || enterpriseMembership.memberships.length <= 1}
+          >
             <div className="w-10 h-10 shrink-0 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
               <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
             </div>
@@ -318,7 +332,10 @@ export function AppSidebar() {
                 )}
               </div>
             )}
-          </div>
+            {!collapsed && enterpriseMembership?.memberships && enterpriseMembership.memberships.length > 1 && (
+              <FiChevronDown className="text-muted-foreground shrink-0 text-sm" />
+            )}
+          </button>
         </div>
 
         {/* Trial banner rendered at bottom */}
@@ -545,6 +562,18 @@ export function AppSidebar() {
       {/* Dialogs */}
       <SubscribeDialog open={showSubscribe} onOpenChange={setShowSubscribe} />
       <AdminSupportPanel open={showAdminSupport} onOpenChange={setShowAdminSupport} />
+      {enterpriseMembership?.memberships && enterpriseMembership.memberships.length > 1 && (
+        <OrgSwitcherDialog
+          open={showOrgSwitcher}
+          onOpenChange={setShowOrgSwitcher}
+          memberships={enterpriseMembership.memberships}
+          activeCompanyId={enterpriseMembership.activeCompanyId}
+          onSelect={async (companyId) => {
+            await switchCompany(companyId);
+            toast({ title: 'Organisation bytt', description: `Du arbetar nu i ${enterpriseMembership.memberships?.find(m => m.companyId === companyId)?.companyName || 'vald organisation'}.` });
+          }}
+        />
+      )}
     </>
   );
 }

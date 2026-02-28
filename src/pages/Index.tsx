@@ -1,15 +1,17 @@
 import { TranscriptionInterface } from "@/components/TranscriptionInterface";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
+import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 
 const Index = () => {
-  const { userPlan, isLoading } = useSubscription();
+  const { userPlan, isLoading, enterpriseMembership, switchCompany } = useSubscription();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showOrgChooser, setShowOrgChooser] = useState(false);
 
   // Check if user needs to set their name
   useEffect(() => {
@@ -21,8 +23,25 @@ const Index = () => {
     }
   }, [user, isAuthLoading]);
 
+  // Show org chooser on startup if multiple memberships and no prior choice
+  useEffect(() => {
+    if (!isAuthLoading && !isLoading && user && enterpriseMembership) {
+      const memberships = enterpriseMembership.memberships;
+      if (memberships && memberships.length > 1) {
+        const previousChoice = localStorage.getItem('tivly_org_chosen');
+        if (!previousChoice) {
+          setShowOrgChooser(true);
+        }
+      }
+    }
+  }, [isAuthLoading, isLoading, user, enterpriseMembership]);
+
   const handleNameComplete = () => {
     setShowNameDialog(false);
+  };
+
+  const handleOrgSelect = async (companyId: string) => {
+    await switchCompany(companyId);
   };
 
   return (
@@ -44,6 +63,17 @@ const Index = () => {
         open={showNameDialog} 
         onComplete={handleNameComplete} 
       />
+
+      {/* Org chooser for multi-company users on first visit */}
+      {enterpriseMembership?.memberships && enterpriseMembership.memberships.length > 1 && (
+        <OrgSwitcherDialog
+          open={showOrgChooser}
+          onOpenChange={setShowOrgChooser}
+          memberships={enterpriseMembership.memberships}
+          activeCompanyId={enterpriseMembership.activeCompanyId}
+          onSelect={handleOrgSelect}
+        />
+      )}
     </>
   );
 };
