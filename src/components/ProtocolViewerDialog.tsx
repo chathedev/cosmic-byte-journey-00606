@@ -147,15 +147,15 @@ export const ProtocolViewerDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogContent className="max-w-5xl w-[calc(100%-1rem)] sm:w-full max-h-[90vh] flex flex-col p-0 gap-0">
           {/* Header with title + actions */}
-          <div className="flex items-center gap-3 px-6 py-4 border-b">
-            <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-3 sm:py-4 border-b overflow-hidden">
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h2 className="text-base font-semibold text-foreground truncate">
+              <h2 className="text-sm sm:text-base font-semibold text-foreground truncate">
                 {protocol?.fileName?.replace(/\.(docx|pdf)$/i, '') || "Protokoll"}
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 {protocol?.storedAt ? new Date(protocol.storedAt).toLocaleDateString('sv-SE', {
                   year: 'numeric',
                   month: 'long',
@@ -164,14 +164,14 @@ export const ProtocolViewerDialog = ({
                 {protocol?.size ? ` · ${formatFileSize(protocol.size)}` : ''}
               </p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Button onClick={handleDownload} variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-                <Download className="w-4 h-4" />
-                Ladda ner
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Button onClick={handleDownload} variant="ghost" size="sm" className="gap-1 text-muted-foreground h-8 px-2 sm:px-3 text-xs">
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Ladda ner</span>
               </Button>
-              <Button onClick={handleShare} variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-                <Share2 className="w-4 h-4" />
-                Dela
+              <Button onClick={handleShare} variant="ghost" size="sm" className="gap-1 text-muted-foreground h-8 px-2 sm:px-3 text-xs">
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Dela</span>
               </Button>
             </div>
           </div>
@@ -189,12 +189,12 @@ export const ProtocolViewerDialog = ({
                 </div>
               </div>
             ) : htmlContent ? (
-              <div className="py-8 px-4 sm:px-8">
+              <div className="py-4 px-2 sm:py-8 sm:px-8">
                 <div className="max-w-[210mm] mx-auto">
                   {/* Document Paper */}
                   <div 
-                    className="bg-white dark:bg-white shadow-2xl min-h-[297mm] p-12 sm:p-16 
-                               document-preview text-gray-900"
+                    className="bg-white dark:bg-white shadow-2xl min-h-[200px] sm:min-h-[297mm] p-4 sm:p-12 md:p-16 
+                               document-preview text-gray-900 overflow-x-hidden break-words"
                     style={{
                       fontFamily: 'Georgia, "Times New Roman", serif',
                       lineHeight: '1.8',
