@@ -2253,10 +2253,10 @@ const MeetingDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Clean Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 min-h-[3.5rem] py-2 flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 min-h-[3.5rem] py-2 flex items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -2325,7 +2325,7 @@ const MeetingDetail = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <main className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5 overflow-x-hidden">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-32 gap-3">
             <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
@@ -2427,8 +2427,8 @@ const MeetingDetail = () => {
 
                 {/* Protocol Section — prominent CTA or existing protocol */}
                 {!isEditing && (
-                  <section className="rounded-lg border border-border bg-card">
-                    <div className="p-5">
+                <section className="rounded-lg border border-border bg-card overflow-hidden">
+                    <div className="p-3 sm:p-5">
                       {protocolData ? (
                         <div className="space-y-4">
                           <div className="flex items-start gap-3">
@@ -2442,14 +2442,14 @@ const MeetingDetail = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Button onClick={handleViewProtocol} size="sm" variant="default" className="gap-1.5 h-9 text-xs no-hover-lift">
-                              <Eye className="w-3.5 h-3.5" /> Visa protokoll
+                              <Eye className="w-3.5 h-3.5" /> Visa
                             </Button>
                             <Button onClick={handleDownloadProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift">
                               <Download className="w-3.5 h-3.5" /> Ladda ner
                             </Button>
-                            <div className="flex items-center gap-1 ml-auto">
+                            <div className="flex items-center gap-1 sm:ml-auto">
                               {canGenerateMoreProtocols && (
                                 <Button onClick={handleCreateProtocol} size="sm" variant="ghost" className="gap-1.5 h-9 text-xs text-muted-foreground no-hover-lift">
                                   <RefreshCw className="w-3.5 h-3.5" /> Ersätt
@@ -2608,7 +2608,7 @@ const MeetingDetail = () => {
                 {/* Transcript Section */}
                 <div className="rounded-lg border border-border bg-card overflow-hidden">
                   {/* Header */}
-                  <div className="px-4 py-3 border-b border-border">
+                  <div className="px-3 sm:px-4 py-3 border-b border-border">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-muted-foreground" />
@@ -2647,7 +2647,7 @@ const MeetingDetail = () => {
                   </div>
 
                   {/* Transcript Content */}
-                  <div className="p-4">
+                  <div className="p-3 sm:p-4 overflow-x-hidden break-words">
                     {isEditing ? (
                       <Textarea
                         value={editedTranscript}
@@ -2703,7 +2703,7 @@ const MeetingDetail = () => {
                                     <span className="text-xs text-muted-foreground/60 tabular-nums">{timestamp}</span>
                                   )}
                                 </div>
-                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap pl-4">
+                                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words pl-4">
                                   {segment.text || ''}
                                 </p>
                               </div>
