@@ -70,8 +70,19 @@ export interface CostHistoryEntry {
   amountUsd: number;
   description?: string;
   metadata?: Record<string, unknown>;
-  timestamp: string;
+  timestamp?: string;
+  recordedAt?: string;
   userEmail?: string;
+  model?: string | null;
+  requestedModel?: string | null;
+  provider?: string | null;
+  requestedProvider?: string | null;
+  usage?: { totalTokens?: number; promptTokens?: number; completionTokens?: number } | null;
+  usageSource?: string | null;
+  source?: string | null;
+  engine?: string | null;
+  durationSec?: number | null;
+  ratePerMinute?: number | null;
 }
 
 export interface UserCosts {
