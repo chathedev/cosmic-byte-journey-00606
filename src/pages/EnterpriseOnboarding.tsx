@@ -295,11 +295,7 @@ export default function EnterpriseOnboarding() {
     }
   };
 
-  useEffect(() => {
-    const seats = form.expectedSeats || 5;
-    if (seats <= 10) setForm(prev => ({ ...prev, planType: 'enterprise_small' }));
-    else setForm(prev => ({ ...prev, planType: 'enterprise_standard' }));
-  }, [form.expectedSeats]);
+  // No auto-switch — user picks plan manually. Both plans allow extra seats at 249 kr/st.
 
   useEffect(() => {
     if (initialMountRef.current) return;
