@@ -10,23 +10,27 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, RefreshCw, DollarSign, Users, Layers, Clock, TrendingUp, AlertCircle, Cpu, Timer, Zap } from "lucide-react";
+import {
+  ArrowLeft, RefreshCw, DollarSign, Users, Layers, Clock,
+  TrendingUp, AlertCircle, Cpu, Timer, Zap, Brain, AudioLines,
+  Mic, Volume2, Bot, Hash, ChevronRight
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAdminAICosts, AdminCosts, CostHistoryEntry } from "@/lib/geminiApi";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 type Currency = 'USD' | 'SEK';
 
-const SERVICE_CONFIG: Record<string, { color: string; icon: string }> = {
-  gemini: { color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: "🧠" },
-  groq: { color: "bg-green-500/10 text-green-600 border-green-500/20", icon: "⚡" },
-  openai: { color: "bg-violet-500/10 text-violet-600 border-violet-500/20", icon: "🤖" },
-  deepgram: { color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20", icon: "🎙️" },
-  elevenlabs: { color: "bg-orange-500/10 text-orange-600 border-orange-500/20", icon: "🔊" },
+const SERVICE_CONFIG: Record<string, { icon: typeof Brain; label: string }> = {
+  gemini: { icon: Brain, label: "Gemini" },
+  groq: { icon: Zap, label: "Groq" },
+  openai: { icon: Bot, label: "OpenAI" },
+  deepgram: { icon: Mic, label: "Deepgram" },
+  elevenlabs: { icon: Volume2, label: "ElevenLabs" },
 };
 
-function getServiceStyle(service: string) {
-  return SERVICE_CONFIG[service.toLowerCase()] || { color: "bg-muted text-muted-foreground", icon: "📦" };
+function getServiceConfig(service: string) {
+  return SERVICE_CONFIG[service.toLowerCase()] || { icon: Cpu, label: service };
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -34,7 +38,7 @@ function formatDuration(seconds: number | null | undefined): string {
   if (seconds < 60) return `${seconds.toFixed(1)}s`;
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
-  return `${mins}m ${secs}s`;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 }
 
 function safeFormatDate(dateStr?: string | null): string {
@@ -51,6 +55,20 @@ function safeFormatDate(dateStr?: string | null): string {
   }
 }
 
+function safeFormatDateShort(dateStr?: string | null): string {
+  if (!dateStr) return '–';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '–';
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return `Idag ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`;
+    return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '–';
+  }
+}
+
 function getEntryDate(entry: CostHistoryEntry): string {
   return entry.recordedAt || entry.timestamp || '';
 }
@@ -58,23 +76,28 @@ function getEntryDate(entry: CostHistoryEntry): string {
 function ServiceBreakdownChart({ byService, total, formatAmount }: { byService: Record<string, number>; total: number; formatAmount: (n: number) => string }) {
   const sorted = Object.entries(byService).sort(([, a], [, b]) => b - a);
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {sorted.map(([service, cost]) => {
         const pct = total > 0 ? (cost / total) * 100 : 0;
-        const cfg = getServiceStyle(service);
+        const cfg = getServiceConfig(service);
+        const Icon = cfg.icon;
         return (
-          <div key={service} className="space-y-1.5">
+          <div key={service} className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-base">{cfg.icon}</span>
-                <Badge variant="outline" className={cfg.color}>{service}</Badge>
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-sm bg-muted flex items-center justify-center">
+                  <Icon className="h-4 w-4 text-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium leading-none">{cfg.label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{pct.toFixed(1)}% av total</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">{pct.toFixed(1)}%</span>
-                <span className="font-semibold text-sm tabular-nums">{formatAmount(cost)}</span>
-              </div>
+              <span className="font-semibold text-sm tabular-nums">{formatAmount(cost)}</span>
             </div>
-            <Progress value={pct} className="h-2" />
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-foreground/70 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+            </div>
           </div>
         );
       })}
@@ -83,45 +106,54 @@ function ServiceBreakdownChart({ byService, total, formatAmount }: { byService: 
 }
 
 function TransactionRow({ entry, formatAmount }: { entry: CostHistoryEntry; formatAmount: (n: number) => string }) {
-  const cfg = getServiceStyle(entry.service);
-  const dateStr = safeFormatDate(getEntryDate(entry));
+  const cfg = getServiceConfig(entry.service);
+  const Icon = cfg.icon;
+  const dateStr = safeFormatDateShort(getEntryDate(entry));
   const desc = entry.description || '';
   const isMeeting = desc.startsWith('meeting:');
   const meetingId = isMeeting ? desc.replace('meeting:', '').slice(0, 8) : null;
 
   return (
-    <div className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border/50 gap-3">
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm">{cfg.icon}</span>
-          <Badge variant="outline" className={`${cfg.color} text-xs`}>{entry.service}</Badge>
+    <div className="flex items-center gap-3 py-3 border-b border-border/50 last:border-0">
+      <div className="h-8 w-8 rounded-sm bg-muted flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 text-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{cfg.label}</span>
           {entry.model && (
-            <span className="text-[11px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{entry.model}</span>
+            <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded-sm text-muted-foreground border border-border/50">{entry.model}</span>
           )}
           {entry.engine && !entry.model && (
-            <span className="text-[11px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{entry.engine}</span>
+            <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded-sm text-muted-foreground border border-border/50">{entry.engine}</span>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-          {entry.userEmail && <span className="truncate max-w-[200px]">{entry.userEmail}</span>}
+        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+          {entry.userEmail && <span className="truncate max-w-[160px]">{entry.userEmail}</span>}
           {isMeeting && meetingId && (
-            <span className="font-mono opacity-60">#{meetingId}…</span>
+            <>
+              <span className="text-border">·</span>
+              <span className="font-mono flex items-center gap-0.5"><Hash className="h-2.5 w-2.5" />{meetingId}</span>
+            </>
           )}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground/70">
-          <span>{dateStr}</span>
           {entry.durationSec != null && (
-            <span className="flex items-center gap-0.5"><Timer className="h-3 w-3" />{formatDuration(entry.durationSec)}</span>
+            <>
+              <span className="text-border">·</span>
+              <span className="flex items-center gap-0.5"><Timer className="h-2.5 w-2.5" />{formatDuration(entry.durationSec)}</span>
+            </>
           )}
           {entry.usage?.totalTokens != null && (
-            <span className="flex items-center gap-0.5"><Cpu className="h-3 w-3" />{entry.usage.totalTokens.toLocaleString()} tokens</span>
-          )}
-          {entry.source && (
-            <span className="opacity-60">{entry.source}</span>
+            <>
+              <span className="text-border">·</span>
+              <span>{entry.usage.totalTokens.toLocaleString()} tok</span>
+            </>
           )}
         </div>
       </div>
-      <span className="font-semibold text-sm whitespace-nowrap tabular-nums">{formatAmount(entry.amountUsd)}</span>
+      <div className="text-right shrink-0">
+        <span className="font-semibold text-sm tabular-nums">{formatAmount(entry.amountUsd)}</span>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{dateStr}</p>
+      </div>
     </div>
   );
 }
@@ -169,129 +201,105 @@ export default function AdminAICosts() {
 
   const sortedUsers = useMemo(() => {
     if (!costsData?.byUser) return [];
-    return Object.entries(costsData.byUser)
-      .sort(([, a], [, b]) => b.totalUsd - a.totalUsd);
+    return Object.entries(costsData.byUser).sort(([, a], [, b]) => b.totalUsd - a.totalUsd);
   }, [costsData]);
 
-  const totalTransactions = useMemo(() => {
-    return costsData?.history?.length || 0;
-  }, [costsData]);
+  const totalTransactions = costsData?.history?.length || 0;
 
   if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b px-4 py-3">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
+      <div className="sticky top-0 z-40 bg-background border-b px-4 py-3">
+        <div className="flex items-center justify-between max-w-5xl mx-auto">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="rounded-sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-lg font-semibold flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                AI Kostnader
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                {costsData?.lastUpdated ? `Senast: ${safeFormatDate(costsData.lastUpdated)}` : 'Admin Dashboard'}
+              <h1 className="text-sm font-semibold uppercase tracking-wider">AI Kostnader</h1>
+              <p className="text-[11px] text-muted-foreground">
+                {costsData?.lastUpdated ? safeFormatDate(costsData.lastUpdated) : '–'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
-              <Label htmlFor="currency-toggle" className={`text-xs font-medium transition-colors ${currency === 'USD' ? 'text-primary' : 'text-muted-foreground'}`}>USD</Label>
-              <Switch id="currency-toggle" checked={currency === 'SEK'} onCheckedChange={(c) => setCurrency(c ? 'SEK' : 'USD')} disabled={rateLoading} />
-              <Label htmlFor="currency-toggle" className={`text-xs font-medium transition-colors ${currency === 'SEK' ? 'text-primary' : 'text-muted-foreground'}`}>SEK</Label>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 border rounded-sm px-2.5 py-1">
+              <Label htmlFor="currency-toggle" className={`text-[11px] font-medium transition-colors cursor-pointer ${currency === 'USD' ? 'text-foreground' : 'text-muted-foreground'}`}>USD</Label>
+              <Switch id="currency-toggle" checked={currency === 'SEK'} onCheckedChange={(c) => setCurrency(c ? 'SEK' : 'USD')} disabled={rateLoading} className="scale-75" />
+              <Label htmlFor="currency-toggle" className={`text-[11px] font-medium transition-colors cursor-pointer ${currency === 'SEK' ? 'text-foreground' : 'text-muted-foreground'}`}>SEK</Label>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchCosts} disabled={isLoading}>
-              <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <Button variant="outline" size="sm" onClick={fetchCosts} disabled={isLoading} className="rounded-sm h-8 text-xs">
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
               Uppdatera
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-4 space-y-6">
-        {/* Exchange rate */}
+      <div className="max-w-5xl mx-auto p-4 space-y-5">
+        {/* Exchange rate bar */}
         {currency === 'SEK' && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-            <span>Växelkurs: <span className="font-semibold text-foreground">1 USD = {rate.toFixed(2)} SEK</span></span>
-            {rateUpdated && <span>Uppdaterad: {rateUpdated.toLocaleTimeString('sv-SE')}</span>}
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground border-b pb-3">
+            <span>Växelkurs: <span className="text-foreground font-medium">1 USD = {rate.toFixed(2)} SEK</span></span>
+            {rateUpdated && <span>{rateUpdated.toLocaleTimeString('sv-SE')}</span>}
           </div>
         )}
 
         {error && (
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="flex items-center gap-3 py-4">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <p className="text-sm text-destructive">{error}</p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-2 text-sm text-destructive border border-destructive/30 rounded-sm px-3 py-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <p>{error}</p>
+          </div>
         )}
 
-        {/* Summary Cards */}
+        {/* Top stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card>
-            <CardHeader className="pb-1 pt-4 px-4">
-              <CardDescription className="flex items-center gap-1.5 text-xs"><DollarSign className="h-3.5 w-3.5" />Total</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              {isLoading ? <Skeleton className="h-7 w-20" /> : (
-                <p className="text-xl font-bold text-primary tabular-nums">{formatAmount(costsData?.totalUsd || 0)}</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 pt-4 px-4">
-              <CardDescription className="flex items-center gap-1.5 text-xs"><Layers className="h-3.5 w-3.5" />Tjänster</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              {isLoading ? <Skeleton className="h-7 w-10" /> : (
-                <p className="text-xl font-bold">{Object.keys(costsData?.byService || {}).length}</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 pt-4 px-4">
-              <CardDescription className="flex items-center gap-1.5 text-xs"><Users className="h-3.5 w-3.5" />Användare</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              {isLoading ? <Skeleton className="h-7 w-10" /> : (
-                <p className="text-xl font-bold">{Object.keys(costsData?.byUser || {}).length}</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 pt-4 px-4">
-              <CardDescription className="flex items-center gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" />Transaktioner</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              {isLoading ? <Skeleton className="h-7 w-10" /> : (
-                <p className="text-xl font-bold">{totalTransactions}</p>
-              )}
-            </CardContent>
-          </Card>
+          {[
+            { label: "Total kostnad", icon: DollarSign, value: isLoading ? null : formatAmount(costsData?.totalUsd || 0), primary: true },
+            { label: "Tjänster", icon: Layers, value: isLoading ? null : String(Object.keys(costsData?.byService || {}).length) },
+            { label: "Användare", icon: Users, value: isLoading ? null : String(Object.keys(costsData?.byUser || {}).length) },
+            { label: "Transaktioner", icon: TrendingUp, value: isLoading ? null : String(totalTransactions) },
+          ].map((stat) => {
+            const StatIcon = stat.icon;
+            return (
+              <div key={stat.label} className="border rounded-sm p-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <StatIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider">{stat.label}</span>
+                </div>
+                {stat.value === null ? (
+                  <Skeleton className="h-6 w-16" />
+                ) : (
+                  <p className={`text-lg font-bold tabular-nums ${stat.primary ? 'text-foreground' : ''}`}>{stat.value}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
+        {/* Tabs */}
         <Tabs defaultValue="services" className="space-y-4">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="services" className="text-xs">Tjänster</TabsTrigger>
-            <TabsTrigger value="users" className="text-xs">Användare</TabsTrigger>
-            <TabsTrigger value="history" className="text-xs">Historik</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-3 rounded-sm h-9">
+            <TabsTrigger value="services" className="rounded-sm text-xs">Tjänster</TabsTrigger>
+            <TabsTrigger value="users" className="rounded-sm text-xs">Användare</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-sm text-xs">Historik</TabsTrigger>
           </TabsList>
 
-          {/* Services Tab */}
+          {/* Services */}
           <TabsContent value="services">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2"><Layers className="h-5 w-5" />Kostnad per tjänst</CardTitle>
+            <Card className="rounded-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="h-4 w-4" />Kostnad per tjänst
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                  <div className="space-y-4">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
                 ) : Object.keys(costsData?.byService || {}).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Inga kostnader registrerade</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">Inga kostnader registrerade</p>
                 ) : (
                   <ServiceBreakdownChart byService={costsData!.byService} total={costsData!.totalUsd} formatAmount={formatAmount} />
                 )}
@@ -299,32 +307,39 @@ export default function AdminAICosts() {
             </Card>
           </TabsContent>
 
-          {/* Users Tab */}
+          {/* Users */}
           <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2"><Users className="h-5 w-5" />Kostnad per användare</CardTitle>
+            <Card className="rounded-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <Users className="h-4 w-4" />Kostnad per användare
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+                  <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
                 ) : sortedUsers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Inga användare</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">Inga användare</p>
                 ) : (
                   <ScrollArea className="max-h-[500px]">
-                    <div className="space-y-2">
+                    <div className="divide-y divide-border/50">
                       {sortedUsers.map(([email, userData]) => {
                         const pct = costsData!.totalUsd > 0 ? (userData.totalUsd / costsData!.totalUsd) * 100 : 0;
                         return (
-                          <div key={email} className="p-3 rounded-lg bg-muted/50 space-y-2">
-                            <div className="flex items-center justify-between">
+                          <div key={email} className="py-3 first:pt-0 last:pb-0">
+                            <div className="flex items-center justify-between mb-1.5">
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{email}</p>
-                                <p className="text-[11px] text-muted-foreground">{userData.history?.length || 0} transaktioner · {pct.toFixed(1)}% av total</p>
+                                <p className="text-sm font-medium truncate">{email}</p>
+                                <p className="text-[11px] text-muted-foreground">{userData.history?.length || 0} transaktioner</p>
                               </div>
-                              <span className="font-semibold text-primary tabular-nums">{formatAmount(userData.totalUsd)}</span>
+                              <div className="text-right shrink-0 ml-3">
+                                <span className="font-semibold text-sm tabular-nums">{formatAmount(userData.totalUsd)}</span>
+                                <p className="text-[10px] text-muted-foreground">{pct.toFixed(1)}%</p>
+                              </div>
                             </div>
-                            <Progress value={pct} className="h-1.5" />
+                            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-foreground/60 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                            </div>
                           </div>
                         );
                       })}
@@ -335,21 +350,23 @@ export default function AdminAICosts() {
             </Card>
           </TabsContent>
 
-          {/* History Tab */}
+          {/* History */}
           <TabsContent value="history">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2"><Clock className="h-5 w-5" />Senaste transaktioner</CardTitle>
-                <CardDescription>De senaste {totalTransactions} AI-kostnaderna</CardDescription>
+            <Card className="rounded-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="h-4 w-4" />Senaste transaktioner
+                </CardTitle>
+                <CardDescription className="text-xs">{totalTransactions} poster</CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-2">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
+                  <div className="space-y-3">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
                 ) : (costsData?.history || []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Ingen historik</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">Ingen historik</p>
                 ) : (
                   <ScrollArea className="max-h-[600px]">
-                    <div className="space-y-2">
+                    <div>
                       {costsData!.history.map((entry, idx) => (
                         <TransactionRow key={idx} entry={entry} formatAmount={formatAmount} />
                       ))}
