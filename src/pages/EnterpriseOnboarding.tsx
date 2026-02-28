@@ -336,12 +336,16 @@ export default function EnterpriseOnboarding() {
       .catch(() => setOnboardingEnabled(false));
   }, []);
 
-  // Redirect users who already have an enterprise company
+  // Pre-fill form from logged-in user (only on initial mount, before interaction)
   useEffect(() => {
-    if (enterpriseMembership?.isMember && enterpriseMembership.company?.id) {
-      navigate('/', { replace: true });
+    if (!user || hasUserInteractedRef.current) return;
+    const prefill: Partial<OnboardingFormData> = {};
+    if (user.email && !form.workEmail) prefill.workEmail = user.email;
+    if ((user as any).name && !form.contactName) prefill.contactName = (user as any).name;
+    if (Object.keys(prefill).length > 0) {
+      setForm(prev => ({ ...prev, ...prefill }));
     }
-  }, [enterpriseMembership, navigate]);
+  }, [user]);
 
   const selectedPlan = PLANS.find(p => p.id === form.planType) || PLANS[0];
   const seats = form.expectedSeats || 5;
@@ -575,6 +579,22 @@ export default function EnterpriseOnboarding() {
           </div>
         </div>
       </div>
+
+      {/* Info banner for existing enterprise members */}
+      {enterpriseMembership?.isMember && enterpriseMembership.company?.id && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="flex items-center gap-3 px-4 py-3 border border-primary/20 bg-primary/5 rounded-lg">
+            <Info className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-sm text-foreground">
+              Du är redan medlem i <span className="font-semibold">{enterpriseMembership.company.name || 'ett företag'}</span>.
+              Du kan fortfarande skapa ett nytt Enterprise-konto här.
+            </p>
+            <Button variant="ghost" size="sm" className="ml-auto shrink-0 text-xs" onClick={() => navigate('/')}>
+              Gå till appen
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Main content — two-column on desktop */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
