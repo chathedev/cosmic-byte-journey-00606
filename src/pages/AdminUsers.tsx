@@ -407,7 +407,7 @@ export default function AdminUsers() {
       }
       
       toast({
-        title: "✅ Återställt",
+        title: "Återställt",
         description: `${resetUsageUser.email}: ${results.join(' & ')} återställda.`,
       });
       

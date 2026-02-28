@@ -266,7 +266,7 @@ export default function EnterpriseOnboarding() {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
         if (res.emailVerification?.status === 'verified') {
           setEmailVerifyState('verified');
-          toast({ title: '✅ E-post verifierad', description: 'Din företagsmail har bekräftats.' });
+          toast({ title: 'E-post verifierad', description: 'Din företagsmail har bekräftats.' });
           setTimeout(() => setStep(3), 1500);
         }
       } catch {}
