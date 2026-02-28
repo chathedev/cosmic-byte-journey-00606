@@ -322,6 +322,44 @@ const MeetingDetail = () => {
     }
   }, [meeting]);
 
+  // Lock page scroll completely while recording mode is active
+  useEffect(() => {
+    if (!isRecordingMode) return;
+
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const mainEl = document.querySelector('main');
+
+    const prevHtmlOverflow = htmlEl.style.overflow;
+    const prevBodyOverflow = bodyEl.style.overflow;
+    const prevBodyHeight = bodyEl.style.height;
+
+    htmlEl.style.overflow = 'hidden';
+    bodyEl.style.overflow = 'hidden';
+    bodyEl.style.height = '100dvh';
+
+    let prevMainOverflow = '';
+    let prevMainPaddingTop = '';
+    if (mainEl instanceof HTMLElement) {
+      prevMainOverflow = mainEl.style.overflow;
+      prevMainPaddingTop = mainEl.style.paddingTop;
+      mainEl.style.overflow = 'hidden';
+      mainEl.style.paddingTop = '0px';
+    }
+
+    return () => {
+      htmlEl.style.overflow = prevHtmlOverflow;
+      bodyEl.style.overflow = prevBodyOverflow;
+      bodyEl.style.height = prevBodyHeight;
+      
+
+      if (mainEl instanceof HTMLElement) {
+        mainEl.style.overflow = prevMainOverflow;
+        mainEl.style.paddingTop = prevMainPaddingTop;
+      }
+    };
+  }, [isRecordingMode]);
+
   // Simple stage-based status text
   const getStageInfo = () => {
     if (stage === 'transcribing') return { title: 'Transkriberar...', subtitle: 'Konverterar ljud till text' };
@@ -2169,7 +2207,7 @@ const MeetingDetail = () => {
   // Recording mode view - full-screen recorder
   if (isRecordingMode && id) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+      <div className="h-[100dvh] max-h-[100dvh] overflow-hidden overscroll-none bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
         <MeetingRecorder
           meetingId={id}
           meetingTitle={meetingTitle}

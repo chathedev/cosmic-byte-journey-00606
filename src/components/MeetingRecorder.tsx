@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { VoiceNamePrompt } from "./VoiceNamePrompt";
@@ -690,7 +690,7 @@ export const MeetingRecorder = ({
         {/* Live Transcript Display (Free/Pro only) - capped height */}
         {!useAsrMode && (liveTranscript || interimText) && (
           <div className="mt-2 w-full max-w-md flex-shrink min-h-0 overflow-hidden" style={{ maxHeight: 'clamp(60px, 15vh, 120px)' }}>
-            <div ref={transcriptScrollRef} className="h-full overflow-y-auto rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 p-3 text-sm leading-relaxed">
+            <div ref={transcriptScrollRef} className="h-full overflow-hidden rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 p-3 text-sm leading-relaxed">
               <span className="text-foreground">{liveTranscript}</span>
               {interimText && (
                 <span className="text-muted-foreground/60 italic">{interimText}</span>
