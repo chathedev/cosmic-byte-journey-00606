@@ -38,7 +38,7 @@ const PLANS = [
   { id: 'enterprise_standard' as const, name: 'Standard', priceSek: 5990, seats: 30, activationSek: 9900 },
 ];
 const EXTRA_SEAT_PRICE = 249;
-const STEPS = ['Team', 'Plan', 'Uppgifter', 'Bekräfta', 'Betalning'];
+const STEPS = ['Team', 'Uppgifter', 'Plan', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -200,8 +200,8 @@ export default function EnterpriseOnboarding() {
 
   const [stepValidating, setStepValidating] = useState(false);
 
-  // Step 2: validate → company connection popup → email verification popup
-  const handleNextFromStep2 = async () => {
+  // Step 1 (Uppgifter): validate → company connection popup → email verification popup
+  const handleNextFromStep1 = async () => {
     hasUserInteractedRef.current = true;
     const missing: string[] = [];
     if (!form.companyName?.trim()) missing.push('companyName');
@@ -217,9 +217,9 @@ export default function EnterpriseOnboarding() {
       return;
     }
     
-    // If both already verified, go straight to next step
+    // If both already verified, go straight to next step (Plan)
     if (companyConnState === 'verified' && emailVerifyState === 'verified') {
-      setStep(3);
+      setStep(2);
       return;
     }
     
@@ -288,14 +288,14 @@ export default function EnterpriseOnboarding() {
   const proceedToEmailVerification = async () => {
     // If email already verified, go to next step
     if (emailVerifyState === 'verified') {
-      setStep(3);
+      setStep(2);
       return;
     }
 
     // Save draft to ensure draftId exists for verification
     const draftRes = await saveDraft({
       ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-      progressStep: 2, progressPercent: 40,
+      progressStep: 1, progressPercent: 40,
     } as any);
     if (draftRes.draft) {
       setDraftId(draftRes.draft.id);
@@ -322,14 +322,14 @@ export default function EnterpriseOnboarding() {
 
   // Email verification polling — auto-detect when user verifies via link in another tab
   useEffect(() => {
-    if (step !== 2 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
+    if (step !== 1 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
     const interval = setInterval(async () => {
       try {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
         if (res.emailVerification?.status === 'verified') {
           setEmailVerifyState('verified');
           toast({ title: 'E-post verifierad', description: 'Din företagsmail har bekräftats.' });
-          setTimeout(() => setStep(3), 1500);
+          setTimeout(() => setStep(2), 1500);
         }
       } catch {}
     }, 4000);
@@ -663,8 +663,7 @@ export default function EnterpriseOnboarding() {
           {/* Left: Form */}
           <main className="flex-1 min-w-0">
             {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
-            {step === 1 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 2 && (
+            {step === 1 && (
               <StepDetails
                 form={form}
                 fieldErrors={fieldErrors}
@@ -682,6 +681,7 @@ export default function EnterpriseOnboarding() {
                 onResend={handleResendVerification}
               />
             )}
+            {step === 2 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
             {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
             {step === 4 && draftId && resumeToken && (
               <StepCardPayment
@@ -702,14 +702,23 @@ export default function EnterpriseOnboarding() {
             )}
 
             {/* Navigation */}
-            {step < 2 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s - 1); }} disabled={step === 0} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-                  <ChevronLeft className="h-4 w-4" /> Tillbaka
-                </Button>
-                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(s => s + 1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
+            {step === 0 && (
+              <div className="flex items-center justify-end mt-8 pt-6 border-t border-border">
+                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
                   Nästa <ChevronRight className="h-4 w-4" />
                 </Button>
+              </div>
+            )}
+            {step === 1 && (
+              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(0); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                  <ChevronLeft className="h-4 w-4" /> Tillbaka
+                </Button>
+                {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && companyConnState !== 'verifying' && companyConnState !== 'verified' && (
+                  <Button size="sm" onClick={handleNextFromStep1} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
+                    {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
+                  </Button>
+                )}
               </div>
             )}
             {step === 2 && (
@@ -717,11 +726,9 @@ export default function EnterpriseOnboarding() {
                 <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
-                {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && companyConnState !== 'verifying' && companyConnState !== 'verified' && (
-                  <Button size="sm" onClick={handleNextFromStep2} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
-                    {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
-                  </Button>
-                )}
+                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(3); }} className="gap-1.5 no-hover-lift rounded-none px-6">
+                  Nästa <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
             {step === 3 && (
@@ -736,8 +743,8 @@ export default function EnterpriseOnboarding() {
             )}
           </main>
 
-          {/* Right: Cost sidebar — desktop only, visible from step 1 (after plan chosen) */}
-          {step >= 1 && (
+          {/* Right: Cost sidebar — desktop only, visible from step 2 (after plan chosen) */}
+          {step >= 2 && (
             <aside className="hidden lg:block w-72 shrink-0">
               <div className="sticky top-[calc(3.5rem+3.5rem+1px)] space-y-4">
                 <CostSidebar
