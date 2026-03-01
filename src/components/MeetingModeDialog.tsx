@@ -1,23 +1,54 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Users, Phone, ArrowRight, Mic } from "lucide-react";
+import { Users, Phone, ArrowRight, Mic, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-export type MeetingMode = 'in-person' | 'phone-call';
+export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
 
 interface MeetingModeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (mode: MeetingMode) => void;
+  showDigitalOption?: boolean;
 }
+
+const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: string; hint: string; hintIcon: typeof Mic }[] = [
+  {
+    mode: 'in-person',
+    icon: Users,
+    title: 'Fysiskt möte',
+    desc: 'Alla sitter i samma rum',
+    hint: 'Pausar automatiskt vid inkommande samtal',
+    hintIcon: Phone,
+  },
+  {
+    mode: 'phone-call',
+    icon: Phone,
+    title: 'Telefonmöte',
+    desc: 'Mötet sker via telefon eller högtalartelefon',
+    hint: 'Fortsätter spela in även vid samtal',
+    hintIcon: Mic,
+  },
+  {
+    mode: 'digital',
+    icon: Monitor,
+    title: 'Teams-möte (bot)',
+    desc: 'En bot går med i ditt Teams-möte och transkriberar',
+    hint: 'Du behöver inte spela in själv',
+    hintIcon: Monitor,
+  },
+];
 
 export const MeetingModeDialog = ({
   open,
   onOpenChange,
   onSelect,
+  showDigitalOption = false,
 }: MeetingModeDialogProps) => {
   const [hoveredOption, setHoveredOption] = useState<MeetingMode | null>(null);
+
+  const visibleOptions = showDigitalOption ? OPTIONS : OPTIONS.filter(o => o.mode !== 'digital');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,83 +66,44 @@ export const MeetingModeDialog = ({
         </div>
 
         <div className="px-4 pb-6 space-y-3">
-          {/* In Person Option */}
-          <button
-            onClick={() => onSelect('in-person')}
-            onMouseEnter={() => setHoveredOption('in-person')}
-            onMouseLeave={() => setHoveredOption(null)}
-            className={cn(
-              "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
-              "flex items-center gap-4 group",
-              hoveredOption === 'in-person'
-                ? "border-primary bg-primary/5 shadow-md"
-                : "border-border hover:border-primary/50 bg-card"
-            )}
-          >
-            <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-              hoveredOption === 'in-person'
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            )}>
-              <Users className="w-6 h-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="font-semibold text-foreground">Fysiskt möte</span>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Alla sitter i samma rum
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-                <Phone className="w-3 h-3" />
-                Pausar automatiskt vid inkommande samtal
-              </p>
-            </div>
-            <ArrowRight className={cn(
-              "w-5 h-5 shrink-0 transition-all",
-              hoveredOption === 'in-person'
-                ? "text-primary translate-x-0.5"
-                : "text-muted-foreground/50"
-            )} />
-          </button>
-
-          {/* Phone Call Option */}
-          <button
-            onClick={() => onSelect('phone-call')}
-            onMouseEnter={() => setHoveredOption('phone-call')}
-            onMouseLeave={() => setHoveredOption(null)}
-            className={cn(
-              "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
-              "flex items-center gap-4 group",
-              hoveredOption === 'phone-call'
-                ? "border-primary bg-primary/5 shadow-md"
-                : "border-border hover:border-primary/50 bg-card"
-            )}
-          >
-            <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-              hoveredOption === 'phone-call'
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            )}>
-              <Phone className="w-6 h-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="font-semibold text-foreground">Telefonmöte</span>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Mötet sker via telefon eller högtalartelefon
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-                <Mic className="w-3 h-3" />
-                Fortsätter spela in även vid samtal
-              </p>
-            </div>
-            <ArrowRight className={cn(
-              "w-5 h-5 shrink-0 transition-all",
-              hoveredOption === 'phone-call'
-                ? "text-primary translate-x-0.5"
-                : "text-muted-foreground/50"
-            )} />
-          </button>
+          {visibleOptions.map((opt) => (
+            <button
+              key={opt.mode}
+              onClick={() => onSelect(opt.mode)}
+              onMouseEnter={() => setHoveredOption(opt.mode)}
+              onMouseLeave={() => setHoveredOption(null)}
+              className={cn(
+                "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
+                "flex items-center gap-4 group",
+                hoveredOption === opt.mode
+                  ? "border-primary bg-primary/5 shadow-md"
+                  : "border-border hover:border-primary/50 bg-card"
+              )}
+            >
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                hoveredOption === opt.mode
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              )}>
+                <opt.icon className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-foreground">{opt.title}</span>
+                <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
+                <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
+                  <opt.hintIcon className="w-3 h-3" />
+                  {opt.hint}
+                </p>
+              </div>
+              <ArrowRight className={cn(
+                "w-5 h-5 shrink-0 transition-all",
+                hoveredOption === opt.mode
+                  ? "text-primary translate-x-0.5"
+                  : "text-muted-foreground/50"
+              )} />
+            </button>
+          ))}
         </div>
 
         <div className="px-6 py-3 bg-muted/30 border-t border-border/50">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText } from "lucide-react";
+import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -7,6 +7,10 @@ import { SubscribeDialog } from "./SubscribeDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
 import { TeamSelectDialog } from "./TeamSelectDialog";
+import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
+import { DigitalSessionStartDialog } from "./DigitalSessionStartDialog";
+import { DigitalSessionView } from "./DigitalSessionView";
+import { useDigitalSession } from "@/hooks/useDigitalSession";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -55,6 +59,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [showTeamSelect, setShowTeamSelect] = useState(false);
   const [pendingAction, setPendingAction] = useState<'record' | 'upload' | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [showModeDialog, setShowModeDialog] = useState(false);
+  const [showDigitalStartDialog, setShowDigitalStartDialog] = useState(false);
+  const [showDigitalSession, setShowDigitalSession] = useState(false);
+
+  const digitalSession = useDigitalSession();
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
   useEffect(() => {
@@ -79,23 +88,38 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     })();
   }, [searchParams, currentView, navigate, isFreeTrialMode, selectedLanguage]);
 
-   // Handle "Spela in live" button click - go straight to in-person recording
-  const handleRecordLiveClick = async () => {
+   // Handle "Spela in" button click - show mode selection
+  const handleRecordClick = async () => {
     const { allowed, reason } = await canCreateMeeting();
     if (!allowed) {
       setUpgradeReason(reason || 'Du har nått din gräns för möten');
       setShowUpgradeDialog(true);
       return;
     }
+    setShowModeDialog(true);
+  };
 
-     // Enterprise users: show team selection first
-     if (isEnterprise) {
-       setPendingAction('record');
-       setShowTeamSelect(true);
-       return;
-     }
+  const handleModeSelect = async (mode: MeetingMode) => {
+    setShowModeDialog(false);
 
-     await startInPersonRecording();
+    if (mode === 'digital') {
+      // Check if a session is already active
+      if (digitalSession.isActive) {
+        setShowDigitalSession(true);
+        return;
+      }
+      setShowDigitalStartDialog(true);
+      return;
+    }
+
+    // For in-person / phone-call, proceed with recording
+    if (isEnterprise) {
+      setPendingAction('record');
+      setShowTeamSelect(true);
+      return;
+    }
+
+    await startInPersonRecording(null, mode);
   };
 
   const handleUploadClick = async () => {
@@ -120,8 +144,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   };
 
+  const handleDigitalStart = async (joinUrl: string, title: string): Promise<boolean> => {
+    const success = await digitalSession.startSession(joinUrl, title);
+    if (success) {
+      setShowDigitalSession(true);
+    }
+    return success;
+  };
+
   // Start in-person recording (current behavior)
-  const startInPersonRecording = async (teamId?: string | null) => {
+  const startInPersonRecording = async (teamId?: string | null, mode?: MeetingMode) => {
     setIsStartingRecording(true);
 
     try {
@@ -300,6 +332,38 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   };
 
+  // Show digital session monitoring view
+  if (showDigitalSession && digitalSession.isActive) {
+    return (
+      <DigitalSessionView
+        session={digitalSession.session}
+        status={digitalSession.status}
+        error={digitalSession.error}
+        onPause={digitalSession.pauseSession}
+        onResume={digitalSession.resumeSession}
+        onStop={digitalSession.stopSession}
+        onReset={() => { digitalSession.reset(); setShowDigitalSession(false); }}
+        onBack={() => setShowDigitalSession(false)}
+      />
+    );
+  }
+
+  // Show digital session completed/failed view
+  if (showDigitalSession && digitalSession.session && !digitalSession.isActive) {
+    return (
+      <DigitalSessionView
+        session={digitalSession.session}
+        status={digitalSession.status}
+        error={digitalSession.error}
+        onPause={digitalSession.pauseSession}
+        onResume={digitalSession.resumeSession}
+        onStop={digitalSession.stopSession}
+        onReset={() => { digitalSession.reset(); setShowDigitalSession(false); }}
+        onBack={() => setShowDigitalSession(false)}
+      />
+    );
+  }
+
   if (currentView === "analyzing") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -379,10 +443,29 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             </p>
           </div>
 
+          {/* Active digital session banner */}
+          {digitalSession.isActive && (
+            <button
+              onClick={() => setShowDigitalSession(true)}
+              className="w-full p-4 rounded-xl border-2 border-primary bg-primary/5 text-left flex items-center gap-3 transition-all hover:shadow-md"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Monitor className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">Digital session aktiv</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {digitalSession.session?.meetingTitle || 'Teams-möte pågår'}
+                </p>
+              </div>
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+            </button>
+          )}
+
           {/* Action buttons - clean and simple */}
           <div className="space-y-3">
             <Button 
-              onClick={handleRecordLiveClick}
+              onClick={handleRecordClick}
               size="lg"
               disabled={isStartingRecording}
               className="w-full h-14 text-base gap-3 rounded-none"
@@ -392,7 +475,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               ) : (
                 <Mic className="w-5 h-5" />
               )}
-              {isStartingRecording ? 'Startar...' : 'Spela in live'}
+              {isStartingRecording ? 'Startar...' : 'Spela in möte'}
             </Button>
 
             <Button 
@@ -459,6 +542,21 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         open={showTeamSelect}
         onOpenChange={setShowTeamSelect}
         onSelect={handleTeamSelected}
+      />
+
+      <MeetingModeDialog
+        open={showModeDialog}
+        onOpenChange={setShowModeDialog}
+        onSelect={handleModeSelect}
+        showDigitalOption={true}
+      />
+
+      <DigitalSessionStartDialog
+        open={showDigitalStartDialog}
+        onOpenChange={setShowDigitalStartDialog}
+        onStart={handleDigitalStart}
+        isLocked={digitalSession.isLocked}
+        error={digitalSession.error}
       />
     </div>
   );
