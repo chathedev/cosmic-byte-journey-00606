@@ -145,7 +145,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   const handleDigitalStart = async (joinUrl: string, title: string): Promise<boolean> => {
-    const success = await digitalSession.startSession(joinUrl, title);
+    const success = await digitalSession.startSession({ joinUrl, title });
     if (success) {
       setShowDigitalSession(true);
     }
@@ -339,9 +339,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         session={digitalSession.session}
         status={digitalSession.status}
         error={digitalSession.error}
+        errorCode={digitalSession.errorCode}
         onPause={digitalSession.pauseSession}
         onResume={digitalSession.resumeSession}
         onStop={digitalSession.stopSession}
+        onRetry={digitalSession.retrySession}
         onReset={() => { digitalSession.reset(); setShowDigitalSession(false); }}
         onBack={() => setShowDigitalSession(false)}
       />
@@ -355,9 +357,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         session={digitalSession.session}
         status={digitalSession.status}
         error={digitalSession.error}
+        errorCode={digitalSession.errorCode}
         onPause={digitalSession.pauseSession}
         onResume={digitalSession.resumeSession}
         onStop={digitalSession.stopSession}
+        onRetry={digitalSession.retrySession}
         onReset={() => { digitalSession.reset(); setShowDigitalSession(false); }}
         onBack={() => setShowDigitalSession(false)}
       />
