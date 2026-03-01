@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Users, Phone, ArrowRight, Mic, Monitor } from "lucide-react";
+import { Users, Phone, ArrowRight, Mic, Monitor, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import type { LockedSessionInfo } from "@/hooks/useDigitalSession";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
 
@@ -11,6 +12,8 @@ interface MeetingModeDialogProps {
   onOpenChange: (open: boolean) => void;
   onSelect: (mode: MeetingMode) => void;
   showDigitalOption?: boolean;
+  digitalLocked?: boolean;
+  lockedSessionInfo?: LockedSessionInfo | null;
 }
 
 const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: string; hint: string; hintIcon: typeof Mic }[] = [
@@ -45,6 +48,8 @@ export const MeetingModeDialog = ({
   onOpenChange,
   onSelect,
   showDigitalOption = false,
+  digitalLocked = false,
+  lockedSessionInfo,
 }: MeetingModeDialogProps) => {
   const [hoveredOption, setHoveredOption] = useState<MeetingMode | null>(null);
 
@@ -66,44 +71,73 @@ export const MeetingModeDialog = ({
         </div>
 
         <div className="px-4 pb-6 space-y-3">
-          {visibleOptions.map((opt) => (
-            <button
-              key={opt.mode}
-              onClick={() => onSelect(opt.mode)}
-              onMouseEnter={() => setHoveredOption(opt.mode)}
-              onMouseLeave={() => setHoveredOption(null)}
-              className={cn(
-                "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
-                "flex items-center gap-4 group",
-                hoveredOption === opt.mode
-                  ? "border-primary bg-primary/5 shadow-md"
-                  : "border-border hover:border-primary/50 bg-card"
-              )}
-            >
-              <div className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                hoveredOption === opt.mode
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              )}>
-                <opt.icon className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold text-foreground">{opt.title}</span>
-                <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
-                <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-                  <opt.hintIcon className="w-3 h-3" />
-                  {opt.hint}
-                </p>
-              </div>
-              <ArrowRight className={cn(
-                "w-5 h-5 shrink-0 transition-all",
-                hoveredOption === opt.mode
-                  ? "text-primary translate-x-0.5"
-                  : "text-muted-foreground/50"
-              )} />
-            </button>
-          ))}
+          {visibleOptions.map((opt) => {
+            const isDigitalLocked = opt.mode === 'digital' && digitalLocked;
+
+            return (
+              <button
+                key={opt.mode}
+                onClick={() => !isDigitalLocked && onSelect(opt.mode)}
+                onMouseEnter={() => setHoveredOption(opt.mode)}
+                onMouseLeave={() => setHoveredOption(null)}
+                disabled={isDigitalLocked}
+                className={cn(
+                  "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
+                  "flex items-center gap-4 group",
+                  isDigitalLocked
+                    ? "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
+                    : hoveredOption === opt.mode
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : "border-border hover:border-primary/50 bg-card"
+                )}
+              >
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors relative",
+                  isDigitalLocked
+                    ? "bg-muted text-muted-foreground"
+                    : hoveredOption === opt.mode
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                )}>
+                  <opt.icon className="w-6 h-6" />
+                  {isDigitalLocked && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
+                      <Lock className="w-3 h-3 text-destructive-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold text-foreground">{opt.title}</span>
+                  {isDigitalLocked ? (
+                    <div className="mt-0.5">
+                      <p className="text-sm text-destructive font-medium">Upptagen just nu</p>
+                      {lockedSessionInfo?.meetingTitle && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          Pågående: {lockedSessionInfo.meetingTitle}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
+                        <opt.hintIcon className="w-3 h-3" />
+                        {opt.hint}
+                      </p>
+                    </>
+                  )}
+                </div>
+                {!isDigitalLocked && (
+                  <ArrowRight className={cn(
+                    "w-5 h-5 shrink-0 transition-all",
+                    hoveredOption === opt.mode
+                      ? "text-primary translate-x-0.5"
+                      : "text-muted-foreground/50"
+                  )} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="px-6 py-3 bg-muted/30 border-t border-border/50">

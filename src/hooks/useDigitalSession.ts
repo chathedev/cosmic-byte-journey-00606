@@ -43,12 +43,18 @@ export interface DigitalSession {
   error: DigitalSessionError | null;
 }
 
+export interface LockedSessionInfo {
+  meetingTitle?: string;
+  status?: string;
+  startedAt?: string;
+}
+
 interface StatusResponse {
   active: boolean;
   locked?: boolean;
   status?: string;
   session: DigitalSession | null;
-  activeSession?: any;
+  activeSession?: LockedSessionInfo;
 }
 
 interface StartParams {
@@ -63,6 +69,7 @@ interface UseDigitalSessionReturn {
   status: DigitalSessionStatus;
   isActive: boolean;
   isLocked: boolean;
+  lockedSessionInfo: LockedSessionInfo | null;
   error: string | null;
   errorCode: string | null;
   startSession: (params: StartParams) => Promise<boolean>;
@@ -82,6 +89,7 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
   const [session, setSession] = useState<DigitalSession | null>(null);
   const [status, setStatus] = useState<DigitalSessionStatus>('idle');
   const [isLocked, setIsLocked] = useState(false);
+  const [lockedSessionInfo, setLockedSessionInfo] = useState<LockedSessionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -127,6 +135,7 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
 
       if (data.locked) {
         setIsLocked(true);
+        setLockedSessionInfo(data.activeSession || null);
         setStatus('idle');
         stopPolling();
         return;
@@ -292,6 +301,7 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     status,
     isActive,
     isLocked,
+    lockedSessionInfo,
     error,
     errorCode,
     startSession,
