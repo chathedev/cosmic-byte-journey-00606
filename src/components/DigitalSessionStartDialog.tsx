@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Monitor, Loader2, AlertCircle, Link2 } from "lucide-react";
+import { Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
 interface DigitalSessionStartDialogProps {
   open: boolean;
@@ -53,87 +53,73 @@ export const DigitalSessionStartDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden border-border/40 rounded-2xl" aria-describedby={undefined}>
         <VisuallyHidden>
-          <DialogTitle>Starta digital session</DialogTitle>
+          <DialogTitle>Digital session</DialogTitle>
         </VisuallyHidden>
 
-        <div className="p-6 pb-4">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Monitor className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-semibold text-foreground">Gå med i Teams-möte</h2>
-          </div>
-          <p className="text-sm text-muted-foreground text-center">
-            Vår bot går med i mötet och transkriberar automatiskt
-          </p>
-        </div>
-
-        <div className="px-6 pb-4 space-y-4">
+        <div className="p-5 space-y-4">
           {isLocked && (
-            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+            <div className="p-3 rounded-xl bg-destructive/8 border border-destructive/15 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">
-                En digital session är redan aktiv. Avsluta den först.
+              <p className="text-sm text-destructive leading-snug">
+                En session är redan aktiv. Avsluta den först.
               </p>
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Teams-möteslänk *</label>
-            <div className="relative">
-              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="https://teams.microsoft.com/l/meetup-join/..."
-                value={joinUrl}
-                onChange={(e) => {
-                  setJoinUrl(e.target.value);
-                  setLocalError(null);
-                }}
-                className="pl-10"
-                disabled={isLocked || isStarting}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Teams-länk</label>
+            <Input
+              placeholder="Klistra in möteslänk..."
+              value={joinUrl}
+              onChange={(e) => {
+                setJoinUrl(e.target.value);
+                setLocalError(null);
+              }}
+              className="h-11 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
+              disabled={isLocked || isStarting}
+              autoFocus
+            />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Mötesnamn (valfritt)</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Namn <span className="text-muted-foreground/50 normal-case">(valfritt)</span></label>
             <Input
               placeholder="t.ex. Kundmöte Acme"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              className="h-11 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
               disabled={isLocked || isStarting}
             />
           </div>
 
           {displayError && !isLocked && (
-            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">{displayError}</p>
-            </div>
+            <p className="text-xs text-destructive flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {displayError}
+            </p>
           )}
 
           <Button
             onClick={handleStart}
             disabled={isLocked || isStarting || !joinUrl.trim()}
-            className="w-full h-12 text-base gap-2"
+            className="w-full h-11 rounded-xl text-sm font-medium gap-2"
           >
             {isStarting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Startar...
-              </>
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <Monitor className="w-5 h-5" />
-                Starta digital session
+                Starta
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </Button>
         </div>
 
-        <div className="px-6 py-3 bg-muted/30 border-t border-border/50">
-          <p className="text-xs text-muted-foreground text-center">
-            Boten går med som deltagare — alla i mötet ser att den är med
+        <div className="px-5 py-2.5 bg-muted/20 border-t border-border/30">
+          <p className="text-[11px] text-muted-foreground/60 text-center">
+            Boten syns som deltagare i mötet
           </p>
         </div>
       </DialogContent>

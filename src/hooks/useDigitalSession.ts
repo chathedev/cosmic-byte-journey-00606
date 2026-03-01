@@ -16,6 +16,12 @@ export type DigitalSessionStatus =
   | 'cancelled'
   | 'interrupted';
 
+export interface DigitalSessionError {
+  message: string;
+  code?: string;
+  details?: string;
+}
+
 export interface DigitalSession {
   id: string;
   meetingId: string;
@@ -34,7 +40,7 @@ export interface DigitalSession {
   reconnectCount: number;
   maxReconnects: number;
   pauseDropsAudio: boolean;
-  error: { message: string; code?: string } | null;
+  error: DigitalSessionError | null;
 }
 
 interface StatusResponse {
@@ -45,32 +51,44 @@ interface StatusResponse {
   activeSession?: any;
 }
 
+interface StartParams {
+  joinUrl: string;
+  title?: string;
+  meetingId?: string;
+  maxMeetingMinutes?: number;
+}
+
 interface UseDigitalSessionReturn {
   session: DigitalSession | null;
   status: DigitalSessionStatus;
   isActive: boolean;
   isLocked: boolean;
   error: string | null;
-  startSession: (joinUrl: string, title?: string, maxMinutes?: number) => Promise<boolean>;
+  errorCode: string | null;
+  startSession: (params: StartParams) => Promise<boolean>;
   pauseSession: () => Promise<void>;
   resumeSession: () => Promise<void>;
   stopSession: () => Promise<void>;
+  retrySession: () => void;
   reset: () => void;
 }
 
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
 
 const TERMINAL_STATUSES: DigitalSessionStatus[] = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'];
+const ACTIVE_STATUSES: DigitalSessionStatus[] = ['pending', 'starting', 'joining', 'listening', 'paused', 'stopping'];
 
 export const useDigitalSession = (): UseDigitalSessionReturn => {
   const [session, setSession] = useState<DigitalSession | null>(null);
   const [status, setStatus] = useState<DigitalSessionStatus>('idle');
   const [isLocked, setIsLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const lastStartParamsRef = useRef<StartParams | null>(null);
 
-  const isActive = !['idle', 'completed', 'failed', 'timed_out', 'cancelled', 'interrupted'].includes(status);
+  const isActive = ACTIVE_STATUSES.includes(status);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -97,7 +115,6 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
 
       if (!res.ok) {
         if (res.status === 404) {
-          // No active session
           setSession(null);
           setStatus('idle');
           stopPolling();
@@ -120,6 +137,12 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
         setStatus(data.session.status);
         sessionIdRef.current = data.session.id;
 
+        // Extract error info from session
+        if (data.session.error) {
+          setError(data.session.error.message);
+          setErrorCode(data.session.error.code || null);
+        }
+
         if (TERMINAL_STATUSES.includes(data.session.status)) {
           stopPolling();
         }
@@ -135,11 +158,9 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
 
   const startPolling = useCallback(() => {
     stopPolling();
-    // Poll every 3 seconds
     pollRef.current = setInterval(fetchStatus, 3000);
   }, [fetchStatus, stopPolling]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => stopPolling();
   }, [stopPolling]);
@@ -149,7 +170,7 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     fetchStatus();
   }, [fetchStatus]);
 
-  const startSession = useCallback(async (joinUrl: string, title?: string, maxMinutes?: number): Promise<boolean> => {
+  const startSession = useCallback(async (params: StartParams): Promise<boolean> => {
     const token = getAuthToken();
     if (!token) {
       setError('Ingen autentiseringstoken hittades');
@@ -157,6 +178,8 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     }
 
     setError(null);
+    setErrorCode(null);
+    lastStartParamsRef.current = params;
 
     try {
       const res = await fetch(`${API_BASE_URL}/digital-sessions/start`, {
@@ -166,21 +189,24 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          joinUrl,
-          title: title || 'Digitalt möte',
-          maxMeetingMinutes: maxMinutes || 120,
+          joinUrl: params.joinUrl,
+          title: params.title || 'Digitalt möte',
+          meetingId: params.meetingId,
+          maxMeetingMinutes: params.maxMeetingMinutes || 120,
         }),
       });
 
       if (res.status === 409) {
-        setError('En digital session är redan aktiv. Avsluta den innan du startar en ny.');
+        setError('En digital session är redan aktiv.');
+        setErrorCode('digital_session_already_active');
         setIsLocked(true);
         return false;
       }
 
       if (res.status === 400) {
         const data = await res.json().catch(() => ({}));
-        setError(data.message || 'Ogiltig Teams-länk. Kontrollera och försök igen.');
+        setError(data.message || 'Ogiltig Teams-länk.');
+        setErrorCode(data.code || null);
         return false;
       }
 
@@ -224,7 +250,6 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
         throw new Error(`${action} failed: ${res.status}`);
       }
 
-      // Immediate status fetch
       await fetchStatus();
     } catch (err: any) {
       console.error(`Digital session ${action} error:`, err);
@@ -236,13 +261,30 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
   const resumeSession = useCallback(() => sessionAction('resume'), [sessionAction]);
   const stopSession = useCallback(() => sessionAction('stop'), [sessionAction]);
 
+  const retrySession = useCallback(() => {
+    // Reset state and re-use last params if available (for interrupted sessions)
+    stopPolling();
+    setSession(null);
+    setStatus('idle');
+    setIsLocked(false);
+    setError(null);
+    setErrorCode(null);
+    sessionIdRef.current = null;
+
+    if (lastStartParamsRef.current) {
+      startSession(lastStartParamsRef.current);
+    }
+  }, [stopPolling, startSession]);
+
   const reset = useCallback(() => {
     stopPolling();
     setSession(null);
     setStatus('idle');
     setIsLocked(false);
     setError(null);
+    setErrorCode(null);
     sessionIdRef.current = null;
+    lastStartParamsRef.current = null;
   }, [stopPolling]);
 
   return {
@@ -251,10 +293,12 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     isActive,
     isLocked,
     error,
+    errorCode,
     startSession,
     pauseSession,
     resumeSession,
     stopSession,
+    retrySession,
     reset,
   };
 };
