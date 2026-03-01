@@ -11,10 +11,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { VoiceNamePrompt } from "./VoiceNamePrompt";
+import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
+import { CallInterruptionDialog } from "./CallInterruptionDialog";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { uploadRecordingToAsr } from "@/lib/asrRecordingUpload";
 import { apiClient } from "@/lib/api";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
+import { useCallInterruptionDetector } from "@/hooks/useCallInterruptionDetector";
 import { digitalRecordingStreams } from "@/lib/digitalRecordingStreams";
 import { noSleep } from "@/lib/noSleep";
 
@@ -48,6 +51,8 @@ export const MeetingRecorder = ({
   const [showInstructions, setShowInstructions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [localTitle, setLocalTitle] = useState(meetingTitle);
+  const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(isDigitalRecording ? 'phone-call' : null);
+  const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording);
 
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
@@ -81,6 +86,45 @@ export const MeetingRecorder = ({
       console.log(`🛡️ MeetingRecorder auto-backup: ${count} chunks, ${bytes} bytes`);
     },
   });
+
+  // Call interruption detection for in-person meetings
+  const handleCallInterruption = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      releaseWakeLock();
+      saveBackup();
+      if (!useAsrMode && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      }
+      console.log('📞 Recording auto-paused due to call interruption');
+    }
+  };
+
+  const { showResumeDialog, dismissResumeDialog } = useCallInterruptionDetector({
+    enabled: meetingMode === 'in-person',
+    isRecording,
+    isPaused,
+    stream: streamRef.current,
+    onInterrupted: handleCallInterruption,
+  });
+
+  const handleResumeAfterCall = () => {
+    dismissResumeDialog();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+      requestWakeLock();
+      if (!useAsrMode && recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch { /* ignore */ }
+      }
+    }
+  };
+
+  const handleStopAfterCall = () => {
+    dismissResumeDialog();
+    handleStopRecording();
+  };
 
   // Check instructions
   useEffect(() => {
@@ -209,8 +253,9 @@ export const MeetingRecorder = ({
     }
   };
 
-  // Auto-start recording on mount
+  // Auto-start recording on mount (only after mode is selected)
   useEffect(() => {
+    if (!meetingMode) return; // Wait for mode selection
     startRecording();
     return () => {
       stopMediaRecorder();
@@ -218,7 +263,12 @@ export const MeetingRecorder = ({
       releaseWakeLock();
       noSleep.disable();
     };
-  }, []);
+  }, [meetingMode]);
+
+  const handleModeSelect = (mode: MeetingMode) => {
+    setMeetingMode(mode);
+    setShowModeDialog(false);
+  };
 
   // Duration timer
   useEffect(() => {
@@ -679,7 +729,7 @@ export const MeetingRecorder = ({
         </div>
 
         <div className="w-full max-w-md flex-shrink-0">
-          <VoiceNamePrompt />
+          <VoiceNamePrompt durationSec={durationSec} />
         </div>
 
         {/* Live Transcript Display (Free/Pro only) - capped height */}
@@ -754,6 +804,27 @@ export const MeetingRecorder = ({
       </AlertDialog>
 
       <RecordingInstructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} />
+
+      {/* Meeting Mode Selection Dialog */}
+      <MeetingModeDialog
+        open={showModeDialog}
+        onOpenChange={(open) => {
+          if (!open && !meetingMode) {
+            // User dismissed without selecting - cancel
+            onCancel();
+          }
+          setShowModeDialog(open);
+        }}
+        onSelect={handleModeSelect}
+      />
+
+      {/* Call Interruption Resume Dialog */}
+      <CallInterruptionDialog
+        open={showResumeDialog}
+        onContinue={handleResumeAfterCall}
+        onStop={handleStopAfterCall}
+        durationSec={durationSec}
+      />
     </div>
   );
 };

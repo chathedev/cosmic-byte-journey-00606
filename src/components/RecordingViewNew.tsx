@@ -12,7 +12,10 @@ import { useNavigate } from "react-router-dom";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { VoiceNamePrompt } from "./VoiceNamePrompt";
 import { RecordingIndicator } from "./RecordingIndicator";
+import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
+import { CallInterruptionDialog } from "./CallInterruptionDialog";
 import { isNativeApp } from "@/utils/capacitorDetection";
+import { useCallInterruptionDetector } from "@/hooks/useCallInterruptionDetector";
 import { MinimalAudioAnalyzer } from "./MinimalAudioAnalyzer";
 import { startBackgroundUpload } from "@/lib/backgroundUploader";
 import { noSleep } from "@/lib/noSleep";
@@ -66,6 +69,8 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isTestMode, setIsTestMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(null);
+  const [showModeDialog, setShowModeDialog] = useState(true);
   
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>(continuedMeeting?.transcript || "");
@@ -111,6 +116,43 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       console.log(`🛡️ Auto-backup saved: ${count} chunks, ${bytes} bytes`);
     },
   });
+
+  // Call interruption detection for in-person meetings
+  const handleCallInterruption = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      releaseWakeLock();
+      saveBackup();
+      if (!useAsrMode && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      }
+      console.log('📞 Recording auto-paused due to call interruption');
+    }
+  };
+
+  const { showResumeDialog, dismissResumeDialog } = useCallInterruptionDetector({
+    enabled: meetingMode === 'in-person',
+    isRecording,
+    isPaused,
+    stream: streamRef.current,
+    onInterrupted: handleCallInterruption,
+  });
+
+  const handleResumeAfterCall = () => {
+    dismissResumeDialog();
+    togglePause(); // Resume
+  };
+
+  const handleStopAfterCall = () => {
+    dismissResumeDialog();
+    handleStopRecording();
+  };
+
+  const handleModeSelect = (mode: MeetingMode) => {
+    setMeetingMode(mode);
+    setShowModeDialog(false);
+  };
 
   // Load folders
   useEffect(() => {
@@ -300,8 +342,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     }
   };
 
-  // Initialize session and start recording
+  // Initialize session and start recording (only after mode is selected)
   useEffect(() => {
+    if (!meetingMode) return; // Wait for mode selection
+
     const initSession = async () => {
       if (!user) return;
       
@@ -309,7 +353,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         setSessionId(continuedMeeting.id);
         setSelectedFolder(continuedMeeting.folder);
         hasIncrementedCountRef.current = true;
-        // Start recording for continued meeting too
         startRecording();
         return;
       }
@@ -324,7 +367,6 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       createdAtRef.current = new Date().toISOString();
       setSessionId(tempId);
       
-      // Start recording
       startRecording();
     };
 
@@ -336,7 +378,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       releaseWakeLock();
       noSleep.disable();
     };
-  }, [user]);
+  }, [user, meetingMode]);
 
   // Duration timer
   useEffect(() => {
@@ -924,7 +966,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
             </p>
           </div>
 
-          <VoiceNamePrompt />
+          <VoiceNamePrompt durationSec={durationSec} />
 
           {/* Live Transcript Display (Free/Pro only) - capped height */}
           {!useAsrMode && (liveTranscript || interimText) && (
@@ -999,6 +1041,26 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
 
         <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
         <RecordingInstructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} />
+
+        {/* Meeting Mode Selection Dialog */}
+        <MeetingModeDialog
+          open={showModeDialog}
+          onOpenChange={(open) => {
+            if (!open && !meetingMode) {
+              onBack();
+            }
+            setShowModeDialog(open);
+          }}
+          onSelect={handleModeSelect}
+        />
+
+        {/* Call Interruption Resume Dialog */}
+        <CallInterruptionDialog
+          open={showResumeDialog}
+          onContinue={handleResumeAfterCall}
+          onStop={handleStopAfterCall}
+          durationSec={durationSec}
+        />
       </div>
     );
   }
