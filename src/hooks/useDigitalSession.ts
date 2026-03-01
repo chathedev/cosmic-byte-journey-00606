@@ -1,0 +1,260 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+const API_BASE_URL = 'https://api.tivly.se';
+
+export type DigitalSessionStatus =
+  | 'idle'
+  | 'pending'
+  | 'starting'
+  | 'joining'
+  | 'listening'
+  | 'paused'
+  | 'stopping'
+  | 'completed'
+  | 'failed'
+  | 'timed_out'
+  | 'cancelled'
+  | 'interrupted';
+
+export interface DigitalSession {
+  id: string;
+  meetingId: string;
+  status: DigitalSessionStatus;
+  meetingTitle: string;
+  transcriptPreview: string | null;
+  transcriptChunkCount: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  joinedAt: string | null;
+  pausedAt: string | null;
+  endedAt: string | null;
+  lastHeartbeatAt: string | null;
+  maxMeetingMinutes: number;
+  reconnectCount: number;
+  maxReconnects: number;
+  pauseDropsAudio: boolean;
+  error: { message: string; code?: string } | null;
+}
+
+interface StatusResponse {
+  active: boolean;
+  locked?: boolean;
+  status?: string;
+  session: DigitalSession | null;
+  activeSession?: any;
+}
+
+interface UseDigitalSessionReturn {
+  session: DigitalSession | null;
+  status: DigitalSessionStatus;
+  isActive: boolean;
+  isLocked: boolean;
+  error: string | null;
+  startSession: (joinUrl: string, title?: string, maxMinutes?: number) => Promise<boolean>;
+  pauseSession: () => Promise<void>;
+  resumeSession: () => Promise<void>;
+  stopSession: () => Promise<void>;
+  reset: () => void;
+}
+
+const getAuthToken = (): string | null => localStorage.getItem('authToken');
+
+const TERMINAL_STATUSES: DigitalSessionStatus[] = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'];
+
+export const useDigitalSession = (): UseDigitalSessionReturn => {
+  const [session, setSession] = useState<DigitalSession | null>(null);
+  const [status, setStatus] = useState<DigitalSessionStatus>('idle');
+  const [isLocked, setIsLocked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+
+  const isActive = !['idle', 'completed', 'failed', 'timed_out', 'cancelled', 'interrupted'].includes(status);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const fetchStatus = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const url = sessionIdRef.current
+        ? `${API_BASE_URL}/digital-sessions/${sessionIdRef.current}/status`
+        : `${API_BASE_URL}/digital-sessions/status`;
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          // No active session
+          setSession(null);
+          setStatus('idle');
+          stopPolling();
+          return;
+        }
+        throw new Error(`Status check failed: ${res.status}`);
+      }
+
+      const data: StatusResponse = await res.json();
+
+      if (data.locked) {
+        setIsLocked(true);
+        setStatus('idle');
+        stopPolling();
+        return;
+      }
+
+      if (data.session) {
+        setSession(data.session);
+        setStatus(data.session.status);
+        sessionIdRef.current = data.session.id;
+
+        if (TERMINAL_STATUSES.includes(data.session.status)) {
+          stopPolling();
+        }
+      } else {
+        setSession(null);
+        setStatus('idle');
+        stopPolling();
+      }
+    } catch (err) {
+      console.error('Digital session status poll error:', err);
+    }
+  }, [stopPolling]);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    // Poll every 3 seconds
+    pollRef.current = setInterval(fetchStatus, 3000);
+  }, [fetchStatus, stopPolling]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  // Check for existing active session on mount
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  const startSession = useCallback(async (joinUrl: string, title?: string, maxMinutes?: number): Promise<boolean> => {
+    const token = getAuthToken();
+    if (!token) {
+      setError('Ingen autentiseringstoken hittades');
+      return false;
+    }
+
+    setError(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/digital-sessions/start`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          joinUrl,
+          title: title || 'Digitalt möte',
+          maxMeetingMinutes: maxMinutes || 120,
+        }),
+      });
+
+      if (res.status === 409) {
+        setError('En digital session är redan aktiv. Avsluta den innan du startar en ny.');
+        setIsLocked(true);
+        return false;
+      }
+
+      if (res.status === 400) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || 'Ogiltig Teams-länk. Kontrollera och försök igen.');
+        return false;
+      }
+
+      if (!res.ok) {
+        throw new Error(`Start failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.session) {
+        setSession(data.session);
+        setStatus(data.session.status);
+        sessionIdRef.current = data.session.id;
+      } else {
+        setStatus('pending');
+      }
+
+      startPolling();
+      return true;
+    } catch (err: any) {
+      console.error('Start digital session error:', err);
+      setError(err.message || 'Kunde inte starta digital session');
+      return false;
+    }
+  }, [startPolling]);
+
+  const sessionAction = useCallback(async (action: 'pause' | 'resume' | 'stop') => {
+    const token = getAuthToken();
+    const id = sessionIdRef.current;
+    if (!token || !id) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/digital-sessions/${id}/${action}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`${action} failed: ${res.status}`);
+      }
+
+      // Immediate status fetch
+      await fetchStatus();
+    } catch (err: any) {
+      console.error(`Digital session ${action} error:`, err);
+      setError(err.message || `Kunde inte ${action === 'pause' ? 'pausa' : action === 'resume' ? 'återuppta' : 'stoppa'} sessionen`);
+    }
+  }, [fetchStatus]);
+
+  const pauseSession = useCallback(() => sessionAction('pause'), [sessionAction]);
+  const resumeSession = useCallback(() => sessionAction('resume'), [sessionAction]);
+  const stopSession = useCallback(() => sessionAction('stop'), [sessionAction]);
+
+  const reset = useCallback(() => {
+    stopPolling();
+    setSession(null);
+    setStatus('idle');
+    setIsLocked(false);
+    setError(null);
+    sessionIdRef.current = null;
+  }, [stopPolling]);
+
+  return {
+    session,
+    status,
+    isActive,
+    isLocked,
+    error,
+    startSession,
+    pauseSession,
+    resumeSession,
+    stopSession,
+    reset,
+  };
+};
