@@ -44,7 +44,11 @@ export interface DigitalSessionMetadata {
   processingProgressPercent?: number;
   asrStatus?: string;
   asrEngine?: string;
+  speakerDiarizationEnabled?: boolean;
+  speakerDiarizationEngine?: string;
+  speakerDiarizationAfterTranscript?: boolean;
   speakerNames?: Record<string, string>;
+  speakerRoleSuggestions?: Record<string, string>;
   endedReason?: string;
   meetingEndedByHost?: boolean;
 }
