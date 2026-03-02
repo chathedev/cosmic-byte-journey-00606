@@ -10,6 +10,7 @@ import { TeamSelectDialog } from "./TeamSelectDialog";
 import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
 import { DigitalSessionStartDialog } from "./DigitalSessionStartDialog";
 import { DigitalSessionView } from "./DigitalSessionView";
+import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
 import { useDigitalSession } from "@/hooks/useDigitalSession";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -64,6 +65,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [showModeDialog, setShowModeDialog] = useState(false);
   const [showDigitalStartDialog, setShowDigitalStartDialog] = useState(false);
   const [showDigitalSession, setShowDigitalSession] = useState(false);
+  const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
+  const [pendingParticipants, setPendingParticipants] = useState<string[]>([]);
 
   const digitalSession = useDigitalSession();
 
@@ -164,17 +167,26 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
-    // For in-person / phone-call, proceed with recording
+    // For in-person / phone-call, show participants dialog first
+    setPendingMeetingMode(mode);
+    setShowParticipantsDialog(true);
+  };
+
+  const handleParticipantsConfirm = async (participants: string[]) => {
+    setPendingParticipants(participants);
+    setShowParticipantsDialog(false);
+
+    const mode = pendingMeetingMode;
+
     if (isEnterprise) {
       debugLog('[🏠 Home] Enterprise user — showing team select with pending mode:', mode);
-      setPendingMeetingMode(mode);
       setPendingAction('record');
       setShowTeamSelect(true);
       return;
     }
 
     debugLog('[🏠 Home] Starting in-person recording, mode:', mode);
-    await startInPersonRecording(null, mode);
+    await startInPersonRecording(null, mode ?? undefined, participants);
   };
 
   const handleUploadClick = async () => {
@@ -197,14 +209,14 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setPendingMeetingMode(null);
 
     if (action === 'record') {
-      await startInPersonRecording(teamId, selectedMode ?? undefined);
+      await startInPersonRecording(teamId, selectedMode ?? undefined, pendingParticipants);
     } else if (action === 'upload') {
       setShowDigitalMeetingDialog(true);
     }
   };
 
-  const handleDigitalStart = async (joinUrl: string, title: string): Promise<boolean> => {
-    const success = await digitalSession.startSession({ joinUrl, title });
+  const handleDigitalStart = async (joinUrl: string, title: string, participants?: string[]): Promise<boolean> => {
+    const success = await digitalSession.startSession({ joinUrl, title, participants });
     if (success) {
       setShowDigitalSession(true);
     }
@@ -212,7 +224,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   // Start in-person recording (current behavior)
-  const startInPersonRecording = async (teamId?: string | null, mode?: MeetingMode) => {
+  const startInPersonRecording = async (teamId?: string | null, mode?: MeetingMode, participants?: string[]) => {
     debugLog('[🏠 Home] startInPersonRecording called, teamId:', teamId, 'mode:', mode);
     setIsStartingRecording(true);
 
@@ -225,6 +237,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         meetingStartedAt: now,
         transcript: '',
         transcriptionStatus: 'recording',
+        ...(participants && participants.length > 0 ? { participants } : {}),
         ...(teamId ? { teamId, enterpriseTeamId: teamId, accessScope: 'team' } : {}),
       });
 
@@ -632,6 +645,13 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         isLocked={digitalSession.isLocked}
         error={digitalSession.error}
         onClearError={digitalSession.clearError}
+      />
+
+      <ParticipantsInputDialog
+        open={showParticipantsDialog}
+        onOpenChange={setShowParticipantsDialog}
+        onConfirm={handleParticipantsConfirm}
+        confirmLabel="Starta inspelning"
       />
     </div>
   );

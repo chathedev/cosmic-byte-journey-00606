@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Upload, FileAudio, X, AlertCircle, Lock, Loader2, Coffee, Sparkles, Heart } from "lucide-react";
+import { Upload, FileAudio, X, AlertCircle, Lock, Loader2, Coffee, Sparkles, Heart, Users, Plus, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -81,6 +81,8 @@ export const DigitalMeetingDialog = ({
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadStep, setUploadStep] = useState<'file' | 'participants'>('file');
+  const [participants, setParticipants] = useState<string[]>([""]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userPlan, isAdmin } = useSubscription();
@@ -209,6 +211,7 @@ export const DigitalMeetingDialog = ({
       // Create meeting immediately with processing status
       // IMPORTANT: isCompleted must be true to get a real backend ID (not a temp draft ID)
       const now = new Date().toISOString();
+      const filledParticipants = participants.map(p => p.trim()).filter(p => p.length > 0);
       const meetingData = {
         title: meetingTitle,
         folder: 'Allmänt',
@@ -221,6 +224,7 @@ export const DigitalMeetingDialog = ({
         source: 'upload' as const,
         transcriptionStatus: 'uploading' as const,
         forceCreate: true,
+        ...(filledParticipants.length > 0 ? { participants: filledParticipants } : {}),
         ...(teamId ? { teamId, enterpriseTeamId: teamId, accessScope: 'team' as const } : {}),
       };
 
@@ -330,198 +334,190 @@ export const DigitalMeetingDialog = ({
   const CurrentIcon = currentMessage.icon;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { setUploadStep('file'); setParticipants([""]); } onOpenChange(v); }}>
       <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Ladda upp mötesinspelning</DialogTitle>
-          <DialogDescription>
-            Transkribera en ljudfil från ditt digitala möte
-          </DialogDescription>
-        </DialogHeader>
+        {uploadStep === 'file' ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Ladda upp mötesinspelning</DialogTitle>
+              <DialogDescription>
+                Transkribera en ljudfil från ditt digitala möte
+              </DialogDescription>
+            </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Instructions */}
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-3">
-                <p className="font-medium">Ladda upp din ljudfil</p>
-                <p className="text-sm text-muted-foreground">
-                  Stöder MP3, WAV och M4A. Max 500MB. Uppladdning sker i bakgrunden.
-                </p>
-              </div>
-            </AlertDescription>
-          </Alert>
-
-          {/* File upload area */}
-          {!selectedFile ? (
-            <div 
-              onClick={() => !isSubmitting && fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200 ${
-                isDragging 
-                  ? 'border-primary bg-primary/10 scale-[1.02]' 
-                  : 'border-border hover:border-primary hover:bg-accent/5'
-              }`}
-            >
-              <Upload className={`w-12 h-12 mx-auto mb-4 transition-colors ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
-              <p className="text-sm font-medium text-foreground mb-1">
-                {isDragging ? 'Släpp filen här' : 'Dra och släpp eller klicka för att välja'}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                MP3, WAV eller M4A (max 500MB)
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
-          ) : (
-            <div className="border border-border rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    {isSubmitting ? (
-                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                    ) : (
-                      <FileAudio className="w-5 h-5 text-primary" />
-                    )}
+            <div className="space-y-4 py-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-3">
+                    <p className="font-medium">Ladda upp din ljudfil</p>
+                    <p className="text-sm text-muted-foreground">
+                      Stöder MP3, WAV och M4A. Max 500MB. Uppladdning sker i bakgrunden.
+                    </p>
                   </div>
-                  <div className="flex-1 min-w-0 max-w-[200px] sm:max-w-[300px]">
-                    <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>
-                      {formatFileName(selectedFile.name, 30)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {fileSizeMB.toFixed(2)} MB
-                      {isLargeFile && !isSubmitting && (
-                        <span className="ml-2 text-primary">• Stor fil</span>
-                      )}
-                    </p>
+                </AlertDescription>
+              </Alert>
+
+              {!selectedFile ? (
+                <div 
+                  onClick={() => !isSubmitting && fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200 ${
+                    isDragging 
+                      ? 'border-primary bg-primary/10 scale-[1.02]' 
+                      : 'border-border hover:border-primary hover:bg-accent/5'
+                  }`}
+                >
+                  <Upload className={`w-12 h-12 mx-auto mb-4 transition-colors ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {isDragging ? 'Släpp filen här' : 'Dra och släpp eller klicka för att välja'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    MP3, WAV eller M4A (max 500MB)
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".mp3,.wav,.m4a,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              ) : (
+                <div className="border border-border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <FileAudio className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0 max-w-[200px] sm:max-w-[300px]">
+                        <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>
+                          {formatFileName(selectedFile.name, 30)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {fileSizeMB.toFixed(2)} MB
+                          {isLargeFile && (
+                            <span className="ml-2 text-primary">• Stor fil</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={handleRemoveFile}>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                {!isSubmitting && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRemoveFile}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              
-              {/* Enhanced upload state for large files */}
-              <AnimatePresence mode="wait">
-                {isSubmitting && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-4 pt-4 border-t border-border"
-                  >
-                    {isLargeFile ? (
-                      <div className="space-y-4">
-                        {/* Friendly large file message */}
-                        <motion.div 
-                          key={currentMessageIndex}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10"
-                        >
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <CurrentIcon className="w-6 h-6 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {currentMessage.text}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {currentMessage.subtext}
-                            </p>
-                          </div>
-                        </motion.div>
-
-                        {/* Upload progress */}
-                        <div className="space-y-2">
-                          <div className="h-2 rounded-full bg-muted overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
-                              initial={{ width: "0%" }}
-                              animate={{ width: `${Math.min(100, Math.max(uploadProgress, 2))}%` }}
-                              transition={{ duration: 0.2, ease: "easeOut" }}
-                            />
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Laddar upp {fileSizeMB.toFixed(0)}MB...</span>
-                            <span>{uploadProgress}%</span>
-                          </div>
-                        </div>
-
-                        {/* Rotating tips */}
-                        <motion.p 
-                          key={currentTipIndex}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="text-xs text-center text-muted-foreground italic"
-                        >
-                          💡 {UPLOAD_TIPS[currentTipIndex]}
-                        </motion.p>
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          Laddar upp din inspelning... {uploadProgress}%
-                        </p>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden max-w-xs mx-auto">
-                          <motion.div 
-                            className="h-full bg-primary rounded-full"
-                            initial={{ width: "0%" }}
-                            animate={{ width: `${Math.min(100, Math.max(uploadProgress, 2))}%` }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
-          {/* Upload button */}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Avbryt
-            </Button>
-            <Button
-              onClick={handleUpload}
-              disabled={!selectedFile || isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Laddar upp...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Ladda upp
-                </>
               )}
-            </Button>
-          </div>
-        </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Avbryt
+                </Button>
+                <Button
+                  onClick={() => setUploadStep('participants')}
+                  disabled={!selectedFile}
+                >
+                  Nästa
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Mötesdeltagare
+              </DialogTitle>
+              <DialogDescription>
+                Ange deltagarnas namn för bättre transkribering
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                {participants.map((name, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <span className="text-xs font-medium text-muted-foreground">{index + 1}</span>
+                    </div>
+                    <input
+                      placeholder="Förnamn Efternamn"
+                      value={name}
+                      onChange={(e) => {
+                        const updated = [...participants];
+                        updated[index] = e.target.value;
+                        setParticipants(updated);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && participants[index].trim()) {
+                          e.preventDefault();
+                          setParticipants(prev => [...prev, ""]);
+                        }
+                      }}
+                      className="flex-1 h-10 px-3 rounded-xl border border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+                      autoFocus={index === participants.length - 1}
+                    />
+                    {participants.length > 1 && (
+                      <button
+                        onClick={() => setParticipants(prev => prev.filter((_, i) => i !== index))}
+                        className="w-7 h-7 rounded-full hover:bg-destructive/10 flex items-center justify-center shrink-0 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setParticipants(prev => [...prev, ""])}
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm text-primary hover:text-primary/80 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Lägg till deltagare
+              </button>
+
+              <p className="text-xs text-muted-foreground/60 text-center">
+                Fullständiga namn ger bättre namnigenkänning i transkriptet
+              </p>
+
+              <div className="flex justify-between gap-2">
+                <Button variant="ghost" onClick={() => setUploadStep('file')} className="gap-1">
+                  <ArrowLeft className="h-4 w-4" />
+                  Tillbaka
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setParticipants([""]); handleUpload(); }}
+                    disabled={isSubmitting}
+                  >
+                    Hoppa över
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Laddar upp...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Ladda upp
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
