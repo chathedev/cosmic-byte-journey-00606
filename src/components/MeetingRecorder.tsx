@@ -55,7 +55,7 @@ export const MeetingRecorder = ({
   const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(isDigitalRecording ? 'phone-call' : null);
   const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording);
 
-  debugLog('[🎬 MeetingRecorder] render — isRecording:', isRecording, 'isPaused:', isPaused, 'showModeDialog:', !isDigitalRecording, 'meetingMode:', meetingMode);
+  debugLog('[🎬 MeetingRecorder] render — isRecording:', isRecording, 'isPaused:', isPaused, 'showModeDialog:', showModeDialog, 'meetingMode:', meetingMode);
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
   const [interimText, setInterimText] = useState<string>("");
