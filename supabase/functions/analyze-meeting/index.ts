@@ -50,56 +50,38 @@ serve(async (req) => {
     const isEnterpriseTier = isEnterprise === true || userPlan === 'enterprise';
     const tierMultiplier = isEnterpriseTier ? 1.5 : 1; // Enterprise gets ~50% more detail
     
-    let summaryLength, mainPointsCount, mainPointsDetail, decisionsDetail, actionItemsCount, actionItemsDetail, nextMeetingCount;
+    let summaryLength, mainPointsCount, actionItemsCount, nextMeetingCount;
     
-    if (wordCount < 100) {
-      summaryLength = isEnterpriseTier ? "4-5 meningar" : "3-4 meningar";
-      mainPointsCount = isEnterpriseTier ? "4-6" : "3-5";
-      mainPointsDetail = "Två meningar per punkt med substans";
-      decisionsDetail = "Endast FAKTISKA beslut som explicit fattades";
-      actionItemsCount = isEnterpriseTier ? "2-3" : "1-2";
-      actionItemsDetail = "Kort – titel, ansvarig och leverans om nämnt";
-      nextMeetingCount = "1-2";
+    if (wordCount < 50) {
+      summaryLength = "1-2 meningar";
+      mainPointsCount = "1-2";
+      actionItemsCount = "0-1";
+      nextMeetingCount = "0-1";
     } else if (wordCount < 200) {
-      summaryLength = isEnterpriseTier ? "5-6 meningar" : "4-5 meningar";
-      mainPointsCount = isEnterpriseTier ? "5-7" : "4-6";
-      mainPointsDetail = "Två till tre meningar per punkt med resultat och kontext";
-      decisionsDetail = "Endast FAKTISKA beslut - inte diskussioner eller förslag";
-      actionItemsCount = isEnterpriseTier ? "2-5" : "2-3";
-      actionItemsDetail = "Titel, ansvarig, leveransmål";
-      nextMeetingCount = "2-3";
+      summaryLength = "2-4 meningar";
+      mainPointsCount = "2-4";
+      actionItemsCount = "0-2";
+      nextMeetingCount = "0-2";
     } else if (wordCount < 500) {
-      summaryLength = isEnterpriseTier ? "6-8 meningar" : "5-6 meningar";
-      mainPointsCount = isEnterpriseTier ? "6-10" : "5-8";
-      mainPointsDetail = "Tre meningar per punkt med slutsats, ansvarig och kontext";
-      decisionsDetail = "KONKRETA beslut med ansvarig och konsekvens";
-      actionItemsCount = isEnterpriseTier ? "4-7" : "3-5";
-      actionItemsDetail = "Detaljerad: vad levereras, till vem, i vilket format";
-      nextMeetingCount = "2-4";
+      summaryLength = "3-5 meningar";
+      mainPointsCount = "3-6";
+      actionItemsCount = "0-4";
+      nextMeetingCount = "1-3";
     } else if (wordCount < 1000) {
-      summaryLength = isEnterpriseTier ? "8-10 meningar" : "6-8 meningar";
-      mainPointsCount = isEnterpriseTier ? "8-12" : "6-10";
-      mainPointsDetail = "Tre till fyra meningar per punkt med detaljer, kontext och ansvarig";
-      decisionsDetail = "Tydliga beslut med kontext, ansvarig och uppföljning";
-      actionItemsCount = isEnterpriseTier ? "5-10" : "4-7";
-      actionItemsDetail = "Fullständig: leverans, mottagare, format, kvalitetskrav";
-      nextMeetingCount = "3-5";
+      summaryLength = "4-8 meningar";
+      mainPointsCount = "4-8";
+      actionItemsCount = "0-6";
+      nextMeetingCount = "2-4";
     } else if (wordCount < 2000) {
-      summaryLength = isEnterpriseTier ? "10-12 meningar" : "8-10 meningar";
-      mainPointsCount = isEnterpriseTier ? "10-15" : "8-12";
-      mainPointsDetail = "Fyra meningar per punkt med djupgående detaljer och kontext";
-      decisionsDetail = "Detaljerade beslut med bakgrund, ansvarig och uppföljningsdatum";
-      actionItemsCount = isEnterpriseTier ? "7-14" : "5-9";
-      actionItemsDetail = "Omfattande: leverans, mottagare, format, tidsperspektiv, kvalitetskrav";
-      nextMeetingCount = "4-6";
+      summaryLength = "6-10 meningar";
+      mainPointsCount = "6-12";
+      actionItemsCount = "0-8";
+      nextMeetingCount = "2-5";
     } else {
-      summaryLength = isEnterpriseTier ? "12-16 meningar med executive briefing" : "10-12 meningar";
-      mainPointsCount = isEnterpriseTier ? "12-20" : "10-15";
-      mainPointsDetail = "Fyra till fem meningar per punkt med djupgående analys, kontext och strategisk implikation";
-      decisionsDetail = "Fullständiga beslut med bakgrund, konsekvensanalys och ansvarig";
-      actionItemsCount = isEnterpriseTier ? "10-20" : "7-14";
-      actionItemsDetail = "Mycket omfattande: exakt leverans, mottagare, format, kvalitetsmått, beroenden";
-      nextMeetingCount = "5-7";
+      summaryLength = "8-14 meningar";
+      mainPointsCount = "8-16";
+      actionItemsCount = "0-12";
+      nextMeetingCount = "3-6";
     }
     
     const agendaSection = agenda ? "\n\nMötesagenda:\n" + agenda + "\n" : '';
@@ -130,106 +112,72 @@ NAMNANVÄNDNING - OBLIGATORISKT:
 `;
     }
 
-    const promptContent = `Du är en operativ styrelsesekreterare med expertis inom det aktuella ämnesområdet. Du skriver protokoll som STYR ARBETE – inte som DOKUMENTERAR SAMTAL.
+    const promptContent = `Du är en protokollsekreterare. Du skriver STRIKT FAKTABASERADE protokoll.
 
-GRUNDREGEL: Om en läsare inte kan svara på "Vad ska jag göra måndag morgon?" efter att ha läst protokollet, har du misslyckats.
+═══ ABSOLUT GRUNDREGEL ═══
+ENDAST information som UTTRYCKLIGEN SÄGS i transkriptet får inkluderas i protokollet.
+- Inga antaganden, tolkningar, kompletteringar eller spekulationer.
+- Om något INTE sades → det ska INTE finnas i protokollet.
+- Om beslut, ansvar eller åtgärder INTE uttalades tydligt → skapa dem INTE.
+- Om information saknas → utelämna den. Fyll ALDRIG i.
+- Protokollets längd ska PROPORTIONELLT matcha transkriptets längd. Kort transkript = kort protokoll. Långt transkript = längre protokoll.
+- Protokollet ska kunna användas som FORMELL DOKUMENTATION utan tillagd eller spekulativ information.
 
-═══ FÖRBJUDNA MÖNSTER ═══
-Dessa formuleringar är BANNLYSTA. Använd dem ALDRIG:
-- "lyfte fram", "betonade", "poängterade", "underströk"
-- "diskuterade vikten av", "tog upp frågan om"
-- "ska undersöka", "ska titta på", "ska kolla", "ska se över"
-- "upprätthålla dialog", "fortsätta diskussionen", "bevaka frågan"
-- "det konstaterades att", "man var överens om att"
-- Alla passiva konstruktioner: "det beslutades" → skriv istället "X beslutade att..."
-- Berättande text som beskriver VAD som hände istället för VAD SOM SKA GÖRAS
-- Vaga åtgärder utan leveransmål: "placera frågan på agendan" → skriv istället "Presentera beslutsunderlag med tre alternativ för [frågan] på nästa styrelsemöte"
+═══ FÖRBJUDET ═══
+- HITTA INTE PÅ information som inte finns i transkriptet
+- LÄGG INTE TILL kontext, bakgrund eller detaljer som inte nämndes
+- SKAPA INTE beslut som inte explicit fattades
+- SKAPA INTE åtgärdspunkter som ingen sa att de skulle göra
+- TILLSKRIV INTE ansvar som inte uttalades
+- UTÖKA INTE korta möten med utfyllnad — om mötet var 30 sekunder, skriv ett protokoll som reflekterar det
+- ANVÄND INTE formuleringar som "lyfte fram", "betonade", "poängterade", "underströk", "diskuterade vikten av"
+- ANVÄND INTE passiva konstruktioner: "det beslutades" → skriv istället vem som beslutade
+- GISSA INTE deadlines — om inget datum nämndes, skriv ""
 
-═══ BANNLYSTA GENERISKA FORMULERINGAR I HUVUDPUNKTER ═══
-Följande formuleringar är TOTALFÖRBJUDNA i huvudpunkter. Om du skriver något av dessa har du MISSLYCKATS:
-- "Mötets huvudsyfte var att gå igenom aktuellt läge och nästa steg."
-- "Deltagarna diskuterade ansvarsfördelning, tidsplan och prioriterade aktiviteter."
-- "Genomgång av nuläge och viktigaste frågor som lyftes under mötet."
-- "Identifiering av ansvariga personer och kommande aktiviteter."
-- "Överenskommelse om uppföljning och förslag på nästa möte."
-- ALLA formuleringar som "kunde tillhöra vilket möte som helst" utan domänspecifik substans.
-
-Varje huvudpunkt MÅSTE innehålla DOMÄNSPECIFIK information som är UNIK för just detta möte.
-Nämn specifika organisationer, tekniska termer, sakfrågor, regelverk, produkter, siffror och namn som faktiskt diskuterades.
-
-═══ OBLIGATORISK SKRIVSTIL ═══
+═══ SKRIVSTIL ═══
+Formuleringar ska vara juridiskt hållbara, neutrala och sakliga.
+Skriv formellt men koncist. Varje mening ska vara förankrad i vad som faktiskt sades.
 
 SAMMANFATTNING:
-- Mening 1: "[Namn] ledde mötet om [specifikt syfte med domäntermer]. Huvudresultat: [konkret utfall]."
-- Mening 2-3: De viktigaste besluten/åtgärderna i kortform med domänspecifika detaljer.
-- Sista meningen: "Öppna frågor: [specifika frågor]" eller "Nästa kritiska steg: [vad exakt]"
-- ALDRIG berättande stil. Skriv som en executive briefing.
+- Sammanfatta EXAKT vad som sades, inget mer.
+- Om mötet var kort och innehöll lite information, skriv en kort sammanfattning.
+- ALDRIG längre än vad innehållet motiverar.
 
-HUVUDPUNKTER – varje punkt MÅSTE följa detta format:
-"[Specifikt ämne med domäntermer]: [Slutsats/resultat med detaljer]. [Namn] ansvarar för [vad]. [Status: klart/pågår/bordlagt]"
-- VARJE punkt MÅSTE referera till SPECIFIKT INNEHÅLL från transkriptionen
-- Inkludera organisationsnamn, tekniska begrepp, regelverk, siffror som nämndes
-- Om deltagare hade OLIKA STÅNDPUNKTER, beskriv dem: "[Namn A] förespråkade X medan [Namn B] argumenterade för Y"
-- Strategiska spänningar eller meningsskiljaktigheter ska fångas neutralt men tydligt
-- Om ingen slutsats nåddes: "[Specifikt ämne]: Ingen slutsats. Bordlagt till nästa möte."
-- Om det bara diskuterades utan resultat, SÄG DET RAKT: "Diskussion utan beslut."
-- ALDRIG avsluta en punkt utan att ange status (klart/pågår/bordlagt/beslutat)
+HUVUDPUNKTER:
+- Varje punkt MÅSTE vara direkt kopplad till något som UTTALADES i transkriptet.
+- Om bara 2 saker diskuterades → skriv 2 punkter, inte 8.
+- Inkludera namn, organisationer, siffror och specifika detaljer BARA om de nämndes.
 
-BESLUT – ultra-strikt:
-- Format: "[Vad beslutades med specifika detaljer] → Ansvarig: [Namn]. Deadline: [datum/saknas]."
-- "Ska undersöka" = INTE ett beslut. Det är en åtgärdspunkt.
-- "Vi borde" = INTE ett beslut. Det är en åsikt.
-- Ett beslut kräver att gruppen SA JA eller FATTADE ETT AKTIVT VAL.
-- 0 beslut är bättre än 1 falskt beslut. Tom lista [] är helt acceptabelt.
+BESLUT:
+- BARA beslut som EXPLICIT fattades med tydligt ja/godkännande.
+- Om inga beslut fattades → returnera tom lista []. Det är helt korrekt.
 
-ÅTGÄRDSPUNKTER – leveransfokus:
-- "titel": Börja med VERB. "Genomför...", "Sammanställ...", "Kontakta...", "Leverera...", "Presentera..."
-- "beskrivning": MÅSTE besvara ALLA dessa frågor:
-  1. Vad ska levereras? (dokument, beslut, analys, rapport?)
-  2. Till vem? (mottagare/forum)
-  3. I vilket format? (presentation, mail, rapport, muntligt?)
-  4. Vad är godkänt resultat? (kvalitetskrav)
-  Dåligt: "Följa upp säkerhetsfrågan"
-  Dåligt: "Placera frågan på agendan"
-  Dåligt: "Upprätthålla dialog med myndigheten"
-  Bra: "Sammanställ beslutsunderlag med tre alternativa strategier för myndighetskontakt. Presentera som en A4-sida med för/nackdelar per alternativ vid nästa styrelsemöte."
-  Bra: "Kontakta Arbetsmiljöverket per telefon och efterfråga skriftlig vägledning kring nya krav. Sammanfatta svaret i ett internt PM till teamet."
-- "ansvarig": Personens NAMN. Om ingen nämndes → "" (tomt, gissa aldrig)
-- "deadline": Använd ALLTID en av dessa strategier:
-  1. Om ett EXAKT DATUM nämndes → använd det (YYYY-MM-DD)
-  2. Om en TIDSRAM nämndes ("inom två veckor", "före sommaren") → beräkna ett rimligt datum från mötesdatumet
-  3. Om ett NÄSTA MÖTE eller EVENT nämndes ("före nästa styrelsemöte", "innan konferensen") → skriv "Före [event/möte]"
-  4. Om INGET av ovanstående → härleda en rimlig deadline baserat på prioritet och komplexitet:
-     - critical/high → "Inom 1-2 veckor"
-     - medium → "Inom 1 månad"  
-     - low → "Inom 2 månader"
-  ALDRIG lämna deadline tom. Varje åtgärd behöver en tidshorisont för att vara uppföljningsbar.
-- "prioritet": critical (blockerar annat arbete), high (måste ske snart), medium (viktigt men ej brådskande), low (nice-to-have)
-- KVALITETSTEST: Om en åtgärd kan besvaras med "ja, men vad exakt?" → den är för vag. Gör den mer konkret.
+ÅTGÄRDSPUNKTER:
+- BARA åtgärder där någon UTTRYCKLIGEN sa att de ska göra något.
+- "ansvarig": BARA om en person NAMNGIVITS som ansvarig. Annars "".
+- "deadline": BARA om ett datum/tidsram UTTALADES. Annars "".
+- "prioritet": Härledd från sammanhanget, men konservativt.
+- Om inga åtgärder uttalades → returnera tom lista [].
 
 NÄSTA MÖTE-FÖRSLAG:
-- Koppla DIREKT till olösta frågor: "Uppföljning av [specifik åtgärd] – status och resultat"
-- ALDRIG datum/tider. Bara ämnen.
+- Koppla BARA till olösta frågor som FAKTISKT diskuterades.
+- Om inget behöver följas upp → tom lista [].
 
-═══ DIPLOMATISK SPRÅKPOLERING ═══
-Protokollet ska vara institutionellt hållbart – det kan skickas till myndigheter, styrelser eller externa parter.
-
-REGLER:
-- Undvik absoluta påståenden som kan ifrågasättas. Skriv "med en mycket låg officiell olycksfrekvens" istället för "med endast två dödsfall sedan 1972".
-- Undvik retoriska eller informella uttryck från transkriptionen (t.ex. "agera polis"). Omformulera till formellt språk: "ta ett större egenansvar för säkerhetsuppföljning".
-- Om en talare använde starkt eller färgat språk, BEHÅLL innebörden men GÖR den diplomatisk och formell.
-- Varje formulering ska klara testet: "Kan detta publiceras i en årsredovisning utan att någon reagerar?"
-- Strategiska spänningar och meningsskiljaktigheter ska beskrivas NEUTRALT men TYDLIGT – aldrig dramatiserat, aldrig urvattnat.
+═══ SKALNING ═══
+Protokollets omfattning ska EXAKT matcha transkriptets innehåll:
+- <50 ord: 1-2 meningar sammanfattning, 1-2 huvudpunkter, troligen inga beslut/åtgärder
+- 50-200 ord: 2-4 meningar, 2-4 huvudpunkter
+- 200-500 ord: 3-5 meningar, 3-6 huvudpunkter
+- 500-1000 ord: 4-8 meningar, 4-8 huvudpunkter
+- 1000+ ord: Skala proportionellt men ALDRIG mer substans än vad som sades
 
 ═══ KVALITETSKONTROLL ═══
 Innan du svarar, kontrollera:
-1. Innehåller VARJE huvudpunkt DOMÄNSPECIFIK substans? Om en punkt "kunde tillhöra vilket möte som helst" → SKRIV OM med specifika detaljer från transkriptionen.
-2. Fångar protokollet eventuella MENINGSSKILJAKTIGHETER eller STRATEGISKA SPÄNNINGAR mellan deltagare? Om olika perspektiv fanns → beskriv dem neutralt.
-3. Är VARJE åtgärdspunkt tillräckligt specifik för att någon annan ska kunna utföra den? Om inte → gör den mer konkret.
-4. Finns det NÅGRA av de bannlysta formuleringarna? Om ja → skriv om.
-5. Kan en person som INTE var på mötet förstå exakt vad som diskuterades och vad som ska göras? Om inte → förtydliga med domänspecifika detaljer.
-6. Nämns organisationer, regelverk, tekniska termer och siffror som togs upp i mötet? Om inte → lägg till dem.
-7. Klarar VARJE formulering det diplomatiska testet? Om ett uttryck är för informellt, retoriskt eller absolut → omformulera till institutionellt hållbart språk.
+1. Finns VARJE påstående i protokollet ORDAGRANT eller tydligt uttryckt i transkriptet? Om inte → TA BORT det.
+2. Har du LAGT TILL information som inte sades? Om ja → TA BORT det.
+3. Är protokollet PROPORTIONELLT till transkriptets längd? Om protokollet är längre/mer detaljerat än vad transkriptet motiverar → KORTA NER.
+4. Är beslut och åtgärder FAKTISKT uttalade i mötet? Om du är osäker → inkludera dem INTE.
+5. Klarar VARJE formulering det juridiska testet: "Kan detta presenteras som formell dokumentation?"
 
 Dagens datum: ${new Date().toISOString().split('T')[0]}
 VIKTIGT: Alla datum i protokollet (inklusive deadlines) MÅSTE vara i framtiden relativt dagens datum. Använd ALDRIG år som redan passerat.
@@ -244,26 +192,26 @@ JSON-struktur (svara ENBART med detta):
 
 {
   "protokoll": {
-    "titel": "Kort, specifik titel som fångar huvudbeslutet eller syftet",
+    "titel": "Kort, specifik titel baserad på vad som FAKTISKT diskuterades",
     "datum": "YYYY-MM-DD",
-    "sammanfattning": "${summaryLength}. Executive briefing-stil. Resultat först, detaljer sen.",
+    "sammanfattning": "${summaryLength}. BARA vad som sades. Inga tillägg.",
     "huvudpunkter": [
-      "MAX ${mainPointsCount} punkter. ${mainPointsDetail}. Format: Ämne → Resultat → Ansvarig → Status."
+      "MAX ${mainPointsCount} punkter. BARA saker som UTTRYCKLIGEN diskuterades. Varje punkt måste vara förankrad i transkriptet."
     ],
     "beslut": [
-      "${decisionsDetail}. Format: '[Beslut] → Ansvarig: [Namn]. Deadline: [datum/saknas].' Tom lista om inga beslut fattades."
+      "BARA beslut som EXPLICIT fattades. Tom lista [] om inga beslut uttalades."
     ],
     "åtgärdspunkter": [
       {
-        "titel": "VERB-inledd, specifik leverans",
-        "beskrivning": "${actionItemsDetail}. Vad levereras? Till vem? I vilket format?",
-        "ansvarig": "NAMN eller tom sträng",
-        "deadline": "YYYY-MM-DD eller tom sträng",
+        "titel": "VERB-inledd, baserad på vad som SADES",
+        "beskrivning": "Vad som UTTALADES ska göras. Inga tillägg.",
+        "ansvarig": "NAMN bara om uttryckligen nämnt, annars tom sträng",
+        "deadline": "YYYY-MM-DD bara om uttalat, annars tom sträng",
         "prioritet": "critical | high | medium | low"
       }
     ],
     "nästaMöteFörslag": [
-      "MAX ${nextMeetingCount}. Koppla till olösta frågor."
+      "MAX ${nextMeetingCount}. BARA kopplade till faktiskt diskuterade olösta frågor. Tom lista om inget behöver följas upp."
     ]
   }
 }
@@ -300,7 +248,7 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
         provider,
         model,
         prompt: promptContent,
-        temperature: 0.2,
+        temperature: 0.1,
         maxOutputTokens: 16384,
         costUsd,
       }),
@@ -445,18 +393,16 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
         nextMeetingSuggestionsCount: nextMeetingSuggestions.length,
       });
       
-      // If summary or main points are missing, generate strategic fallback from transcript
+      // Fallbacks: use minimal factual statements, never fabricate
       const safeSummary = summary && summary.trim().length > 0
         ? summary
-        : `Mötet behandlade ${meetingName || 'aktuella frågor'} med fokus på planering och nästa steg.`;
+        : `Protokoll för ${meetingName || 'möte'}.`;
 
-      // Never dump raw transcript as main points — use a strategic single-point fallback
       let safeMainPoints = mainPoints;
-      if (mainPoints.length === 0 && safeSummary.length > 30) {
-        // Re-use the summary as a single main point if AI failed to generate bullets
+      if (mainPoints.length === 0 && safeSummary.length > 10) {
         safeMainPoints = [safeSummary];
       } else if (mainPoints.length === 0) {
-        safeMainPoints = [`Mötet behandlade ${meetingName || 'aktuella ämnen'} och identifierade uppföljningspunkter för kommande arbete.`];
+        safeMainPoints = [`Protokoll för ${meetingName || 'möte'}.`];
       }
 
       result = {
@@ -479,18 +425,10 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
       console.error("❌ Parse/normalization error:", parseError);
       console.error('Stack:', parseError instanceof Error ? parseError.stack : 'No stack');
 
-      // Absolute fallback: strategic summary from transcript, never apologetic
-      const fallbackWordCount = transcript.trim().split(/\s+/).length;
-      const fallbackSummary = `Mötet behandlade ${meetingName || 'aktuella ämnen'} och omfattade cirka ${fallbackWordCount} ord av diskussion.`;
-
-      const fallbackMainPoints = [
-        `Mötet behandlade ${meetingName || 'aktuella ämnen'} och identifierade uppföljningspunkter för kommande arbete.`,
-      ];
-
       result = {
         title: meetingName || 'Mötesprotokoll',
-        summary: fallbackSummary,
-        mainPoints: fallbackMainPoints,
+        summary: `Protokoll för ${meetingName || 'möte'}. AI-parsning misslyckades.`,
+        mainPoints: [`Protokoll kunde inte genereras automatiskt.`],
         decisions: [],
         actionItems: [],
         nextMeetingSuggestions: [],
@@ -499,17 +437,13 @@ Svara ENDAST med giltig JSON, utan extra text, utan markdown, utan förklaringar
       console.log('⚠️ Using fallback protocol due to parse error');
     }
 
-    // Final validation - ensure we never return garbage data
-    if (!result.summary || result.summary.trim().length < 10) {
-      console.error('❌ Invalid summary detected:', result.summary);
-      result.summary = `Mötet behandlade ${meetingName || 'aktuella frågor'} med fokus på planering och uppföljning.`;
+    // Final validation - minimal factual fallbacks only
+    if (!result.summary || result.summary.trim().length < 5) {
+      result.summary = `Protokoll för ${meetingName || 'möte'}.`;
     }
     
     if (!Array.isArray(result.mainPoints) || result.mainPoints.length === 0) {
-      console.error('❌ Invalid mainPoints detected');
-      result.mainPoints = [
-        `Mötet behandlade ${meetingName || 'aktuella ämnen'} och identifierade uppföljningspunkter för kommande arbete.`,
-      ];
+      result.mainPoints = [`Protokoll för ${meetingName || 'möte'}.`];
     }
 
     console.log("✅ Returning protocol:", {
