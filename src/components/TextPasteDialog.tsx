@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useScrollToInputHandler } from "@/hooks/useScrollToInput";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +15,7 @@ interface TextPasteDialogProps {
 export const TextPasteDialog = ({ open, onOpenChange, onTextReady }: TextPasteDialogProps) => {
   const [text, setText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const { toast } = useToast();
 
   const handleGenerate = async () => {
@@ -69,6 +71,7 @@ export const TextPasteDialog = ({ open, onOpenChange, onTextReady }: TextPasteDi
             placeholder="Klistra in mötesanteckningar, transkription eller annan text från ditt möte här..."
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onFocus={scrollOnFocus}
             className="flex-1 min-h-[300px] resize-none"
             disabled={isProcessing}
           />

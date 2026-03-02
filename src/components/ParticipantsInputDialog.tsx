@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useScrollToInputHandler } from "@/hooks/useScrollToInput";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export const ParticipantsInputDialog = ({
   allowSkip = true,
 }: ParticipantsInputDialogProps) => {
   const [participants, setParticipants] = useState<string[]>([""]);
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Reset when dialog opens
@@ -116,6 +118,7 @@ export const ParticipantsInputDialog = ({
                   value={name}
                   onChange={(e) => handleChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
+                  onFocus={scrollOnFocus}
                   className="h-10 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
                 />
                 {participants.length > 1 && (

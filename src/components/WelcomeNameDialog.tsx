@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useScrollToInputHandler } from "@/hooks/useScrollToInput";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ interface WelcomeNameDialogProps {
 export function WelcomeNameDialog({ open, onComplete }: WelcomeNameDialogProps) {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -76,6 +78,7 @@ export function WelcomeNameDialog({ open, onComplete }: WelcomeNameDialogProps) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={scrollOnFocus}
               autoFocus
               disabled={isSaving}
             />

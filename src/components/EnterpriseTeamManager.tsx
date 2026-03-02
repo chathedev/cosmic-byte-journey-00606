@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Plus, Trash2, Edit2, Check, X, UserPlus, UserMinus, ChevronDown, ChevronUp, Archive, RotateCcw } from 'lucide-react';
+import { useScrollToInputHandler } from '@/hooks/useScrollToInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ interface Team {
 export function EnterpriseTeamManager() {
   const { enterpriseMembership } = useSubscription();
   const { toast } = useToast();
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const [teams, setTeams] = useState<Team[]>([]);
   const [availableMembers, setAvailableMembers] = useState<string[]>([]);
   const [canManageTeams, setCanManageTeams] = useState(false);
@@ -214,6 +216,7 @@ export function EnterpriseTeamManager() {
                   value={newTeamName}
                   onChange={e => setNewTeamName(e.target.value)}
                   autoFocus
+                  onFocus={scrollOnFocus}
                 />
                 <Input
                   placeholder="Beskrivning (valfritt)"
@@ -267,6 +270,7 @@ export function EnterpriseTeamManager() {
                             onChange={e => setEditName(e.target.value)}
                             className="h-8 text-sm"
                             autoFocus
+                            onFocus={scrollOnFocus}
                           />
                           <Button size="sm" variant="ghost" onClick={() => handleUpdateTeam(team.id)}>
                             <Check className="w-4 h-4" />
@@ -343,6 +347,7 @@ export function EnterpriseTeamManager() {
                                   onChange={e => setNewMemberEmail(e.target.value)}
                                   className="h-8 text-xs"
                                   autoFocus
+                                  onFocus={scrollOnFocus}
                                   list={`members-${team.id}`}
                                 />
                                 <datalist id={`members-${team.id}`}>

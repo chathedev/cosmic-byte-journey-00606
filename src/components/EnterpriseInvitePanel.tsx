@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useScrollToInputHandler } from '@/hooks/useScrollToInput';
 import { UserPlus, Loader2, Check, Users, Mail, Shield, Crown, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ interface MemberInfo {
 export function EnterpriseInvitePanel() {
   const { enterpriseMembership } = useSubscription();
   const { toast } = useToast();
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -168,7 +170,9 @@ export function EnterpriseInvitePanel() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              onFocus={scrollOnFocus}
               className="h-9 text-sm"
+              autoFocus
             />
           </div>
           <div className="space-y-1.5">
@@ -179,6 +183,7 @@ export function EnterpriseInvitePanel() {
               value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              onFocus={scrollOnFocus}
               className="h-9 text-sm"
             />
           </div>
