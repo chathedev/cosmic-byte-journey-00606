@@ -584,35 +584,29 @@ export const MeetingRecorder = ({
     debugLog('[🎬 MeetingRecorder] handleStopRecording called, isSaving:', isSaving, 'durationSec:', durationSec);
     if (isSaving) return;
 
-    if (durationSec < 5) {
-      toast({
-        title: 'För kort inspelning',
-        description: 'Spela in minst 5 sekunder.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     const currentTranscript = (liveTranscript + ' ' + interimText).trim();
-    if (!useAsrMode && !currentTranscript) {
-      toast({
-        title: 'Ingen text transkriberad',
-        description: 'Försäkra dig om att mikrofonen fungerar och tala tydligt.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const wordCount = currentTranscript.split(/\s+/).filter(w => w).length;
+    const isEmpty = durationSec < 5 || (!useAsrMode && (!currentTranscript || wordCount < 20));
 
-    if (!useAsrMode) {
-      const wordCount = currentTranscript.split(/\s+/).filter(w => w).length;
-      if (wordCount < 20) {
-        toast({
-          title: 'För kort transkription',
-          description: `Minst 20 ord krävs. Du har ${wordCount} ord.`,
-          variant: 'destructive',
-        });
-        return;
+    if (isEmpty) {
+      debugLog('[🎬 MeetingRecorder] Recording too short/empty — auto-restarting', { durationSec, wordCount, useAsrMode });
+      toast({
+        title: 'Inspelningen var tom',
+        description: 'Startar om automatiskt. Tala tydligt i mikrofonen.',
+      });
+      // Reset state and restart
+      setDurationSec(0);
+      setLiveTranscript('');
+      setInterimText('');
+      audioChunksRef.current = [];
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
       }
+      // Small delay then restart recording
+      setTimeout(() => {
+        void startRecording();
+      }, 500);
+      return;
     }
 
     setIsSaving(true);
