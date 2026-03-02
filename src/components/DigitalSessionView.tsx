@@ -71,7 +71,8 @@ const getJoinStageLabel = (stage?: string): string => {
     case 'clicking_join': return 'Ansluter till mötet...';
     case 'lobby_waiting': return 'Väntar i lobbyn...';
     case 'call_detected': return 'Möte hittat, ansluter ljud...';
-    default: return 'Ansluter till Teams...';
+    case 'in_call': return 'I mötet, förbereder inspelning...';
+    default: return 'Ansluter till mötet...';
   }
 };
 
@@ -239,10 +240,10 @@ export const DigitalSessionView = ({
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {awaitingHost
-                      ? (hostActionText || `Mötesvärden behöver godkänna ${botName} i Teams.`)
+                      ? (hostActionText || `${botName} väntar på att bli insläppt i mötet.`)
                       : isLobby 
-                      ? 'Mötesvärden behöver släppa in boten. Det kan ta en stund.'
-                      : 'Boten ansluter till mötet. Det kan ta upp till en minut.'}
+                      ? `${botName} väntar i lobbyn. Mötesvärden behöver släppa in den.`
+                      : `${botName} ansluter till mötet. Det kan ta upp till en minut.`}
                   </p>
                   {/* Host admission callout */}
                   {awaitingHost && (
@@ -270,7 +271,7 @@ export const DigitalSessionView = ({
               ) : (
                 <>
                   <p className="text-base font-semibold text-foreground">
-                    {status === 'pending' ? 'Startar session...' : 'Initierar browser och ljud...'}
+                    {status === 'pending' ? 'Startar Digital Mode...' : 'Initierar Teams-bot...'}
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     Det här kan ta några sekunder.
@@ -328,7 +329,7 @@ export const DigitalSessionView = ({
               <Radio className="w-8 h-8 text-green-500" />
             </div>
             <div className="text-center space-y-0.5">
-              <p className="text-lg font-semibold text-foreground">Spelar in mötet</p>
+              <p className="text-lg font-semibold text-foreground">Inspelning pågår</p>
               <p className="text-xs text-muted-foreground">Transkribering sker efter mötet</p>
               {showTimer && (
                 <div className="flex items-center justify-center gap-1.5 mt-1">
@@ -373,9 +374,9 @@ export const DigitalSessionView = ({
               <CheckCircle2 className="w-10 h-10 text-primary" />
             </div>
             <div className="text-center space-y-1.5">
-              <p className="text-lg font-semibold text-foreground">Boten är redo i mötet</p>
+              <p className="text-lg font-semibold text-foreground">{botName} är redo i mötet</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Tryck på <span className="font-semibold text-foreground">Starta inspelning</span> när du vill börja spela in.
+                Tryck på <span className="font-semibold text-foreground">Starta inspelning</span> för att börja spela in.
               </p>
             </div>
             {metadata?.botMediaMuted && (
