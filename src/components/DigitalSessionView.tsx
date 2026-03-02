@@ -115,7 +115,7 @@ export const DigitalSessionView = ({
   useEffect(() => {
     if (status === 'completed' && session?.meetingId && !hasAutoNavigated.current) {
       hasAutoNavigated.current = true;
-      navigate(`/meetings/${session.meetingId}`);
+      navigate(`/meetings/${session.meetingId}`, { replace: true });
     }
   }, [status, session?.meetingId, navigate]);
 
@@ -135,7 +135,7 @@ export const DigitalSessionView = ({
 
   const handleGoToMeeting = () => {
     if (session?.meetingId) {
-      navigate(`/meetings/${session.meetingId}`);
+      navigate(`/meetings/${session.meetingId}`, { replace: true });
     }
   };
 
