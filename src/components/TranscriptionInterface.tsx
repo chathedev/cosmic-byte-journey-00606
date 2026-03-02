@@ -67,9 +67,19 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
 
-  // Auto-show digital session view when there's an active/non-idle session on mount
+  // Auto-show Digital Session view only for active/in-progress states (not stale terminal states)
   useEffect(() => {
-    if (digitalSession.status !== 'idle' && digitalSession.session) {
+    const shouldAutoShowDigitalSession = [
+      'pending',
+      'starting',
+      'joining',
+      'listening',
+      'paused',
+      'stopping',
+      'processing',
+    ].includes(digitalSession.status);
+
+    if (shouldAutoShowDigitalSession && digitalSession.session) {
       setShowDigitalSession(true);
     }
   }, [digitalSession.status, digitalSession.session]);
