@@ -563,6 +563,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         onStart={handleDigitalStart}
         isLocked={digitalSession.isLocked}
         error={digitalSession.error}
+        onClearError={digitalSession.clearError}
       />
     </div>
   );

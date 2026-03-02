@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, AlertCircle, ArrowRight } from "lucide-react";
+import { Loader2, AlertCircle, ArrowRight, Monitor, Bot } from "lucide-react";
 
 interface DigitalSessionStartDialogProps {
   open: boolean;
@@ -11,6 +11,7 @@ interface DigitalSessionStartDialogProps {
   onStart: (joinUrl: string, title: string) => Promise<boolean>;
   isLocked: boolean;
   error: string | null;
+  onClearError?: () => void;
 }
 
 const TEAMS_URL_PATTERN = /teams\.microsoft\.com|teams\.live\.com/i;
@@ -21,6 +22,7 @@ export const DigitalSessionStartDialog = ({
   onStart,
   isLocked,
   error,
+  onClearError,
 }: DigitalSessionStartDialogProps) => {
   const [joinUrl, setJoinUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -28,6 +30,14 @@ export const DigitalSessionStartDialog = ({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const isValidUrl = joinUrl.trim().length > 10 && TEAMS_URL_PATTERN.test(joinUrl);
+
+  // Clear stale errors when dialog opens
+  useEffect(() => {
+    if (open) {
+      setLocalError(null);
+      onClearError?.();
+    }
+  }, [open]);
 
   const handleStart = async () => {
     if (!isValidUrl) {
@@ -49,6 +59,12 @@ export const DigitalSessionStartDialog = ({
     setIsStarting(false);
   };
 
+  const handleUrlChange = (value: string) => {
+    setJoinUrl(value);
+    setLocalError(null);
+    onClearError?.();
+  };
+
   const displayError = localError || error;
 
   return (
@@ -59,6 +75,13 @@ export const DigitalSessionStartDialog = ({
         </VisuallyHidden>
 
         <div className="p-5 space-y-4">
+          {/* Header icon */}
+          <div className="flex justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Monitor className="w-6 h-6 text-primary" />
+            </div>
+          </div>
+
           {isLocked && (
             <div className="p-3 rounded-xl bg-destructive/8 border border-destructive/15 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
@@ -73,10 +96,7 @@ export const DigitalSessionStartDialog = ({
             <Input
               placeholder="Klistra in möteslänk..."
               value={joinUrl}
-              onChange={(e) => {
-                setJoinUrl(e.target.value);
-                setLocalError(null);
-              }}
+              onChange={(e) => handleUrlChange(e.target.value)}
               className="h-11 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
               disabled={isLocked || isStarting}
               autoFocus
@@ -95,10 +115,12 @@ export const DigitalSessionStartDialog = ({
           </div>
 
           {displayError && !isLocked && (
-            <p className="text-xs text-destructive flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {displayError}
-            </p>
+            <div className="p-2.5 rounded-lg bg-destructive/5 border border-destructive/15">
+              <p className="text-xs text-destructive flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {displayError}
+              </p>
+            </div>
           )}
 
           <Button
@@ -118,7 +140,8 @@ export const DigitalSessionStartDialog = ({
         </div>
 
         <div className="px-5 py-2.5 bg-muted/20 border-t border-border/30">
-          <p className="text-[11px] text-muted-foreground/60 text-center">
+          <p className="text-[11px] text-muted-foreground/60 text-center flex items-center justify-center gap-1.5">
+            <Bot className="w-3 h-3" />
             Boten syns som deltagare i mötet
           </p>
         </div>
