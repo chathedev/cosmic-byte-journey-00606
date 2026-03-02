@@ -384,6 +384,14 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
 
   // Duration timer (clock-based for reliable mobile behavior)
   useEffect(() => {
+    if (!isRecording) {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      return;
+    }
+
     const syncDurationFromClock = () => {
       const startedAt = recordingStartedAtMsRef.current;
       if (!startedAt) return;
@@ -398,19 +406,19 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         return;
       }
 
-      setDurationSec((prev) => (prev === elapsedSec ? prev : elapsedSec));
+      setDurationSec(elapsedSec);
     };
 
-    if (isRecording) {
-      syncDurationFromClock();
-      durationIntervalRef.current = setInterval(syncDurationFromClock, 250);
-    } else if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = null;
-    }
+    // Sync immediately on this tick
+    syncDurationFromClock();
+    // Then poll every 250ms
+    durationIntervalRef.current = setInterval(syncDurationFromClock, 250);
 
     return () => {
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
     };
   }, [isRecording, isPaused]);
 
@@ -476,12 +484,15 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
         startSpeechRecognition();
       }
 
+      // Set recording state BEFORE async wake lock so timer starts immediately
       recordingStartedAtMsRef.current = Date.now();
       totalPausedMsRef.current = 0;
       pauseStartedAtMsRef.current = null;
       setDurationSec(0);
       setIsRecording(true);
-      await requestWakeLock();
+
+      // Fire-and-forget: don't block recording start on wake lock
+      requestWakeLock().catch(() => {});
       noSleep.enable();
       
       console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
