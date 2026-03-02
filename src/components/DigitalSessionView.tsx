@@ -115,10 +115,7 @@ export const DigitalSessionView = ({
   useEffect(() => {
     if (status === 'completed' && session?.meetingId && !hasAutoNavigated.current) {
       hasAutoNavigated.current = true;
-      const timer = setTimeout(() => {
-        navigate(`/meetings/${session.meetingId}`);
-      }, 1500);
-      return () => clearTimeout(timer);
+      navigate(`/meetings/${session.meetingId}`);
     }
   }, [status, session?.meetingId, navigate]);
 
