@@ -22,6 +22,14 @@ export interface DigitalSessionError {
   details?: string;
 }
 
+export interface DigitalSessionMetadata {
+  joinStage?: string;
+  joinElapsedMs?: number;
+  admissionState?: string;
+  prejoinTimeoutMs?: number;
+  lobbyTimeoutMs?: number;
+}
+
 export interface DigitalSession {
   id: string;
   meetingId: string;
@@ -41,6 +49,7 @@ export interface DigitalSession {
   maxReconnects: number;
   pauseDropsAudio: boolean;
   error: DigitalSessionError | null;
+  metadata?: DigitalSessionMetadata | null;
 }
 
 export interface LockedSessionInfo {
