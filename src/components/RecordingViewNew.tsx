@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { RecordingInstructions } from "./RecordingInstructions";
 import { VoiceNamePrompt } from "./VoiceNamePrompt";
-import { RecordingIndicator } from "./RecordingIndicator";
 import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
 import { CallInterruptionDialog } from "./CallInterruptionDialog";
 import { isNativeApp } from "@/utils/capacitorDetection";
@@ -875,7 +874,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
   const canAccessLibraryForOverlay = hasLibraryAccess(userPlan?.plan, isAdmin);
   if (isSaving && canAccessLibraryForOverlay) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <h2 className="text-lg font-medium">Sparar möte...</h2>
@@ -887,25 +886,21 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
   // Recording View
   if (viewState === 'recording') {
     return (
-      <div className="h-[100dvh] bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
-        {/* Always-on-screen Recording Indicator - Floating, persistent */}
-        <RecordingIndicator
-          isRecording={isRecording}
-          isPaused={isPaused}
-          durationSec={durationSec}
-          isBackupEnabled={isBackupEnabled}
-          chunksSaved={chunksSaved}
-          compact={true}
-        />
-
-        {/* Header - Compact for mobile */}
-        <div className={`border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
-          <div className="max-w-5xl mx-auto px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className={`w-2.5 h-2.5 flex-shrink-0 rounded-full transition-all ${
-                  !isPaused ? 'bg-destructive animate-pulse shadow-lg shadow-destructive/50' : 'bg-muted-foreground/40'
-                }`} />
+      <div className="h-[100dvh] bg-background flex flex-col">
+        {/* Header */}
+        <div className={`border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0 ${isNative ? 'pt-safe' : ''}`}>
+          <div className="max-w-5xl mx-auto px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                {/* Recording dot */}
+                <div className="relative flex-shrink-0">
+                  <div className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                    isPaused ? 'bg-amber-500' : 'bg-destructive'
+                  }`} />
+                  {!isPaused && isRecording && (
+                    <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-destructive animate-ping opacity-75" />
+                  )}
+                </div>
                 {isEditingName ? (
                   <div className="flex gap-1 items-center flex-1 min-w-0">
                     <Input
@@ -914,15 +909,15 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                       onBlur={() => setIsEditingName(false)}
                       onKeyDown={(e) => e.key === "Enter" && setIsEditingName(false)}
                       autoFocus
-                      className="h-7 text-xs flex-1"
+                      className="h-7 text-sm flex-1"
                     />
                     <Button onClick={() => setIsEditingName(false)} size="sm" variant="ghost" className="h-7 w-7 p-0 flex-shrink-0">
-                      <Check className="w-3 h-3" />
+                      <Check className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 group cursor-pointer flex-1 min-w-0" onClick={() => setIsEditingName(true)}>
-                    <h1 className="text-xs font-medium truncate">{meetingName}</h1>
+                    <h1 className="text-sm font-medium truncate">{meetingName}</h1>
                     <Edit2 className="w-3 h-3 flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 )}
@@ -931,12 +926,11 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
                 {isBackupEnabled && chunksSaved > 0 && (
                   <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                     <Shield className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-medium hidden sm:inline">Säkrad</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/50">
                   <Clock className="w-3 h-3 text-muted-foreground" />
-                  <span className="font-mono text-[10px]">
+                  <span className="font-mono text-xs tabular-nums">
                     {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
                   </span>
                 </div>
@@ -945,63 +939,63 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
           </div>
         </div>
 
-        {/* Main Content - Fills available space, no scroll */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0 overflow-hidden">
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0 overflow-hidden gap-3">
           {/* Audio Analyzer Visualization */}
           <div className="flex-shrink-0">
             <MinimalAudioAnalyzer
               stream={streamRef.current}
               isActive={isRecording && !isPaused}
-              size={Math.min(120, window.innerWidth - 80)}
+              size={140}
             />
           </div>
 
-          {/* Minimal Status */}
-          <div className="mt-2 text-center flex-shrink-0">
-            <div className="font-mono text-2xl tracking-tight text-foreground/80">
+          {/* Timer + Status */}
+          <div className="text-center flex-shrink-0">
+            <div className="font-mono text-3xl font-light tracking-tight text-foreground tabular-nums">
               {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground font-medium">
               {isTestMode ? 'Testläge' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
 
           <VoiceNamePrompt durationSec={durationSec} />
 
-          {/* Live Transcript Display (Free/Pro only) - capped height */}
+          {/* Live Transcript Display (Free/Pro only) */}
           {!useAsrMode && (liveTranscript || interimText) && (
-            <div className="mt-2 w-full max-w-md flex-shrink min-h-0 overflow-hidden" style={{ maxHeight: 'clamp(60px, 15vh, 120px)' }}>
-              <div ref={transcriptScrollRef} className="h-full overflow-y-auto rounded-xl bg-card/60 backdrop-blur-sm border border-border/30 p-3 text-sm leading-relaxed">
+            <div className="w-full max-w-md flex-shrink min-h-0 overflow-hidden" style={{ maxHeight: 'clamp(60px, 15vh, 120px)' }}>
+              <div ref={transcriptScrollRef} className="h-full overflow-y-auto rounded-xl bg-muted/30 border border-border/30 p-3 text-sm leading-relaxed">
                 <span className="text-foreground">{liveTranscript}</span>
                 {interimText && (
-                  <span className="text-muted-foreground/60 italic">{interimText}</span>
+                  <span className="text-muted-foreground/50 italic">{interimText}</span>
                 )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Bottom Controls - Fixed at bottom, safe area aware */}
-        <div className={`flex-shrink-0 bg-background/95 backdrop-blur-sm border-t shadow-lg`}
+        {/* Bottom Controls */}
+        <div className="flex-shrink-0 bg-background border-t border-border/50"
           style={{ paddingBottom: isNative ? 'max(env(safe-area-inset-bottom, 16px), 16px)' : '16px' }}
         >
           <div className="max-w-5xl mx-auto px-4 py-3">
             <div className="flex items-center justify-center gap-3">
-              <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-11 px-3">
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Tillbaka</span>
+              <Button onClick={handleBackClick} variant="ghost" size="sm" className="h-11 px-3 text-muted-foreground">
+                <ArrowLeft className="w-4 h-4 mr-1.5" />
+                Tillbaka
               </Button>
               
-              <Button onClick={togglePause} variant="outline" size="sm" className="h-11 px-4">
+              <Button onClick={togglePause} variant="outline" size="sm" className="h-11 px-5 rounded-xl">
                 {isPaused ? (
                   <>
-                    <Play className="w-4 h-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">Återuppta</span>
+                    <Play className="w-4 h-4 mr-1.5" />
+                    Återuppta
                   </>
                 ) : (
                   <>
-                    <Pause className="w-4 h-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">Pausa</span>
+                    <Pause className="w-4 h-4 mr-1.5" />
+                    Pausa
                   </>
                 )}
               </Button>
@@ -1009,7 +1003,7 @@ Bra jobbat allihop. Nästa steg blir att rulla ut detta till alla användare nä
               <Button 
                 onClick={handleStopRecording} 
                 size="sm" 
-                className="h-11 px-5 bg-primary hover:bg-primary/90 font-semibold"
+                className="h-11 px-6 rounded-xl font-semibold"
               >
                 <Square className="w-4 h-4 mr-1.5" />
                 Färdig
