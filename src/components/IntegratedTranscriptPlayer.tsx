@@ -68,24 +68,30 @@ export function IntegratedTranscriptPlayer({
   const [isDragging, setIsDragging] = useState(false);
   const [dragTime, setDragTime] = useState(0);
 
+
   const playRequestRef = useRef<Promise<void> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const rafRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
 
-  // RAF-based time sync (only when not dragging)
-  const tick = useCallback(() => {
-    const el = audioRef.current;
-    if (el && !el.paused && !isDragging) {
-      setCurrentTime(el.currentTime);
-      onTimeUpdate?.(el.currentTime);
-    }
-    rafRef.current = requestAnimationFrame(tick);
-  }, [isDragging, onTimeUpdate]);
+  // Keep ref in sync with state
+  useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
 
+  // RAF-based time sync — uses refs to avoid stale closures
   useEffect(() => {
+    const tick = () => {
+      const el = audioRef.current;
+      if (el && !el.paused && !isDraggingRef.current) {
+        setCurrentTime(el.currentTime);
+        onTimeUpdateRef.current?.(el.currentTime);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [tick]);
+  }, []);
 
   // External seek
   useEffect(() => {
