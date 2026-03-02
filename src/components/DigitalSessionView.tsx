@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio } from "lucide-react";
+import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
 import type { DigitalSession, DigitalSessionStatus } from "@/hooks/useDigitalSession";
 
 interface DigitalSessionViewProps {
@@ -19,19 +20,16 @@ interface DigitalSessionViewProps {
   onBack: () => void;
 }
 
-const STATUS_CONFIG: Record<DigitalSessionStatus, { label: string; sublabel?: string }> = {
-  idle: { label: 'Inaktiv' },
-  pending: { label: 'Startar session', sublabel: 'Initierar...' },
-  starting: { label: 'Initierar', sublabel: 'Startar browser och ljud...' },
-  joining: { label: 'Ansluter till Teams', sublabel: 'Väntar på att bli insläppt...' },
-  listening: { label: 'Live', sublabel: 'Transkriberar...' },
-  paused: { label: 'Pausad', sublabel: 'Boten är kvar i mötet' },
-  stopping: { label: 'Avslutar', sublabel: 'Sparar transkription...' },
-  completed: { label: 'Klart', sublabel: 'Transkription sparad' },
-  failed: { label: 'Fel uppstod' },
-  timed_out: { label: 'Tidsgräns nådd' },
-  cancelled: { label: 'Avbruten' },
-  interrupted: { label: 'Anslutningen bröts', sublabel: 'Sessionen avbröts oväntat' },
+const ERROR_CODE_LABELS: Record<string, string> = {
+  teams_bot_credentials_missing: 'Saknade inloggningsuppgifter',
+  teams_join_button_not_found: 'Kunde inte hitta "Gå med"-knappen',
+  teams_call_ui_not_detected: 'Teams svarade inte i tid',
+  teams_prejoin_timeout: 'Fastnade på föranslutningsskärmen',
+  teams_lobby_timeout: 'Ingen släppte in boten i lobbyn',
+  teams_join_denied: 'Åtkomst nekad av mötesvärden',
+  digital_bot_removed: 'Boten togs bort från mötet',
+  teams_reconnect_exhausted: 'Alla återanslutningsförsök misslyckades',
+  digital_session_already_active: 'En annan session är redan aktiv',
 };
 
 const formatDuration = (startedAt: string | null): string => {
@@ -42,6 +40,42 @@ const formatDuration = (startedAt: string | null): string => {
   const s = seconds % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const formatElapsedMs = (ms: number): string => {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+};
+
+// Map join stages to user-friendly text
+const getJoinStageLabel = (stage?: string): string => {
+  switch (stage) {
+    case 'navigating': return 'Öppnar möteslänk...';
+    case 'prejoin': return 'Förbereder anslutning...';
+    case 'clicking_join': return 'Ansluter till mötet...';
+    case 'lobby_waiting': return 'Väntar i lobbyn...';
+    case 'call_detected': return 'Möte hittat, ansluter ljud...';
+    default: return 'Ansluter till Teams...';
+  }
+};
+
+// Stepper for the connection phase
+const CONNECTION_STEPS = [
+  { key: 'pending', label: 'Skapar session' },
+  { key: 'starting', label: 'Initierar' },
+  { key: 'joining', label: 'Ansluter' },
+  { key: 'listening', label: 'Live' },
+];
+
+const getStepIndex = (status: DigitalSessionStatus): number => {
+  switch (status) {
+    case 'pending': return 0;
+    case 'starting': return 1;
+    case 'joining': return 2;
+    case 'listening': return 3;
+    default: return -1;
+  }
 };
 
 export const DigitalSessionView = ({
@@ -61,11 +95,15 @@ export const DigitalSessionView = ({
   const [elapsed, setElapsed] = useState('00:00');
 
   const isTerminal = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'].includes(status);
-  const isWorking = ['pending', 'starting', 'joining', 'stopping'].includes(status);
+  const isConnecting = ['pending', 'starting', 'joining'].includes(status);
   const isStopping = status === 'stopping';
   const isListening = status === 'listening';
   const isPaused = status === 'paused';
   const isInterrupted = status === 'interrupted';
+  const stepIndex = getStepIndex(status);
+
+  const metadata = session?.metadata;
+  const isLobby = metadata?.joinStage === 'lobby_waiting';
 
   useEffect(() => {
     if (!session?.startedAt || isTerminal) return;
@@ -87,11 +125,8 @@ export const DigitalSessionView = ({
     }
   };
 
-  const config = STATUS_CONFIG[status];
   const sessionError = session?.error?.message || error;
-
-  // Progress steps for the working phase
-  const workingStep = status === 'pending' ? 0 : status === 'starting' ? 1 : status === 'joining' ? 2 : 3;
+  const friendlyErrorCode = errorCode ? ERROR_CODE_LABELS[errorCode] : null;
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
@@ -119,25 +154,70 @@ export const DigitalSessionView = ({
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
         
-        {/* Working / connecting states */}
-        {isWorking && !isStopping && (
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        {/* Connecting states (pending → starting → joining) */}
+        {isConnecting && (
+          <div className="flex flex-col items-center gap-6 w-full max-w-xs">
+            {/* Pulsing orb */}
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-primary/5 animate-ping" style={{ animationDuration: '3s' }} />
+              <div className="absolute inset-1 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
+              <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2s' }} />
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-foreground">{config.label}</p>
-              {config.sublabel && (
-                <p className="text-sm text-muted-foreground">{config.sublabel}</p>
+
+            {/* Status text */}
+            <div className="text-center space-y-1.5">
+              {status === 'joining' ? (
+                <>
+                  <p className="text-base font-semibold text-foreground">
+                    {isLobby ? 'Väntar i lobbyn' : getJoinStageLabel(metadata?.joinStage)}
+                  </p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {isLobby 
+                      ? 'Mötesvärden behöver släppa in boten. Det kan ta en stund.'
+                      : 'Boten ansluter till mötet. Det kan ta upp till en minut.'}
+                  </p>
+                  {metadata?.joinElapsedMs != null && metadata.joinElapsedMs > 10000 && (
+                    <div className="flex items-center justify-center gap-1.5 mt-2">
+                      <Timer className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      <span className="text-xs text-muted-foreground/60 font-mono">
+                        {formatElapsedMs(metadata.joinElapsedMs)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold text-foreground">
+                    {status === 'pending' ? 'Startar session...' : 'Initierar browser och ljud...'}
+                  </p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Det här kan ta några sekunder.
+                  </p>
+                </>
               )}
             </div>
-            {/* Step dots */}
-            <div className="flex items-center gap-2">
-              {[0, 1, 2].map(i => (
-                <div key={i} className={cn(
-                  "w-2 h-2 rounded-full transition-all duration-300",
-                  i <= workingStep ? "bg-primary" : "bg-muted-foreground/20"
-                )} />
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-1 w-full max-w-[200px]">
+              {CONNECTION_STEPS.slice(0, 3).map((step, i) => (
+                <div key={step.key} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className={cn(
+                    "h-1 w-full rounded-full transition-all duration-700",
+                    i < stepIndex ? "bg-primary" :
+                    i === stepIndex ? "bg-primary/60 animate-pulse" :
+                    "bg-muted-foreground/15"
+                  )} />
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between w-full max-w-[200px] -mt-4">
+              {CONNECTION_STEPS.slice(0, 3).map((step, i) => (
+                <span key={step.key} className={cn(
+                  "text-[10px] transition-colors",
+                  i <= stepIndex ? "text-muted-foreground" : "text-muted-foreground/30"
+                )}>
+                  {step.label}
+                </span>
               ))}
             </div>
           </div>
@@ -145,23 +225,32 @@ export const DigitalSessionView = ({
 
         {/* Stopping */}
         {isStopping && (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-            <p className="text-sm text-muted-foreground">{config.label}...</p>
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <Loader2 className="w-7 h-7 text-muted-foreground animate-spin" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-base font-semibold text-foreground">Avslutar session...</p>
+              <p className="text-sm text-muted-foreground">Sparar transkription</p>
+            </div>
           </div>
         )}
 
         {/* Listening */}
         {isListening && (
-          <div className="flex flex-col items-center gap-4 w-full">
-            <div className="relative w-20 h-20 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full bg-green-500/10 animate-ping" style={{ animationDuration: '2s' }} />
-              <div className="absolute inset-2 rounded-full bg-green-500/5" />
+          <div className="flex flex-col items-center gap-5 w-full">
+            <div className="relative w-24 h-24 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-green-500/8 animate-ping" style={{ animationDuration: '2.5s' }} />
+              <div className="absolute inset-2 rounded-full bg-green-500/5 animate-pulse" style={{ animationDuration: '1.5s' }} />
+              <div className="absolute inset-4 rounded-full bg-green-500/5" />
               <Radio className="w-8 h-8 text-green-500" />
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-mono text-lg text-foreground">{elapsed}</span>
+            <div className="text-center space-y-0.5">
+              <p className="text-lg font-semibold text-foreground">Transkriberar</p>
+              <div className="flex items-center justify-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
+              </div>
             </div>
           </div>
         )}
@@ -173,8 +262,12 @@ export const DigitalSessionView = ({
               <Pause className="w-8 h-8 text-yellow-500" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-yellow-600 dark:text-yellow-400">{config.label}</p>
-              <p className="text-sm text-muted-foreground">{config.sublabel}</p>
+              <p className="text-base font-semibold text-yellow-600 dark:text-yellow-400">Pausad</p>
+              <p className="text-sm text-muted-foreground">Boten är kvar i mötet. Transkription pausad.</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
             </div>
           </div>
         )}
@@ -186,8 +279,8 @@ export const DigitalSessionView = ({
               <CheckCircle2 className="w-8 h-8 text-green-500" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-foreground">{config.label}</p>
-              <p className="text-sm text-muted-foreground">{config.sublabel}</p>
+              <p className="text-base font-semibold text-foreground">Klart</p>
+              <p className="text-sm text-muted-foreground">Transkription sparad</p>
             </div>
             {session?.transcriptChunkCount != null && session.transcriptChunkCount > 0 && (
               <p className="text-xs text-muted-foreground">{session.transcriptChunkCount} delar transkriberade</p>
@@ -195,16 +288,27 @@ export const DigitalSessionView = ({
           </div>
         )}
 
-        {/* Error terminal states */}
+        {/* Error terminal states (failed, timed_out, cancelled) */}
         {isTerminal && status !== 'completed' && !isInterrupted && (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 max-w-xs">
             <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-destructive" />
+              {status === 'timed_out' ? (
+                <Timer className="w-8 h-8 text-destructive" />
+              ) : (
+                <AlertTriangle className="w-8 h-8 text-destructive" />
+              )}
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-foreground">{config.label}</p>
+            <div className="text-center space-y-1.5">
+              <p className="text-base font-semibold text-foreground">
+                {status === 'failed' ? 'Något gick fel' :
+                 status === 'timed_out' ? 'Tidsgräns nådd' :
+                 'Sessionen avbröts'}
+              </p>
+              {friendlyErrorCode && (
+                <p className="text-sm font-medium text-destructive">{friendlyErrorCode}</p>
+              )}
               {sessionError && (
-                <p className="text-sm text-muted-foreground max-w-xs">{sessionError}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{sessionError}</p>
               )}
             </div>
           </div>
@@ -212,14 +316,14 @@ export const DigitalSessionView = ({
 
         {/* Interrupted – offer retry */}
         {isInterrupted && (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 max-w-xs">
             <div className="w-16 h-16 rounded-full bg-yellow-500/10 flex items-center justify-center">
-              <RefreshCw className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+              <ShieldAlert className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-foreground">{config.label}</p>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                {sessionError || config.sublabel}
+            <div className="text-center space-y-1.5">
+              <p className="text-base font-semibold text-foreground">Anslutningen avbröts</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {sessionError || 'Servern startade om medan sessionen var aktiv. Du kan försöka igen.'}
               </p>
             </div>
           </div>
@@ -294,12 +398,20 @@ export const DigitalSessionView = ({
         )}
 
         {isTerminal && !['completed', 'interrupted'].includes(status) && (
-          <Button variant="ghost" onClick={() => { onReset(); onBack(); }} className="w-full h-10 text-sm text-muted-foreground">
-            Tillbaka
-          </Button>
+          <div className="space-y-2">
+            {(status === 'failed' || status === 'timed_out') && (
+              <Button onClick={onRetry} variant="outline" className="w-full h-11 gap-2 rounded-xl">
+                <RefreshCw className="w-4 h-4" />
+                Försök igen
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => { onReset(); onBack(); }} className="w-full h-10 text-sm text-muted-foreground">
+              Tillbaka
+            </Button>
+          </div>
         )}
 
-        {isWorking && !isStopping && (
+        {isConnecting && (
           <Button variant="ghost" onClick={() => setShowStopConfirm(true)} className="w-full h-10 text-sm text-muted-foreground gap-2">
             Avbryt
           </Button>
