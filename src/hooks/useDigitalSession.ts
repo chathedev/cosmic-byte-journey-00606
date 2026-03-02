@@ -309,6 +309,13 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     const id = sessionIdRef.current;
     if (!token || !id) return;
 
+    // Optimistic status update to prevent UI flicker
+    if (action === 'stop') {
+      setStatus('stopping');
+    } else if (action === 'pause') {
+      setStatus('paused');
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/digital-sessions/${id}/${action}`, {
         method: 'POST',
@@ -322,13 +329,19 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
         throw new Error(`${action} failed: ${res.status}`);
       }
 
-      await fetchStatus();
-      // After resume, use fast polling for quicker UI response
-      if (action === 'resume') {
+      // After stop, poll fast to catch processing/completed transition quickly
+      if (action === 'stop') {
         startPolling(1000);
+      } else {
+        await fetchStatus();
+        if (action === 'resume') {
+          startPolling(1000);
+        }
       }
     } catch (err: any) {
       console.error(`Digital session ${action} error:`, err);
+      // Revert optimistic update on error
+      await fetchStatus();
       setError(err.message || `Kunde inte ${action === 'pause' ? 'pausa' : action === 'resume' ? 'återuppta' : 'stoppa'} sessionen`);
     }
   }, [fetchStatus, startPolling]);
