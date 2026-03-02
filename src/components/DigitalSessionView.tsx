@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer, Mic, MicOff } from "lucide-react";
+import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer, Mic, MicOff, UserCheck, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -105,7 +105,8 @@ export const DigitalSessionView = ({
 
   const metadata = session?.metadata;
   const isLobby = metadata?.joinStage === 'lobby_waiting';
-
+  const awaitingHost = metadata?.awaitingHostAdmission || metadata?.joinUiState === 'await_host_admission';
+  const botName = metadata?.botDisplayName || 'Tivly Assistant';
   useEffect(() => {
     if (!session?.startedAt || isTerminal) return;
     setElapsed(formatDuration(session.startedAt));
@@ -170,13 +171,29 @@ export const DigitalSessionView = ({
               {status === 'joining' ? (
                 <>
                   <p className="text-base font-semibold text-foreground">
-                    {isLobby ? 'Väntar i lobbyn' : getJoinStageLabel(metadata?.joinStage)}
+                    {awaitingHost ? 'Väntar på att bli insläppt' : isLobby ? 'Väntar i lobbyn' : getJoinStageLabel(metadata?.joinStage)}
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {isLobby 
+                    {awaitingHost
+                      ? 'Mötesvärden behöver godkänna boten i Teams.'
+                      : isLobby 
                       ? 'Mötesvärden behöver släppa in boten. Det kan ta en stund.'
                       : 'Boten ansluter till mötet. Det kan ta upp till en minut.'}
                   </p>
+                  {/* Host admission callout */}
+                  {awaitingHost && (
+                    <div className="mt-3 mx-auto max-w-[260px] flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15 text-left">
+                      <UserCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-foreground">
+                          Släpp in {botName}
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {metadata?.hostActionText || `Godkänn ${botName} i Teams-mötet för att starta inspelningen.`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {metadata?.joinElapsedMs != null && metadata.joinElapsedMs > 10000 && (
                     <div className="flex items-center justify-center gap-1.5 mt-2">
                       <Timer className="w-3.5 h-3.5 text-muted-foreground/60" />
@@ -238,7 +255,7 @@ export const DigitalSessionView = ({
         )}
 
         {/* Listening */}
-        {isListening && (
+        {isListening && session?.joinedAt && (
           <div className="flex flex-col items-center gap-5 w-full">
             <div className="relative w-24 h-24 flex items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-green-500/8 animate-ping" style={{ animationDuration: '2.5s' }} />
@@ -261,6 +278,16 @@ export const DigitalSessionView = ({
                 <span className="text-[11px] font-medium text-green-600 dark:text-green-400">Lyssnar</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Listening but not yet joined (edge case) */}
+        {isListening && !session?.joinedAt && (
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2s' }} />
+            </div>
+            <p className="text-base font-semibold text-foreground">Ansluter...</p>
           </div>
         )}
 
