@@ -2237,7 +2237,7 @@ const MeetingDetail = () => {
   // Recording mode view - full-screen recorder
   if (isRecordingMode && id) {
     return (
-      <div className="fixed inset-0 z-[80] h-[100svh] max-h-[100svh] overflow-hidden overscroll-none bg-gradient-to-br from-background via-background to-primary/5 flex flex-col md:h-[100dvh] md:max-h-[100dvh]">
+      <div className="fixed inset-0 z-[80] h-[100svh] max-h-[100svh] overflow-hidden overscroll-none bg-background flex flex-col md:h-[100dvh] md:max-h-[100dvh]">
         <MeetingRecorder
           meetingId={id}
           meetingTitle={meetingTitle}
