@@ -702,7 +702,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         }}
         onSelect={handleModeSelect}
         showDigitalOption={true}
-        digitalComingSoon={true}
+        digitalComingSoon={user?.email?.toLowerCase() !== 'vildewretling@gmail.com'}
         digitalLocked={digitalSession.isLocked}
         lockedSessionInfo={digitalSession.lockedSessionInfo}
       />
