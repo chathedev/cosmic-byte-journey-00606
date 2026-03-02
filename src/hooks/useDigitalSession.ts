@@ -97,6 +97,7 @@ interface StartParams {
   title?: string;
   meetingId?: string;
   maxMeetingMinutes?: number;
+  participants?: string[];
 }
 
 interface UseDigitalSessionReturn {
@@ -238,6 +239,7 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
           title: params.title || 'Digitalt möte',
           meetingId: params.meetingId,
           maxMeetingMinutes: params.maxMeetingMinutes || 120,
+          ...(params.participants && params.participants.length > 0 ? { participants: params.participants } : {}),
         }),
       });
 
