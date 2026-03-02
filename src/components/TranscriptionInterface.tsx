@@ -143,12 +143,30 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowDigitalSession(false);
     digitalSession.reset();
 
-    // Clean URL requirement: always redirect to /library (never /meetings/:id)
+    const meetingId = digitalSession.session?.meetingId ?? null;
+
+    // Pass state that Library expects for ASR polling:
+    // - fromRecording: true → triggers pending meeting handling
+    // - pendingMeetingId → starts ASR polling in Library
+    // Store a minimal pending meeting in sessionStorage so Library can show it immediately
+    if (meetingId) {
+      const pendingMeeting = {
+        id: meetingId,
+        title: digitalSession.session?.meetingTitle || 'Digitalt möte',
+        createdAt: digitalSession.session?.createdAt || new Date().toISOString(),
+        transcript: '',
+        transcriptionStatus: 'processing',
+        userId: '',
+      };
+      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
+    }
+
     navigate('/library', {
       replace: true,
       state: {
+        fromRecording: true,
+        pendingMeetingId: meetingId,
         source: 'digital-session',
-        meetingId: digitalSession.session?.meetingId ?? null,
       },
     });
   }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, showDigitalSession, navigate, digitalSession.reset]);
