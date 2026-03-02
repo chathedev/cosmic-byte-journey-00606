@@ -129,10 +129,10 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
 
-  // Redirect to Library when monitored Digital Session transitions to
-  // stopping/processing/completed so users get the normal batch flow with clean URL.
-  // Digital Mode uses the SAME batch ASR pipeline as uploads — no manual file upload needed.
-  // Backend automatically submits the recorded WAV to /asr/status & /asr/stream.
+  // Redirect to Meeting Detail page when monitored Digital Session transitions to
+  // stopping/processing/completed. The MeetingDetail page handles ASR polling and
+  // SSE streaming via the same shared pipeline as uploads and recordings.
+  // Backend automatically submits the recorded WAV — no manual file upload needed.
   useEffect(() => {
     const redirectStatuses = ['stopping', 'processing', 'completed'];
     if (!redirectStatuses.includes(digitalSession.status)) return;
@@ -156,28 +156,29 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowDigitalSession(false);
     digitalSession.reset();
 
-    // Store a minimal pending meeting in sessionStorage so Library can
+    if (!meetingId) return;
+
+    // Store a minimal pending meeting in sessionStorage so MeetingDetail can
     // display it immediately and begin ASR polling via the shared pipeline.
     // No manual upload is needed — backend auto-submits the WAV file.
-    if (meetingId) {
-      const pendingMeeting = {
-        id: meetingId,
-        title: meetingTitle,
-        createdAt,
-        updatedAt,
-        transcript: '',
-        transcriptionStatus: 'processing',
-        userId: '',
-        folder: '',
-      };
-      sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
-    }
+    const pendingMeeting = {
+      id: meetingId,
+      title: meetingTitle,
+      createdAt,
+      updatedAt,
+      transcript: '',
+      transcriptionStatus: 'processing',
+      userId: '',
+      folder: '',
+    };
+    sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
 
-    navigate('/library', {
+    // Navigate to Meeting Detail — same page used by uploads and recordings.
+    // MeetingDetail will pick up the pendingMeeting from sessionStorage,
+    // start ASR polling via /asr/status, and stream via /asr/stream.
+    navigate(`/meetings/${meetingId}`, {
       replace: true,
       state: {
-        fromRecording: true,
-        pendingMeetingId: meetingId || null,
         source: 'digital-session',
       },
     });
