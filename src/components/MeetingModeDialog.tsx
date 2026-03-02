@@ -39,8 +39,8 @@ const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: str
   {
     mode: 'digital',
     icon: Monitor,
-    title: 'Teams-möte (bot)',
-    desc: 'En bot går med i ditt Teams-möte och transkriberar',
+    title: 'Teams-möte (digital)',
+    desc: 'En AI-assistent går med i ditt Teams-möte och transkriberar',
     hint: 'Du behöver inte spela in själv',
     hintIcon: Monitor,
   },
