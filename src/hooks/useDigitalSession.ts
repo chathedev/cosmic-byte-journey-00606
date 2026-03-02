@@ -45,6 +45,8 @@ export interface DigitalSessionMetadata {
   asrStatus?: string;
   asrEngine?: string;
   speakerNames?: Record<string, string>;
+  endedReason?: string;
+  meetingEndedByHost?: boolean;
 }
 
 export interface DigitalSession {

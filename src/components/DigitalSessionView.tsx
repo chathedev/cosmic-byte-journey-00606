@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer, Mic, MicOff, UserCheck, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -93,6 +93,7 @@ export const DigitalSessionView = ({
   const navigate = useNavigate();
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [elapsed, setElapsed] = useState('00:00');
+  const hasAutoNavigated = useRef(false);
 
   const isTerminal = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'].includes(status);
   const isConnecting = ['pending', 'starting', 'joining'].includes(status);
@@ -107,6 +108,19 @@ export const DigitalSessionView = ({
   const isLobby = metadata?.joinStage === 'lobby_waiting';
   const awaitingHost = metadata?.awaitingHostAdmission || metadata?.joinUiState === 'await_host_admission';
   const botName = metadata?.botDisplayName || 'Tivly Assistant';
+  const meetingEndedByHost = metadata?.meetingEndedByHost;
+
+  // Auto-navigate to meeting page when completed
+  useEffect(() => {
+    if (status === 'completed' && session?.meetingId && !hasAutoNavigated.current) {
+      hasAutoNavigated.current = true;
+      const timer = setTimeout(() => {
+        navigate(`/meetings/${session.meetingId}`);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [status, session?.meetingId, navigate]);
+
   useEffect(() => {
     if (!session?.startedAt || isTerminal) return;
     setElapsed(formatDuration(session.startedAt));
@@ -326,6 +340,7 @@ export const DigitalSessionView = ({
             {session?.transcriptChunkCount != null && session.transcriptChunkCount > 0 && (
               <p className="text-xs text-muted-foreground">{session.transcriptChunkCount} delar transkriberade</p>
             )}
+            <p className="text-xs text-muted-foreground/50 animate-pulse">Går till mötet...</p>
           </div>
         )}
 
@@ -377,8 +392,11 @@ export const DigitalSessionView = ({
               <div className="absolute inset-0 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
               <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2.5s' }} />
             </div>
-            <div className="text-center space-y-1.5">
+             <div className="text-center space-y-1.5">
               <p className="text-base font-semibold text-foreground">Bearbetar inspelning</p>
+              {meetingEndedByHost && (
+                <p className="text-xs text-muted-foreground/70">Mötet avslutades av värden</p>
+              )}
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {metadata?.processingStage === 'transcribing' ? 'Transkriberar...' :
                  metadata?.processingStage === 'cleanup' ? 'Rensar transcript...' :
@@ -432,9 +450,18 @@ export const DigitalSessionView = ({
               <CheckCircle2 className="w-4 h-4" />
               Visa möte & protokoll
             </Button>
-            <Button variant="ghost" onClick={() => { onReset(); onBack(); }} className="w-full h-10 text-sm text-muted-foreground">
-              Tillbaka
+          </div>
+        )}
+
+        {isProcessing && (
+          <div className="space-y-2">
+            <Button variant="outline" onClick={handleGoToMeeting} className="w-full h-11 gap-2 rounded-xl">
+              <Clock className="w-4 h-4" />
+              Gå till mötet
             </Button>
+            <p className="text-[11px] text-muted-foreground/50 text-center">
+              Du behöver inte vänta här. Transkriberingen fortsätter i bakgrunden.
+            </p>
           </div>
         )}
 

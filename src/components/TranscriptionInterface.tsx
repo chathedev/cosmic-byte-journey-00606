@@ -66,6 +66,13 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const digitalSession = useDigitalSession();
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
+
+  // Auto-show digital session view when there's an active/non-idle session on mount
+  useEffect(() => {
+    if (digitalSession.status !== 'idle' && digitalSession.session) {
+      setShowDigitalSession(true);
+    }
+  }, [digitalSession.status, digitalSession.session]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
