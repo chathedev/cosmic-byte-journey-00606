@@ -69,6 +69,7 @@ export const MeetingRecorder = ({
   const recognitionRef = useRef<any>(null);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const isSavingRef = useRef(false);
+  const hasStartedRecordingRef = useRef(false);
 
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
@@ -256,21 +257,27 @@ export const MeetingRecorder = ({
     }
   };
 
-  // Auto-start recording on mount (only after mode is selected)
+  // Auto-start only for preconfigured digital recording flow
   useEffect(() => {
-    if (!meetingMode) return; // Wait for mode selection
-    startRecording();
+    if (!isDigitalRecording || !meetingMode || hasStartedRecordingRef.current) return;
+    void startRecording();
+  }, [isDigitalRecording, meetingMode]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       stopMediaRecorder();
       stopSpeechRecognition();
       releaseWakeLock();
       noSleep.disable();
     };
-  }, [meetingMode]);
+  }, []);
 
   const handleModeSelect = (mode: MeetingMode) => {
     setMeetingMode(mode);
     setShowModeDialog(false);
+    // Start immediately in the same user gesture (iOS/Safari-safe)
+    void startRecording();
   };
 
   // Duration timer (clock-based for reliable mobile behavior)
@@ -314,6 +321,9 @@ export const MeetingRecorder = ({
   }, [isRecording, isPaused]);
 
   const startRecording = async () => {
+    if (hasStartedRecordingRef.current) return;
+    hasStartedRecordingRef.current = true;
+
     try {
       let combinedStream: MediaStream;
 
@@ -434,6 +444,7 @@ export const MeetingRecorder = ({
         description: isDigitalRecording ? 'Kunde inte starta digital inspelning.' : 'Tivly behöver tillstånd till mikrofon.',
         variant: 'destructive',
       });
+      hasStartedRecordingRef.current = false;
       onCancel();
     }
   };
@@ -454,6 +465,7 @@ export const MeetingRecorder = ({
     recordingStartedAtMsRef.current = null;
     pauseStartedAtMsRef.current = null;
     totalPausedMsRef.current = 0;
+    hasStartedRecordingRef.current = false;
   };
 
   const togglePause = () => {
@@ -757,9 +769,9 @@ export const MeetingRecorder = ({
               {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
             </div>
             <p className={`mt-1.5 text-xs font-medium tracking-wide uppercase ${
-              isPaused ? 'text-amber-500' : 'text-destructive/70'
+              !isRecording ? 'text-muted-foreground/70' : isPaused ? 'text-amber-500' : 'text-destructive/70'
             }`}>
-              {isPaused ? 'Pausad' : 'Spelar in'}
+              {!isRecording ? 'Startar inspelning...' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
         </div>
@@ -844,10 +856,8 @@ export const MeetingRecorder = ({
       <MeetingModeDialog
         open={showModeDialog}
         onOpenChange={(open) => {
-          if (!open && !meetingMode) {
-            // User dismissed without selecting - cancel
-            onCancel();
-          }
+          // Prevent accidental dismiss before selecting mode
+          if (!open && !meetingMode) return;
           setShowModeDialog(open);
         }}
         onSelect={handleModeSelect}
