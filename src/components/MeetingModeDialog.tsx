@@ -83,23 +83,23 @@ export const MeetingModeDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50 max-h-[min(88vh,600px)] flex flex-col" aria-describedby={undefined}>
         <VisuallyHidden>
           <DialogTitle>Välj inspelningsläge</DialogTitle>
         </VisuallyHidden>
         {showStartConfirmation && pendingMode && selectedOption ? (
           <>
-            <div className="p-6 pb-3 text-center space-y-1">
-              <h2 className="text-xl font-semibold text-foreground">Starta möte</h2>
+            <div className="p-5 sm:p-6 pb-3 text-center space-y-1 shrink-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">Starta möte</h2>
               <p className="text-sm text-muted-foreground">
                 Du har valt <span className="font-medium text-foreground">{selectedOption.title}</span>.
               </p>
             </div>
 
-            <div className="px-4 pb-5">
-              <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <selectedOption.icon className="w-5 h-5" />
+            <div className="px-4 pb-4 sm:pb-5 shrink-0">
+              <div className="rounded-xl border border-border bg-card p-3 sm:p-4 flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <selectedOption.icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">{selectedOption.title}</p>
@@ -108,10 +108,10 @@ export const MeetingModeDialog = ({
               </div>
             </div>
 
-            <div className="px-4 pb-6 grid grid-cols-2 gap-2">
+            <div className="px-4 pb-5 sm:pb-6 grid grid-cols-2 gap-2 shrink-0">
               <button
                 onClick={() => { debugLog('[📋 ModeDialog] Tillbaka clicked'); setPendingMode(null); }}
-                className="h-11 rounded-xl border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="h-10 sm:h-11 rounded-xl border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 Tillbaka
               </button>
@@ -121,7 +121,7 @@ export const MeetingModeDialog = ({
                   debugLog('[📋 ModeDialog] Starta möte clicked, confirming mode:', pendingMode);
                   onSelect(pendingMode);
                 }}
-                className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                className="h-10 sm:h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
               >
                 Starta möte
               </button>
@@ -129,16 +129,16 @@ export const MeetingModeDialog = ({
           </>
         ) : (
           <>
-            <div className="p-6 pb-4">
-              <h2 className="text-xl font-semibold text-foreground text-center">
+            <div className="p-5 sm:p-6 pb-3 sm:pb-4 shrink-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground text-center">
                 Hur ser mötet ut?
               </h2>
-              <p className="text-sm text-muted-foreground text-center mt-1">
+              <p className="text-xs sm:text-sm text-muted-foreground text-center mt-1">
                 Vi anpassar inspelningen efter din situation
               </p>
             </div>
 
-            <div className="px-4 pb-6 space-y-3">
+            <div className="px-3 sm:px-4 pb-4 sm:pb-6 space-y-2 sm:space-y-3 overflow-y-auto min-h-0 flex-1">
               {visibleOptions.map((opt) => {
                 const isDigitalLocked = opt.mode === 'digital' && digitalLocked;
                 const isDigitalComingSoon = opt.mode === 'digital' && digitalComingSoon && !isDigitalLocked;
@@ -152,8 +152,8 @@ export const MeetingModeDialog = ({
                     onMouseLeave={() => setHoveredOption(null)}
                     disabled={isDisabled}
                     className={cn(
-                      "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
-                      "flex items-center gap-4 group",
+                      "w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all duration-200",
+                      "flex items-center gap-3 sm:gap-4 group",
                       isDisabled
                         ? "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
                         : hoveredOption === opt.mode
@@ -162,14 +162,14 @@ export const MeetingModeDialog = ({
                     )}
                   >
                     <div className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors relative",
+                      "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors relative",
                       isDisabled
                         ? "bg-muted text-muted-foreground"
                         : hoveredOption === opt.mode
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
                     )}>
-                      <opt.icon className="w-6 h-6" />
+                      <opt.icon className="w-5 h-5 sm:w-6 sm:h-6" />
                       {isDisabled && (
                         <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
                           <Lock className="w-3 h-3 text-destructive-foreground" />
@@ -177,10 +177,10 @@ export const MeetingModeDialog = ({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-foreground">{opt.title}</span>
+                      <span className="font-semibold text-sm sm:text-base text-foreground">{opt.title}</span>
                       {isDigitalLocked ? (
                         <div className="mt-0.5">
-                          <p className="text-sm text-destructive font-medium">Upptagen just nu</p>
+                          <p className="text-xs sm:text-sm text-destructive font-medium">Upptagen just nu</p>
                           {lockedSessionInfo?.meetingTitle && (
                             <p className="text-xs text-muted-foreground mt-0.5 truncate">
                               Pågående: {lockedSessionInfo.meetingTitle}
@@ -189,22 +189,22 @@ export const MeetingModeDialog = ({
                         </div>
                       ) : isDigitalComingSoon ? (
                         <div className="mt-0.5">
-                          <p className="text-sm text-amber-500 font-medium">Kommer snart</p>
+                          <p className="text-xs sm:text-sm text-amber-500 font-medium">Kommer snart</p>
                           <p className="text-xs text-muted-foreground mt-0.5">Vi jobbar på den här funktionen</p>
                         </div>
                       ) : (
                         <>
-                          <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
-                          <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-                            <opt.hintIcon className="w-3 h-3" />
-                            {opt.hint}
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
+                          <p className="text-xs text-muted-foreground/70 mt-0.5 sm:mt-1 flex items-center gap-1">
+                            <opt.hintIcon className="w-3 h-3 shrink-0" />
+                            <span className="line-clamp-1">{opt.hint}</span>
                           </p>
                         </>
                       )}
                     </div>
                     {!isDisabled && (
                       <ArrowRight className={cn(
-                        "w-5 h-5 shrink-0 transition-all",
+                        "w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-all",
                         hoveredOption === opt.mode
                           ? "text-primary translate-x-0.5"
                           : "text-muted-foreground/50"
@@ -215,9 +215,9 @@ export const MeetingModeDialog = ({
               })}
             </div>
 
-            <div className="px-6 py-3 bg-muted/30 border-t border-border/50">
+            <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-muted/30 border-t border-border/50 shrink-0">
               <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
-                <Mic className="w-3.5 h-3.5 text-primary" />
+                <Mic className="w-3.5 h-3.5 text-primary shrink-0" />
                 Tips: Låt alla säga sitt namn i början för bättre protokoll
               </p>
             </div>
