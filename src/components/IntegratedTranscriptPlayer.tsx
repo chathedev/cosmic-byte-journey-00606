@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface IntegratedTranscriptPlayerProps {
   meetingId: string;
   audioBackup: AudioBackup;
+  fallbackDuration?: number;
   onTimeUpdate?: (currentTime: number) => void;
   onPlayStateChange?: (isPlaying: boolean) => void;
   onSeek?: (time: number) => void;
@@ -46,6 +47,7 @@ function formatTime(time: number): string {
 export function IntegratedTranscriptPlayer({
   meetingId,
   audioBackup,
+  fallbackDuration,
   onTimeUpdate,
   onPlayStateChange,
   onSeek,
@@ -58,7 +60,7 @@ export function IntegratedTranscriptPlayer({
   const [isLoading, setIsLoading] = useState(false);
   const [isStartingPlayback, setIsStartingPlayback] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(fallbackDuration || 0);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
@@ -94,7 +96,14 @@ export function IntegratedTranscriptPlayer({
     }
   }, [seekTo]);
 
-  // Fetch audio
+  // Use fallback duration if audio metadata doesn't provide one
+  useEffect(() => {
+    if (fallbackDuration && fallbackDuration > 0 && duration === 0) {
+      setDuration(fallbackDuration);
+    }
+  }, [fallbackDuration, duration]);
+
+
   useEffect(() => {
     const downloadPath = audioBackup.downloadPath;
     if (!downloadPath) { setError('Ingen ljudfil tillgänglig'); return; }
