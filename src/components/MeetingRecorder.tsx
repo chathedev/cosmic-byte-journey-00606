@@ -62,6 +62,7 @@ export const MeetingRecorder = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const durationRafRef = useRef<number | null>(null);
   const recordingStartedAtMsRef = useRef<number | null>(null);
   const totalPausedMsRef = useRef(0);
   const pauseStartedAtMsRef = useRef<number | null>(null);
@@ -70,6 +71,7 @@ export const MeetingRecorder = ({
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const isSavingRef = useRef(false);
   const hasStartedRecordingRef = useRef(false);
+  const hasAutoStoppedRef = useRef(false);
 
   const MAX_DURATION_SECONDS = 28800; // 8 hours
   const isNative = isNativeApp();
@@ -280,13 +282,18 @@ export const MeetingRecorder = ({
     void startRecording();
   };
 
-  // Duration timer (clock-based for reliable mobile behavior)
+  // Duration timer (clock-based + RAF fallback for Safari/UI freeze edge cases)
   useEffect(() => {
     if (!isRecording) {
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
       }
+      if (durationRafRef.current !== null) {
+        window.cancelAnimationFrame(durationRafRef.current);
+        durationRafRef.current = null;
+      }
+      hasAutoStoppedRef.current = false;
       return;
     }
 
@@ -300,22 +307,34 @@ export const MeetingRecorder = ({
 
       if (elapsedSec >= MAX_DURATION_SECONDS) {
         setDurationSec(MAX_DURATION_SECONDS);
-        handleStopRecording();
+        if (!hasAutoStoppedRef.current) {
+          hasAutoStoppedRef.current = true;
+          void handleStopRecording();
+        }
         return;
       }
 
-      setDurationSec(elapsedSec);
+      setDurationSec((prev) => (prev === elapsedSec ? prev : elapsedSec));
     };
 
-    // Sync immediately on this tick
+    // Sync immediately, then run both interval + RAF fallback for smoother reliability
     syncDurationFromClock();
-    // Then poll every 250ms
-    durationIntervalRef.current = setInterval(syncDurationFromClock, 250);
+    durationIntervalRef.current = setInterval(syncDurationFromClock, 1000);
+
+    const rafLoop = () => {
+      syncDurationFromClock();
+      durationRafRef.current = window.requestAnimationFrame(rafLoop);
+    };
+    durationRafRef.current = window.requestAnimationFrame(rafLoop);
 
     return () => {
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
+      }
+      if (durationRafRef.current !== null) {
+        window.cancelAnimationFrame(durationRafRef.current);
+        durationRafRef.current = null;
       }
     };
   }, [isRecording, isPaused]);
@@ -408,6 +427,15 @@ export const MeetingRecorder = ({
           audioChunksRef.current.push(event.data);
           // Add to backup system for recovery
           addChunk(event.data, mediaRecorder.mimeType);
+
+          // Also sync UI timer on media ticks (extra reliability on mobile/Safari)
+          const startedAt = recordingStartedAtMsRef.current;
+          if (startedAt) {
+            const now = Date.now();
+            const pausedMs = totalPausedMsRef.current + (pauseStartedAtMsRef.current ? now - pauseStartedAtMsRef.current : 0);
+            const elapsedSec = Math.max(0, Math.floor((now - startedAt - pausedMs) / 1000));
+            setDurationSec((prev) => (prev === elapsedSec ? prev : elapsedSec));
+          }
         }
       };
 
@@ -422,6 +450,7 @@ export const MeetingRecorder = ({
       recordingStartedAtMsRef.current = Date.now();
       totalPausedMsRef.current = 0;
       pauseStartedAtMsRef.current = null;
+      hasAutoStoppedRef.current = false;
       setDurationSec(0);
       setIsRecording(true);
 
@@ -451,6 +480,14 @@ export const MeetingRecorder = ({
 
   const stopMediaRecorder = () => {
     stopAutoSave(); // Stop backup timer
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+    if (durationRafRef.current !== null) {
+      window.cancelAnimationFrame(durationRafRef.current);
+      durationRafRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -465,6 +502,7 @@ export const MeetingRecorder = ({
     recordingStartedAtMsRef.current = null;
     pauseStartedAtMsRef.current = null;
     totalPausedMsRef.current = 0;
+    hasAutoStoppedRef.current = false;
     hasStartedRecordingRef.current = false;
   };
 
