@@ -108,7 +108,7 @@ export const DigitalSessionView = ({
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [elapsed, setElapsed] = useState('00:00');
   const [isStartingRecording, setIsStartingRecording] = useState(false);
-  const hasAutoNavigated = useRef(false);
+  const hasAutoNavigated = useRef(false); // kept for potential future use
 
   const isTerminal = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'].includes(status);
   const isConnecting = ['pending', 'starting', 'joining'].includes(status);
@@ -137,13 +137,7 @@ export const DigitalSessionView = ({
   const timerReference = recordingStartedAt || (isListening ? session?.startedAt : null);
   const showTimer = !!timerReference && !awaitingRecordingStart;
 
-  // Auto-navigate to meeting page when completed
-  useEffect(() => {
-    if (status === 'completed' && session?.meetingId && !hasAutoNavigated.current) {
-      hasAutoNavigated.current = true;
-      navigate(`/meetings/${session.meetingId}`, { replace: true });
-    }
-  }, [status, session?.meetingId, navigate]);
+  // No auto-navigate — redirect handled by TranscriptionInterface
 
   // Timer effect – use recordingStartedAt when available
   useEffect(() => {
@@ -172,7 +166,7 @@ export const DigitalSessionView = ({
 
   const handleGoToMeeting = () => {
     if (session?.meetingId) {
-      navigate(`/meetings/${session.meetingId}`, { replace: true });
+      navigate(`/library`, { replace: true });
     }
   };
 
@@ -491,7 +485,7 @@ export const DigitalSessionView = ({
 
         {/* Processing state (batch transcription after meeting) */}
         {isProcessing && (
-          <div className="flex flex-col items-center gap-5 w-full max-w-xs">
+          <div className="flex flex-col items-center gap-5 w-full max-w-sm">
             <div className="relative w-20 h-20 flex items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
               <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2.5s' }} />
@@ -515,6 +509,9 @@ export const DigitalSessionView = ({
               {metadata?.processingStage === 'diarizing' && metadata?.speakerDiarizationEngine && (
                 <p className="text-[10px] text-muted-foreground/40">via {metadata.speakerDiarizationEngine}</p>
               )}
+              {metadata?.sharedAsrPipeline && (
+                <p className="text-[10px] text-muted-foreground/40">Samma batchpipeline som övriga möteslägen</p>
+              )}
             </div>
             {metadata?.processingProgressPercent != null && (
               <div className="w-full space-y-1.5">
@@ -522,6 +519,24 @@ export const DigitalSessionView = ({
                 <p className="text-[11px] text-muted-foreground text-center">{metadata.processingProgressPercent}%</p>
               </div>
             )}
+
+            {/* Transcript preview during processing */}
+            {session?.transcriptPreview && (
+              <div className="w-full mt-2 space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground">Preliminärt transkript</p>
+                <div className="max-h-[200px] overflow-y-auto rounded-lg bg-muted/30 border border-border/40 p-3">
+                  <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                    {session.transcriptPreview}
+                  </p>
+                </div>
+                {metadata?.transcriptionFirst && (
+                  <p className="text-[10px] text-muted-foreground/50 text-center">
+                    Talarnamn förfinas efter att transkriptet är klart
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Audio stats */}
             {(metadata?.recordedAudioBytes != null || metadata?.audioMeanVolumeDb != null) && (
               <div className="flex flex-wrap items-center justify-center gap-3 mt-1">

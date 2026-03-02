@@ -47,6 +47,12 @@ export interface DigitalSessionMetadata {
   processingProgressPercent?: number;
   asrStatus?: string;
   asrEngine?: string;
+  asrStatusUrl?: string;
+  asrStreamUrl?: string;
+  sharedAsrPipeline?: boolean;
+  sharedBatchSender?: boolean;
+  transcriptStreamingAvailable?: boolean;
+  transcriptionFirst?: boolean;
   speakerDiarizationEnabled?: boolean;
   speakerDiarizationEngine?: string;
   speakerDiarizationAfterTranscript?: boolean;
@@ -194,6 +200,18 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
 
         if (TERMINAL_STATUSES.includes(data.session.status)) {
           stopPolling();
+        } else {
+          // Adaptive polling: 1s for joining/starting, 1.5s for listening/paused, 2s for processing
+          const fastStatuses: DigitalSessionStatus[] = ['joining', 'starting', 'pending'];
+          const mediumStatuses: DigitalSessionStatus[] = ['listening', 'paused', 'stopping'];
+          const newInterval = fastStatuses.includes(data.session.status) ? 1000
+            : mediumStatuses.includes(data.session.status) ? 1500
+            : 2000;
+          // Only restart polling if interval changed
+          if (pollRef.current) {
+            stopPolling();
+            pollRef.current = setInterval(fetchStatus, newInterval);
+          }
         }
       } else {
         setSession(null);
@@ -205,9 +223,10 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     }
   }, [stopPolling]);
 
-  const startPolling = useCallback(() => {
+  const startPolling = useCallback((intervalMs = 1500) => {
     stopPolling();
-    pollRef.current = setInterval(fetchStatus, 3000);
+    // Fast polling (1-2s) for joining/resume, normal for other states
+    pollRef.current = setInterval(fetchStatus, intervalMs);
   }, [fetchStatus, stopPolling]);
 
   useEffect(() => {
@@ -273,7 +292,7 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
         setStatus('pending');
       }
 
-      startPolling();
+      startPolling(1000); // Fast polling initially
       return true;
     } catch (err: any) {
       console.error('Start digital session error:', err);
@@ -301,11 +320,15 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
       }
 
       await fetchStatus();
+      // After resume, use fast polling for quicker UI response
+      if (action === 'resume') {
+        startPolling(1000);
+      }
     } catch (err: any) {
       console.error(`Digital session ${action} error:`, err);
       setError(err.message || `Kunde inte ${action === 'pause' ? 'pausa' : action === 'resume' ? 'återuppta' : 'stoppa'} sessionen`);
     }
-  }, [fetchStatus]);
+  }, [fetchStatus, startPolling]);
 
   const pauseSession = useCallback(() => sessionAction('pause'), [sessionAction]);
   const resumeSession = useCallback(() => sessionAction('resume'), [sessionAction]);
