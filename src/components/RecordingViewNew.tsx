@@ -87,6 +87,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingStartedAtMsRef = useRef<number | null>(null);
+  const totalPausedMsRef = useRef(0);
+  const pauseStartedAtMsRef = useRef<number | null>(null);
   const createdAtRef = useRef<string>(continuedMeeting?.createdAt || new Date().toISOString());
   const wakeLockRef = useRef<any>(null);
   const hasIncrementedCountRef = useRef(!!continuedMeeting);
@@ -379,23 +382,33 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     };
   }, [user, meetingMode]);
 
-  // Duration timer
+  // Duration timer (clock-based for reliable mobile behavior)
   useEffect(() => {
-    if (isRecording && !isPaused) {
-      durationIntervalRef.current = setInterval(() => {
-        setDurationSec(s => {
-          if (s + 1 >= MAX_DURATION_SECONDS) {
-            handleStopRecording();
-          }
-          return s + 1;
-        });
-      }, 1000);
-    } else {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-        durationIntervalRef.current = null;
+    const syncDurationFromClock = () => {
+      const startedAt = recordingStartedAtMsRef.current;
+      if (!startedAt) return;
+
+      const now = Date.now();
+      const pausedMs = totalPausedMsRef.current + (pauseStartedAtMsRef.current ? now - pauseStartedAtMsRef.current : 0);
+      const elapsedSec = Math.max(0, Math.floor((now - startedAt - pausedMs) / 1000));
+
+      if (elapsedSec >= MAX_DURATION_SECONDS) {
+        setDurationSec(MAX_DURATION_SECONDS);
+        handleStopRecording();
+        return;
       }
+
+      setDurationSec((prev) => (prev === elapsedSec ? prev : elapsedSec));
+    };
+
+    if (isRecording) {
+      syncDurationFromClock();
+      durationIntervalRef.current = setInterval(syncDurationFromClock, 250);
+    } else if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
     }
+
     return () => {
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
     };
@@ -457,14 +470,19 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       
       // Start auto-save backup for reliability
       startAutoSave();
-      setIsRecording(true);
-      await requestWakeLock();
-      noSleep.enable();
-      
+
       // Start browser speech recognition for Free/Pro plans
       if (!useAsrMode) {
         startSpeechRecognition();
       }
+
+      recordingStartedAtMsRef.current = Date.now();
+      totalPausedMsRef.current = 0;
+      pauseStartedAtMsRef.current = null;
+      setDurationSec(0);
+      setIsRecording(true);
+      await requestWakeLock();
+      noSleep.enable();
       
       console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', '| mimeType:', mediaRecorder.mimeType);
     } catch (error) {
@@ -487,6 +505,9 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    recordingStartedAtMsRef.current = null;
+    pauseStartedAtMsRef.current = null;
+    totalPausedMsRef.current = 0;
   };
 
   const togglePause = () => {
@@ -494,6 +515,10 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
     
     if (isPaused) {
       mediaRecorderRef.current.resume();
+      if (pauseStartedAtMsRef.current) {
+        totalPausedMsRef.current += Date.now() - pauseStartedAtMsRef.current;
+        pauseStartedAtMsRef.current = null;
+      }
       setIsPaused(false);
       requestWakeLock();
       // Resume speech recognition for Free/Pro
@@ -502,6 +527,7 @@ export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = f
       }
     } else {
       mediaRecorderRef.current.pause();
+      pauseStartedAtMsRef.current = Date.now();
       setIsPaused(true);
       releaseWakeLock();
       // Save backup when pausing for extra safety
