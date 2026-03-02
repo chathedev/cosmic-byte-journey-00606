@@ -69,7 +69,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   // Auto-show Digital Session view only for active/in-progress states (not stale terminal states)
   useEffect(() => {
-    const shouldAutoShowDigitalSession = [
+    const activeStatuses = [
       'pending',
       'starting',
       'joining',
@@ -77,10 +77,17 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       'paused',
       'stopping',
       'processing',
-    ].includes(digitalSession.status);
+    ];
 
-    if (shouldAutoShowDigitalSession && digitalSession.session) {
+    if (activeStatuses.includes(digitalSession.status) && digitalSession.session) {
       setShowDigitalSession(true);
+    }
+
+    // Auto-navigate to meeting detail when completed
+    if (digitalSession.status === 'completed' && digitalSession.session?.meetingId) {
+      navigate(`/meetings/${digitalSession.session.meetingId}`);
+      // Reset after navigating so it doesn't re-trigger
+      setTimeout(() => digitalSession.reset(), 500);
     }
   }, [digitalSession.status, digitalSession.session]);
   useEffect(() => {
