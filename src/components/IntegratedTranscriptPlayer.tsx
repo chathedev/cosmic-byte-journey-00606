@@ -182,7 +182,11 @@ export function IntegratedTranscriptPlayer({
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (!duration) return;
     e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    const bar = progressBarRef.current;
+    if (bar) {
+      try { bar.setPointerCapture(e.pointerId); } catch {}
+    }
     setIsDragging(true);
     const t = getTimeFromPointer(e.clientX);
     setDragTime(t);
@@ -190,12 +194,18 @@ export function IntegratedTranscriptPlayer({
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
+    e.preventDefault();
     const t = getTimeFromPointer(e.clientX);
     setDragTime(t);
   }, [isDragging, getTimeFromPointer]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
+    e.preventDefault();
+    const bar = progressBarRef.current;
+    if (bar) {
+      try { bar.releasePointerCapture(e.pointerId); } catch {}
+    }
     setIsDragging(false);
     const t = getTimeFromPointer(e.clientX);
     commitSeek(t);
@@ -299,10 +309,10 @@ export function IntegratedTranscriptPlayer({
         onPointerCancel={handlePointerUp}
       >
         {/* Track */}
-        <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted">
+        <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted pointer-events-none">
           {/* Filled */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-75"
+            className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-75 pointer-events-none"
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
@@ -310,7 +320,7 @@ export function IntegratedTranscriptPlayer({
         {duration > 0 && (
           <div
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-primary shadow-sm border-2 border-background transition-[left] duration-75",
+              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 md:w-3.5 md:h-3.5 rounded-full bg-primary shadow-sm border-2 border-background transition-[left] duration-75 pointer-events-none",
               isDragging && "scale-125"
             )}
             style={{ left: `${Math.min(100, progress)}%` }}
