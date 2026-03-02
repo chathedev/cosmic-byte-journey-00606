@@ -27,11 +27,17 @@ export interface DigitalSessionMetadata {
   joinStage?: string;
   joinElapsedMs?: number;
   admissionState?: string;
+  joinUiState?: string;
   prejoinTimeoutMs?: number;
   lobbyTimeoutMs?: number;
   audioCaptureActive?: boolean;
   capturePaused?: boolean;
   botMediaMuted?: boolean;
+  botDisplayName?: string;
+  awaitingHostAdmission?: boolean;
+  hostActionRequired?: boolean;
+  hostActionType?: string;
+  hostActionText?: string;
   liveTranscriptEnabled?: boolean;
   transcriptionStartsAfterMeeting?: boolean;
   processingStage?: string;
