@@ -94,6 +94,7 @@ export const DigitalSessionView = ({
   const navigate = useNavigate();
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [elapsed, setElapsed] = useState('00:00');
+  const [isStartingRecording, setIsStartingRecording] = useState(false);
   const hasAutoNavigated = useRef(false);
 
   const isTerminal = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'].includes(status);
@@ -111,6 +112,14 @@ export const DigitalSessionView = ({
   const botName = metadata?.botDisplayName || 'Tivly Assistant';
   const meetingEndedByHost = metadata?.meetingEndedByHost;
 
+  // Key new flags from the guide
+  const awaitingRecordingStart = metadata?.awaitingRecordingStart === true;
+  const recordingStartedAt = metadata?.recordingStartedAt || null;
+
+  // Timer should only run from recordingStartedAt (actual recording), not session.startedAt
+  const timerReference = recordingStartedAt || (isListening ? session?.startedAt : null);
+  const showTimer = !!timerReference && !awaitingRecordingStart;
+
   // Auto-navigate to meeting page when completed
   useEffect(() => {
     if (status === 'completed' && session?.meetingId && !hasAutoNavigated.current) {
@@ -119,14 +128,25 @@ export const DigitalSessionView = ({
     }
   }, [status, session?.meetingId, navigate]);
 
+  // Timer effect – use recordingStartedAt when available
   useEffect(() => {
-    if (!session?.startedAt || isTerminal) return;
-    setElapsed(formatDuration(session.startedAt));
+    if (!timerReference || isTerminal || awaitingRecordingStart) {
+      if (!timerReference) setElapsed('00:00');
+      return;
+    }
+    setElapsed(formatDuration(timerReference));
     const interval = setInterval(() => {
-      setElapsed(formatDuration(session.startedAt));
+      setElapsed(formatDuration(timerReference));
     }, 1000);
     return () => clearInterval(interval);
-  }, [session?.startedAt, isTerminal]);
+  }, [timerReference, isTerminal, awaitingRecordingStart]);
+
+  // Reset the starting flag when status changes away from paused
+  useEffect(() => {
+    if (status !== 'paused') {
+      setIsStartingRecording(false);
+    }
+  }, [status]);
 
   const handleStopConfirm = () => {
     setShowStopConfirm(false);
@@ -137,6 +157,12 @@ export const DigitalSessionView = ({
     if (session?.meetingId) {
       navigate(`/meetings/${session.meetingId}`, { replace: true });
     }
+  };
+
+  const handleStartRecording = async () => {
+    setIsStartingRecording(true);
+    // resume endpoint is used for the first explicit start of recording
+    onResume();
   };
 
   const sessionError = session?.error?.message || error;
@@ -153,7 +179,8 @@ export const DigitalSessionView = ({
           <p className="text-sm font-medium text-foreground truncate">
             {session?.meetingTitle || 'Digital session'}
           </p>
-          {(isListening || isPaused) && (
+          {/* Only show timer when recording has actually started */}
+          {showTimer && (isListening || isPaused) && (
             <p className="text-xs text-muted-foreground font-mono">{elapsed}</p>
           )}
         </div>
@@ -161,6 +188,13 @@ export const DigitalSessionView = ({
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[11px] font-medium text-green-600 dark:text-green-400">LIVE</span>
+          </div>
+        )}
+        {/* Show "Ready" badge when awaiting recording start */}
+        {isPaused && awaitingRecordingStart && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            <span className="text-[11px] font-medium text-primary">REDO</span>
           </div>
         )}
       </div>
@@ -278,16 +312,25 @@ export const DigitalSessionView = ({
             <div className="text-center space-y-0.5">
               <p className="text-lg font-semibold text-foreground">Spelar in mötet</p>
               <p className="text-xs text-muted-foreground">Transkribering sker efter mötet</p>
-              <div className="flex items-center justify-center gap-1.5 mt-1">
-                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
-              </div>
+              {showTimer && (
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
+                </div>
+              )}
             </div>
             {/* Audio capture indicator */}
             {metadata?.audioCaptureActive && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/8 border border-green-500/15">
                 <Mic className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-[11px] font-medium text-green-600 dark:text-green-400">Lyssnar</span>
+              </div>
+            )}
+            {/* Bot media muted trust signal */}
+            {metadata?.botMediaMuted && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted">
+                <MicOff className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">Botens mic/kamera av</span>
               </div>
             )}
           </div>
@@ -303,8 +346,37 @@ export const DigitalSessionView = ({
           </div>
         )}
 
-        {/* Paused */}
-        {isPaused && (
+        {/* Paused – Awaiting Recording Start (bot is in meeting, waiting for user to press start) */}
+        {isPaused && awaitingRecordingStart && (
+          <div className="flex flex-col items-center gap-5 w-full max-w-xs">
+            <div className="relative w-24 h-24 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-primary/8 animate-pulse" style={{ animationDuration: '2s' }} />
+              <div className="absolute inset-2 rounded-full bg-primary/5" />
+              <CheckCircle2 className="w-10 h-10 text-primary" />
+            </div>
+            <div className="text-center space-y-1.5">
+              <p className="text-lg font-semibold text-foreground">Boten är redo i mötet</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Tryck på <span className="font-semibold text-foreground">Starta inspelning</span> när du vill börja spela in.
+              </p>
+            </div>
+            {/* Bot media muted trust signal */}
+            {metadata?.botMediaMuted && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted">
+                <MicOff className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">Botens mic & kamera är avstängda</span>
+              </div>
+            )}
+            {metadata?.botArrivedAt && (
+              <p className="text-[11px] text-muted-foreground/50">
+                Boten gick med {new Date(metadata.botArrivedAt).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Paused – Normal pause (user paused during recording) */}
+        {isPaused && !awaitingRecordingStart && (
           <div className="flex flex-col items-center gap-4">
             <div className="w-20 h-20 rounded-full bg-yellow-500/10 border-2 border-yellow-500/20 flex items-center justify-center">
               <Pause className="w-8 h-8 text-yellow-500" />
@@ -318,10 +390,12 @@ export const DigitalSessionView = ({
               <MicOff className="w-3.5 h-3.5 text-yellow-500" />
               <span className="text-[11px] font-medium text-yellow-600 dark:text-yellow-400">Ljud pausat</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
-            </div>
+            {showTimer && (
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -441,6 +515,32 @@ export const DigitalSessionView = ({
 
       {/* Controls */}
       <div className="p-4 space-y-2 border-t border-border/50">
+
+        {/* Awaiting recording start – big Start button */}
+        {isPaused && awaitingRecordingStart && (
+          <div className="space-y-2">
+            <Button
+              onClick={handleStartRecording}
+              disabled={isStartingRecording}
+              className="w-full h-14 gap-3 rounded-xl text-base font-semibold"
+            >
+              {isStartingRecording ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Radio className="w-5 h-5" />
+              )}
+              {isStartingRecording ? 'Startar...' : 'Starta inspelning'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowStopConfirm(true)}
+              className="w-full h-10 text-sm text-muted-foreground"
+            >
+              Avsluta utan att spela in
+            </Button>
+          </div>
+        )}
+
         {isListening && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={onPause} className="flex-1 h-11 gap-2 rounded-xl">
@@ -454,7 +554,8 @@ export const DigitalSessionView = ({
           </div>
         )}
 
-        {isPaused && (
+        {/* Normal pause controls (not awaiting start) */}
+        {isPaused && !awaitingRecordingStart && (
           <div className="flex gap-2">
             <Button onClick={onResume} className="flex-1 h-11 gap-2 rounded-xl">
               <Play className="w-4 h-4" />

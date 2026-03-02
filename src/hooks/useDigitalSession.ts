@@ -40,6 +40,9 @@ export interface DigitalSessionMetadata {
   hostActionText?: string;
   liveTranscriptEnabled?: boolean;
   transcriptionStartsAfterMeeting?: boolean;
+  botArrivedAt?: string;
+  recordingStartedAt?: string;
+  awaitingRecordingStart?: boolean;
   processingStage?: string;
   processingProgressPercent?: number;
   asrStatus?: string;
