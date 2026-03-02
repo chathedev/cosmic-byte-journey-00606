@@ -465,6 +465,10 @@ export const MeetingRecorder = ({
       console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', isDigitalRecording ? '(Digital)' : '(In-person)');
     } catch (error) {
       console.error('Error starting recording:', error);
+      // Reset recording state since we set it optimistically
+      setIsRecording(false);
+      recordingStartedAtMsRef.current = null;
+      setDurationSec(0);
       // Clean up digital streams on error
       if (isDigitalRecording) {
         digitalRecordingStreams.clear();
