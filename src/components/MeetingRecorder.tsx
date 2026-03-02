@@ -873,25 +873,27 @@ export const MeetingRecorder = ({
         </div>
       </div>
 
-      {/* Start confirmation popup after mode selection */}
-      <AlertDialog open={readyToStart}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Starta möte</AlertDialogTitle>
-            <AlertDialogDescription>
-              Inspelningen startar direkt och timern börjar räkna när du trycker på "Starta möte".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setReadyToStart(false); onCancel(); }}>
-              Avbryt
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setReadyToStart(false); void startRecording(); }}>
-              Starta möte
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Start-overlay efter valt läge */}
+      {readyToStart && (
+        <div className="fixed inset-0 z-[120] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-background shadow-xl p-5 space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold text-foreground">Starta möte</h3>
+              <p className="text-sm text-muted-foreground">
+                Inspelningen startar direkt och timern börjar räkna när du trycker på knappen.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => { setReadyToStart(false); onCancel(); }}>
+                Avbryt
+              </Button>
+              <Button onClick={() => { setReadyToStart(false); void startRecording(); }}>
+                Starta möte
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Exit Warning Dialog */}
       <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
