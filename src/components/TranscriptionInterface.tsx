@@ -131,34 +131,40 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   // Redirect to Library when monitored Digital Session transitions to
   // stopping/processing/completed so users get the normal batch flow with clean URL.
+  // Digital Mode uses the SAME batch ASR pipeline as uploads — no manual file upload needed.
+  // Backend automatically submits the recorded WAV to /asr/status & /asr/stream.
   useEffect(() => {
     const redirectStatuses = ['stopping', 'processing', 'completed'];
     if (!redirectStatuses.includes(digitalSession.status)) return;
     if (!showDigitalSession) return;
 
-    const sessionId = digitalSession.session?.id;
+    // Capture session data BEFORE any state mutations
+    const sess = digitalSession.session;
+    const sessionId = sess?.id;
     if (!sessionId) return;
 
     if (redirectedCompletedSessionRef.current === sessionId) return;
     redirectedCompletedSessionRef.current = sessionId;
 
+    // Snapshot everything we need from the session before reset clears it
+    const meetingId = sess.meetingId;
+    const meetingTitle = sess.meetingTitle || 'Digitalt möte';
+    const createdAt = sess.createdAt || new Date().toISOString();
+    const updatedAt = sess.updatedAt || new Date().toISOString();
+
     // Reset digital session UI state
     setShowDigitalSession(false);
     digitalSession.reset();
 
-    const meetingId = digitalSession.session?.meetingId ?? null;
-
-    // Pass state that Library expects for ASR polling:
-    // - fromRecording: true → triggers pending meeting handling
-    // - pendingMeetingId → starts ASR polling in Library
-    // Store a minimal pending meeting in sessionStorage so Library can show it immediately
+    // Store a minimal pending meeting in sessionStorage so Library can
+    // display it immediately and begin ASR polling via the shared pipeline.
+    // No manual upload is needed — backend auto-submits the WAV file.
     if (meetingId) {
-      const now = new Date().toISOString();
       const pendingMeeting = {
         id: meetingId,
-        title: digitalSession.session?.meetingTitle || 'Digitalt möte',
-        createdAt: digitalSession.session?.createdAt || now,
-        updatedAt: digitalSession.session?.updatedAt || now,
+        title: meetingTitle,
+        createdAt,
+        updatedAt,
         transcript: '',
         transcriptionStatus: 'processing',
         userId: '',
@@ -171,11 +177,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       replace: true,
       state: {
         fromRecording: true,
-        pendingMeetingId: meetingId,
+        pendingMeetingId: meetingId || null,
         source: 'digital-session',
       },
     });
-  }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, showDigitalSession, navigate, digitalSession.reset]);
+  }, [digitalSession.status, digitalSession.session, showDigitalSession, navigate, digitalSession.reset]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;

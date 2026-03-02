@@ -34,7 +34,9 @@ const ERROR_CODE_LABELS: Record<string, string> = {
 };
 
 const PROCESSING_STAGE_LABELS: Record<string, string> = {
+  finalizing_recording: 'Förbereder inspelningen för transkribering...',
   queued: 'Väntar i kö...',
+  preparing_audio: 'Förbereder ljudet...',
   transcribing: 'Transkriberar...',
   diarizing: 'Identifierar talare...',
   cleanup: 'Rensar transcript...',
@@ -315,6 +317,9 @@ export const DigitalSessionView = ({
             <div className="text-center space-y-1">
               <p className="text-base font-semibold text-foreground">Avslutar mötet...</p>
               <p className="text-sm text-muted-foreground">Inspelningen skickas till transkribering.</p>
+              {metadata?.processingStage === 'finalizing_recording' && (
+                <p className="text-xs text-muted-foreground/60">Förbereder inspelningen...</p>
+              )}
             </div>
           </div>
         )}
