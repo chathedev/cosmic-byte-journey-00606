@@ -76,6 +76,8 @@ export const MeetingRecorder = ({
       ? Phone
       : Monitor;
 
+  const shouldShowStartOverlay = showStartMeetingDialog && !!meetingMode && !isRecording && !showModeDialog;
+
   debugLog('[🎬 MeetingRecorder] render — isRecording:', isRecording, 'isPaused:', isPaused, 'showModeDialog:', showModeDialog, 'showStartMeetingDialog:', showStartMeetingDialog, 'meetingMode:', meetingMode);
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
@@ -168,10 +170,10 @@ export const MeetingRecorder = ({
   // Check instructions
   useEffect(() => {
     const hasSeenInstructions = localStorage.getItem('hasSeenRecordingInstructions');
-    if (!hasSeenInstructions) {
+    if (!hasSeenInstructions && !showArrivalStartDialog) {
       setShowInstructions(true);
     }
-  }, []);
+  }, [showArrivalStartDialog]);
 
   // Auto-scroll transcript to bottom
   useEffect(() => {
@@ -312,6 +314,7 @@ export const MeetingRecorder = ({
     debugLog('[🎬 MeetingRecorder] handleModeSelect:', mode);
     setMeetingMode(mode);
     setShowModeDialog(false);
+    setShowInstructions(false);
     setShowStartMeetingDialog(true);
   };
 
@@ -934,42 +937,52 @@ export const MeetingRecorder = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      <RecordingInstructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} />
+      <RecordingInstructions isOpen={showInstructions && !shouldShowStartOverlay && !showModeDialog} onClose={() => setShowInstructions(false)} />
 
-      {/* Start Meeting Confirmation Dialog (shown on arrival to meeting detail) */}
-      <AlertDialog open={showStartMeetingDialog && !!meetingMode && !isRecording}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <MeetingModeIcon className="w-5 h-5 text-primary" />
-              Starta möte
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Du är nu på mötessidan. När du trycker <strong>Starta möte</strong> börjar inspelningen direkt i läget <strong>{meetingModeLabel}</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                debugLog('[🎬 MeetingRecorder] Start dialog -> choose another mode');
-                setShowStartMeetingDialog(false);
-                setShowModeDialog(true);
-              }}
-            >
-              Byt mötesläge
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                debugLog('[🎬 MeetingRecorder] Start dialog -> start recording clicked');
-                setShowStartMeetingDialog(false);
-                void startRecording();
-              }}
-            >
-              Starta möte
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Start Meeting Overlay (shown on arrival to meeting detail) */}
+      {shouldShowStartOverlay && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-xl">
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <MeetingModeIcon className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-foreground">Starta möte</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Du är nu på mötessidan. Tryck <span className="font-medium text-foreground">Starta möte</span> för att börja inspelningen i <span className="font-medium text-foreground">{meetingModeLabel}</span>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    debugLog('[🎬 MeetingRecorder] Start overlay -> choose another mode');
+                    setShowStartMeetingDialog(false);
+                    setShowModeDialog(true);
+                  }}
+                >
+                  Byt mötesläge
+                </Button>
+                <Button
+                  onClick={() => {
+                    debugLog('[🎬 MeetingRecorder] Start overlay -> start recording clicked');
+                    localStorage.setItem('hasSeenRecordingInstructions', 'true');
+                    setShowInstructions(false);
+                    setShowStartMeetingDialog(false);
+                    void startRecording();
+                  }}
+                >
+                  Starta möte
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Meeting Mode Selection Dialog */}
       <MeetingModeDialog
