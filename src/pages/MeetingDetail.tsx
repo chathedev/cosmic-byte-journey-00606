@@ -155,6 +155,7 @@ const MeetingDetail = () => {
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
   const [audioSeekTo, setAudioSeekTo] = useState<number | undefined>(undefined);
   const [audioSeekGeneration, setAudioSeekGeneration] = useState(0);
+  const [audioFallbackDuration, setAudioFallbackDuration] = useState<number | undefined>(undefined);
 
   // Speaker identification UX thresholds (per docs)
   const SIS_DISPLAY_THRESHOLD_PERCENT = 75;
@@ -256,6 +257,9 @@ const MeetingDetail = () => {
           // Audio backup
           if (asrStatus.audioBackup?.available) {
             setAudioBackup(asrStatus.audioBackup);
+          }
+          if (asrStatus.wavDurationSec) {
+            setAudioFallbackDuration(asrStatus.wavDurationSec);
           }
 
           // Protocol count (not in ASRStatus type but may exist)
@@ -554,6 +558,7 @@ const MeetingDetail = () => {
               if (asrStatus.audioBackup?.available) {
                 setAudioBackup(asrStatus.audioBackup);
               }
+              if (asrStatus.wavDurationSec) setAudioFallbackDuration(asrStatus.wavDurationSec);
 
               // Only hydrate segmentation when transcript is NOT manually edited and SIS is not disabled
               if (!isManualTranscript && !sisDisabled) {
@@ -587,6 +592,7 @@ const MeetingDetail = () => {
               if (asrStatus.audioBackup?.available) {
                 setAudioBackup(asrStatus.audioBackup);
               }
+              if (asrStatus.wavDurationSec) setAudioFallbackDuration(asrStatus.wavDurationSec);
               
               if (asrStatus.status === 'error' || asrStatus.status === 'failed') {
                 // Transcription failed - show failed state, don't start polling
@@ -779,6 +785,7 @@ const MeetingDetail = () => {
         if (asrStatus.audioBackup?.available) {
           setAudioBackup(asrStatus.audioBackup);
         }
+        if (asrStatus.wavDurationSec) setAudioFallbackDuration(asrStatus.wavDurationSec);
 
         // Update status based on ASR response
         if (asrStatus.status === 'queued') {
@@ -2644,6 +2651,7 @@ const MeetingDetail = () => {
                         <IntegratedTranscriptPlayer
                           meetingId={meeting.id}
                           audioBackup={audioBackup}
+                          fallbackDuration={audioFallbackDuration}
                           onTimeUpdate={setAudioCurrentTime}
                           onPlayStateChange={setAudioIsPlaying}
                           seekTo={audioSeekTo}
