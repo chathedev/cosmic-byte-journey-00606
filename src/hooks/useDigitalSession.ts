@@ -329,10 +329,10 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
         throw new Error(`${action} failed: ${res.status}`);
       }
 
-      // After stop, poll fast to catch processing/completed transition quickly
-      if (action === 'stop') {
-        startPolling(1000);
-      } else {
+      // For stop: do NOT start polling — the redirect effect in TranscriptionInterface
+      // will fire on the optimistic 'stopping' status and navigate immediately.
+      // Starting polling here would race with reset() and re-fetch 'listening' from backend.
+      if (action !== 'stop') {
         await fetchStatus();
         if (action === 'resume') {
           startPolling(1000);
