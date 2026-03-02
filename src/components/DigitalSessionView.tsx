@@ -30,6 +30,7 @@ const ERROR_CODE_LABELS: Record<string, string> = {
   digital_bot_removed: 'Boten togs bort från mötet',
   teams_reconnect_exhausted: 'Alla återanslutningsförsök misslyckades',
   digital_session_already_active: 'En annan session är redan aktiv',
+  digital_audio_silent: 'Inget användbart mötesljud fångades',
 };
 
 const formatDuration = (startedAt: string | null): string => {
@@ -350,13 +351,16 @@ export const DigitalSessionView = ({
             <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
               {status === 'timed_out' ? (
                 <Timer className="w-8 h-8 text-destructive" />
+              ) : errorCode === 'digital_audio_silent' ? (
+                <MicOff className="w-8 h-8 text-destructive" />
               ) : (
                 <AlertTriangle className="w-8 h-8 text-destructive" />
               )}
             </div>
             <div className="text-center space-y-1.5">
               <p className="text-base font-semibold text-foreground">
-                {status === 'failed' ? 'Något gick fel' :
+                {status === 'failed' && errorCode === 'digital_audio_silent' ? 'Inget ljud fångades' :
+                 status === 'failed' ? 'Något gick fel' :
                  status === 'timed_out' ? 'Tidsgräns nådd' :
                  'Sessionen avbröts'}
               </p>
@@ -365,6 +369,11 @@ export const DigitalSessionView = ({
               )}
               {sessionError && (
                 <p className="text-sm text-muted-foreground leading-relaxed">{sessionError}</p>
+              )}
+              {errorCode === 'digital_audio_silent' && (
+                <p className="text-xs text-muted-foreground/70 leading-relaxed mt-1">
+                  Inspelningen skapades men mötesljudet var för svagt eller helt tyst.
+                </p>
               )}
             </div>
           </div>
@@ -399,18 +408,34 @@ export const DigitalSessionView = ({
               )}
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {metadata?.processingStage === 'transcribing' ? 'Transkriberar...' :
-                 metadata?.processingStage === 'diarizing' ? 'Identifierar talare...' :
+                 metadata?.processingStage === 'diarizing' ? 'Identifierar talare via ElevenLabs...' :
                  metadata?.processingStage === 'cleanup' ? 'Rensar transcript...' :
                  metadata?.processingStage === 'sis_processing' ? 'Bearbetar talare...' :
                  metadata?.processingStage === 'queued' ? 'Väntar i kö...' :
                  metadata?.processingStage === 'done' ? 'Nästan klart...' :
                  'Det här kan ta några minuter. Du behöver inte vänta här.'}
               </p>
+              {metadata?.processingStage === 'diarizing' && metadata?.speakerDiarizationAfterTranscript && (
+                <p className="text-xs text-muted-foreground/60">Transkript klart – separerar talare</p>
+              )}
             </div>
             {metadata?.processingProgressPercent != null && (
               <div className="w-full space-y-1.5">
                 <Progress value={metadata.processingProgressPercent} className="h-1.5" />
                 <p className="text-[11px] text-muted-foreground text-center">{metadata.processingProgressPercent}%</p>
+              </div>
+            )}
+            {/* Speaker role suggestions */}
+            {metadata?.speakerRoleSuggestions && Object.keys(metadata.speakerRoleSuggestions).length > 0 && (
+              <div className="w-full space-y-1 mt-1">
+                <p className="text-[11px] text-muted-foreground/60 text-center">Identifierade roller</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {Object.entries(metadata.speakerRoleSuggestions).map(([speaker, role]) => (
+                    <span key={speaker} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      {metadata?.speakerNames?.[speaker] || speaker}: {role}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>

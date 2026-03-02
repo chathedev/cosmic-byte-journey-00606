@@ -51,6 +51,9 @@ export interface DigitalSessionMetadata {
   speakerRoleSuggestions?: Record<string, string>;
   endedReason?: string;
   meetingEndedByHost?: boolean;
+  audioMeanVolumeDb?: number;
+  audioMaxVolumeDb?: number;
+  recordedAudioBytes?: number;
 }
 
 export interface DigitalSession {
