@@ -202,10 +202,12 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
         if (TERMINAL_STATUSES.includes(data.session.status)) {
           stopPolling();
         } else {
-          // Adaptive polling: 1s for joining/starting, 1.5s for listening/paused, 2s for processing
+          // Adaptive polling: 1s for joining/starting/in_call, 1.5s for listening/paused, 2s for processing
+          const joinStage = data.session.metadata?.joinStage;
+          const isInCall = joinStage === 'in_call' || data.session.metadata?.admissionState === 'in_call';
           const fastStatuses: DigitalSessionStatus[] = ['joining', 'starting', 'pending'];
           const mediumStatuses: DigitalSessionStatus[] = ['listening', 'paused', 'stopping'];
-          const newInterval = fastStatuses.includes(data.session.status) ? 1000
+          const newInterval = fastStatuses.includes(data.session.status) || isInCall ? 1000
             : mediumStatuses.includes(data.session.status) ? 1500
             : 2000;
           // Only restart polling if interval changed
