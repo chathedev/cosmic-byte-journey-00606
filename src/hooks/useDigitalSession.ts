@@ -10,6 +10,7 @@ export type DigitalSessionStatus =
   | 'listening'
   | 'paused'
   | 'stopping'
+  | 'processing'
   | 'completed'
   | 'failed'
   | 'timed_out'
@@ -31,6 +32,13 @@ export interface DigitalSessionMetadata {
   audioCaptureActive?: boolean;
   capturePaused?: boolean;
   botMediaMuted?: boolean;
+  liveTranscriptEnabled?: boolean;
+  transcriptionStartsAfterMeeting?: boolean;
+  processingStage?: string;
+  processingProgressPercent?: number;
+  asrStatus?: string;
+  asrEngine?: string;
+  speakerNames?: Record<string, string>;
 }
 
 export interface DigitalSession {
@@ -95,7 +103,7 @@ interface UseDigitalSessionReturn {
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
 
 const TERMINAL_STATUSES: DigitalSessionStatus[] = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'];
-const ACTIVE_STATUSES: DigitalSessionStatus[] = ['pending', 'starting', 'joining', 'listening', 'paused', 'stopping'];
+const ACTIVE_STATUSES: DigitalSessionStatus[] = ['pending', 'starting', 'joining', 'listening', 'paused', 'stopping', 'processing'];
 
 export const useDigitalSession = (): UseDigitalSessionReturn => {
   const [session, setSession] = useState<DigitalSession | null>(null);

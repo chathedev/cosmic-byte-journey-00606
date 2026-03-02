@@ -100,6 +100,7 @@ export const DigitalSessionView = ({
   const isListening = status === 'listening';
   const isPaused = status === 'paused';
   const isInterrupted = status === 'interrupted';
+  const isProcessing = status === 'processing';
   const stepIndex = getStepIndex(status);
 
   const metadata = session?.metadata;
@@ -231,7 +232,7 @@ export const DigitalSessionView = ({
             </div>
             <div className="text-center space-y-1">
               <p className="text-base font-semibold text-foreground">Avslutar session...</p>
-              <p className="text-sm text-muted-foreground">Sparar transkription</p>
+              <p className="text-sm text-muted-foreground">Boten lämnar mötet...</p>
             </div>
           </div>
         )}
@@ -246,8 +247,9 @@ export const DigitalSessionView = ({
               <Radio className="w-8 h-8 text-green-500" />
             </div>
             <div className="text-center space-y-0.5">
-              <p className="text-lg font-semibold text-foreground">Transkriberar</p>
-              <div className="flex items-center justify-center gap-1.5">
+              <p className="text-lg font-semibold text-foreground">Spelar in mötet</p>
+              <p className="text-xs text-muted-foreground">Transkribering sker efter mötet</p>
+              <div className="flex items-center justify-center gap-1.5 mt-1">
                 <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
               </div>
@@ -270,7 +272,7 @@ export const DigitalSessionView = ({
             </div>
             <div className="text-center space-y-1">
               <p className="text-base font-semibold text-yellow-600 dark:text-yellow-400">Pausad</p>
-              <p className="text-sm text-muted-foreground">Boten är kvar i mötet. Transkription pausad.</p>
+              <p className="text-sm text-muted-foreground">Boten är kvar i mötet. Inspelning pausad.</p>
             </div>
             {/* Capture paused indicator */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/8 border border-yellow-500/15">
@@ -341,18 +343,30 @@ export const DigitalSessionView = ({
           </div>
         )}
 
-        {/* Transcript preview */}
-        {session?.transcriptPreview && !isTerminal && (
-          <div className="w-full max-w-md bg-muted/30 rounded-xl p-4 border border-border/40">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Transkription</span>
-              {session.transcriptChunkCount > 0 && (
-                <span className="text-[11px] text-muted-foreground">{session.transcriptChunkCount} delar</span>
-              )}
+        {/* Processing state (batch transcription after meeting) */}
+        {isProcessing && (
+          <div className="flex flex-col items-center gap-5 w-full max-w-xs">
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
+              <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2.5s' }} />
             </div>
-            <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">
-              {session.transcriptPreview}
-            </p>
+            <div className="text-center space-y-1.5">
+              <p className="text-base font-semibold text-foreground">Bearbetar inspelning</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {metadata?.processingStage === 'transcribing' ? 'Transkriberar...' :
+                 metadata?.processingStage === 'cleanup' ? 'Rensar transcript...' :
+                 metadata?.processingStage === 'sis_processing' ? 'Bearbetar talare...' :
+                 metadata?.processingStage === 'queued' ? 'Väntar i kö...' :
+                 metadata?.processingStage === 'done' ? 'Nästan klart...' :
+                 'Det här kan ta några minuter. Du behöver inte vänta här.'}
+              </p>
+            </div>
+            {metadata?.processingProgressPercent != null && (
+              <div className="w-full space-y-1.5">
+                <Progress value={metadata.processingProgressPercent} className="h-1.5" />
+                <p className="text-[11px] text-muted-foreground text-center">{metadata.processingProgressPercent}%</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -436,7 +450,7 @@ export const DigitalSessionView = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Avsluta sessionen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Boten lämnar mötet. Eventuell transkription sparas.
+              Boten lämnar mötet. Inspelningen bearbetas efteråt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
