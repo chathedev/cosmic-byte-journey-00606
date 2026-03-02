@@ -104,6 +104,7 @@ interface UseDigitalSessionReturn {
   stopSession: () => Promise<void>;
   retrySession: () => void;
   reset: () => void;
+  clearError: () => void;
 }
 
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
@@ -322,6 +323,11 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     lastStartParamsRef.current = null;
   }, [stopPolling]);
 
+  const clearError = useCallback(() => {
+    setError(null);
+    setErrorCode(null);
+  }, []);
+
   return {
     session,
     status,
@@ -336,5 +342,6 @@ export const useDigitalSession = (): UseDigitalSessionReturn => {
     stopSession,
     retrySession,
     reset,
+    clearError,
   };
 };
