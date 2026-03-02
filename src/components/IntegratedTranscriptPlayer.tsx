@@ -1,10 +1,8 @@
-// IntegratedTranscriptPlayer - Audio player integrated into the transcript section
-// Shows audio controls above/within the transcript with synced playback
+// IntegratedTranscriptPlayer - Minimal audio player with reliable seeking
 
-import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, RotateCcw, SkipBack, SkipForward, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Play, Pause, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { type AudioBackup } from "@/lib/asrService";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,15 +21,11 @@ const BACKEND_API_URL = 'https://api.tivly.se';
 
 async function getAuthToken(): Promise<string | null> {
   const localToken = localStorage.getItem('authToken');
-  if (localToken && localToken.trim().length > 0) {
-    return localToken;
-  }
+  if (localToken && localToken.trim().length > 0) return localToken;
   try {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function normalizeAudioMimeType(mime?: string | null): string | null {
@@ -40,6 +34,13 @@ function normalizeAudioMimeType(mime?: string | null): string | null {
   if (m.includes('audio/x-m4a') || m.includes('audio/m4a')) return 'audio/mp4';
   if (m.includes('audio/x-wav')) return 'audio/wav';
   return mime;
+}
+
+function formatTime(time: number): string {
+  if (!isFinite(time) || isNaN(time) || time < 0) return '0:00';
+  const mins = Math.floor(time / 60);
+  const secs = Math.floor(time % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export function IntegratedTranscriptPlayer({
@@ -52,40 +53,39 @@ export function IntegratedTranscriptPlayer({
   className,
 }: IntegratedTranscriptPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isStartingPlayback, setIsStartingPlayback] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragTime, setDragTime] = useState(0);
 
   const playRequestRef = useRef<Promise<void> | null>(null);
-  const timeTickerRef = useRef<number | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const rafRef = useRef<number | null>(null);
 
-  const stopTimeTicker = () => {
-    if (timeTickerRef.current) {
-      window.clearInterval(timeTickerRef.current);
-      timeTickerRef.current = null;
+  // RAF-based time sync (only when not dragging)
+  const tick = useCallback(() => {
+    const el = audioRef.current;
+    if (el && !el.paused && !isDragging) {
+      setCurrentTime(el.currentTime);
+      onTimeUpdate?.(el.currentTime);
     }
-  };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [isDragging, onTimeUpdate]);
 
-  const startTimeTicker = () => {
-    if (timeTickerRef.current) return;
-    timeTickerRef.current = window.setInterval(() => {
-      const el = audioRef.current;
-      if (!el || el.paused) return;
-      const t = el.currentTime;
-      setCurrentTime(t);
-      onTimeUpdate?.(t);
-    }, 100);
-  };
+  useEffect(() => {
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [tick]);
 
-  // Handle external seek requests
+  // External seek
   useEffect(() => {
     if (seekTo !== undefined && audioRef.current && isFinite(seekTo)) {
       audioRef.current.currentTime = seekTo;
@@ -94,234 +94,153 @@ export function IntegratedTranscriptPlayer({
     }
   }, [seekTo]);
 
-  // Cleanup ticker on unmount
-  useEffect(() => {
-    return () => {
-      stopTimeTicker();
-    };
-  }, []);
-
   // Fetch audio
   useEffect(() => {
     const downloadPath = audioBackup.downloadPath;
-    if (!downloadPath) {
-      setError('Ingen ljudfil tillgänglig');
-      return;
-    }
+    if (!downloadPath) { setError('Ingen ljudfil tillgänglig'); return; }
 
     const fullUrl = downloadPath.startsWith('http')
       ? downloadPath
       : `${BACKEND_API_URL}${downloadPath.startsWith('/') ? '' : '/'}${downloadPath}`;
 
+    let cancelled = false;
     const fetchAudio = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         const token = await getAuthToken();
         const headers: HeadersInit = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-
         const response = await fetch(fullUrl, { headers });
-        if (!response.ok) {
-          throw new Error(`Kunde inte ladda ljud: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`Kunde inte ladda ljud: ${response.status}`);
         const contentType = response.headers.get('Content-Type') || '';
         if (contentType.includes('application/json')) {
           const data: any = await response.json().catch(() => ({}));
-          const raw = data?.error || data?.message || data;
-          const msg = typeof raw === 'string' ? raw : (raw?.message || 'Kunde inte ladda ljudfilen');
-          throw new Error(msg);
+          throw new Error(typeof data?.error === 'string' ? data.error : 'Kunde inte ladda ljudfilen');
         }
-
         const blob = await response.blob();
-        if (blob.size === 0) {
-          throw new Error('Tom ljudfil mottagen');
-        }
+        if (blob.size === 0) throw new Error('Tom ljudfil mottagen');
+        if (cancelled) return;
 
         const rawMime = audioBackup.mimeType || contentType || blob.type;
         const normalizedMime = normalizeAudioMimeType(rawMime) || rawMime || blob.type;
-        const playableBlob =
-          normalizedMime && normalizedMime !== blob.type ? new Blob([blob], { type: normalizedMime }) : blob;
+        const playableBlob = normalizedMime && normalizedMime !== blob.type ? new Blob([blob], { type: normalizedMime }) : blob;
 
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current);
-        }
-
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
         const url = URL.createObjectURL(playableBlob);
         objectUrlRef.current = url;
         setAudioMimeType(normalizedMime || blob.type || null);
         setAudioUrl(url);
       } catch (err: any) {
-        const msg = typeof err?.message === 'string' ? err.message : 'Kunde inte ladda ljudfilen';
-        setError(msg);
-        setAudioUrl(null);
+        if (!cancelled) { setError(err?.message || 'Kunde inte ladda ljudfilen'); setAudioUrl(null); }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
-
     fetchAudio();
-
-    return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-    };
+    return () => { cancelled = true; if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null; } };
   }, [audioBackup.downloadPath, meetingId]);
 
-  // Reload audio element when URL changes
+  // Load audio element
   useEffect(() => {
     if (!audioUrl) return;
-    const t = window.setTimeout(() => {
+    const t = setTimeout(() => {
       if (playRequestRef.current) return;
       const el = audioRef.current;
-      if (!el || !el.paused) return;
-      try {
-        el.load();
-      } catch {
-        // ignore
-      }
+      if (el && el.paused) { try { el.load(); } catch {} }
     }, 50);
-    return () => window.clearTimeout(t);
+    return () => clearTimeout(t);
   }, [audioUrl, audioMimeType]);
 
-  const formatTime = (time: number): string => {
-    if (!isFinite(time) || isNaN(time)) return '0:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  // --- Pointer-based seeking on the progress bar ---
+  const getTimeFromPointer = useCallback((clientX: number): number => {
+    const bar = progressBarRef.current;
+    if (!bar || !duration) return 0;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return ratio * duration;
+  }, [duration]);
+
+  const commitSeek = useCallback((time: number) => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.currentTime = time;
+    setCurrentTime(time);
+    onTimeUpdate?.(time);
+    onSeek?.(time);
+  }, [onTimeUpdate, onSeek]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (!duration) return;
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    const t = getTimeFromPointer(e.clientX);
+    setDragTime(t);
+  }, [duration, getTimeFromPointer]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const t = getTimeFromPointer(e.clientX);
+    setDragTime(t);
+  }, [isDragging, getTimeFromPointer]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    const t = getTimeFromPointer(e.clientX);
+    commitSeek(t);
+  }, [isDragging, getTimeFromPointer, commitSeek]);
 
   const togglePlay = async () => {
     const el = audioRef.current;
     if (!el || !audioUrl) return;
-
     setError(null);
     if (playRequestRef.current) return;
-
-    if (!el.paused) {
-      el.pause();
-      return;
-    }
-
+    if (!el.paused) { el.pause(); return; }
     try {
       setIsStartingPlayback(true);
-      if (el.readyState === 0) {
-        try { el.load(); } catch { /* ignore */ }
-      }
-
+      if (el.readyState === 0) { try { el.load(); } catch {} }
       const p = el.play();
-      if (p && typeof (p as any).then === 'function') {
-        playRequestRef.current = p as Promise<void>;
-        await playRequestRef.current;
-      }
+      if (p) { playRequestRef.current = p; await p; }
     } catch (err: any) {
-      const msg = typeof err?.message === 'string' ? err.message : 'Kunde inte starta uppspelning';
-      if (!msg.toLowerCase().includes('interrupted by a call to pause')) {
-        setError(msg);
-      }
-    } finally {
-      playRequestRef.current = null;
-      setIsStartingPlayback(false);
-    }
-  };
-
-  const handleSeek = (value: number[]) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = value[0];
-    setCurrentTime(value[0]);
-    onTimeUpdate?.(value[0]);
-    onSeek?.(value[0]);
-  };
-
-  const skipBackward = () => {
-    if (!audioRef.current) return;
-    const newTime = Math.max(0, audioRef.current.currentTime - 10);
-    audioRef.current.currentTime = newTime;
-    onSeek?.(newTime);
-  };
-
-  const skipForward = () => {
-    if (!audioRef.current) return;
-    const newTime = Math.min(duration, audioRef.current.currentTime + 10);
-    audioRef.current.currentTime = newTime;
-    onSeek?.(newTime);
-  };
-
-  const toggleMute = () => {
-    if (!audioRef.current) return;
-    audioRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
+      if (!err?.message?.toLowerCase().includes('interrupted by a call to pause')) setError(err?.message || 'Uppspelningsfel');
+    } finally { playRequestRef.current = null; setIsStartingPlayback(false); }
   };
 
   const cyclePlaybackRate = () => {
-    const rates = [1, 1.25, 1.5, 1.75, 2, 0.75];
-    const currentIndex = rates.indexOf(playbackRate);
-    const nextRate = rates[(currentIndex + 1) % rates.length];
-    setPlaybackRate(nextRate);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = nextRate;
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const time = audioRef.current.currentTime;
-      setCurrentTime(time);
-      onTimeUpdate?.(time);
-    }
+    const rates = [1, 1.25, 1.5, 2];
+    const next = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+    setPlaybackRate(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
   };
 
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
-      setDuration(audioRef.current.duration);
+      const d = audioRef.current.duration;
+      if (isFinite(d) && d > 0) setDuration(d);
       audioRef.current.playbackRate = playbackRate;
     }
   };
 
-  const handlePlay = () => {
-    setIsPlaying(true);
-    onPlayStateChange?.(true);
-    startTimeTicker();
-  };
+  const handlePlay = () => { setIsPlaying(true); onPlayStateChange?.(true); };
+  const handlePause = () => { setIsPlaying(false); onPlayStateChange?.(false); };
+  const handleEnded = () => { setIsPlaying(false); onPlayStateChange?.(false); };
+  const handleError = () => { setError('Kunde inte spela upp ljudfilen'); setIsPlaying(false); onPlayStateChange?.(false); };
 
-  const handlePause = () => {
-    setIsPlaying(false);
-    onPlayStateChange?.(false);
-    stopTimeTicker();
-  };
-
-  const handleEnded = () => {
-    setIsPlaying(false);
-    onPlayStateChange?.(false);
-    stopTimeTicker();
-  };
-
-  const handleError = () => {
-    setError('Kunde inte spela upp ljudfilen');
-    setIsPlaying(false);
-    onPlayStateChange?.(false);
-    stopTimeTicker();
-  };
+  const displayTime = isDragging ? dragTime : currentTime;
+  const progress = duration > 0 ? (displayTime / duration) * 100 : 0;
 
   if (error && !audioUrl) {
-    return (
-      <div className={cn("text-sm text-muted-foreground p-4 text-center", className)}>
-        {error}
-      </div>
-    );
+    return <div className={cn("text-sm text-muted-foreground p-3 text-center", className)}>{error}</div>;
   }
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("flex items-center gap-3 py-2", className)}>
       {audioUrl && (
         <audio
           key={audioUrl}
           ref={audioRef}
-          onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onPlay={handlePlay}
           onPause={handlePause}
@@ -333,110 +252,78 @@ export function IntegratedTranscriptPlayer({
         </audio>
       )}
 
-      {/* Progress bar */}
-      <div className="px-1">
-        <Slider
-          value={[currentTime]}
-          max={duration || 100}
-          step={0.1}
-          onValueChange={handleSeek}
-          disabled={!audioUrl || duration === 0}
-          className="w-full"
-        />
-      </div>
-
-      {/* Controls row */}
-      <div className="flex items-center justify-between gap-2">
-        {/* Left side - time */}
-        <div className="flex items-center gap-1 min-w-0">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {formatTime(currentTime)}
-          </span>
-          <span className="text-xs text-muted-foreground">/</span>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {formatTime(duration)}
-          </span>
+      {/* Play button */}
+      {isLoading ? (
+        <div className="h-9 w-9 flex items-center justify-center shrink-0">
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </div>
-
-        {/* Center - playback controls */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={skipBackward}
-            disabled={!audioUrl}
-            className="h-8 w-8 rounded-full"
-            title="Hoppa bakåt 10s"
-          >
-            <SkipBack className="w-4 h-4" />
-          </Button>
-
-          {isLoading ? (
-            <div className="h-10 w-10 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={togglePlay}
+          disabled={!audioUrl || isStartingPlayback}
+          className="h-9 w-9 shrink-0 rounded-full"
+        >
+          {isStartingPlayback ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : isPlaying ? (
+            <Pause className="w-4 h-4" />
           ) : (
-            <Button
-              variant={isPlaying ? "secondary" : "default"}
-              size="icon"
-              onClick={togglePlay}
-              disabled={!audioUrl || isStartingPlayback}
-              className="h-10 w-10 rounded-full"
-            >
-              {isStartingPlayback ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isPlaying ? (
-                <Pause className="w-5 h-5" />
-              ) : (
-                <Play className="w-5 h-5 ml-0.5" />
-              )}
-            </Button>
+            <Play className="w-4 h-4 ml-0.5" />
           )}
+        </Button>
+      )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={skipForward}
-            disabled={!audioUrl}
-            className="h-8 w-8 rounded-full"
-            title="Hoppa framåt 10s"
-          >
-            <SkipForward className="w-4 h-4" />
-          </Button>
+      {/* Time */}
+      <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap shrink-0 min-w-[3rem]">
+        {formatTime(displayTime)}
+      </span>
+
+      {/* Progress bar - custom pointer-based seeking */}
+      <div
+        ref={progressBarRef}
+        className="relative flex-1 h-8 flex items-center cursor-pointer touch-none select-none group"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        {/* Track */}
+        <div className="absolute inset-x-0 h-1.5 rounded-full bg-muted">
+          {/* Filled */}
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-75"
+            style={{ width: `${Math.min(100, progress)}%` }}
+          />
         </div>
-
-        {/* Right side - speed & volume */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={cyclePlaybackRate}
-            disabled={!audioUrl}
-            className="h-7 px-2 text-xs font-mono"
-            title="Ändra hastighet"
-          >
-            {playbackRate}x
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMute}
-            className="h-8 w-8 rounded-full"
-            disabled={!audioUrl}
-          >
-            {isMuted ? (
-              <VolumeX className="w-4 h-4" />
-            ) : (
-              <Volume2 className="w-4 h-4" />
+        {/* Thumb */}
+        {duration > 0 && (
+          <div
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-primary shadow-sm border-2 border-background transition-[left] duration-75",
+              isDragging && "scale-125"
             )}
-          </Button>
-        </div>
+            style={{ left: `${Math.min(100, progress)}%` }}
+          />
+        )}
       </div>
 
-      {error && (
-        <p className="text-xs text-destructive text-center">{error}</p>
-      )}
+      {/* End time */}
+      <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap shrink-0 min-w-[3rem] text-right">
+        {duration > 0 ? formatTime(duration) : '--:--'}
+      </span>
+
+      {/* Speed */}
+      <button
+        onClick={cyclePlaybackRate}
+        disabled={!audioUrl}
+        className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors shrink-0 px-1"
+      >
+        {playbackRate}x
+      </button>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
