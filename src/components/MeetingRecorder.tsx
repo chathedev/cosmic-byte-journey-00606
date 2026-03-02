@@ -16,6 +16,7 @@ import { CallInterruptionDialog } from "./CallInterruptionDialog";
 import { isNativeApp } from "@/utils/capacitorDetection";
 import { uploadRecordingToAsr } from "@/lib/asrRecordingUpload";
 import { apiClient } from "@/lib/api";
+import { debugLog, debugError } from "@/lib/debugLogger";
 import { useRecordingBackup } from "@/hooks/useRecordingBackup";
 import { useCallInterruptionDetector } from "@/hooks/useCallInterruptionDetector";
 import { digitalRecordingStreams } from "@/lib/digitalRecordingStreams";
@@ -276,9 +277,9 @@ export const MeetingRecorder = ({
   }, []);
 
   const handleModeSelect = (mode: MeetingMode) => {
+    debugLog('[🎬 MeetingRecorder] handleModeSelect:', mode);
     setMeetingMode(mode);
     setShowModeDialog(false);
-    // Bekräftelse sker i dialogen; starta direkt efter "Starta möte"
     void startRecording();
   };
 
@@ -340,6 +341,7 @@ export const MeetingRecorder = ({
   }, [isRecording, isPaused]);
 
   const startRecording = async () => {
+    debugLog('[🎬 MeetingRecorder] startRecording called, hasStarted:', hasStartedRecordingRef.current);
     if (hasStartedRecordingRef.current) return;
     hasStartedRecordingRef.current = true;
 
@@ -350,6 +352,7 @@ export const MeetingRecorder = ({
     hasAutoStoppedRef.current = false;
     setDurationSec(0);
     setIsRecording(true);
+    debugLog('[🎬 MeetingRecorder] isRecording set to true, clock started at', recordingStartedAtMsRef.current);
 
     try {
       let combinedStream: MediaStream;
@@ -460,10 +463,11 @@ export const MeetingRecorder = ({
       // Fire-and-forget: don't block recording start on wake lock
       requestWakeLock().catch(() => {});
       noSleep.enable();
+      debugLog('[🎬 MeetingRecorder] MediaRecorder started, mimeType:', mediaRecorder.mimeType);
 
       console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', isDigitalRecording ? '(Digital)' : '(In-person)');
     } catch (error) {
-      console.error('Error starting recording:', error);
+      debugError('[🎬 MeetingRecorder] startRecording FAILED:', error);
       // Reset recording state since we set it optimistically
       setIsRecording(false);
       recordingStartedAtMsRef.current = null;

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { apiClient, User } from '@/lib/api';
+import { installGlobalDebugLogging } from '@/lib/debugLogger';
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +25,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const userData = await apiClient.getMe();
       setUser(userData);
+      // Install debug logging after user is known
+      installGlobalDebugLogging();
     } catch (error) {
       console.error('Failed to fetch user:', error);
       // Only clear user on actual auth errors, not network errors
