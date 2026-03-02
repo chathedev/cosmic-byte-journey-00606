@@ -46,7 +46,7 @@ interface TranscriptionInterfaceProps {
 export const TranscriptionInterface = ({ isFreeTrialMode = false }: TranscriptionInterfaceProps) => {
   const [currentView, setCurrentView] = useState<View>("welcome");
   const [transcript, setTranscript] = useState("");
-  const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan, enterpriseMembership } = useSubscription();
+  const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan, enterpriseMembership, isAdmin } = useSubscription();
   const { user } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState('');
@@ -701,8 +701,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           setShowModeDialog(open);
         }}
         onSelect={handleModeSelect}
-        showDigitalOption={true}
-        digitalComingSoon={!isEnterprise}
+        showDigitalOption={isEnterprise || isAdmin}
+        digitalComingSoon={isEnterprise && !isAdmin}
         digitalLocked={digitalSession.isLocked}
         lockedSessionInfo={digitalSession.lockedSessionInfo}
       />
