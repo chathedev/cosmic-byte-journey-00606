@@ -96,33 +96,36 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   // and clear only stale terminal sessions on initial hydration.
   const hasHydratedDigitalSessionRef = useRef(false);
   const redirectedCompletedSessionRef = useRef<string | null>(null);
+  // Guard: once we reset a stale session on mount, never auto-open again in this page lifecycle
+  const suppressAutoOpenRef = useRef(false);
 
   useEffect(() => {
+    // On first hydration, check if the session from backend is stale and reset it
+    if (!hasHydratedDigitalSessionRef.current && digitalSession.session) {
+      hasHydratedDigitalSessionRef.current = true;
+      const staleStatuses = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted', 'processing', 'stopping'];
+      if (staleStatuses.includes(digitalSession.status)) {
+        suppressAutoOpenRef.current = true;
+        digitalSession.reset();
+        setShowDigitalSession(false);
+        return;
+      }
+    }
+
+    // Never auto-open if we already suppressed a stale session
+    if (suppressAutoOpenRef.current) return;
+
     const activeStatuses = [
       'pending',
       'starting',
       'joining',
       'listening',
       'paused',
-      'stopping',
     ];
 
-    // Auto-open Digital Session only for real-time meeting states.
-    // IMPORTANT: Exclude "processing" to avoid endless auto-redirect loops
-    // when user returns to Home while backend is still batch-processing.
+    // Auto-open Digital Session only for real-time meeting states
     if (activeStatuses.includes(digitalSession.status) && digitalSession.session) {
       setShowDigitalSession(true);
-    }
-
-    if (!hasHydratedDigitalSessionRef.current && digitalSession.session) {
-      hasHydratedDigitalSessionRef.current = true;
-      // Clear ALL stale terminal AND processing sessions on mount
-      // to prevent auto-redirect loops when returning to Home
-      const staleStatuses = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted', 'processing'];
-      if (staleStatuses.includes(digitalSession.status)) {
-        digitalSession.reset();
-        setShowDigitalSession(false);
-      }
     }
   }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
 
