@@ -28,6 +28,9 @@ export interface DigitalSessionMetadata {
   admissionState?: string;
   prejoinTimeoutMs?: number;
   lobbyTimeoutMs?: number;
+  audioCaptureActive?: boolean;
+  capturePaused?: boolean;
+  botMediaMuted?: boolean;
 }
 
 export interface DigitalSession {
