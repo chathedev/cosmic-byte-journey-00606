@@ -2,7 +2,7 @@
 // Records audio directly on the meeting page, then uploads to /asr/recording-upload
 
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, AlertTriangle, Shield, Monitor } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, AlertTriangle, Shield, Monitor, Users, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ interface MeetingRecorderProps {
   useAsrMode: boolean;
   language?: string;
   isDigitalRecording?: boolean;
+  initialMeetingMode?: MeetingMode | null;
+  showArrivalStartDialog?: boolean;
 }
 
 export const MeetingRecorder = ({
@@ -42,6 +44,8 @@ export const MeetingRecorder = ({
   useAsrMode,
   language = 'sv',
   isDigitalRecording = false,
+  initialMeetingMode = null,
+  showArrivalStartDialog = false,
 }: MeetingRecorderProps) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -52,10 +56,27 @@ export const MeetingRecorder = ({
   const [showInstructions, setShowInstructions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [localTitle, setLocalTitle] = useState(meetingTitle);
-  const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(isDigitalRecording ? 'phone-call' : null);
-  const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording);
+  const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(initialMeetingMode ?? (isDigitalRecording ? 'phone-call' : null));
+  const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording && !initialMeetingMode);
+  const [showStartMeetingDialog, setShowStartMeetingDialog] = useState(
+    showArrivalStartDialog && !!initialMeetingMode && !isDigitalRecording
+  );
 
-  debugLog('[🎬 MeetingRecorder] render — isRecording:', isRecording, 'isPaused:', isPaused, 'showModeDialog:', showModeDialog, 'meetingMode:', meetingMode);
+  const meetingModeLabel = meetingMode === 'in-person'
+    ? 'Fysiskt möte'
+    : meetingMode === 'phone-call'
+      ? 'Telefonmöte'
+      : meetingMode === 'digital'
+        ? 'Teams-möte (bot)'
+        : '';
+
+  const MeetingModeIcon = meetingMode === 'in-person'
+    ? Users
+    : meetingMode === 'phone-call'
+      ? Phone
+      : Monitor;
+
+  debugLog('[🎬 MeetingRecorder] render — isRecording:', isRecording, 'isPaused:', isPaused, 'showModeDialog:', showModeDialog, 'showStartMeetingDialog:', showStartMeetingDialog, 'meetingMode:', meetingMode);
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
   const [interimText, setInterimText] = useState<string>("");
@@ -133,6 +154,16 @@ export const MeetingRecorder = ({
     dismissResumeDialog();
     handleStopRecording();
   };
+
+  useEffect(() => {
+    debugLog('[🎬 MeetingRecorder] popup state:', {
+      showModeDialog,
+      showStartMeetingDialog,
+      meetingMode,
+      showArrivalStartDialog,
+      initialMeetingMode,
+    });
+  }, [showModeDialog, showStartMeetingDialog, meetingMode, showArrivalStartDialog, initialMeetingMode]);
 
   // Check instructions
   useEffect(() => {
@@ -281,7 +312,7 @@ export const MeetingRecorder = ({
     debugLog('[🎬 MeetingRecorder] handleModeSelect:', mode);
     setMeetingMode(mode);
     setShowModeDialog(false);
-    void startRecording();
+    setShowStartMeetingDialog(true);
   };
 
   // Duration timer (clock-based + RAF fallback for Safari/UI freeze edge cases)
@@ -905,6 +936,41 @@ export const MeetingRecorder = ({
 
       <RecordingInstructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} />
 
+      {/* Start Meeting Confirmation Dialog (shown on arrival to meeting detail) */}
+      <AlertDialog open={showStartMeetingDialog && !!meetingMode && !isRecording}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <MeetingModeIcon className="w-5 h-5 text-primary" />
+              Starta möte
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Du är nu på mötessidan. När du trycker <strong>Starta möte</strong> börjar inspelningen direkt i läget <strong>{meetingModeLabel}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                debugLog('[🎬 MeetingRecorder] Start dialog -> choose another mode');
+                setShowStartMeetingDialog(false);
+                setShowModeDialog(true);
+              }}
+            >
+              Byt mötesläge
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                debugLog('[🎬 MeetingRecorder] Start dialog -> start recording clicked');
+                setShowStartMeetingDialog(false);
+                void startRecording();
+              }}
+            >
+              Starta möte
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Meeting Mode Selection Dialog */}
       <MeetingModeDialog
         open={showModeDialog}
@@ -914,7 +980,6 @@ export const MeetingRecorder = ({
           setShowModeDialog(open);
         }}
         onSelect={handleModeSelect}
-        showStartConfirmation
       />
 
       {/* Call Interruption Resume Dialog */}

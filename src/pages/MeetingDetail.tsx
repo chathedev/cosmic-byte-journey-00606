@@ -22,6 +22,7 @@ import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
+import type { MeetingMode } from "@/components/MeetingModeDialog";
 import { IntegratedTranscriptPlayer } from "@/components/IntegratedTranscriptPlayer";
 import { TeamSelector } from "@/components/TeamSelector";
 
@@ -70,11 +71,18 @@ const MeetingDetail = () => {
   const { userPlan, incrementMeetingCount, isAdmin, enterpriseMembership } = useSubscription();
 
   // Check if we're starting in recording mode (from navigation state)
-  const locationState = location.state as { startRecording?: boolean; isFreeTrialMode?: boolean; selectedLanguage?: 'sv-SE' | 'en-US'; digitalRecording?: boolean } | null;
+  const locationState = location.state as {
+    startRecording?: boolean;
+    isFreeTrialMode?: boolean;
+    selectedLanguage?: 'sv-SE' | 'en-US';
+    digitalRecording?: boolean;
+    meetingMode?: MeetingMode;
+  } | null;
   const [isRecordingMode, setIsRecordingMode] = useState(locationState?.startRecording === true);
   const isFreeTrialMode = locationState?.isFreeTrialMode || false;
   const selectedLanguage = locationState?.selectedLanguage || 'sv-SE';
   const isDigitalRecording = locationState?.digitalRecording === true;
+  const selectedMeetingMode = locationState?.meetingMode ?? null;
 
   // Determine if user has ASR access (Enterprise or Admin)
   // NOTE: plan can be non-string at runtime; coerce defensively.
@@ -2247,6 +2255,8 @@ const MeetingDetail = () => {
           useAsrMode={useAsrMode}
           language={selectedLanguage === 'en-US' ? 'en' : 'sv'}
           isDigitalRecording={isDigitalRecording}
+          initialMeetingMode={selectedMeetingMode}
+          showArrivalStartDialog={locationState?.startRecording === true}
         />
       </div>
     );

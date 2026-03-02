@@ -59,6 +59,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const isMobile = useIsMobile();
   const [showTeamSelect, setShowTeamSelect] = useState(false);
   const [pendingAction, setPendingAction] = useState<'record' | 'upload' | null>(null);
+  const [pendingMeetingMode, setPendingMeetingMode] = useState<MeetingMode | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [showModeDialog, setShowModeDialog] = useState(false);
   const [showDigitalStartDialog, setShowDigitalStartDialog] = useState(false);
@@ -153,6 +154,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowModeDialog(false);
 
     if (mode === 'digital') {
+      setPendingMeetingMode(null);
       debugLog('[🏠 Home] Digital mode selected, isActive:', digitalSession.isActive);
       if (digitalSession.isActive) {
         setShowDigitalSession(true);
@@ -164,7 +166,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
     // For in-person / phone-call, proceed with recording
     if (isEnterprise) {
-      debugLog('[🏠 Home] Enterprise user — showing team select');
+      debugLog('[🏠 Home] Enterprise user — showing team select with pending mode:', mode);
+      setPendingMeetingMode(mode);
       setPendingAction('record');
       setShowTeamSelect(true);
       return;
@@ -177,6 +180,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const handleUploadClick = async () => {
     // Enterprise users: show team selection first
     if (isEnterprise) {
+      setPendingMeetingMode(null);
       setPendingAction('upload');
       setShowTeamSelect(true);
       return;
@@ -185,13 +189,15 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   const handleTeamSelected = async (teamId: string | null) => {
-    debugLog('[🏠 Home] Team selected:', teamId, 'pendingAction:', pendingAction);
+    debugLog('[🏠 Home] Team selected:', teamId, 'pendingAction:', pendingAction, 'pendingMeetingMode:', pendingMeetingMode);
     setSelectedTeamId(teamId);
     const action = pendingAction;
+    const selectedMode = pendingMeetingMode;
     setPendingAction(null);
+    setPendingMeetingMode(null);
 
     if (action === 'record') {
-      await startInPersonRecording(teamId);
+      await startInPersonRecording(teamId, selectedMode ?? undefined);
     } else if (action === 'upload') {
       setShowDigitalMeetingDialog(true);
     }
@@ -244,6 +250,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           startRecording: true,
           isFreeTrialMode,
           selectedLanguage,
+          meetingMode: mode,
         },
       });
     } catch (error: any) {
@@ -613,7 +620,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           setShowModeDialog(open);
         }}
         onSelect={handleModeSelect}
-        showStartConfirmation
         showDigitalOption={true}
         digitalLocked={digitalSession.isLocked}
         lockedSessionInfo={digitalSession.lockedSessionInfo}
