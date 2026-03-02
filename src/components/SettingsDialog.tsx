@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useScrollToInputHandler } from "@/hooks/useScrollToInput";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ interface SettingsDialogProps {
 export const SettingsDialog = ({ open, onOpenChange, requireName = false }: SettingsDialogProps) => {
   const { user, logout, refreshUser } = useAuth();
   const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership } = useSubscription();
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -354,6 +356,7 @@ export const SettingsDialog = ({ open, onOpenChange, requireName = false }: Sett
                       onChange={(e) => setPreferredName(e.target.value)}
                       placeholder="T.ex. Anna Andersson"
                       className="flex-1 h-10 text-sm"
+                      onFocus={scrollOnFocus}
                       autoFocus
                     />
                     <Button

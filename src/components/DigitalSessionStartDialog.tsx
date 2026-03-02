@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useScrollToInputHandler } from "@/hooks/useScrollToInput";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export const DigitalSessionStartDialog = ({
 }: DigitalSessionStartDialogProps) => {
   const [joinUrl, setJoinUrl] = useState("");
   const [title, setTitle] = useState("");
+  const { handleFocus: scrollOnFocus } = useScrollToInputHandler();
   const [isStarting, setIsStarting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>('details');
@@ -141,6 +143,7 @@ export const DigitalSessionStartDialog = ({
                 placeholder="Klistra in möteslänk..."
                 value={joinUrl}
                 onChange={(e) => handleUrlChange(e.target.value)}
+                onFocus={scrollOnFocus}
                 className="h-11 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
                 disabled={isLocked || isStarting}
                 autoFocus
@@ -153,6 +156,7 @@ export const DigitalSessionStartDialog = ({
                 placeholder="t.ex. Kundmöte Acme"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onFocus={scrollOnFocus}
                 className="h-11 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
                 disabled={isLocked || isStarting}
               />
@@ -209,6 +213,7 @@ export const DigitalSessionStartDialog = ({
                     value={name}
                     onChange={(e) => handleParticipantChange(index, e.target.value)}
                     onKeyDown={(e) => handleParticipantKeyDown(e, index)}
+                    onFocus={scrollOnFocus}
                     className="h-10 rounded-xl border-border/50 bg-muted/30 text-sm placeholder:text-muted-foreground/50"
                     autoFocus={index === participants.length - 1}
                   />
