@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer, Mic, MicOff, UserCheck, Info } from "lucide-react";
+import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer, Mic, MicOff, UserCheck, Info, Volume2, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +33,15 @@ const ERROR_CODE_LABELS: Record<string, string> = {
   digital_audio_silent: 'Inget användbart mötesljud fångades',
 };
 
+const PROCESSING_STAGE_LABELS: Record<string, string> = {
+  queued: 'Väntar i kö...',
+  transcribing: 'Transkriberar...',
+  diarizing: 'Identifierar talare...',
+  cleanup: 'Rensar transcript...',
+  sis_processing: 'Bearbetar talare...',
+  done: 'Nästan klart...',
+};
+
 const formatDuration = (startedAt: string | null): string => {
   if (!startedAt) return '00:00';
   const seconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
@@ -49,7 +58,12 @@ const formatElapsedMs = (ms: number): string => {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-// Map join stages to user-friendly text
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const getJoinStageLabel = (stage?: string): string => {
   switch (stage) {
     case 'navigating': return 'Öppnar möteslänk...';
@@ -61,7 +75,6 @@ const getJoinStageLabel = (stage?: string): string => {
   }
 };
 
-// Stepper for the connection phase
 const CONNECTION_STEPS = [
   { key: 'pending', label: 'Skapar session' },
   { key: 'starting', label: 'Initierar' },
@@ -109,12 +122,16 @@ export const DigitalSessionView = ({
   const metadata = session?.metadata;
   const isLobby = metadata?.joinStage === 'lobby_waiting';
   const awaitingHost = metadata?.awaitingHostAdmission || metadata?.joinUiState === 'await_host_admission';
+  const hostActionText = metadata?.hostActionText;
   const botName = metadata?.botDisplayName || 'Tivly Assistant';
   const meetingEndedByHost = metadata?.meetingEndedByHost;
+  const endedReason = metadata?.endedReason;
 
-  // Key new flags from the guide
+  // Key flags from the guide
   const awaitingRecordingStart = metadata?.awaitingRecordingStart === true;
   const recordingStartedAt = metadata?.recordingStartedAt || null;
+  const audioCaptureActive = metadata?.audioCaptureActive === true;
+  const capturePaused = metadata?.capturePaused === true;
 
   // Timer should only run from recordingStartedAt (actual recording), not session.startedAt
   const timerReference = recordingStartedAt || (isListening ? session?.startedAt : null);
@@ -161,7 +178,6 @@ export const DigitalSessionView = ({
 
   const handleStartRecording = async () => {
     setIsStartingRecording(true);
-    // resume endpoint is used for the first explicit start of recording
     onResume();
   };
 
@@ -172,29 +188,39 @@ export const DigitalSessionView = ({
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-border/50">
-        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0 -ml-1">
+        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0 -ml-1" disabled={isStopping}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">
             {session?.meetingTitle || 'Digital session'}
           </p>
-          {/* Only show timer when recording has actually started */}
           {showTimer && (isListening || isPaused) && (
             <p className="text-xs text-muted-foreground font-mono">{elapsed}</p>
           )}
         </div>
-        {isListening && (
+        {isListening && audioCaptureActive && (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[11px] font-medium text-green-600 dark:text-green-400">LIVE</span>
           </div>
         )}
-        {/* Show "Ready" badge when awaiting recording start */}
         {isPaused && awaitingRecordingStart && (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             <span className="text-[11px] font-medium text-primary">REDO</span>
+          </div>
+        )}
+        {isPaused && !awaitingRecordingStart && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-500/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+            <span className="text-[11px] font-medium text-yellow-600 dark:text-yellow-400">PAUSAD</span>
+          </div>
+        )}
+        {isProcessing && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10">
+            <Loader2 className="w-3 h-3 text-primary animate-spin" />
+            <span className="text-[11px] font-medium text-primary">BEARBETAR</span>
           </div>
         )}
       </div>
@@ -205,14 +231,12 @@ export const DigitalSessionView = ({
         {/* Connecting states (pending → starting → joining) */}
         {isConnecting && (
           <div className="flex flex-col items-center gap-6 w-full max-w-xs">
-            {/* Pulsing orb */}
             <div className="relative w-20 h-20 flex items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-primary/5 animate-ping" style={{ animationDuration: '3s' }} />
               <div className="absolute inset-1 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
               <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2s' }} />
             </div>
 
-            {/* Status text */}
             <div className="text-center space-y-1.5">
               {status === 'joining' ? (
                 <>
@@ -221,21 +245,21 @@ export const DigitalSessionView = ({
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {awaitingHost
-                      ? 'Mötesvärden behöver godkänna boten i Teams.'
+                      ? (hostActionText || `Mötesvärden behöver godkänna ${botName} i Teams.`)
                       : isLobby 
                       ? 'Mötesvärden behöver släppa in boten. Det kan ta en stund.'
                       : 'Boten ansluter till mötet. Det kan ta upp till en minut.'}
                   </p>
                   {/* Host admission callout */}
                   {awaitingHost && (
-                    <div className="mt-3 mx-auto max-w-[260px] flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15 text-left">
+                    <div className="mt-3 mx-auto max-w-[280px] flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15 text-left">
                       <UserCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
                         <p className="text-sm font-medium text-foreground">
                           Släpp in {botName}
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Godkänn {botName} i Teams-mötet för att starta inspelningen.
+                          {hostActionText || `Godkänn ${botName} i Teams-mötet för att fortsätta.`}
                         </p>
                       </div>
                     </div>
@@ -287,7 +311,7 @@ export const DigitalSessionView = ({
           </div>
         )}
 
-        {/* Stopping */}
+        {/* Stopping – lock all controls */}
         {isStopping && (
           <div className="flex flex-col items-center gap-4">
             <div className="relative w-16 h-16 flex items-center justify-center">
@@ -295,12 +319,12 @@ export const DigitalSessionView = ({
             </div>
             <div className="text-center space-y-1">
               <p className="text-base font-semibold text-foreground">Avslutar session...</p>
-              <p className="text-sm text-muted-foreground">Boten lämnar mötet...</p>
+              <p className="text-sm text-muted-foreground">Boten lämnar mötet och inspelningen bearbetas.</p>
             </div>
           </div>
         )}
 
-        {/* Listening */}
+        {/* Listening – bot is in meeting and recording */}
         {isListening && session?.joinedAt && (
           <div className="flex flex-col items-center gap-5 w-full">
             <div className="relative w-24 h-24 flex items-center justify-center">
@@ -320,7 +344,7 @@ export const DigitalSessionView = ({
               )}
             </div>
             {/* Audio capture indicator */}
-            {metadata?.audioCaptureActive && (
+            {audioCaptureActive && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/8 border border-green-500/15">
                 <Mic className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-[11px] font-medium text-green-600 dark:text-green-400">Lyssnar</span>
@@ -330,7 +354,7 @@ export const DigitalSessionView = ({
             {metadata?.botMediaMuted && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted">
                 <MicOff className="w-3 h-3 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">Botens mic/kamera av</span>
+                <span className="text-[10px] text-muted-foreground">Botens mic & kamera av</span>
               </div>
             )}
           </div>
@@ -360,7 +384,6 @@ export const DigitalSessionView = ({
                 Tryck på <span className="font-semibold text-foreground">Starta inspelning</span> när du vill börja spela in.
               </p>
             </div>
-            {/* Bot media muted trust signal */}
             {metadata?.botMediaMuted && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted">
                 <MicOff className="w-3 h-3 text-muted-foreground" />
@@ -385,11 +408,12 @@ export const DigitalSessionView = ({
               <p className="text-base font-semibold text-yellow-600 dark:text-yellow-400">Pausad</p>
               <p className="text-sm text-muted-foreground">Boten är kvar i mötet. Inspelning pausad.</p>
             </div>
-            {/* Capture paused indicator */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/8 border border-yellow-500/15">
-              <MicOff className="w-3.5 h-3.5 text-yellow-500" />
-              <span className="text-[11px] font-medium text-yellow-600 dark:text-yellow-400">Ljud pausat</span>
-            </div>
+            {capturePaused && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/8 border border-yellow-500/15">
+                <MicOff className="w-3.5 h-3.5 text-yellow-500" />
+                <span className="text-[11px] font-medium text-yellow-600 dark:text-yellow-400">Ljud pausat</span>
+              </div>
+            )}
             {showTimer && (
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-muted-foreground" />
@@ -472,28 +496,47 @@ export const DigitalSessionView = ({
               <div className="absolute inset-0 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
               <Loader2 className="w-7 h-7 text-primary animate-spin" style={{ animationDuration: '2.5s' }} />
             </div>
-             <div className="text-center space-y-1.5">
+            <div className="text-center space-y-1.5">
               <p className="text-base font-semibold text-foreground">Bearbetar inspelning</p>
               {meetingEndedByHost && (
                 <p className="text-xs text-muted-foreground/70">Mötet avslutades av värden</p>
               )}
+              {!meetingEndedByHost && endedReason === 'stopped' && (
+                <p className="text-xs text-muted-foreground/70">Sessionen avslutades manuellt</p>
+              )}
               <p className="text-sm text-muted-foreground leading-relaxed">
-                {metadata?.processingStage === 'transcribing' ? 'Transkriberar...' :
-                 metadata?.processingStage === 'diarizing' ? 'Identifierar talare via ElevenLabs...' :
-                 metadata?.processingStage === 'cleanup' ? 'Rensar transcript...' :
-                 metadata?.processingStage === 'sis_processing' ? 'Bearbetar talare...' :
-                 metadata?.processingStage === 'queued' ? 'Väntar i kö...' :
-                 metadata?.processingStage === 'done' ? 'Nästan klart...' :
-                 'Det här kan ta några minuter. Du behöver inte vänta här.'}
+                {metadata?.processingStage
+                  ? PROCESSING_STAGE_LABELS[metadata.processingStage] || 'Bearbetar...'
+                  : 'Det här kan ta några minuter. Du behöver inte vänta här.'}
               </p>
               {metadata?.processingStage === 'diarizing' && metadata?.speakerDiarizationAfterTranscript && (
                 <p className="text-xs text-muted-foreground/60">Transkript klart – separerar talare</p>
+              )}
+              {metadata?.processingStage === 'diarizing' && metadata?.speakerDiarizationEngine && (
+                <p className="text-[10px] text-muted-foreground/40">via {metadata.speakerDiarizationEngine}</p>
               )}
             </div>
             {metadata?.processingProgressPercent != null && (
               <div className="w-full space-y-1.5">
                 <Progress value={metadata.processingProgressPercent} className="h-1.5" />
                 <p className="text-[11px] text-muted-foreground text-center">{metadata.processingProgressPercent}%</p>
+              </div>
+            )}
+            {/* Audio stats */}
+            {(metadata?.recordedAudioBytes != null || metadata?.audioMeanVolumeDb != null) && (
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-1">
+                {metadata?.recordedAudioBytes != null && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                    <HardDrive className="w-3 h-3" />
+                    <span>{formatBytes(metadata.recordedAudioBytes)}</span>
+                  </div>
+                )}
+                {metadata?.audioMeanVolumeDb != null && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                    <Volume2 className="w-3 h-3" />
+                    <span>{metadata.audioMeanVolumeDb.toFixed(0)} dB medel</span>
+                  </div>
+                )}
               </div>
             )}
             {/* Speaker role suggestions */}
@@ -566,6 +609,14 @@ export const DigitalSessionView = ({
               Avsluta
             </Button>
           </div>
+        )}
+
+        {/* Stopping – all controls locked */}
+        {isStopping && (
+          <Button disabled className="w-full h-11 gap-2 rounded-xl">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Avslutar...
+          </Button>
         )}
 
         {status === 'completed' && (
