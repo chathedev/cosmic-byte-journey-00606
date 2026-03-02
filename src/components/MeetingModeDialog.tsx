@@ -14,6 +14,7 @@ interface MeetingModeDialogProps {
   onSelect: (mode: MeetingMode) => void;
   showDigitalOption?: boolean;
   digitalLocked?: boolean;
+  digitalComingSoon?: boolean;
   lockedSessionInfo?: LockedSessionInfo | null;
   showStartConfirmation?: boolean;
 }
@@ -51,6 +52,7 @@ export const MeetingModeDialog = ({
   onSelect,
   showDigitalOption = false,
   digitalLocked = false,
+  digitalComingSoon = false,
   lockedSessionInfo,
   showStartConfirmation = false,
 }: MeetingModeDialogProps) => {
@@ -139,18 +141,20 @@ export const MeetingModeDialog = ({
             <div className="px-4 pb-6 space-y-3">
               {visibleOptions.map((opt) => {
                 const isDigitalLocked = opt.mode === 'digital' && digitalLocked;
+                const isDigitalComingSoon = opt.mode === 'digital' && digitalComingSoon && !isDigitalLocked;
+                const isDisabled = isDigitalLocked || isDigitalComingSoon;
 
                 return (
                   <button
                     key={opt.mode}
-                    onClick={() => !isDigitalLocked && handleOptionSelect(opt.mode)}
+                    onClick={() => !isDisabled && handleOptionSelect(opt.mode)}
                     onMouseEnter={() => setHoveredOption(opt.mode)}
                     onMouseLeave={() => setHoveredOption(null)}
-                    disabled={isDigitalLocked}
+                    disabled={isDisabled}
                     className={cn(
                       "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
                       "flex items-center gap-4 group",
-                      isDigitalLocked
+                      isDisabled
                         ? "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
                         : hoveredOption === opt.mode
                           ? "border-primary bg-primary/5 shadow-md"
@@ -159,14 +163,14 @@ export const MeetingModeDialog = ({
                   >
                     <div className={cn(
                       "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors relative",
-                      isDigitalLocked
+                      isDisabled
                         ? "bg-muted text-muted-foreground"
                         : hoveredOption === opt.mode
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
                     )}>
                       <opt.icon className="w-6 h-6" />
-                      {isDigitalLocked && (
+                      {isDisabled && (
                         <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
                           <Lock className="w-3 h-3 text-destructive-foreground" />
                         </div>
@@ -183,6 +187,11 @@ export const MeetingModeDialog = ({
                             </p>
                           )}
                         </div>
+                      ) : isDigitalComingSoon ? (
+                        <div className="mt-0.5">
+                          <p className="text-sm text-amber-500 font-medium">Kommer snart</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Vi jobbar på den här funktionen</p>
+                        </div>
                       ) : (
                         <>
                           <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
@@ -193,7 +202,7 @@ export const MeetingModeDialog = ({
                         </>
                       )}
                     </div>
-                    {!isDigitalLocked && (
+                    {!isDisabled && (
                       <ArrowRight className={cn(
                         "w-5 h-5 shrink-0 transition-all",
                         hoveredOption === opt.mode
