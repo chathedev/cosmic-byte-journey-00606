@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
@@ -92,7 +92,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     pendingAction,
   ]);
 
-  // Auto-show Digital Session view only for active/in-progress states (not stale terminal states)
+  // Auto-show Digital Session view for active/in-progress states
+  // and clear only stale terminal sessions on initial hydration.
+  const hasHydratedDigitalSessionRef = useRef(false);
+  const redirectedCompletedSessionRef = useRef<string | null>(null);
+
   useEffect(() => {
     const activeStatuses = [
       'pending',
@@ -108,13 +112,29 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       setShowDigitalSession(true);
     }
 
-    // If session is in a terminal state on mount, just reset it so it doesn't linger
-    const terminalStatuses = ['completed', 'failed', 'timed_out', 'cancelled'];
-    if (terminalStatuses.includes(digitalSession.status) && digitalSession.session) {
-      digitalSession.reset();
-      setShowDigitalSession(false);
+    if (!hasHydratedDigitalSessionRef.current && digitalSession.session) {
+      hasHydratedDigitalSessionRef.current = true;
+      const staleTerminalStatuses = ['failed', 'timed_out', 'cancelled', 'interrupted'];
+      if (staleTerminalStatuses.includes(digitalSession.status)) {
+        digitalSession.reset();
+        setShowDigitalSession(false);
+      }
     }
-  }, [digitalSession.status, digitalSession.session]);
+  }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
+
+  // Always redirect instantly to meeting detail when Digital Mode is completed.
+  useEffect(() => {
+    if (digitalSession.status !== 'completed') return;
+
+    const meetingId = digitalSession.session?.meetingId;
+    const sessionId = digitalSession.session?.id;
+    if (!meetingId || !sessionId) return;
+
+    if (redirectedCompletedSessionRef.current === sessionId) return;
+    redirectedCompletedSessionRef.current = sessionId;
+
+    navigate(`/meetings/${meetingId}`, { replace: true });
+  }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, navigate]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
