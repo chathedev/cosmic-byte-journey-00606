@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Users, Phone, ArrowRight, Mic, Monitor, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LockedSessionInfo } from "@/hooks/useDigitalSession";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
@@ -14,6 +14,7 @@ interface MeetingModeDialogProps {
   showDigitalOption?: boolean;
   digitalLocked?: boolean;
   lockedSessionInfo?: LockedSessionInfo | null;
+  showStartConfirmation?: boolean;
 }
 
 const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: string; hint: string; hintIcon: typeof Mic }[] = [
@@ -50,10 +51,28 @@ export const MeetingModeDialog = ({
   showDigitalOption = false,
   digitalLocked = false,
   lockedSessionInfo,
+  showStartConfirmation = false,
 }: MeetingModeDialogProps) => {
   const [hoveredOption, setHoveredOption] = useState<MeetingMode | null>(null);
+  const [pendingMode, setPendingMode] = useState<MeetingMode | null>(null);
 
   const visibleOptions = showDigitalOption ? OPTIONS : OPTIONS.filter(o => o.mode !== 'digital');
+
+  useEffect(() => {
+    if (!open) {
+      setPendingMode(null);
+    }
+  }, [open]);
+
+  const selectedOption = pendingMode ? OPTIONS.find((o) => o.mode === pendingMode) : null;
+
+  const handleOptionSelect = (mode: MeetingMode) => {
+    if (showStartConfirmation) {
+      setPendingMode(mode);
+      return;
+    }
+    onSelect(mode);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,91 +80,134 @@ export const MeetingModeDialog = ({
         <VisuallyHidden>
           <DialogTitle>Välj inspelningsläge</DialogTitle>
         </VisuallyHidden>
-        <div className="p-6 pb-4">
-          <h2 className="text-xl font-semibold text-foreground text-center">
-            Hur ser mötet ut?
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mt-1">
-            Vi anpassar inspelningen efter din situation
-          </p>
-        </div>
+        {showStartConfirmation && pendingMode && selectedOption ? (
+          <>
+            <div className="p-6 pb-3 text-center space-y-1">
+              <h2 className="text-xl font-semibold text-foreground">Starta möte</h2>
+              <p className="text-sm text-muted-foreground">
+                Du har valt <span className="font-medium text-foreground">{selectedOption.title}</span>.
+              </p>
+            </div>
 
-        <div className="px-4 pb-6 space-y-3">
-          {visibleOptions.map((opt) => {
-            const isDigitalLocked = opt.mode === 'digital' && digitalLocked;
-
-            return (
-              <button
-                key={opt.mode}
-                onClick={() => !isDigitalLocked && onSelect(opt.mode)}
-                onMouseEnter={() => setHoveredOption(opt.mode)}
-                onMouseLeave={() => setHoveredOption(null)}
-                disabled={isDigitalLocked}
-                className={cn(
-                  "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
-                  "flex items-center gap-4 group",
-                  isDigitalLocked
-                    ? "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
-                    : hoveredOption === opt.mode
-                      ? "border-primary bg-primary/5 shadow-md"
-                      : "border-border hover:border-primary/50 bg-card"
-                )}
-              >
-                <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors relative",
-                  isDigitalLocked
-                    ? "bg-muted text-muted-foreground"
-                    : hoveredOption === opt.mode
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                )}>
-                  <opt.icon className="w-6 h-6" />
-                  {isDigitalLocked && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
-                      <Lock className="w-3 h-3 text-destructive-foreground" />
-                    </div>
-                  )}
+            <div className="px-4 pb-5">
+              <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <selectedOption.icon className="w-5 h-5" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-foreground">{opt.title}</span>
-                  {isDigitalLocked ? (
-                    <div className="mt-0.5">
-                      <p className="text-sm text-destructive font-medium">Upptagen just nu</p>
-                      {lockedSessionInfo?.meetingTitle && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          Pågående: {lockedSessionInfo.meetingTitle}
-                        </p>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{selectedOption.title}</p>
+                  <p className="text-xs text-muted-foreground">{selectedOption.desc}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 pb-6 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setPendingMode(null)}
+                className="h-11 rounded-xl border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                Tillbaka
+              </button>
+              <button
+                onClick={() => {
+                  if (!pendingMode) return;
+                  onSelect(pendingMode);
+                }}
+                className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Starta möte
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-6 pb-4">
+              <h2 className="text-xl font-semibold text-foreground text-center">
+                Hur ser mötet ut?
+              </h2>
+              <p className="text-sm text-muted-foreground text-center mt-1">
+                Vi anpassar inspelningen efter din situation
+              </p>
+            </div>
+
+            <div className="px-4 pb-6 space-y-3">
+              {visibleOptions.map((opt) => {
+                const isDigitalLocked = opt.mode === 'digital' && digitalLocked;
+
+                return (
+                  <button
+                    key={opt.mode}
+                    onClick={() => !isDigitalLocked && handleOptionSelect(opt.mode)}
+                    onMouseEnter={() => setHoveredOption(opt.mode)}
+                    onMouseLeave={() => setHoveredOption(null)}
+                    disabled={isDigitalLocked}
+                    className={cn(
+                      "w-full p-4 rounded-xl border-2 text-left transition-all duration-200",
+                      "flex items-center gap-4 group",
+                      isDigitalLocked
+                        ? "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
+                        : hoveredOption === opt.mode
+                          ? "border-primary bg-primary/5 shadow-md"
+                          : "border-border hover:border-primary/50 bg-card"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors relative",
+                      isDigitalLocked
+                        ? "bg-muted text-muted-foreground"
+                        : hoveredOption === opt.mode
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                    )}>
+                      <opt.icon className="w-6 h-6" />
+                      {isDigitalLocked && (
+                        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
+                          <Lock className="w-3 h-3 text-destructive-foreground" />
+                        </div>
                       )}
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
-                      <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-                        <opt.hintIcon className="w-3 h-3" />
-                        {opt.hint}
-                      </p>
-                    </>
-                  )}
-                </div>
-                {!isDigitalLocked && (
-                  <ArrowRight className={cn(
-                    "w-5 h-5 shrink-0 transition-all",
-                    hoveredOption === opt.mode
-                      ? "text-primary translate-x-0.5"
-                      : "text-muted-foreground/50"
-                  )} />
-                )}
-              </button>
-            );
-          })}
-        </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-foreground">{opt.title}</span>
+                      {isDigitalLocked ? (
+                        <div className="mt-0.5">
+                          <p className="text-sm text-destructive font-medium">Upptagen just nu</p>
+                          {lockedSessionInfo?.meetingTitle && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              Pågående: {lockedSessionInfo.meetingTitle}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground mt-0.5">{opt.desc}</p>
+                          <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
+                            <opt.hintIcon className="w-3 h-3" />
+                            {opt.hint}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    {!isDigitalLocked && (
+                      <ArrowRight className={cn(
+                        "w-5 h-5 shrink-0 transition-all",
+                        hoveredOption === opt.mode
+                          ? "text-primary translate-x-0.5"
+                          : "text-muted-foreground/50"
+                      )} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="px-6 py-3 bg-muted/30 border-t border-border/50">
-          <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
-            <Mic className="w-3.5 h-3.5 text-primary" />
-            Tips: Låt alla säga sitt namn i början för bättre protokoll
-          </p>
-        </div>
+            <div className="px-6 py-3 bg-muted/30 border-t border-border/50">
+              <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
+                <Mic className="w-3.5 h-3.5 text-primary" />
+                Tips: Låt alla säga sitt namn i början för bättre protokoll
+              </p>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

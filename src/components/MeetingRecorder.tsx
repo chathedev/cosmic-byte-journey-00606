@@ -53,7 +53,6 @@ export const MeetingRecorder = ({
   const [localTitle, setLocalTitle] = useState(meetingTitle);
   const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(isDigitalRecording ? 'phone-call' : null);
   const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording);
-  const [readyToStart, setReadyToStart] = useState(false);
 
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
@@ -279,8 +278,8 @@ export const MeetingRecorder = ({
   const handleModeSelect = (mode: MeetingMode) => {
     setMeetingMode(mode);
     setShowModeDialog(false);
-    // Show confirmation popup before start (explicit user action)
-    setReadyToStart(true);
+    // Bekräftelse sker i dialogen; starta direkt efter "Starta möte"
+    void startRecording();
   };
 
   // Duration timer (clock-based + RAF fallback for Safari/UI freeze edge cases)
@@ -812,9 +811,9 @@ export const MeetingRecorder = ({
               {Math.floor(durationSec / 60)}:{(durationSec % 60).toString().padStart(2, '0')}
             </div>
             <p className={`mt-1.5 text-xs font-medium tracking-wide uppercase ${
-              readyToStart ? 'text-primary' : !isRecording ? 'text-muted-foreground/70' : isPaused ? 'text-amber-500' : 'text-destructive/70'
+              !isRecording ? 'text-muted-foreground/70' : isPaused ? 'text-amber-500' : 'text-destructive/70'
             }`}>
-              {readyToStart ? 'Redo att starta' : !isRecording ? 'Startar inspelning...' : isPaused ? 'Pausad' : 'Spelar in'}
+              {!isRecording ? 'Startar inspelning...' : isPaused ? 'Pausad' : 'Spelar in'}
             </p>
           </div>
         </div>
@@ -847,7 +846,7 @@ export const MeetingRecorder = ({
               Avbryt
             </Button>
 
-            <Button disabled={!isRecording || readyToStart} onClick={togglePause} variant="outline" className="flex-1 h-10 rounded-xl text-sm gap-1.5">
+            <Button disabled={!isRecording} onClick={togglePause} variant="outline" className="flex-1 h-10 rounded-xl text-sm gap-1.5">
               {isPaused ? (
                 <>
                   <Play className="w-3.5 h-3.5" />
@@ -862,7 +861,7 @@ export const MeetingRecorder = ({
             </Button>
 
             <Button
-              disabled={!isRecording || readyToStart}
+              disabled={!isRecording}
               onClick={handleStopRecording}
               className="flex-1 h-10 rounded-xl text-sm font-semibold gap-1.5"
             >
@@ -872,28 +871,6 @@ export const MeetingRecorder = ({
           </div>
         </div>
       </div>
-
-      {/* Start-overlay efter valt läge */}
-      {readyToStart && (
-        <div className="fixed inset-0 z-[120] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-background shadow-xl p-5 space-y-4">
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">Starta möte</h3>
-              <p className="text-sm text-muted-foreground">
-                Inspelningen startar direkt och timern börjar räkna när du trycker på knappen.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => { setReadyToStart(false); onCancel(); }}>
-                Avbryt
-              </Button>
-              <Button onClick={() => { setReadyToStart(false); void startRecording(); }}>
-                Starta möte
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Exit Warning Dialog */}
       <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
@@ -927,6 +904,7 @@ export const MeetingRecorder = ({
           setShowModeDialog(open);
         }}
         onSelect={handleModeSelect}
+        showStartConfirmation
       />
 
       {/* Call Interruption Resume Dialog */}
