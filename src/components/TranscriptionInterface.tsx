@@ -83,11 +83,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       setShowDigitalSession(true);
     }
 
-    // Auto-navigate to meeting detail when completed
-    if (digitalSession.status === 'completed' && digitalSession.session?.meetingId) {
-      navigate(`/meetings/${digitalSession.session.meetingId}`);
-      // Reset after navigating so it doesn't re-trigger
-      setTimeout(() => digitalSession.reset(), 500);
+    // If session is in a terminal state on mount, just reset it so it doesn't linger
+    const terminalStatuses = ['completed', 'failed', 'timed_out', 'cancelled'];
+    if (terminalStatuses.includes(digitalSession.status) && digitalSession.session) {
+      digitalSession.reset();
+      setShowDigitalSession(false);
     }
   }, [digitalSession.status, digitalSession.session]);
   useEffect(() => {
