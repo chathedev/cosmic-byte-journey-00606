@@ -34,7 +34,11 @@ const ERROR_CODE_LABELS: Record<string, string> = {
 };
 
 const PROCESSING_STAGE_LABELS: Record<string, string> = {
-  finalizing_recording: 'Förbereder inspelningen för transkribering...',
+  finalizing_recording: 'Förbereder inspelningen...',
+  stopping_capture: 'Stoppar inspelningen...',
+  assembling_recording: 'Slutför ljudfilen...',
+  analyzing_recording: 'Analyserar ljudfilen...',
+  handoff_to_asr: 'Skickar till transkribering...',
   queued: 'Väntar i kö...',
   preparing_audio: 'Förbereder ljudet...',
   transcribing: 'Transkriberar...',
