@@ -63,6 +63,7 @@ export interface DigitalSessionMetadata {
   audioMeanVolumeDb?: number;
   audioMaxVolumeDb?: number;
   recordedAudioBytes?: number;
+  recordingDurationMs?: number;
 }
 
 export interface DigitalSession {
