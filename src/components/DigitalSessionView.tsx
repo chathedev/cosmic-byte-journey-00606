@@ -399,6 +399,7 @@ export const DigitalSessionView = ({
               )}
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {metadata?.processingStage === 'transcribing' ? 'Transkriberar...' :
+                 metadata?.processingStage === 'diarizing' ? 'Identifierar talare...' :
                  metadata?.processingStage === 'cleanup' ? 'Rensar transcript...' :
                  metadata?.processingStage === 'sis_processing' ? 'Bearbetar talare...' :
                  metadata?.processingStage === 'queued' ? 'Väntar i kö...' :
