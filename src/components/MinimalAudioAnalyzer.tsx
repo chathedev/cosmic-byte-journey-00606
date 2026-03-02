@@ -134,25 +134,19 @@ export const MinimalAudioAnalyzer = ({ stream, isActive, size = 200 }: MinimalAu
 
   return (
     <div className="relative flex items-center justify-center">
-      {/* Subtle glow behind */}
-      <div 
-        className="absolute rounded-full bg-primary/10 blur-2xl pointer-events-none"
-        style={{ width: size * 1.2, height: size * 1.2 }}
-      />
-      
       {/* Analyzer container */}
       <div 
         ref={containerRef} 
-        className="rounded-full overflow-hidden relative z-10"
+        className="rounded-full overflow-hidden relative"
         style={{ width: size, height: size }}
       />
       
       {/* Center dot indicator */}
       <div 
-        className={`absolute z-20 rounded-full transition-all duration-300 ${
-          isActive ? 'bg-primary shadow-lg shadow-primary/30' : 'bg-muted-foreground/40'
+        className={`absolute rounded-full transition-all duration-500 ${
+          isActive ? 'bg-primary scale-100' : 'bg-muted-foreground/30 scale-75'
         }`}
-        style={{ width: 12, height: 12 }}
+        style={{ width: 8, height: 8 }}
       />
     </div>
   );
