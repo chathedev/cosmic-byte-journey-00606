@@ -2,7 +2,7 @@
 // Records audio directly on the meeting page, then uploads to /asr/recording-upload
 
 import { useState, useRef, useEffect } from "react";
-import { Square, Pause, Play, Edit2, Check, AlertTriangle, Shield, Monitor } from "lucide-react";
+import { Square, Pause, Play, Edit2, Check, AlertTriangle, Shield, Monitor, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,7 @@ export const MeetingRecorder = ({
   const [localTitle, setLocalTitle] = useState(meetingTitle);
   const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(isDigitalRecording ? 'phone-call' : null);
   const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording);
+  const [readyToStart, setReadyToStart] = useState(false);
 
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
@@ -278,8 +279,8 @@ export const MeetingRecorder = ({
   const handleModeSelect = (mode: MeetingMode) => {
     setMeetingMode(mode);
     setShowModeDialog(false);
-    // Start immediately in the same user gesture (iOS/Safari-safe)
-    void startRecording();
+    // Show start button instead of auto-starting (ensures user gesture for iOS)
+    setReadyToStart(true);
   };
 
   // Duration timer (clock-based + RAF fallback for Safari/UI freeze edge cases)
@@ -342,6 +343,14 @@ export const MeetingRecorder = ({
   const startRecording = async () => {
     if (hasStartedRecordingRef.current) return;
     hasStartedRecordingRef.current = true;
+
+    // Set recording state IMMEDIATELY (synchronously in user gesture) so timer starts right away
+    recordingStartedAtMsRef.current = Date.now();
+    totalPausedMsRef.current = 0;
+    pauseStartedAtMsRef.current = null;
+    hasAutoStoppedRef.current = false;
+    setDurationSec(0);
+    setIsRecording(true);
 
     try {
       let combinedStream: MediaStream;
@@ -445,14 +454,6 @@ export const MeetingRecorder = ({
       if (!useAsrMode) {
         startSpeechRecognition();
       }
-
-      // Set recording state BEFORE async wake lock so timer starts immediately
-      recordingStartedAtMsRef.current = Date.now();
-      totalPausedMsRef.current = 0;
-      pauseStartedAtMsRef.current = null;
-      hasAutoStoppedRef.current = false;
-      setDurationSec(0);
-      setIsRecording(true);
 
       // Start auto-save backup for reliability
       startAutoSave();
@@ -732,6 +733,81 @@ export const MeetingRecorder = ({
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <h2 className="text-lg font-medium">Sparar inspelning...</h2>
         </div>
+      </div>
+    );
+  }
+
+  // "Ready to start" screen — shown after mode selection, before recording
+  if (readyToStart && !isRecording && !isSaving) {
+    const handleStartTap = () => {
+      setReadyToStart(false);
+      void startRecording();
+    };
+
+    return (
+      <div className="relative flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+        {/* Header */}
+        <div
+          className="bg-background border-b border-border/50 flex-shrink-0"
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        >
+          <div className="max-w-5xl mx-auto px-3 py-1">
+            <div className="flex items-center justify-between gap-2 h-9">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                <span className="text-xs font-medium truncate">{localTitle}</span>
+              </div>
+              <span className="font-mono text-[10px] text-muted-foreground">0:00</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Center content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
+          <div className="flex flex-col items-center gap-5">
+            {/* Pulsing mic icon */}
+            <div className="relative w-28 h-28 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-primary/5 animate-pulse" style={{ animationDuration: '2s' }} />
+              <div className="absolute inset-3 rounded-full bg-primary/8 animate-pulse" style={{ animationDuration: '1.5s' }} />
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mic className="w-7 h-7 text-primary" />
+              </div>
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h2 className="text-lg font-semibold text-foreground">Redo att spela in</h2>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                {meetingMode === 'in-person'
+                  ? 'Placera telefonen nära deltagarna för bästa ljud.'
+                  : 'Inspelningen startar när du trycker på knappen.'}
+              </p>
+            </div>
+
+            <Button
+              onClick={handleStartTap}
+              size="lg"
+              className="h-14 px-10 rounded-2xl text-base font-semibold gap-2.5 shadow-lg"
+            >
+              <Mic className="w-5 h-5" />
+              Starta inspelning
+            </Button>
+          </div>
+        </div>
+
+        {/* Bottom: cancel */}
+        <div
+          className="sticky bottom-0 z-20 flex-shrink-0 bg-background border-t border-border/50"
+          style={{ paddingBottom: isNative ? 'max(env(safe-area-inset-bottom, 6px), 8px)' : '8px' }}
+        >
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex justify-center">
+            <Button onClick={() => { setReadyToStart(false); onCancel(); }} variant="ghost" size="sm" className="text-muted-foreground text-xs">
+              Avbryt
+            </Button>
+          </div>
+        </div>
+
+        {/* Keep mode dialog & instructions available */}
+        <RecordingInstructions isOpen={showInstructions} onClose={() => setShowInstructions(false)} />
       </div>
     );
   }
