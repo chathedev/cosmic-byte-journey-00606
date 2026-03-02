@@ -701,7 +701,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           setShowModeDialog(open);
         }}
         onSelect={handleModeSelect}
-        showDigitalOption={true}
+        showDigitalOption={false}
         digitalLocked={digitalSession.isLocked}
         lockedSessionInfo={digitalSession.lockedSessionInfo}
       />
