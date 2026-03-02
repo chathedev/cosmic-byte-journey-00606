@@ -166,7 +166,7 @@ export const DigitalSessionView = ({
 
   const handleGoToMeeting = () => {
     if (session?.meetingId) {
-      navigate(`/library`, { replace: true });
+      navigate(`/meetings/${session.meetingId}`, { replace: true });
     }
   };
 
@@ -462,6 +462,9 @@ export const DigitalSessionView = ({
               {errorCode === 'digital_audio_silent' && (
                 <p className="text-xs text-muted-foreground/70 leading-relaxed mt-1">
                   Inspelningen skapades men mötesljudet var för svagt eller helt tyst.
+                  {metadata?.recordingDurationMs != null && metadata.recordingDurationMs < 5000 && (
+                    <span className="block mt-0.5">Inspelningstiden var mycket kort ({(metadata.recordingDurationMs / 1000).toFixed(0)}s).</span>
+                  )}
                 </p>
               )}
             </div>

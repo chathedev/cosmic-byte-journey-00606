@@ -126,7 +126,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   // Redirect to meeting detail page when session transitions to stopping/processing/completed
   // so the user sees batch transcription progress exactly like upload/recording modes.
   useEffect(() => {
-    const redirectStatuses = ['stopping', 'processing', 'completed'];
+    const redirectStatuses = ['processing', 'completed'];
     if (!redirectStatuses.includes(digitalSession.status)) return;
     if (!showDigitalSession) return;
 
