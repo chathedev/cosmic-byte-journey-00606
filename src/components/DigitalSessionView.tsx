@@ -189,7 +189,7 @@ export const DigitalSessionView = ({
                           Släpp in {botName}
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          {metadata?.hostActionText || `Godkänn ${botName} i Teams-mötet för att starta inspelningen.`}
+                          Godkänn {botName} i Teams-mötet för att starta inspelningen.
                         </p>
                       </div>
                     </div>
