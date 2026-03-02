@@ -3,6 +3,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Users, Phone, ArrowRight, Mic, Monitor, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { debugLog } from "@/lib/debugLogger";
 import type { LockedSessionInfo } from "@/hooks/useDigitalSession";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
@@ -59,6 +60,7 @@ export const MeetingModeDialog = ({
   const visibleOptions = showDigitalOption ? OPTIONS : OPTIONS.filter(o => o.mode !== 'digital');
 
   useEffect(() => {
+    debugLog('[📋 ModeDialog] open changed:', open);
     if (!open) {
       setPendingMode(null);
     }
@@ -67,10 +69,13 @@ export const MeetingModeDialog = ({
   const selectedOption = pendingMode ? OPTIONS.find((o) => o.mode === pendingMode) : null;
 
   const handleOptionSelect = (mode: MeetingMode) => {
+    debugLog('[📋 ModeDialog] option tapped:', mode, 'showStartConfirmation:', showStartConfirmation);
     if (showStartConfirmation) {
+      debugLog('[📋 ModeDialog] setting pendingMode:', mode);
       setPendingMode(mode);
       return;
     }
+    debugLog('[📋 ModeDialog] calling onSelect directly:', mode);
     onSelect(mode);
   };
 
@@ -103,7 +108,7 @@ export const MeetingModeDialog = ({
 
             <div className="px-4 pb-6 grid grid-cols-2 gap-2">
               <button
-                onClick={() => setPendingMode(null)}
+                onClick={() => { debugLog('[📋 ModeDialog] Tillbaka clicked'); setPendingMode(null); }}
                 className="h-11 rounded-xl border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 Tillbaka
@@ -111,6 +116,7 @@ export const MeetingModeDialog = ({
               <button
                 onClick={() => {
                   if (!pendingMode) return;
+                  debugLog('[📋 ModeDialog] Starta möte clicked, confirming mode:', pendingMode);
                   onSelect(pendingMode);
                 }}
                 className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
