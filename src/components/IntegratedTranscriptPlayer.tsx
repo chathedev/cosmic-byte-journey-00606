@@ -71,29 +71,30 @@ export function IntegratedTranscriptPlayer({
 
   const playRequestRef = useRef<Promise<void> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const isDraggingRef = useRef(false);
-  const onTimeUpdateRef = useRef(onTimeUpdate);
-  onTimeUpdateRef.current = onTimeUpdate;
 
-  // Keep ref in sync with state
-  useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
+  const handleNativeTimeUpdate = useCallback(() => {
+    const el = audioRef.current;
+    if (!el || isDragging) return;
+    const t = el.currentTime;
+    setCurrentTime(t);
+    onTimeUpdate?.(t);
+  }, [isDragging, onTimeUpdate]);
 
-  // RAF-based time sync — uses refs to avoid stale closures
+
+  // Mobile-safe fallback sync while playing (covers browsers with sparse timeupdate events)
   useEffect(() => {
-    const tick = () => {
+    if (!isPlaying) return;
+    const interval = window.setInterval(() => {
       const el = audioRef.current;
-      if (el && !el.paused && !isDraggingRef.current) {
-        setCurrentTime(el.currentTime);
-        onTimeUpdateRef.current?.(el.currentTime);
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, []);
+      if (!el || el.paused || isDragging) return;
+      const t = el.currentTime;
+      setCurrentTime(t);
+      onTimeUpdate?.(t);
+    }, 120);
 
-  // External seek
+    return () => window.clearInterval(interval);
+  }, [isPlaying, isDragging, onTimeUpdate]);
+
   useEffect(() => {
     if (seekTo !== undefined && audioRef.current && isFinite(seekTo)) {
       audioRef.current.currentTime = seekTo;
@@ -248,10 +249,34 @@ export function IntegratedTranscriptPlayer({
     }
   };
 
-  const handlePlay = () => { setIsPlaying(true); onPlayStateChange?.(true); };
-  const handlePause = () => { setIsPlaying(false); onPlayStateChange?.(false); };
-  const handleEnded = () => { setIsPlaying(false); onPlayStateChange?.(false); };
-  const handleError = () => { setError('Kunde inte spela upp ljudfilen'); setIsPlaying(false); onPlayStateChange?.(false); };
+  const handlePlay = () => {
+    setIsPlaying(true);
+    onPlayStateChange?.(true);
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
+    const el = audioRef.current;
+    const t = el?.currentTime ?? currentTime;
+    setCurrentTime(t);
+    onTimeUpdate?.(t);
+    onPlayStateChange?.(false);
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    const el = audioRef.current;
+    const t = el?.duration ?? duration;
+    setCurrentTime(t || 0);
+    onTimeUpdate?.(t || 0);
+    onPlayStateChange?.(false);
+  };
+
+  const handleError = () => {
+    setError('Kunde inte spela upp ljudfilen');
+    setIsPlaying(false);
+    onPlayStateChange?.(false);
+  };
 
   const displayTime = isDragging ? dragTime : currentTime;
   const progress = duration > 0 ? (displayTime / duration) * 100 : 0;
@@ -263,16 +288,17 @@ export function IntegratedTranscriptPlayer({
   return (
     <div className={cn("flex items-center gap-3 py-2", className)}>
       {audioUrl && (
-        <audio
-          key={audioUrl}
-          ref={audioRef}
-          onLoadedMetadata={handleLoadedMetadata}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onEnded={handleEnded}
-          onError={handleError}
-          preload="metadata"
-        >
+          <audio
+            key={audioUrl}
+            ref={audioRef}
+            onLoadedMetadata={handleLoadedMetadata}
+            onTimeUpdate={handleNativeTimeUpdate}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onEnded={handleEnded}
+            onError={handleError}
+            preload="metadata"
+          >
           <source src={audioUrl} type={audioMimeType || undefined} />
         </audio>
       )}
