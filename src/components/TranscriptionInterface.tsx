@@ -114,7 +114,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
     if (!hasHydratedDigitalSessionRef.current && digitalSession.session) {
       hasHydratedDigitalSessionRef.current = true;
-      const staleTerminalStatuses = ['failed', 'timed_out', 'cancelled', 'interrupted'];
+      // Clear ALL stale terminal sessions on mount, including completed
+      const staleTerminalStatuses = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'];
       if (staleTerminalStatuses.includes(digitalSession.status)) {
         digitalSession.reset();
         setShowDigitalSession(false);
@@ -122,9 +123,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
 
-  // Always redirect instantly to meeting detail when Digital Mode is completed.
+  // Redirect to meeting detail ONLY when a session transitions to completed
+  // while we're actively watching it (showDigitalSession is true).
   useEffect(() => {
     if (digitalSession.status !== 'completed') return;
+    if (!showDigitalSession) return; // Not actively monitoring → don't redirect
 
     const meetingId = digitalSession.session?.meetingId;
     const sessionId = digitalSession.session?.id;
@@ -134,7 +137,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     redirectedCompletedSessionRef.current = sessionId;
 
     navigate(`/meetings/${meetingId}`, { replace: true });
-  }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, navigate]);
+  }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, showDigitalSession, navigate]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
