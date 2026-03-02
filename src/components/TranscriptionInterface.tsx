@@ -123,21 +123,27 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
 
-  // Redirect to library when a session transitions to completed
-  // while we're actively watching it (showDigitalSession is true).
+  // Redirect to meeting detail page when session transitions to stopping/processing/completed
+  // so the user sees batch transcription progress exactly like upload/recording modes.
   useEffect(() => {
-    if (digitalSession.status !== 'completed') return;
+    const redirectStatuses = ['stopping', 'processing', 'completed'];
+    if (!redirectStatuses.includes(digitalSession.status)) return;
     if (!showDigitalSession) return;
 
     const sessionId = digitalSession.session?.id;
-    if (!sessionId) return;
+    const meetingId = digitalSession.session?.meetingId;
+    if (!sessionId || !meetingId) return;
 
     if (redirectedCompletedSessionRef.current === sessionId) return;
     redirectedCompletedSessionRef.current = sessionId;
 
-    // Clean URL: always redirect to /library
-    navigate('/library', { replace: true });
-  }, [digitalSession.status, digitalSession.session?.id, showDigitalSession, navigate]);
+    // Reset digital session UI state
+    setShowDigitalSession(false);
+    digitalSession.reset();
+
+    // Navigate to the meeting detail page for batch transcription view
+    navigate(`/meetings/${meetingId}`, { replace: true });
+  }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, showDigitalSession, navigate, digitalSession.reset]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;

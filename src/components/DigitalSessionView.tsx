@@ -305,7 +305,7 @@ export const DigitalSessionView = ({
           </div>
         )}
 
-        {/* Stopping – lock all controls */}
+        {/* Stopping – redirect happens automatically */}
         {isStopping && (
           <div className="flex flex-col items-center gap-4">
             <div className="relative w-16 h-16 flex items-center justify-center">
@@ -313,7 +313,7 @@ export const DigitalSessionView = ({
             </div>
             <div className="text-center space-y-1">
               <p className="text-base font-semibold text-foreground">Avslutar session...</p>
-              <p className="text-sm text-muted-foreground">Boten lämnar mötet och inspelningen bearbetas.</p>
+              <p className="text-sm text-muted-foreground">Inspelningen bearbetas och du skickas vidare.</p>
             </div>
           </div>
         )}
