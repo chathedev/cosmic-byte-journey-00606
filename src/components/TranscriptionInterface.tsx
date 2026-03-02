@@ -68,6 +68,26 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
 
+  useEffect(() => {
+    debugLog('[🏠 Home] Dialog state snapshot:', {
+      showModeDialog,
+      showTeamSelect,
+      showDigitalMeetingDialog,
+      showDigitalStartDialog,
+      showDigitalSession,
+      showUpgradeDialog,
+      pendingAction,
+    });
+  }, [
+    showModeDialog,
+    showTeamSelect,
+    showDigitalMeetingDialog,
+    showDigitalStartDialog,
+    showDigitalSession,
+    showUpgradeDialog,
+    pendingAction,
+  ]);
+
   // Auto-show Digital Session view only for active/in-progress states (not stale terminal states)
   useEffect(() => {
     const activeStatuses = [
@@ -165,6 +185,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   const handleTeamSelected = async (teamId: string | null) => {
+    debugLog('[🏠 Home] Team selected:', teamId, 'pendingAction:', pendingAction);
     setSelectedTeamId(teamId);
     const action = pendingAction;
     setPendingAction(null);
@@ -578,14 +599,21 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
       <TeamSelectDialog
         open={showTeamSelect}
-        onOpenChange={setShowTeamSelect}
+        onOpenChange={(open) => {
+          debugLog('[🏠 Home] TeamSelectDialog onOpenChange:', open, 'pendingAction:', pendingAction);
+          setShowTeamSelect(open);
+        }}
         onSelect={handleTeamSelected}
       />
 
       <MeetingModeDialog
         open={showModeDialog}
-        onOpenChange={setShowModeDialog}
+        onOpenChange={(open) => {
+          debugLog('[🏠 Home] MeetingModeDialog onOpenChange:', open);
+          setShowModeDialog(open);
+        }}
         onSelect={handleModeSelect}
+        showStartConfirmation
         showDigitalOption={true}
         digitalLocked={digitalSession.isLocked}
         lockedSessionInfo={digitalSession.lockedSessionInfo}
