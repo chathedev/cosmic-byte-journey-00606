@@ -313,8 +313,8 @@ export const DigitalSessionView = ({
               <Loader2 className="w-7 h-7 text-muted-foreground animate-spin" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-foreground">Avslutar session...</p>
-              <p className="text-sm text-muted-foreground">Inspelningen bearbetas och du skickas vidare.</p>
+              <p className="text-base font-semibold text-foreground">Avslutar mötet...</p>
+              <p className="text-sm text-muted-foreground">Inspelningen skickas till transkribering.</p>
             </div>
           </div>
         )}
