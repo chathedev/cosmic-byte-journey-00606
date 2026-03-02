@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer } from "lucide-react";
+import { Pause, Play, Square, Clock, AlertTriangle, CheckCircle2, Loader2, ArrowLeft, RefreshCw, Radio, ShieldAlert, Timer, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -252,6 +252,13 @@ export const DigitalSessionView = ({
                 <span className="font-mono text-sm text-muted-foreground">{elapsed}</span>
               </div>
             </div>
+            {/* Audio capture indicator */}
+            {metadata?.audioCaptureActive && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/8 border border-green-500/15">
+                <Mic className="w-3.5 h-3.5 text-green-500" />
+                <span className="text-[11px] font-medium text-green-600 dark:text-green-400">Lyssnar</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -264,6 +271,11 @@ export const DigitalSessionView = ({
             <div className="text-center space-y-1">
               <p className="text-base font-semibold text-yellow-600 dark:text-yellow-400">Pausad</p>
               <p className="text-sm text-muted-foreground">Boten är kvar i mötet. Transkription pausad.</p>
+            </div>
+            {/* Capture paused indicator */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/8 border border-yellow-500/15">
+              <MicOff className="w-3.5 h-3.5 text-yellow-500" />
+              <span className="text-[11px] font-medium text-yellow-600 dark:text-yellow-400">Ljud pausat</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
