@@ -123,21 +123,21 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
 
-  // Redirect to meeting detail ONLY when a session transitions to completed
+  // Redirect to library when a session transitions to completed
   // while we're actively watching it (showDigitalSession is true).
   useEffect(() => {
     if (digitalSession.status !== 'completed') return;
-    if (!showDigitalSession) return; // Not actively monitoring → don't redirect
+    if (!showDigitalSession) return;
 
-    const meetingId = digitalSession.session?.meetingId;
     const sessionId = digitalSession.session?.id;
-    if (!meetingId || !sessionId) return;
+    if (!sessionId) return;
 
     if (redirectedCompletedSessionRef.current === sessionId) return;
     redirectedCompletedSessionRef.current = sessionId;
 
-    navigate(`/meetings/${meetingId}`, { replace: true });
-  }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, showDigitalSession, navigate]);
+    // Clean URL: always redirect to /library
+    navigate('/library', { replace: true });
+  }, [digitalSession.status, digitalSession.session?.id, showDigitalSession, navigate]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
