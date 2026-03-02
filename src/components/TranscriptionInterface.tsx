@@ -18,6 +18,7 @@ import { meetingStorage } from "@/utils/meetingStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { debugLog, debugError } from "@/lib/debugLogger";
 type View = "welcome" | "analyzing" | "transcript-preview";
 
 interface AIActionItem {
@@ -114,20 +115,25 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
    // Handle "Spela in" button click - show mode selection
   const handleRecordClick = async () => {
+    debugLog('[🏠 Home] Record button clicked');
     const { allowed, reason } = await canCreateMeeting();
+    debugLog('[🏠 Home] canCreateMeeting result:', { allowed, reason });
     if (!allowed) {
+      debugLog('[🏠 Home] Blocked — showing upgrade dialog, reason:', reason);
       setUpgradeReason(reason || 'Du har nått din gräns för möten');
       setShowUpgradeDialog(true);
       return;
     }
+    debugLog('[🏠 Home] Opening MeetingModeDialog');
     setShowModeDialog(true);
   };
 
   const handleModeSelect = async (mode: MeetingMode) => {
+    debugLog('[🏠 Home] handleModeSelect called with mode:', mode);
     setShowModeDialog(false);
 
     if (mode === 'digital') {
-      // Check if a session is already active
+      debugLog('[🏠 Home] Digital mode selected, isActive:', digitalSession.isActive);
       if (digitalSession.isActive) {
         setShowDigitalSession(true);
         return;
@@ -138,11 +144,13 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
     // For in-person / phone-call, proceed with recording
     if (isEnterprise) {
+      debugLog('[🏠 Home] Enterprise user — showing team select');
       setPendingAction('record');
       setShowTeamSelect(true);
       return;
     }
 
+    debugLog('[🏠 Home] Starting in-person recording, mode:', mode);
     await startInPersonRecording(null, mode);
   };
 
@@ -178,10 +186,12 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
   // Start in-person recording (current behavior)
   const startInPersonRecording = async (teamId?: string | null, mode?: MeetingMode) => {
+    debugLog('[🏠 Home] startInPersonRecording called, teamId:', teamId, 'mode:', mode);
     setIsStartingRecording(true);
 
     try {
       const now = new Date().toISOString();
+      debugLog('[🏠 Home] Creating meeting via API...');
       const result = await apiClient.createMeeting({
         title: 'Namnlöst möte',
         createdAt: now,
@@ -196,7 +206,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         throw new Error('Inget mötesid returnerades');
       }
 
-      console.log('✅ Meeting created for recording:', meetingId);
+      debugLog('[🏠 Home] Meeting created:', meetingId, '— navigating to recording page');
 
       const pendingMeeting = {
         id: meetingId,
@@ -216,7 +226,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         },
       });
     } catch (error: any) {
-      console.error('Failed to create meeting for recording:', error);
+      debugError('[🏠 Home] Failed to create meeting:', error);
       toast({
         title: 'Kunde inte starta inspelning',
         description: error.message || 'Försök igen',

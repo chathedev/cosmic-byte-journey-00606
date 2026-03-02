@@ -55,6 +55,7 @@ export const MeetingRecorder = ({
   const [meetingMode, setMeetingMode] = useState<MeetingMode | null>(isDigitalRecording ? 'phone-call' : null);
   const [showModeDialog, setShowModeDialog] = useState(!isDigitalRecording);
 
+  debugLog('[🎬 MeetingRecorder] render — isRecording:', isRecording, 'isPaused:', isPaused, 'showModeDialog:', !isDigitalRecording, 'meetingMode:', meetingMode);
   // Real-time transcript for Free/Pro plans (browser speech recognition)
   const [liveTranscript, setLiveTranscript] = useState<string>("");
   const [interimText, setInterimText] = useState<string>("");
@@ -487,6 +488,7 @@ export const MeetingRecorder = ({
   };
 
   const stopMediaRecorder = () => {
+    debugLog('[🎬 MeetingRecorder] stopMediaRecorder called');
     stopAutoSave(); // Stop backup timer
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
@@ -497,6 +499,7 @@ export const MeetingRecorder = ({
       durationRafRef.current = null;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      debugLog('[🎬 MeetingRecorder] stopping MediaRecorder, state was:', mediaRecorderRef.current.state);
       mediaRecorderRef.current.stop();
     }
     if (streamRef.current) {
@@ -516,6 +519,7 @@ export const MeetingRecorder = ({
 
   const togglePause = () => {
     if (!mediaRecorderRef.current) return;
+    debugLog('[🎬 MeetingRecorder] togglePause, currently isPaused:', isPaused);
 
     if (isPaused) {
       mediaRecorderRef.current.resume();
@@ -524,6 +528,7 @@ export const MeetingRecorder = ({
         pauseStartedAtMsRef.current = null;
       }
       setIsPaused(false);
+      debugLog('[🎬 MeetingRecorder] Resumed recording');
       requestWakeLock();
       if (!useAsrMode && recognitionRef.current) {
         try { recognitionRef.current.start(); } catch { /* ignore */ }
@@ -532,8 +537,8 @@ export const MeetingRecorder = ({
       mediaRecorderRef.current.pause();
       pauseStartedAtMsRef.current = Date.now();
       setIsPaused(true);
+      debugLog('[🎬 MeetingRecorder] Paused recording');
       releaseWakeLock();
-      // Save backup when pausing for extra safety
       saveBackup();
       if (!useAsrMode && recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch { /* ignore */ }
@@ -542,6 +547,7 @@ export const MeetingRecorder = ({
   };
 
   const handleStopRecording = async () => {
+    debugLog('[🎬 MeetingRecorder] handleStopRecording called, isSaving:', isSaving, 'durationSec:', durationSec);
     if (isSaving) return;
 
     if (durationSec < 5) {
