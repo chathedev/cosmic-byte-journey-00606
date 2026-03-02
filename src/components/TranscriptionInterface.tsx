@@ -116,9 +116,10 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
 
     if (!hasHydratedDigitalSessionRef.current && digitalSession.session) {
       hasHydratedDigitalSessionRef.current = true;
-      // Clear ALL stale terminal sessions on mount, including completed
-      const staleTerminalStatuses = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted'];
-      if (staleTerminalStatuses.includes(digitalSession.status)) {
+      // Clear ALL stale terminal AND processing sessions on mount
+      // to prevent auto-redirect loops when returning to Home
+      const staleStatuses = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted', 'processing'];
+      if (staleStatuses.includes(digitalSession.status)) {
         digitalSession.reset();
         setShowDigitalSession(false);
       }
