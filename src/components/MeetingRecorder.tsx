@@ -62,6 +62,9 @@ export const MeetingRecorder = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingStartedAtMsRef = useRef<number | null>(null);
+  const totalPausedMsRef = useRef(0);
+  const pauseStartedAtMsRef = useRef<number | null>(null);
   const wakeLockRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -270,23 +273,33 @@ export const MeetingRecorder = ({
     setShowModeDialog(false);
   };
 
-  // Duration timer
+  // Duration timer (clock-based for reliable mobile behavior)
   useEffect(() => {
-    if (isRecording && !isPaused) {
-      durationIntervalRef.current = setInterval(() => {
-        setDurationSec(s => {
-          if (s + 1 >= MAX_DURATION_SECONDS) {
-            handleStopRecording();
-          }
-          return s + 1;
-        });
-      }, 1000);
-    } else {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-        durationIntervalRef.current = null;
+    const syncDurationFromClock = () => {
+      const startedAt = recordingStartedAtMsRef.current;
+      if (!startedAt) return;
+
+      const now = Date.now();
+      const pausedMs = totalPausedMsRef.current + (pauseStartedAtMsRef.current ? now - pauseStartedAtMsRef.current : 0);
+      const elapsedSec = Math.max(0, Math.floor((now - startedAt - pausedMs) / 1000));
+
+      if (elapsedSec >= MAX_DURATION_SECONDS) {
+        setDurationSec(MAX_DURATION_SECONDS);
+        handleStopRecording();
+        return;
       }
+
+      setDurationSec((prev) => (prev === elapsedSec ? prev : elapsedSec));
+    };
+
+    if (isRecording) {
+      syncDurationFromClock();
+      durationIntervalRef.current = setInterval(syncDurationFromClock, 250);
+    } else if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
     }
+
     return () => {
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
     };
@@ -383,16 +396,20 @@ export const MeetingRecorder = ({
       mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
 
-      setIsRecording(true);
-      await requestWakeLock();
-      noSleep.enable();
-      
-      // Start auto-save backup for reliability
-      startAutoSave();
-
       if (!useAsrMode) {
         startSpeechRecognition();
       }
+
+      recordingStartedAtMsRef.current = Date.now();
+      totalPausedMsRef.current = 0;
+      pauseStartedAtMsRef.current = null;
+      setDurationSec(0);
+      setIsRecording(true);
+      await requestWakeLock();
+      noSleep.enable();
+
+      // Start auto-save backup for reliability
+      startAutoSave();
 
       console.log('✅ Recording started', useAsrMode ? '(ASR mode)' : '(Browser mode)', isDigitalRecording ? '(Digital)' : '(In-person)');
     } catch (error) {
@@ -423,6 +440,9 @@ export const MeetingRecorder = ({
     if (isDigitalRecording) {
       digitalRecordingStreams.clear();
     }
+    recordingStartedAtMsRef.current = null;
+    pauseStartedAtMsRef.current = null;
+    totalPausedMsRef.current = 0;
   };
 
   const togglePause = () => {
@@ -430,6 +450,10 @@ export const MeetingRecorder = ({
 
     if (isPaused) {
       mediaRecorderRef.current.resume();
+      if (pauseStartedAtMsRef.current) {
+        totalPausedMsRef.current += Date.now() - pauseStartedAtMsRef.current;
+        pauseStartedAtMsRef.current = null;
+      }
       setIsPaused(false);
       requestWakeLock();
       if (!useAsrMode && recognitionRef.current) {
@@ -437,6 +461,7 @@ export const MeetingRecorder = ({
       }
     } else {
       mediaRecorderRef.current.pause();
+      pauseStartedAtMsRef.current = Date.now();
       setIsPaused(true);
       releaseWakeLock();
       // Save backup when pausing for extra safety
