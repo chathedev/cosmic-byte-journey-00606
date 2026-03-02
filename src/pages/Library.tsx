@@ -520,7 +520,7 @@ const Library = () => {
       const map = new Map<string, MeetingSession>();
       for (const m of userMeetings) {
         const existing = map.get(m.id);
-        if (!existing || new Date(m.updatedAt) > new Date(existing.updatedAt)) {
+        if (!existing || (m.updatedAt && existing.updatedAt && new Date(m.updatedAt) > new Date(existing.updatedAt))) {
           map.set(m.id, m);
         }
       }
@@ -543,7 +543,7 @@ const Library = () => {
       }
       
       const deduped = Array.from(map.values()).filter(m => !['__Trash'].includes(String(m.folder)));
-      deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      deduped.sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0));
       
       setMeetings(deduped);
 
@@ -969,7 +969,9 @@ const Library = () => {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '—';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
     return new Intl.DateTimeFormat("sv-SE", {
       year: "numeric",
       month: "short",

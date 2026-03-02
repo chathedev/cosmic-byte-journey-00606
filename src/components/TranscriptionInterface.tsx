@@ -150,13 +150,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     // - pendingMeetingId → starts ASR polling in Library
     // Store a minimal pending meeting in sessionStorage so Library can show it immediately
     if (meetingId) {
+      const now = new Date().toISOString();
       const pendingMeeting = {
         id: meetingId,
         title: digitalSession.session?.meetingTitle || 'Digitalt möte',
-        createdAt: digitalSession.session?.createdAt || new Date().toISOString(),
+        createdAt: digitalSession.session?.createdAt || now,
+        updatedAt: digitalSession.session?.updatedAt || now,
         transcript: '',
         transcriptionStatus: 'processing',
         userId: '',
+        folder: '',
       };
       sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
     }
