@@ -105,9 +105,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       'listening',
       'paused',
       'stopping',
-      'processing',
     ];
 
+    // Auto-open Digital Session only for real-time meeting states.
+    // IMPORTANT: Exclude "processing" to avoid endless auto-redirect loops
+    // when user returns to Home while backend is still batch-processing.
     if (activeStatuses.includes(digitalSession.status) && digitalSession.session) {
       setShowDigitalSession(true);
     }
@@ -123,16 +125,15 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
 
-  // Redirect to meeting detail page when session transitions to stopping/processing/completed
-  // so the user sees batch transcription progress exactly like upload/recording modes.
+  // Redirect to Library when monitored Digital Session transitions to
+  // stopping/processing/completed so users get the normal batch flow with clean URL.
   useEffect(() => {
     const redirectStatuses = ['stopping', 'processing', 'completed'];
     if (!redirectStatuses.includes(digitalSession.status)) return;
     if (!showDigitalSession) return;
 
     const sessionId = digitalSession.session?.id;
-    const meetingId = digitalSession.session?.meetingId;
-    if (!sessionId || !meetingId) return;
+    if (!sessionId) return;
 
     if (redirectedCompletedSessionRef.current === sessionId) return;
     redirectedCompletedSessionRef.current = sessionId;
@@ -141,8 +142,14 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowDigitalSession(false);
     digitalSession.reset();
 
-    // Navigate to the meeting detail page for batch transcription view
-    navigate(`/meetings/${meetingId}`, { replace: true });
+    // Clean URL requirement: always redirect to /library (never /meetings/:id)
+    navigate('/library', {
+      replace: true,
+      state: {
+        source: 'digital-session',
+        meetingId: digitalSession.session?.meetingId ?? null,
+      },
+    });
   }, [digitalSession.status, digitalSession.session?.id, digitalSession.session?.meetingId, showDigitalSession, navigate, digitalSession.reset]);
   useEffect(() => {
     const id = searchParams.get('continue');
