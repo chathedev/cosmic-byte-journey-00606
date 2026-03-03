@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -95,17 +95,27 @@ export const DigitalImportView = ({
   const [showParticipants, setShowParticipants] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importedMeetingId, setImportedMeetingId] = useState<string | null>(null);
+  const [refreshCooldown, setRefreshCooldown] = useState(false);
+  const hasAutoLoaded = useRef(false);
 
   const isConnected = importStatus?.connected === true;
   const isConfigured = importStatus?.configured === true;
   const isEnabled = importStatus?.enabled === true;
 
-  // Auto-load meetings when connected
+  // Auto-load meetings ONCE when connected
   useEffect(() => {
-    if (isConnected && meetings.length === 0 && state === 'idle') {
+    if (isConnected && !hasAutoLoaded.current && state === 'idle') {
+      hasAutoLoaded.current = true;
       onLoadMeetings();
     }
-  }, [isConnected, meetings.length, state, onLoadMeetings]);
+  }, [isConnected, state, onLoadMeetings]);
+
+  const handleRefreshMeetings = useCallback(() => {
+    if (refreshCooldown || state === 'loading_meetings') return;
+    onLoadMeetings();
+    setRefreshCooldown(true);
+    setTimeout(() => setRefreshCooldown(false), 5000);
+  }, [refreshCooldown, state, onLoadMeetings]);
 
   const handleSelectMeeting = (meeting: ImportableMeeting) => {
     setSelectedMeeting(meeting);
@@ -308,9 +318,10 @@ export const DigitalImportView = ({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onLoadMeetings}
-              disabled={state === 'loading_meetings'}
+              onClick={handleRefreshMeetings}
+              disabled={state === 'loading_meetings' || refreshCooldown}
               className="h-8 w-8"
+              title={refreshCooldown ? 'Vänta några sekunder…' : 'Uppdatera möteslistan'}
             >
               <RefreshCw className={cn("w-4 h-4", state === 'loading_meetings' && "animate-spin")} />
             </Button>
@@ -353,13 +364,20 @@ export const DigitalImportView = ({
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-3 max-w-xs">
             <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto" />
-            <p className="text-sm font-medium text-foreground">Inga importbara möten</p>
+            <p className="text-sm font-medium text-foreground">Inga möten med färdigt transkript</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Här visas möten där Teams-transkribering redan har slutförts. Se till att transkribering är aktiverat i Teams och att du är organisatör.
+              Det finns inga Teams-möten med tillgängligt transkript just nu. 
+              Se till att Teams-transkribering var aktiverad under mötet och att transkriptet har hunnit bearbetas av Microsoft 365.
             </p>
-            <Button variant="outline" size="sm" onClick={onLoadMeetings} className="gap-1.5">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefreshMeetings} 
+              disabled={refreshCooldown}
+              className="gap-1.5"
+            >
               <RefreshCw className="w-3.5 h-3.5" />
-              Uppdatera
+              {refreshCooldown ? 'Vänta…' : 'Sök igen'}
             </Button>
           </div>
         </div>
