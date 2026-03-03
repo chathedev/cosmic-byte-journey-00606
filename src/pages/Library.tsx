@@ -1214,7 +1214,7 @@ const Library = () => {
               </p>
             </div>
           ) : (
-          <div className="grid gap-4">
+          <div className="space-y-3">
             <AnimatePresence mode="popLayout">
             {filteredMeetings.map((meeting, index) => {
               // Check status - treat uploading same as processing
@@ -1227,19 +1227,20 @@ const Library = () => {
               return (
               <motion.div
                 key={meeting.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.2, delay: index * 0.03 }}
                 layout
               >
-              <Card 
-                className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+              <div 
+                className="rounded-lg border border-border bg-card hover:border-primary/30 transition-colors cursor-pointer"
                 onClick={() => navigate(`/meetings/${meeting.id}`)}
               >
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
+                {/* Card header */}
+                <div className="px-4 pt-4 pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
                       {editingMeetingId === meeting.id ? (
                         <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                           <Input
@@ -1247,58 +1248,49 @@ const Library = () => {
                             onChange={(e) => setEditName(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSaveEdit(meeting)}
                             autoFocus
+                            className="h-8 text-sm"
                           />
-                          <Button onClick={() => handleSaveEdit(meeting)} size="sm">
-                            <Check className="w-4 h-4" />
+                          <Button onClick={() => handleSaveEdit(meeting)} size="sm" className="h-8 w-8 p-0">
+                            <Check className="w-3.5 h-3.5" />
                           </Button>
-                          <Button onClick={() => setEditingMeetingId(null)} variant="ghost" size="sm">
-                            <X className="w-4 h-4" />
+                          <Button onClick={() => setEditingMeetingId(null)} variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <X className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">{meeting.title}</CardTitle>
-                          <Button
+                          <h3 className="text-base font-semibold text-foreground truncate">{meeting.title}</h3>
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleStartEdit(meeting); }}
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
+                            className="p-1 rounded hover:bg-muted transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                           >
-                            <Edit2 className="w-3 h-3" />
-                          </Button>
+                            <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
                         </div>
                       )}
-                      <CardDescription className="mt-2 flex items-center gap-4 text-xs flex-wrap">
+
+                      {/* Meta row */}
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {formatDate(meeting.createdAt)}
                         </span>
-                        <span className="text-muted-foreground">•</span>
-                        <span className="text-muted-foreground">
-                          Uppdaterad: {formatDate(meeting.updatedAt)}
-                        </span>
+                        <span className="text-border">·</span>
+                        <span>Uppdaterad: {formatDate(meeting.updatedAt)}</span>
+
                         {meeting.source && (
                           <>
-                            <span className="text-muted-foreground">•</span>
-                            <Badge variant={meeting.source === 'live' ? 'default' : 'secondary'} className="flex items-center gap-1 text-xs">
-                              {meeting.source === 'live' ? (
-                                <>
-                                  <Mic className="w-3 h-3" />
-                                  Live-inspelning
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="w-3 h-3" />
-                                  Uppladdad fil
-                                </>
-                              )}
-                            </Badge>
+                            <span className="text-border">·</span>
+                            <span className="flex items-center gap-1">
+                              {meeting.source === 'live' ? <Mic className="w-3 h-3" /> : <Upload className="w-3 h-3" />}
+                              {meeting.source === 'live' ? 'Inspelning' : 'Uppladdad'}
+                            </span>
                           </>
                         )}
                         {isFailed && (
                           <>
-                            <span className="text-muted-foreground">•</span>
-                            <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                            <span className="text-border">·</span>
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
                               Misslyckades
                             </Badge>
                           </>
@@ -1306,34 +1298,35 @@ const Library = () => {
                         {/* Meeting visibility badge */}
                         {isEnterprise && (
                           <>
-                            <span className="text-muted-foreground">•</span>
+                            <span className="text-border">·</span>
                             {(meeting as any).enterpriseTeamId ? (
-                              <Badge variant="outline" className="flex items-center gap-1.5 text-xs px-2.5 py-0.5 bg-primary/8 border-primary/20 text-primary">
-                                <Users className="w-3 h-3" />
+                              <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-primary/8 border-primary/20 text-primary">
+                                <Users className="w-2.5 h-2.5" />
                                 {(meeting as any).enterpriseTeamName || 'Team'}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="flex items-center gap-1.5 text-xs px-2.5 py-0.5 bg-muted/50 border-border text-muted-foreground">
-                                <Lock className="w-3 h-3" />
+                              <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-muted/50 border-border text-muted-foreground">
+                                <Lock className="w-2.5 h-2.5" />
                                 Individuellt
                               </Badge>
                             )}
                             {(meeting as any).readOnly && (
-                              <Badge variant="secondary" className="flex items-center gap-1.5 text-xs px-2.5 py-0.5">
-                                <Eye className="w-3 h-3" />
+                              <Badge variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4">
+                                <Eye className="w-2.5 h-2.5" />
                                 Skrivskyddat
                               </Badge>
                             )}
                           </>
                         )}
-                      </CardDescription>
+                      </div>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {/* Content based on status */}
+                </div>
+
+                {/* Content */}
+                <div className="px-4 pb-3">
                   {isFailed ? (
-                    <div className="mb-4" onClick={e => e.stopPropagation()}>
+                    <div onClick={e => e.stopPropagation()}>
                       <TranscriptionStatusWidget
                         meetingId={meeting.id}
                         status="failed"
@@ -1348,214 +1341,168 @@ const Library = () => {
                       />
                     </div>
                   ) : isProcessing && !hasTranscript ? (
-                    <div className="mb-4" onClick={e => e.stopPropagation()}>
+                    <div onClick={e => e.stopPropagation()}>
                       <TranscriptionStatusWidget
                         meetingId={meeting.id}
                         status={meeting.transcriptionStatus === 'uploading' ? 'uploading' : 'processing'}
                         stage={meeting.transcriptionStage}
                         meetingTitle={meeting.title}
-                        onComplete={() => {
-                          // Reload meeting data when complete
-                          loadData();
-                        }}
+                        onComplete={() => loadData()}
                       />
                     </div>
                   ) : (
-                    <div className="mb-4">
-                      
-                      <div className="relative">
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {meeting.transcript || ''}
-                        </p>
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/80 pointer-events-none" />
-                      </div>
-                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                      {meeting.transcript || ''}
+                    </p>
                   )}
-                  
-                  {/* Protocol Status Badge */}
-                  {protocolStatus[meeting.id] && (
-                    <div className="mb-3 pb-3 border-b border-border" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            Protokoll sparat
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(protocolStatus[meeting.id].storedAt).toLocaleDateString('sv-SE')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            onClick={async () => {
-                              setLoadingProtocol(meeting.id);
-                              try {
-                                // For demo accounts, use demo protocol data
-                                if (isDemoAccount) {
-                                  const demoData = getDemoProtocol(meeting.id);
-                                  if (demoData?.protocol) {
-                                    setViewingProtocol({
-                                      meetingId: meeting.id,
-                                      protocol: demoData.protocol
-                                    });
-                                  }
-                                } else {
-                                  const data = await backendApi.getProtocol(meeting.id);
-                                  if (data?.protocol) {
-                                    setViewingProtocol({
-                                      meetingId: meeting.id,
-                                      protocol: data.protocol
-                                    });
-                                  }
-                                }
-                              } catch (error: any) {
-                                toast({
-                                  title: "Fel",
-                                  description: error.message || "Kunde inte öppna protokoll",
-                                  variant: "destructive",
-                                  duration: 2500,
-                                });
-                              } finally {
-                                setLoadingProtocol(null);
-                              }
-                            }}
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            disabled={loadingProtocol === meeting.id}
-                          >
-                            {loadingProtocol === meeting.id ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Eye className="w-3.5 h-3.5" />
-                            )}
-                          </Button>
-                          <Button
-                            onClick={async () => {
-                              // Demo accounts can view but not download real files
+                </div>
+
+                {/* Protocol badge */}
+                {protocolStatus[meeting.id] && (
+                  <div className="px-4 pb-3" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between py-2 border-t border-border">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="flex items-center gap-1 text-[10px] h-5">
+                          <FileText className="w-3 h-3" />
+                          Protokoll
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(protocolStatus[meeting.id].storedAt).toLocaleDateString('sv-SE')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          onClick={async () => {
+                            setLoadingProtocol(meeting.id);
+                            try {
                               if (isDemoAccount) {
-                                toast({
-                                  title: "Demo-protokoll",
-                                  description: "Klicka på ögat för att visa protokollet.",
-                                  duration: 2000,
-                                });
-                                return;
-                              }
-                              
-                              setLoadingProtocol(meeting.id);
-                              try {
-                                const data = await backendApi.getProtocol(meeting.id);
-                                if (data?.protocol?.blob) {
-                                  const blob = atob(data.protocol.blob.replace(/^data:.*?;base64,/, ''));
-                                  const bytes = new Uint8Array(blob.length);
-                                  for (let i = 0; i < blob.length; i++) {
-                                    bytes[i] = blob.charCodeAt(i);
-                                  }
-                                  const file = new Blob([bytes], { type: data.protocol.mimeType });
-                                  const url = URL.createObjectURL(file);
-                                  const a = document.createElement('a');
-                                  a.href = url;
-                                  a.download = data.protocol.fileName;
-                                  a.click();
-                                  URL.revokeObjectURL(url);
-                                  toast({
-                                    title: "Protokoll nedladdat",
-                                    description: data.protocol.fileName,
-                                    duration: 2000,
-                                  });
+                                const demoData = getDemoProtocol(meeting.id);
+                                if (demoData?.protocol) {
+                                  setViewingProtocol({ meetingId: meeting.id, protocol: demoData.protocol });
                                 }
-                              } catch (error: any) {
-                                toast({
-                                  title: "Fel",
-                                  description: error.message || "Kunde inte ladda ner protokoll",
-                                  variant: "destructive",
-                                  duration: 2500,
-                                });
-                              } finally {
-                                setLoadingProtocol(null);
+                              } else {
+                                const data = await backendApi.getProtocol(meeting.id);
+                                if (data?.protocol) {
+                                  setViewingProtocol({ meetingId: meeting.id, protocol: data.protocol });
+                                }
                               }
-                            }}
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            disabled={loadingProtocol === meeting.id}
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setMeetingToDeleteProtocol(meeting);
-                            }}
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
+                            } catch (error: any) {
+                              toast({ title: "Fel", description: error.message || "Kunde inte öppna protokoll", variant: "destructive", duration: 2500 });
+                            } finally {
+                              setLoadingProtocol(null);
+                            }
+                          }}
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          disabled={loadingProtocol === meeting.id}
+                        >
+                          {loadingProtocol === meeting.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            if (isDemoAccount) {
+                              toast({ title: "Demo-protokoll", description: "Klicka på ögat för att visa protokollet.", duration: 2000 });
+                              return;
+                            }
+                            setLoadingProtocol(meeting.id);
+                            try {
+                              const data = await backendApi.getProtocol(meeting.id);
+                              if (data?.protocol?.blob) {
+                                const blob = atob(data.protocol.blob.replace(/^data:.*?;base64,/, ''));
+                                const bytes = new Uint8Array(blob.length);
+                                for (let i = 0; i < blob.length; i++) bytes[i] = blob.charCodeAt(i);
+                                const file = new Blob([bytes], { type: data.protocol.mimeType });
+                                const url = URL.createObjectURL(file);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = data.protocol.fileName;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                                toast({ title: "Protokoll nedladdat", description: data.protocol.fileName, duration: 2000 });
+                              }
+                            } catch (error: any) {
+                              toast({ title: "Fel", description: error.message || "Kunde inte ladda ner protokoll", variant: "destructive", duration: 2500 });
+                            } finally {
+                              setLoadingProtocol(null);
+                            }
+                          }}
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          disabled={loadingProtocol === meeting.id}
+                        >
+                          <Download className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          onClick={() => setMeetingToDeleteProtocol(meeting)}
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
                     </div>
-                  )}
-                  
-                  <div className="flex gap-2 flex-wrap items-center" onClick={e => e.stopPropagation()}>
-                    <Button
-                      onClick={() => handleCreateProtocol(meeting)}
-                      size="sm"
-                      variant="outline"
-                      disabled={!!protocolStatus[meeting.id] || isProcessing || !hasTranscript || (meeting as any).readOnly}
-                      title={
-                        (meeting as any).readOnly ? 'Skrivskyddat teammöte' :
-                        isProcessing ? 'Väntar på transkribering...' :
-                        protocolStatus[meeting.id] ? 'Protokoll redan sparat för detta möte' :
-                        !hasTranscript ? 'Ingen transkription tillgänglig' :
-                        undefined
-                      }
-                    >
-                      <FileText className="w-4 h-4 mr-1" />
-                      {isProcessing && !hasTranscript ? 'Transkriberar...' : protocolStatus[meeting.id] ? 'Protokoll sparat' : (userPlan?.plan === 'free' ? 'Testa protokoll' : 'Skapa protokoll')}
-                    </Button>
-                    {userPlan?.plan === 'plus' && (
-                      <Button
-                        onClick={() => setChatMeeting(meeting)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-1" />
-                        Chatta
-                      </Button>
-                    )}
-                    {!(meeting as any).readOnly && (
-                      <Select value={(folders.includes(meeting.folder) || meeting.folder === 'Allmänt') ? meeting.folder : undefined} onValueChange={(value) => handleMoveToFolder(meeting, value)}>
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Klicka för att välja mapp" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["Allmänt", ...folders.filter(f => f !== "Allmänt")].map(folder => (
-                            <SelectItem key={folder} value={folder}>
-                              <div className="flex items-center gap-2">
-                                <Folder className="w-3 h-3" />
-                                {folder}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {!(meeting as any).readOnly && (
-                      <Button
-                        onClick={() => handleDeleteMeeting(meeting.id)}
-                        size="sm"
-                        variant="destructive"
-                        disabled={userPlan?.plan === 'free' || deletingMeetingId === meeting.id}
-                        title={userPlan?.plan === 'free' ? 'Inte tillåtet på gratisplanen' : deletingMeetingId === meeting.id ? 'Tar bort...' : undefined}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Ta bort
-                      </Button>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
+                )}
+
+                {/* Actions */}
+                <div className="px-4 pb-4 flex gap-2 flex-wrap items-center" onClick={e => e.stopPropagation()}>
+                  <Button
+                    onClick={() => handleCreateProtocol(meeting)}
+                    size="sm"
+                    variant="outline"
+                    disabled={!!protocolStatus[meeting.id] || isProcessing || !hasTranscript || (meeting as any).readOnly}
+                    className="h-9 gap-1.5 text-xs"
+                    title={
+                      (meeting as any).readOnly ? 'Skrivskyddat teammöte' :
+                      isProcessing ? 'Väntar på transkribering...' :
+                      protocolStatus[meeting.id] ? 'Protokoll redan sparat' :
+                      !hasTranscript ? 'Ingen transkription tillgänglig' :
+                      undefined
+                    }
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    {isProcessing && !hasTranscript ? 'Transkriberar...' : protocolStatus[meeting.id] ? 'Protokoll sparat' : 'Skapa protokoll'}
+                  </Button>
+                  {userPlan?.plan === 'plus' && (
+                    <Button onClick={() => setChatMeeting(meeting)} size="sm" variant="outline" className="h-9 gap-1.5 text-xs">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Chatta
+                    </Button>
+                  )}
+                  {!(meeting as any).readOnly && (
+                    <Select value={(folders.includes(meeting.folder) || meeting.folder === 'Allmänt') ? meeting.folder : undefined} onValueChange={(value) => handleMoveToFolder(meeting, value)}>
+                      <SelectTrigger className="w-[140px] h-9 text-xs">
+                        <SelectValue placeholder="Välj mapp" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Allmänt", ...folders.filter(f => f !== "Allmänt")].map(folder => (
+                          <SelectItem key={folder} value={folder}>
+                            <div className="flex items-center gap-2">
+                              <Folder className="w-3 h-3" />
+                              {folder}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {!(meeting as any).readOnly && (
+                    <Button
+                      onClick={() => handleDeleteMeeting(meeting.id)}
+                      size="sm"
+                      variant="destructive"
+                      disabled={userPlan?.plan === 'free' || deletingMeetingId === meeting.id}
+                      className="h-9 gap-1.5 text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Ta bort
+                    </Button>
+                  )}
+                </div>
+              </div>
               </motion.div>
               );
             })}
