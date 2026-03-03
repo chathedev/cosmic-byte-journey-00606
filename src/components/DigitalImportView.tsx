@@ -3,7 +3,7 @@ import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText,
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import type { ImportableMeeting, ImportStatus } from "@/hooks/useDigitalImport";
+import type { ImportableMeeting, ImportStatus, ImportLastError } from "@/hooks/useDigitalImport";
 import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
@@ -13,6 +13,7 @@ interface DigitalImportViewProps {
   meetings: ImportableMeeting[];
   state: string;
   error: string | null;
+  errorCode: string | null;
   onConnect: () => Promise<void>;
   onDisconnect: () => Promise<void>;
   onLoadMeetings: () => Promise<void>;
@@ -69,6 +70,10 @@ const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = 
     title: 'Mötes-ID saknas',
     description: 'Nödvändiga identifierare för mötet saknas. Försök uppdatera möteslistan.',
   },
+  microsoft_token_storage_unavailable: {
+    title: 'Säker tokenlagring ej tillgänglig',
+    description: 'Backend saknar säker lagringsmöjlighet för Microsoft-tokens.',
+  },
 };
 
 export const DigitalImportView = ({
@@ -76,6 +81,7 @@ export const DigitalImportView = ({
   meetings,
   state,
   error,
+  errorCode,
   onConnect,
   onDisconnect,
   onLoadMeetings,
@@ -186,7 +192,7 @@ export const DigitalImportView = ({
 
   // Error state
   if (state === 'error' && error) {
-    const errorInfo = ERROR_UI_LABELS[(error as any)] || null;
+    const errorInfo = errorCode ? ERROR_UI_LABELS[errorCode] : null;
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center space-y-5">
         <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -210,6 +216,7 @@ export const DigitalImportView = ({
 
   // Not connected - show connect prompt
   if (!isConnected) {
+    const lastError = importStatus?.lastError;
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -221,6 +228,22 @@ export const DigitalImportView = ({
             Koppla ditt Microsoft-konto för att importera transkript från Teams-möten direkt till Tivly.
           </p>
         </div>
+
+        {lastError && (
+          <div className="w-full max-w-xs rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-left space-y-1">
+            <p className="text-xs font-semibold text-destructive flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {lastError.code === 'microsoft_token_request_failed'
+                ? 'Microsoft-autentiseringen misslyckades'
+                : 'Senaste kopplingen misslyckades'}
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {lastError.message?.includes('AADSTS7000215')
+                ? 'Felaktig klienthemlighet i backend. Kontrollera att MICROSOFT_CLIENT_SECRET är satt till secret Value (inte secret ID) i Azure.'
+                : lastError.message || 'Försök koppla kontot igen.'}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-3 w-full max-w-xs text-left">
           <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">

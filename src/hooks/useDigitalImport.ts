@@ -23,10 +23,19 @@ export interface ImportableMeeting {
   hasAttendanceReport?: boolean;
 }
 
+export interface ImportLastError {
+  code: string;
+  message: string;
+  updatedAt?: string;
+}
+
 export interface ImportStatus {
   enabled: boolean;
   configured: boolean;
+  secureTokenStorage?: boolean;
   connected: boolean;
+  authorityBase?: string;
+  lastError?: ImportLastError | null;
   account?: MicrosoftAccount | null;
   scopes?: string[];
 }
@@ -49,6 +58,7 @@ const ERROR_CODE_LABELS: Record<string, string> = {
   microsoft_graph_not_configured: 'Microsoft Graph är inte konfigurerat',
   microsoft_account_not_connected: 'Microsoft-konto inte kopplat',
   missing_graph_identifiers: 'Mötes-ID eller transkript-ID saknas',
+  microsoft_token_storage_unavailable: 'Säker tokenlagring ej tillgänglig',
   microsoft_token_request_failed: 'Kunde inte autentisera med Microsoft',
   microsoft_graph_request_failed: 'Microsoft Graph-anrop misslyckades',
   microsoft_transcript_empty: 'Transkriptet var tomt',
