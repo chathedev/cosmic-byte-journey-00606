@@ -39,6 +39,54 @@ const IntegrationTeams = () => {
   const [refreshCooldown, setRefreshCooldown] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const hasAutoLoaded = useRef(false);
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const COOLDOWN_KEY = 'teams_refresh_cooldown_until';
+  const COOLDOWN_DURATION = 5;
+
+  // Restore cooldown from sessionStorage on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem(COOLDOWN_KEY);
+    if (stored) {
+      const remaining = Math.ceil((parseInt(stored, 10) - Date.now()) / 1000);
+      if (remaining > 0) {
+        setRefreshCooldown(true);
+        setCooldownSeconds(remaining);
+        startCooldownInterval(remaining);
+      } else {
+        sessionStorage.removeItem(COOLDOWN_KEY);
+      }
+    }
+    return () => {
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    };
+  }, []);
+
+  const startCooldownInterval = (seconds: number) => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    let remaining = seconds;
+    cooldownIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(cooldownIntervalRef.current!);
+        cooldownIntervalRef.current = null;
+        setRefreshCooldown(false);
+        setCooldownSeconds(0);
+        sessionStorage.removeItem(COOLDOWN_KEY);
+      } else {
+        setCooldownSeconds(remaining);
+      }
+    }, 1000);
+  };
+
+  const handleRefreshMeetings = () => {
+    if (refreshCooldown || di.state === 'loading_meetings') return;
+    di.loadMeetings();
+    setRefreshCooldown(true);
+    setCooldownSeconds(COOLDOWN_DURATION);
+    sessionStorage.setItem(COOLDOWN_KEY, String(Date.now() + COOLDOWN_DURATION * 1000));
+    startCooldownInterval(COOLDOWN_DURATION);
+  };
 
   const isEnabled = di.importStatus?.enabled === true;
   const isConfigured = di.importStatus?.configured === true;
@@ -47,50 +95,6 @@ const IntegrationTeams = () => {
   const scopes = di.importStatus?.scopes;
   const missingScopes = di.importStatus?.missingScopes;
   const connectionIssue = di.importStatus?.connectionIssue;
-
-  // Handle OAuth callback
-  useEffect(() => {
-    const integration = searchParams.get('integration');
-    const status = searchParams.get('status');
-    if (integration === 'microsoft' && status) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('status');
-      url.searchParams.delete('integration');
-      window.history.replaceState({}, '', url.toString());
-
-      if (status === 'success') {
-        toast({ title: 'Microsoft-konto kopplat', description: 'Laddar dina möten…' });
-        di.checkStatus().then(() => di.loadMeetings());
-      } else {
-        toast({ title: 'Kopplingen misslyckades', description: 'Försök igen.', variant: 'destructive' });
-      }
-    }
-  }, [searchParams]);
-
-  // Auto-load meetings ONCE when fully connected
-  useEffect(() => {
-    if (di.isFullyConnected && !hasAutoLoaded.current && di.state === 'idle') {
-      hasAutoLoaded.current = true;
-      di.loadMeetings();
-    }
-  }, [di.isFullyConnected]);
-
-  const handleRefreshMeetings = () => {
-    if (refreshCooldown || di.state === 'loading_meetings') return;
-    di.loadMeetings();
-    setRefreshCooldown(true);
-    setCooldownSeconds(5);
-    const interval = setInterval(() => {
-      setCooldownSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setRefreshCooldown(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
 
   const handleConnect = async () => {
     await di.connect();
