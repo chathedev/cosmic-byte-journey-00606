@@ -8,15 +8,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { Trash2, CheckCircle, XCircle, LogOut, Building2, Loader2, Headphones, ExternalLink, ArrowLeft, ChevronRight, Smartphone, Zap, Shield, Sparkles } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, LogOut, Building2, Loader2, Headphones, ExternalLink, ArrowLeft, ChevronRight, Smartphone, Zap, Shield, Sparkles, Monitor, Link2, Unlink, AlertTriangle, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { SupportCodeDialog } from "@/components/SupportCodeDialog";
 import { Separator } from "@/components/ui/separator";
 import { isWebBrowser } from "@/utils/environment";
+import { useDigitalImport } from "@/hooks/useDigitalImport";
 import appStoreBadge from "@/assets/app-store-badge-black.svg";
-
 const formatSwedishDate = (dateString: string | undefined) => {
   if (!dateString) return '';
   try {
@@ -31,6 +31,142 @@ const formatSwedishDate = (dateString: string | undefined) => {
     console.error('Error formatting date:', error);
     return '';
   }
+};
+
+const TeamsIntegrationSection = () => {
+  const { toast } = useToast();
+  const { isAdmin, enterpriseMembership } = useSubscription();
+  const digitalImport = useDigitalImport();
+  const isConnected = digitalImport.importStatus?.connected === true;
+  const isEnabled = digitalImport.importStatus?.enabled === true;
+  const isConfigured = digitalImport.importStatus?.configured === true;
+  const account = digitalImport.importStatus?.account;
+  const lastError = digitalImport.importStatus?.lastError;
+
+  const showSection = isAdmin || enterpriseMembership?.isMember;
+  if (!showSection) return null;
+
+  if (!isEnabled || !isConfigured) {
+    return (
+      <section>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Integrationer</h2>
+        <div className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
+          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Monitor className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">Microsoft Teams</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {!isEnabled ? 'Teams-import är för tillfället inte aktiverat.' : 'Microsoft Graph-integrationen är inte konfigurerad ännu.'}
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const handleConnect = async () => {
+    await digitalImport.connect();
+  };
+
+  const handleDisconnect = async () => {
+    await digitalImport.disconnect();
+    toast({ title: 'Microsoft-konto bortkopplat', description: 'Du kan koppla ett nytt konto när du vill.' });
+  };
+
+  return (
+    <section>
+      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Integrationer</h2>
+      <div className="p-4 rounded-xl border border-border/50 bg-card space-y-4">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Monitor className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-foreground">Microsoft Teams</p>
+              {isConnected ? (
+                <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400">Kopplad</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">Ej kopplad</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Importera transkript från Teams-möten via Microsoft 365
+            </p>
+          </div>
+        </div>
+
+        {isConnected && account ? (
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg bg-muted/40 border border-border/30 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Kopplat konto</span>
+                <span className="text-xs font-medium text-foreground">{account.email}</span>
+              </div>
+              {account.displayName && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Namn</span>
+                  <span className="text-xs text-foreground">{account.displayName}</span>
+                </div>
+              )}
+              {account.connectedAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Kopplad sedan</span>
+                  <span className="text-xs text-foreground">
+                    {new Date(account.connectedAt).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              )}
+              {account.lastImportAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Senaste import</span>
+                  <span className="text-xs text-foreground">
+                    {new Date(account.lastImportAt).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleDisconnect} className="text-xs gap-1.5 text-muted-foreground">
+                <Unlink className="w-3 h-3" />
+                Koppla bort
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => digitalImport.checkStatus()} className="text-xs gap-1.5">
+                <RefreshCw className="w-3 h-3" />
+                Uppdatera
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {lastError && (
+              <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-1">
+                <p className="text-xs font-medium text-destructive flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  {lastError.code === 'microsoft_token_request_failed'
+                    ? 'Autentiseringen misslyckades'
+                    : 'Kopplingen misslyckades'}
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {lastError.message?.includes('AADSTS7000215')
+                    ? 'Felaktig klienthemlighet i backend. Kontrollera att MICROSOFT_CLIENT_SECRET är satt till secret Value, inte secret ID.'
+                    : lastError.message || 'Försök koppla kontot igen.'}
+                </p>
+              </div>
+            )}
+            <Button onClick={handleConnect} disabled={digitalImport.state === 'connecting'} size="sm" className="gap-1.5">
+              {digitalImport.state === 'connecting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+              Koppla Microsoft-konto
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Koppla ditt Microsoft 365-konto för att importera transkript från Teams-möten. Teams-transkribering måste vara aktiverat.
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 };
 
 const Settings = () => {
@@ -418,7 +554,10 @@ const Settings = () => {
                 )}
               </section>
 
-              <Separator />
+          {/* Teams Integration Section */}
+          <TeamsIntegrationSection />
+
+          <Separator />
             </>
           )}
 
