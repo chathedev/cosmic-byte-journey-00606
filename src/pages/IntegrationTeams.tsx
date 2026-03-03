@@ -62,6 +62,14 @@ const IntegrationTeams = () => {
     };
   }, []);
 
+  // Auto-load meetings once when fully connected
+  useEffect(() => {
+    if (di.isFullyConnected && !hasAutoLoaded.current && di.meetings.length === 0 && di.state === 'idle') {
+      hasAutoLoaded.current = true;
+      di.loadMeetings();
+    }
+  }, [di.isFullyConnected, di.state]);
+
   const startCooldownInterval = (seconds: number) => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     let remaining = seconds;
