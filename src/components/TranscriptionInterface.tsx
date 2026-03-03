@@ -371,6 +371,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             meetings={digitalImport.meetings}
             state={digitalImport.state}
             error={digitalImport.error}
+            errorCode={digitalImport.errorCode}
             onConnect={digitalImport.connect}
             onDisconnect={digitalImport.disconnect}
             onLoadMeetings={digitalImport.loadMeetings}
