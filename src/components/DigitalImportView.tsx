@@ -90,9 +90,9 @@ const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = 
     title: 'Administratörsgodkännande krävs',
     description: 'Din organisations IT-administratör behöver godkänna appens behörigheter i Microsoft Entra.',
   },
-  microsoft_adhoc_app_permission_missing: {
-    title: 'Ad hoc-möten kunde inte sökas',
-    description: 'Appen saknar behörigheten CallTranscripts.Read.All för att söka ad hoc-/chatmöten.',
+  microsoft_calendar_meetings_only: {
+    title: 'Endast kalenderbaserade möten stöds',
+    description: 'Ad hoc-/chatmöten utan kalenderhändelse stöds inte. Endast schemalagda Teams-möten kan importeras.',
   },
 };
 
