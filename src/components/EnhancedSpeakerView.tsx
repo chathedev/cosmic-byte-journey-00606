@@ -217,14 +217,16 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
     return `Talare ${num + 1}`;
   }, [speakerNames, blockSuggestedNames, initialSpeakerNames, speakerIndexOffset]);
 
-  // Check if name is AI-suggested (not user-edited)
+  // Check if name is AI-suggested (not user-edited or backend-confirmed)
   const isAISuggested = useCallback((speakerId: string): boolean => {
     // If user has edited this speaker, not AI suggested
     const backendKey = getBackendSpeakerKeyForTranscriptId(speakerId, speakerIndexOffset);
     if (localSpeakerNames[backendKey] || localSpeakerNames[speakerId] || localSpeakerNames[normalizeSpeakerBackendKey(speakerId)]) return false;
-    // Check if there's a block-level suggestion
+    // If backend speakerNames map already contains this name (e.g. from Teams attendance data), it's confirmed
+    if (lookupSpeakerNameRecord(initialSpeakerNames, speakerId, speakerIndexOffset)) return false;
+    // Only block-level names without backend confirmation are suggestions
     return !!lookupSpeakerNameRecord(blockSuggestedNames, speakerId, 0);
-  }, [localSpeakerNames, blockSuggestedNames, speakerIndexOffset]);
+  }, [localSpeakerNames, blockSuggestedNames, initialSpeakerNames, speakerIndexOffset]);
 
   // Get initials for avatar
   const getSpeakerInitials = useCallback((speakerId: string): string => {
