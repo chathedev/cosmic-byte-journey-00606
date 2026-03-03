@@ -1362,7 +1362,7 @@ const Library = () => {
                     </div>
                   ) : (
                     <div className="mb-4">
-                      <TranscriptionCompleteMessage meetingId={meeting.id} status={meeting.transcriptionStatus} />
+                      
                       <div className="relative">
                         <p className="text-sm text-muted-foreground line-clamp-2">
                           {meeting.transcript || ''}
