@@ -412,6 +412,73 @@ const IntegrationTeams = () => {
             )}
           </section>
 
+          {/* ── Guide: Så använder du Teams med Tivly ── */}
+          {isEnabled && isConfigured && (
+            <section className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="p-5 sm:p-6">
+                <h2 className="text-base font-semibold text-foreground mb-1">Så använder du Teams med Tivly</h2>
+                <p className="text-xs text-muted-foreground mb-5">Följ stegen nedan för att aktivera transkribering i ditt Teams-möte och sedan importera det till Tivly.</p>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      step: '1',
+                      title: 'Gå med i ditt Teams-möte',
+                      desc: 'Öppna Microsoft Teams och anslut till det schemalagda mötet som vanligt.',
+                    },
+                    {
+                      step: '2',
+                      title: 'Klicka på "Mer" i toppfältet',
+                      desc: 'I mötets verktygsfält högst upp, klicka på de tre prickarna (⋯) som heter "Mer".',
+                    },
+                    {
+                      step: '3',
+                      title: 'Välj "Spela in och transkribera"',
+                      desc: 'Välj det första alternativet i menyn: "Spela in och transkribera" (Record and Transcribe).',
+                    },
+                    {
+                      step: '4',
+                      title: 'Välj "Transkribera"',
+                      desc: 'I undermenyn som öppnas, klicka på "Transkribera" (Transcribe) för att starta transkriberingen.',
+                    },
+                    {
+                      step: '5',
+                      title: 'Välj språk',
+                      desc: 'Välj önskat språk för transkriberingen. Svenska rekommenderas för bästa resultat med Tivly.',
+                    },
+                    {
+                      step: '6',
+                      title: 'Bekräfta och genomför mötet',
+                      desc: 'Klicka på "Bekräfta" (Confirm) och håll sedan ditt möte som vanligt. Transkriberingen sker i bakgrunden.',
+                    },
+                    {
+                      step: '7',
+                      title: 'Importera till Tivly',
+                      desc: 'Efter mötet, gå till Tivly och importera transkriptet. Det kan ta några minuter innan det blir tillgängligt i Microsoft 365.',
+                    },
+                  ].map((item) => (
+                    <div key={item.step} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-xs font-bold text-primary">{item.step}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{item.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/15">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <span className="font-medium text-foreground">Automatisk import (kommer snart):</span> Vi arbetar på att automatiskt importera dina Teams-möten till Tivly direkt efter avslutat möte — utan att du behöver göra något manuellt.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* ── Quality disclaimer (always visible) ── */}
           {isEnabled && isConfigured && (
             <div className="flex items-start gap-2.5 p-4 rounded-xl bg-muted/30 border border-border/50">
