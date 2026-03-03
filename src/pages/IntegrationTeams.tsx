@@ -549,7 +549,7 @@ const IntegrationTeams = () => {
           {isEnabled && isConfigured && (
             <Collapsible open={guideOpen} onOpenChange={setGuideOpen}>
               <section className="rounded-xl border border-border bg-card overflow-hidden">
-                <CollapsibleTrigger className="w-full px-4 py-3.5 sm:px-5 flex items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors">
+                <CollapsibleTrigger className="w-full px-4 py-3.5 sm:px-5 flex items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset">
                   <div className="flex items-center gap-2.5">
                     <Info className="w-4 h-4 text-muted-foreground" />
                     <h2 className="text-sm font-semibold text-foreground">Så använder du Teams med Tivly</h2>
