@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,20 @@ const Settings = () => {
   const { user, logout, refreshUser } = useAuth();
   const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership } = useSubscription();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  // Redirect Microsoft OAuth callback to integrations/teams
+  useEffect(() => {
+    const integration = searchParams.get('integration');
+    if (integration === 'microsoft') {
+      const status = searchParams.get('status');
+      const target = status
+        ? `/integrations/teams?integration=microsoft&status=${status}`
+        : '/integrations/teams';
+      navigate(target, { replace: true });
+    }
+  }, [searchParams, navigate]);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDowngradeConfirm, setShowDowngradeConfirm] = useState(false);
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
