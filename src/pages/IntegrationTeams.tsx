@@ -428,7 +428,7 @@ const IntegrationTeams = () => {
                     variant="outline"
                     size="sm"
                     onClick={handleRefreshMeetings}
-                    disabled={di.state === 'loading_meetings' || refreshCooldown}
+                    disabled={refreshCooldown}
                     className="gap-1.5 mt-2"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
