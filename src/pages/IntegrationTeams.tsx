@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Monitor, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
@@ -36,6 +36,8 @@ const IntegrationTeams = () => {
   const [searchParams] = useSearchParams();
   const di = useDigitalImport();
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [refreshCooldown, setRefreshCooldown] = useState(false);
+  const hasAutoLoaded = useRef(false);
 
   const isEnabled = di.importStatus?.enabled === true;
   const isConfigured = di.importStatus?.configured === true;
@@ -64,12 +66,20 @@ const IntegrationTeams = () => {
     }
   }, [searchParams]);
 
-  // Auto-load meetings when fully connected
+  // Auto-load meetings ONCE when fully connected
   useEffect(() => {
-    if (di.isFullyConnected && di.meetings.length === 0 && di.state === 'idle') {
+    if (di.isFullyConnected && !hasAutoLoaded.current && di.state === 'idle') {
+      hasAutoLoaded.current = true;
       di.loadMeetings();
     }
   }, [di.isFullyConnected]);
+
+  const handleRefreshMeetings = () => {
+    if (refreshCooldown || di.state === 'loading_meetings') return;
+    di.loadMeetings();
+    setRefreshCooldown(true);
+    setTimeout(() => setRefreshCooldown(false), 5000);
+  };
 
   const handleConnect = async () => {
     await di.connect();
@@ -382,8 +392,8 @@ const IntegrationTeams = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => di.loadMeetings()}
-                  disabled={di.state === 'loading_meetings'}
+                  onClick={handleRefreshMeetings}
+                  disabled={di.state === 'loading_meetings' || refreshCooldown}
                   className="gap-1.5"
                 >
                   {di.state === 'loading_meetings' ? (
@@ -391,7 +401,7 @@ const IntegrationTeams = () => {
                   ) : (
                     <RefreshCw className="w-3.5 h-3.5" />
                   )}
-                  Uppdatera
+                  {refreshCooldown ? 'Vänta…' : 'Uppdatera'}
                 </Button>
               </div>
 
@@ -408,11 +418,22 @@ const IntegrationTeams = () => {
                 <div className="p-8 flex flex-col items-center gap-3 text-center">
                   <FileText className="w-8 h-8 text-muted-foreground/30" />
                   <div>
-                    <p className="text-sm font-medium text-foreground">Inga importerbara möten</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Möten visas här när Teams-transkribering har genomförts och transkriptet är klart.
+                    <p className="text-sm font-medium text-foreground">Inga möten med färdigt transkript</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                      Det finns inga Teams-möten med tillgängligt transkript just nu. 
+                      Se till att Teams-transkribering var aktiverad under mötet och att transkriptet har hunnit bearbetas av Microsoft 365.
                     </p>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshMeetings}
+                    disabled={di.state === 'loading_meetings' || refreshCooldown}
+                    className="gap-1.5 mt-2"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    {refreshCooldown ? 'Vänta…' : 'Sök igen'}
+                  </Button>
                 </div>
               )}
 
