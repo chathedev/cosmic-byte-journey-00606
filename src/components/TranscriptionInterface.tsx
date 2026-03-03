@@ -8,10 +8,9 @@ import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
 import { TeamSelectDialog } from "./TeamSelectDialog";
 import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
-import { DigitalSessionStartDialog } from "./DigitalSessionStartDialog";
-import { DigitalSessionView } from "./DigitalSessionView";
+import { DigitalImportView } from "./DigitalImportView";
 import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
-import { useDigitalSession } from "@/hooks/useDigitalSession";
+import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -63,12 +62,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [pendingMeetingMode, setPendingMeetingMode] = useState<MeetingMode | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [showModeDialog, setShowModeDialog] = useState(false);
-  const [showDigitalStartDialog, setShowDigitalStartDialog] = useState(false);
-  const [showDigitalSession, setShowDigitalSession] = useState(false);
+  const [showDigitalImport, setShowDigitalImport] = useState(false);
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
   const [pendingParticipants, setPendingParticipants] = useState<string[]>([]);
 
-  const digitalSession = useDigitalSession();
+  const digitalImport = useDigitalImport();
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
 
@@ -77,8 +75,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       showModeDialog,
       showTeamSelect,
       showDigitalMeetingDialog,
-      showDigitalStartDialog,
-      showDigitalSession,
+      showDigitalImport,
       showUpgradeDialog,
       pendingAction,
     });
@@ -86,106 +83,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     showModeDialog,
     showTeamSelect,
     showDigitalMeetingDialog,
-    showDigitalStartDialog,
-    showDigitalSession,
+    showDigitalImport,
     showUpgradeDialog,
     pendingAction,
   ]);
 
-  // Auto-show Digital Session view for active/in-progress states
-  // and clear only stale terminal sessions on initial hydration.
-  const hasHydratedDigitalSessionRef = useRef(false);
-  const redirectedCompletedSessionRef = useRef<string | null>(null);
-  // Guard: once we reset a stale session on mount, never auto-open again in this page lifecycle
-  const suppressAutoOpenRef = useRef(false);
-
-  useEffect(() => {
-    // On first hydration, check if the session from backend is stale and reset it
-    if (!hasHydratedDigitalSessionRef.current && digitalSession.session) {
-      hasHydratedDigitalSessionRef.current = true;
-      const staleStatuses = ['completed', 'failed', 'timed_out', 'cancelled', 'interrupted', 'processing', 'stopping'];
-      if (staleStatuses.includes(digitalSession.status)) {
-        suppressAutoOpenRef.current = true;
-        digitalSession.reset();
-        setShowDigitalSession(false);
-        return;
-      }
-    }
-
-    // Never auto-open if we already suppressed a stale session
-    if (suppressAutoOpenRef.current) return;
-
-    const activeStatuses = [
-      'pending',
-      'starting',
-      'joining',
-      'listening',
-      'paused',
-    ];
-
-    // Auto-open Digital Session only for real-time meeting states
-    if (activeStatuses.includes(digitalSession.status) && digitalSession.session) {
-      setShowDigitalSession(true);
-    }
-  }, [digitalSession.status, digitalSession.session, digitalSession.reset]);
-
-  // Redirect to Meeting Detail page when monitored Digital Session transitions to
-  // stopping/processing/completed. The MeetingDetail page handles ASR polling and
-  // SSE streaming via the same shared pipeline as uploads and recordings.
-  // Backend automatically submits the recorded WAV — no manual file upload needed.
-  useEffect(() => {
-    const redirectStatuses = ['stopping', 'processing', 'completed'];
-    if (!redirectStatuses.includes(digitalSession.status)) return;
-    if (!showDigitalSession) return;
-
-    // Capture session data BEFORE any state mutations
-    const sess = digitalSession.session;
-    const sessionId = sess?.id;
-    if (!sessionId) return;
-
-    if (redirectedCompletedSessionRef.current === sessionId) return;
-    redirectedCompletedSessionRef.current = sessionId;
-
-    // Snapshot everything we need from the session before reset clears it
-    const meetingId = sess.meetingId;
-    const meetingTitle = sess.meetingTitle || 'Digitalt möte';
-    const createdAt = sess.createdAt || new Date().toISOString();
-    const updatedAt = sess.updatedAt || new Date().toISOString();
-
-    // Reset digital session UI state
-    setShowDigitalSession(false);
-    digitalSession.reset();
-
-    if (!meetingId) return;
-
-    // Store a minimal pending meeting in sessionStorage so MeetingDetail can
-    // display it immediately and begin ASR polling via the shared pipeline.
-    // No manual upload is needed — backend auto-submits the WAV file.
-    const pendingMeeting = {
-      id: meetingId,
-      title: meetingTitle,
-      createdAt,
-      updatedAt,
-      transcript: '',
-      transcriptionStatus: 'processing',
-      userId: '',
-      folder: '',
-    };
-    sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
-    // Persist digital-session flag + title so MeetingDetail survives page refresh
-    sessionStorage.setItem(`digital_session_${meetingId}`, '1');
-    sessionStorage.setItem(`digital_session_title_${meetingId}`, meetingTitle);
-
-    // Navigate to Meeting Detail — same page used by uploads and recordings.
-    // MeetingDetail will pick up the pendingMeeting from sessionStorage,
-    // start ASR polling via /asr/status, and stream via /asr/stream.
-    navigate(`/meetings/${meetingId}`, {
-      replace: true,
-      state: {
-        source: 'digital-session',
-      },
-    });
-  }, [digitalSession.status, digitalSession.session, showDigitalSession, navigate, digitalSession.reset]);
   useEffect(() => {
     const id = searchParams.get('continue');
     if (!id) return;
@@ -228,13 +130,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowModeDialog(false);
 
     if (mode === 'digital') {
-      setPendingMeetingMode(null);
-      debugLog('[🏠 Home] Digital mode selected, isActive:', digitalSession.isActive);
-      if (digitalSession.isActive) {
-        setShowDigitalSession(true);
-        return;
-      }
-      setShowDigitalStartDialog(true);
+      // Open the Microsoft Graph Import view
+      setShowDigitalImport(true);
       return;
     }
 
@@ -284,14 +181,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     } else if (action === 'upload') {
       setShowDigitalMeetingDialog(true);
     }
-  };
-
-  const handleDigitalStart = async (joinUrl: string, title: string, participants?: string[]): Promise<boolean> => {
-    const success = await digitalSession.startSession({ joinUrl, title, participants });
-    if (success) {
-      setShowDigitalSession(true);
-    }
-    return success;
   };
 
   // Start in-person recording (current behavior)
@@ -356,24 +245,20 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   };
 
   const handleDigitalMeetingUpload = async (transcript: string) => {
-    // Just show the transcript preview - don't save yet
-    // User will save when they click "Spara till bibliotek" or "Generera protokoll"
     setTranscript(transcript);
     setCurrentView("transcript-preview");
   };
 
   const handleOpenDigitalMeeting = async () => {
-    // Dialog handles plan restrictions and shows upgrade prompt for free users
     setShowDigitalMeetingDialog(true);
   };
 
   const handleTextPaste = async (text: string) => {
-    // Navigate directly to protocol generation with the pasted text
     const token = `protocol-${Date.now()}`;
     const payload = {
       transcript: text,
       meetingName: 'Inklistrad text',
-      meetingId: '', // No meeting ID for pasted text
+      meetingId: '',
       token,
     };
     sessionStorage.setItem('protocol_generation_token', token);
@@ -381,14 +266,12 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     navigate('/generate-protocol', { state: payload });
   };
 
-  // Check if user has Pro or Enterprise plan (for upload access)
   const hasProAccess = userPlan && (userPlan.plan === 'pro' || userPlan.plan === 'enterprise');
 
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
-    // Check file size (limit to 500MB)
     const maxSizeMB = 5000;
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
@@ -400,7 +283,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
-    // Check if user can create a meeting
     const { allowed, reason } = await canCreateMeeting();
     if (!allowed) {
       setUpgradeReason(reason || 'Du har nått din gräns för möten');
@@ -408,7 +290,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       return;
     }
 
-    // Show analyzing state
     setCurrentView("analyzing");
 
     try {
@@ -418,13 +299,11 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         throw new Error("Ingen autentiseringstoken hittades");
       }
 
-      // Use multipart/form-data
       const formData = new FormData();
       formData.append('audioFile', file);
     formData.append('modelSize', 'base');
     formData.append('language', 'sv');
 
-      // Call transcription API
       const response = await fetch('https://api.tivly.se/transcribe', {
         method: 'POST',
         credentials: 'include',
@@ -448,8 +327,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         throw new Error("Ingen transkription mottogs");
       }
 
-      // Gå direkt till transkriptions-vyn utan att spara mötet ännu
-      // Mötet sparas först när användaren väljer "Spara till bibliotek" eller "Generera protokoll"
       setTranscript(transcriptText);
       setCurrentView("transcript-preview");
 
@@ -478,39 +355,31 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     }
   };
 
-  // Show digital session monitoring view
-  if (showDigitalSession && digitalSession.isActive) {
+  // Show Digital Import view
+  if (showDigitalImport) {
     return (
-      <DigitalSessionView
-        session={digitalSession.session}
-        status={digitalSession.status}
-        error={digitalSession.error}
-        errorCode={digitalSession.errorCode}
-        onPause={digitalSession.pauseSession}
-        onResume={digitalSession.resumeSession}
-        onStop={digitalSession.stopSession}
-        onRetry={digitalSession.retrySession}
-        onReset={() => { digitalSession.reset(); setShowDigitalSession(false); }}
-        onBack={() => setShowDigitalSession(false)}
-      />
-    );
-  }
-
-  // Show digital session completed/failed view
-  if (showDigitalSession && digitalSession.session && !digitalSession.isActive) {
-    return (
-      <DigitalSessionView
-        session={digitalSession.session}
-        status={digitalSession.status}
-        error={digitalSession.error}
-        errorCode={digitalSession.errorCode}
-        onPause={digitalSession.pauseSession}
-        onResume={digitalSession.resumeSession}
-        onStop={digitalSession.stopSession}
-        onRetry={digitalSession.retrySession}
-        onReset={() => { digitalSession.reset(); setShowDigitalSession(false); }}
-        onBack={() => setShowDigitalSession(false)}
-      />
+      <div className="min-h-[100dvh] bg-background flex flex-col">
+        <div className="flex items-center gap-3 p-4 border-b border-border/50">
+          <Button variant="ghost" size="icon" onClick={() => setShowDigitalImport(false)} className="shrink-0 -ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </Button>
+          <p className="text-sm font-medium text-foreground">Importera från Teams</p>
+        </div>
+        <div className="flex-1">
+          <DigitalImportView
+            importStatus={digitalImport.importStatus}
+            meetings={digitalImport.meetings}
+            state={digitalImport.state}
+            error={digitalImport.error}
+            onConnect={digitalImport.connect}
+            onDisconnect={digitalImport.disconnect}
+            onLoadMeetings={digitalImport.loadMeetings}
+            onImport={digitalImport.importMeeting}
+            onReset={digitalImport.reset}
+            onClose={() => setShowDigitalImport(false)}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -592,25 +461,6 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               Spela in, ladda upp eller klistra in text
             </p>
           </div>
-
-          {/* Active digital session banner */}
-          {digitalSession.isActive && (
-            <button
-              onClick={() => setShowDigitalSession(true)}
-              className="w-full p-4 rounded-xl border-2 border-primary bg-primary/5 text-left flex items-center gap-3 transition-all hover:shadow-md"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Monitor className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">Digital session aktiv</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {digitalSession.session?.meetingTitle || 'Teams-möte pågår'}
-                </p>
-              </div>
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
-            </button>
-          )}
 
           {/* Action buttons - clean and simple */}
           <div className="space-y-3">
@@ -705,18 +555,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         }}
         onSelect={handleModeSelect}
         showDigitalOption={isEnterprise || isAdmin}
-        digitalComingSoon={isEnterprise && !isAdmin}
-        digitalLocked={digitalSession.isLocked}
-        lockedSessionInfo={digitalSession.lockedSessionInfo}
-      />
-
-      <DigitalSessionStartDialog
-        open={showDigitalStartDialog}
-        onOpenChange={setShowDigitalStartDialog}
-        onStart={handleDigitalStart}
-        isLocked={digitalSession.isLocked}
-        error={digitalSession.error}
-        onClearError={digitalSession.clearError}
+        digitalComingSoon={false}
+        digitalLocked={false}
       />
 
       <ParticipantsInputDialog

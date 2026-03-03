@@ -39,9 +39,9 @@ const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: str
   {
     mode: 'digital',
     icon: Monitor,
-    title: 'Teams-möte (digital)',
-    desc: 'En AI-assistent går med i ditt Teams-möte och transkriberar',
-    hint: 'Du behöver inte spela in själv',
+    title: 'Importera från Teams',
+    desc: 'Importera transkript direkt från ditt Teams-möte via Microsoft 365',
+    hint: 'Kräver Teams-transkribering',
     hintIcon: Monitor,
   },
 ];
@@ -218,7 +218,7 @@ export const MeetingModeDialog = ({
             <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-muted/30 border-t border-border/50 shrink-0">
               <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
                 <Mic className="w-3.5 h-3.5 text-primary shrink-0" />
-                Tips: Låt alla säga sitt namn i början för bättre protokoll
+                Tips: Ange deltagarnas namn för bättre transkribering
               </p>
             </div>
           </>
