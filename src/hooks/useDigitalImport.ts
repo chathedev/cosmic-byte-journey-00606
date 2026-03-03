@@ -116,6 +116,7 @@ interface UseDigitalImportReturn {
   disconnect: () => Promise<void>;
   loadMeetings: () => Promise<void>;
   importMeeting: (meeting: ImportableMeeting, meetingId?: string, title?: string) => Promise<ImportResult | null>;
+  toggleAutoImport: (enabled: boolean) => Promise<void>;
   reset: () => void;
   clearError: () => void;
   isFullyConnected: boolean;
