@@ -3,10 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Monitor, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Shield, Info, FileText, Clock, Users, Download, Sparkles,
-  ChevronRight, AlertCircle, ExternalLink
+  ChevronRight, AlertCircle, ExternalLink, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useDigitalImport, ImportableMeeting, ERROR_CODE_LABELS, type ImportWarning } from "@/hooks/useDigitalImport";
