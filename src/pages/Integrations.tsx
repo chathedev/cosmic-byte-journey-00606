@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Monitor, ChevronRight, CheckCircle2, Puzzle, Calendar, Mail } from "lucide-react";
+import { ArrowLeft, Monitor, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 
@@ -64,32 +64,23 @@ const Integrations = () => {
             </div>
           </button>
 
-          {/* Coming soon placeholders */}
-          {[
-            { icon: Calendar, label: 'Google Calendar', desc: 'Synka möten och schemalägg protokoll' },
-            { icon: Mail, label: 'Outlook', desc: 'Skicka protokoll direkt via e-post' },
-            { icon: Puzzle, label: 'Fler integrationer', desc: 'Slack, Notion, och mer' },
-          ].map(({ icon: Icon, label, desc }) => (
-            <div
-              key={label}
-              className="w-full rounded-xl border border-border/50 bg-card/50 opacity-60 cursor-default"
-            >
-              <div className="p-4 sm:p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl bg-muted/50 border border-border/30 flex items-center justify-center shrink-0">
-                  <Icon className="w-5 h-5 text-muted-foreground/50" />
+          {/* Coming soon */}
+          <div className="w-full rounded-lg border border-border/50 bg-card/50 opacity-60 cursor-default">
+            <div className="p-4 sm:p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-muted/50 border border-border/30 flex items-center justify-center shrink-0">
+                <Puzzle className="w-5 h-5 text-muted-foreground/50" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-medium text-foreground/70">Fler integrationer</h2>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground border-border/50">
+                    Kommer snart
+                  </Badge>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-medium text-foreground/70">{label}</h2>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground border-border/50">
-                      Kommer snart
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground/60 mt-0.5">{desc}</p>
-                </div>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">Slack, Google Calendar, Outlook, Notion och mer</p>
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>
