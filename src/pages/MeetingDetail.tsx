@@ -2303,71 +2303,88 @@ const MeetingDetail = () => {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Clean Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-4xl mx-auto px-3 sm:px-6 min-h-[3.5rem] py-2 flex items-center gap-2 sm:gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/library')}
-            className="shrink-0 no-hover-lift"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="font-medium text-sm truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
-              {meeting && enterpriseMembership?.isMember && (
+      <header className="sticky top-0 z-50 bg-background border-b border-border">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-3 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/library')}
+              className="shrink-0 no-hover-lift h-8 w-8"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <h1 className="font-semibold text-base truncate">{meeting?.title || meetingTitle || 'Laddar...'}</h1>
+              {!isEditing && meeting && !isReadOnly && (
+                <button
+                  onClick={enterEditMode}
+                  className="p-1 rounded hover:bg-muted transition-colors shrink-0"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+
+            {/* Top-right actions when transcript is ready */}
+            {hasTranscript && !isEditing && (
+              <div className="flex items-center gap-1">
+                {hasPlusAccess(user, userPlan) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/chat?meeting=${meeting?.id}`)}
+                    className="gap-1.5 text-xs h-8 no-hover-lift"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Chatta</span>
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="gap-1.5 text-xs h-8 text-muted-foreground hover:text-destructive no-hover-lift"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Meta row below title */}
+          {meeting && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap pl-10">
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {formatDate(meeting.createdAt)} {formatTime(meeting.createdAt)}
+              </span>
+              <span className="text-border">·</span>
+              <span>Uppdaterad: {formatDate(meeting.updatedAt || meeting.createdAt)} {formatTime(meeting.updatedAt || meeting.createdAt)}</span>
+
+              {enterpriseMembership?.isMember && (
                 <>
+                  <span className="text-border">·</span>
                   {meeting.enterpriseTeamId ? (
-                    <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-5 bg-primary/8 border-primary/20 text-primary shrink-0">
+                    <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-primary/8 border-primary/20 text-primary">
                       <Users className="w-2.5 h-2.5" />
                       {meeting.enterpriseTeamName || 'Team'}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-5 bg-muted/50 border-border text-muted-foreground shrink-0">
+                    <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-muted/50 border-border text-muted-foreground">
                       <Lock className="w-2.5 h-2.5" />
                       Individuellt
                     </Badge>
                   )}
                   {isReadOnly && (
-                    <Badge variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0 h-5 shrink-0">
+                    <Badge variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4">
                       <Eye className="w-2.5 h-2.5" />
                       Skrivskyddat
                     </Badge>
                   )}
                 </>
               )}
-            </div>
-            {meeting && (
-              <p className="text-xs text-muted-foreground">
-                {formatDate(meeting.createdAt)} · {formatTime(meeting.createdAt)}
-              </p>
-            )}
-          </div>
-
-          {/* Top-right actions when transcript is ready */}
-          {hasTranscript && !isEditing && (
-            <div className="flex items-center gap-1">
-              {hasPlusAccess(user, userPlan) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(`/chat?meeting=${meeting?.id}`)}
-                  className="gap-1.5 text-xs h-8 no-hover-lift"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Chatta</span>
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="gap-1.5 text-xs h-8 text-muted-foreground hover:text-destructive no-hover-lift"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
             </div>
           )}
         </div>
