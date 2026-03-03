@@ -576,9 +576,7 @@ export const DigitalImportView = ({
                 <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
                   <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    {w.code === 'microsoft_adhoc_app_permission_missing'
-                      ? 'Ad hoc-/chatmöten kunde inte sökas. Appen saknar behörigheten CallTranscripts.Read.All.'
-                      : w.message || w.code}
+                   {w.message || w.code}
                   </p>
                 </div>
               ))}
