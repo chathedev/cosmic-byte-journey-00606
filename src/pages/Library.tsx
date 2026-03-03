@@ -1098,112 +1098,115 @@ const Library = () => {
           <ChatUpgradeBanner onUpgrade={() => setShowSubscribeDialog(true)} />
         )}
 
-        {/* Enterprise Scope Filter */}
-        {isEnterprise && (
-          <div className="flex items-center gap-2 border-b pb-3">
-            <Button
-              variant={accessScopeFilter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setAccessScopeFilter('all')}
-              className="text-xs"
-            >
-              Alla möten
-            </Button>
-            <Button
-              variant={accessScopeFilter === 'team' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setAccessScopeFilter('team')}
-              className="text-xs"
-            >
-              <Users className="w-3.5 h-3.5 mr-1" />
-              Teammöten
-            </Button>
-            <Button
-              variant={accessScopeFilter === 'individual' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setAccessScopeFilter('individual')}
-              className="text-xs"
-            >
-              <Lock className="w-3.5 h-3.5 mr-1" />
-              Individuella
-            </Button>
-          </div>
-        )}
-
-        {/* Folder Management */}
+        {/* Filters & Folders – unified row */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Enterprise scope filter – inline with folders */}
+            {isEnterprise && (
+              <>
+                <div className="inline-flex items-center rounded-lg bg-muted p-0.5 mr-1">
+                  <button
+                    onClick={() => setAccessScopeFilter('all')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      accessScopeFilter === 'all'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Alla
+                  </button>
+                  <button
+                    onClick={() => setAccessScopeFilter('team')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                      accessScopeFilter === 'team'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Users className="w-3 h-3" />
+                    Team
+                  </button>
+                  <button
+                    onClick={() => setAccessScopeFilter('individual')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                      accessScopeFilter === 'individual'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Lock className="w-3 h-3" />
+                    Privata
+                  </button>
+                </div>
+                <div className="w-px h-6 bg-border" />
+              </>
+            )}
+
+            {/* Folder pills */}
             <Button
-              variant={selectedFolder === "Alla" ? "default" : "outline"}
+              variant={selectedFolder === "Alla" ? "default" : "ghost"}
               size="sm"
               onClick={() => setSelectedFolder("Alla")}
+              className="h-8 text-xs"
             >
-              Alla möten ({meetings.length})
+              Alla ({meetings.length})
             </Button>
-            {/* Always show Allmänt folder first */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant={selectedFolder === "Allmänt" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFolder("Allmänt")}
-              >
-                <Folder className="w-3 h-3 mr-1" />
-                Allmänt ({meetings.filter(m => !m.folder || m.folder === "Allmänt").length})
-              </Button>
-            </div>
-            {/* Show other folders */}
-            {folders.filter(f => f !== "Allmänt").map((folder, index) => (
-              <div 
-                key={folder} 
-                className="flex items-center gap-1"
-              >
+            <Button
+              variant={selectedFolder === "Allmänt" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setSelectedFolder("Allmänt")}
+              className="h-8 text-xs"
+            >
+              <Folder className="w-3 h-3 mr-1" />
+              Allmänt ({meetings.filter(m => !m.folder || m.folder === "Allmänt").length})
+            </Button>
+            {folders.filter(f => f !== "Allmänt").map((folder) => (
+              <div key={folder} className="flex items-center gap-0.5">
                 <Button
-                  variant={selectedFolder === folder ? "default" : "outline"}
+                  variant={selectedFolder === folder ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setSelectedFolder(folder)}
+                  className="h-8 text-xs"
                 >
                   <Folder className="w-3 h-3 mr-1" />
                   {folder} ({meetings.filter(m => m.folder === folder).length})
                 </Button>
-                {folder !== "Allmänt" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteFolder(folder)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteFolder(folder)}
+                  className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
               </div>
             ))}
-          </div>
 
-          {isAddingFolder ? (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Mappnamn..."
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
-                autoFocus
-              />
-              <Button onClick={handleAddFolder} size="sm">
-                <Check className="w-4 h-4" />
+            {/* Add folder inline */}
+            {isAddingFolder ? (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  placeholder="Mappnamn..."
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
+                  autoFocus
+                  className="h-8 w-32 text-xs"
+                />
+                <Button onClick={handleAddFolder} size="sm" className="h-8 w-8 p-0">
+                  <Check className="w-3.5 h-3.5" />
+                </Button>
+                <Button onClick={() => { setIsAddingFolder(false); setNewFolderName(""); }} variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={() => setIsAddingFolder(true)} variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground">
+                <FolderPlus className="w-3.5 h-3.5 mr-1" />
+                Ny mapp
               </Button>
-              <Button onClick={() => {
-                setIsAddingFolder(false);
-                setNewFolderName("");
-              }} variant="ghost" size="sm">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          ) : (
-            <Button onClick={() => setIsAddingFolder(true)} variant="outline" size="sm">
-              <FolderPlus className="w-4 h-4 mr-2" />
-              Ny mapp
-            </Button>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Meetings List */}
