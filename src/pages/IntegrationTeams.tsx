@@ -149,12 +149,12 @@ const IntegrationTeams = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
-              <Monitor className="w-4.5 h-4.5 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+              <Monitor className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-semibold">Microsoft Teams</h1>
-              <p className="text-xs text-muted-foreground">Importera transkript från Teams-möten</p>
+              <p className="text-sm text-muted-foreground">Importera transkript från Teams-möten</p>
             </div>
           </div>
         </div>
@@ -162,22 +162,22 @@ const IntegrationTeams = () => {
         <div className="space-y-4">
           {/* ── Connection Status ── */}
           <section className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-4 py-3 sm:px-5 flex items-center justify-between">
+            <div className="px-4 py-3.5 sm:px-5 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Anslutning</h2>
               {di.isFullyConnected ? (
-                <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
+                <Badge variant="secondary" className="text-xs bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-2 py-0.5">
+                  <CheckCircle2 className="w-3 h-3" />
                   Kopplad
                 </Badge>
               ) : di.needsReconnect ? (
-                <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
-                  <AlertCircle className="w-2.5 h-2.5" />
+                <Badge variant="secondary" className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-2 py-0.5">
+                  <AlertCircle className="w-3 h-3" />
                   Kräver omkoppling
                 </Badge>
               ) : isEnabled && isConfigured ? (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
+                <Badge variant="secondary" className="text-xs px-2 py-0.5">Ej kopplad</Badge>
               ) : (
-                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0">Ej tillgänglig</Badge>
+                <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground px-2 py-0.5">Ej tillgänglig</Badge>
               )}
             </div>
 
@@ -186,7 +186,7 @@ const IntegrationTeams = () => {
               <div className="px-4 pb-4 sm:px-5">
                 <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/40 border border-border/50">
                   <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {!isEnabled ? 'Teams-import är inte aktiverat. Kontakta din administratör.' : 'Microsoft Graph inte konfigurerat. Kontakta support.'}
                   </p>
                 </div>
@@ -199,11 +199,11 @@ const IntegrationTeams = () => {
                 <Separator />
                 {connectionIssue?.reason === 'personal_account_not_supported_for_transcripts' && (
                   <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5">
-                    <p className="text-xs font-medium text-destructive flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
                       Personligt Microsoft-konto stöds inte
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       Teams-transkript kräver ett Microsoft 365 arbets- eller skolkonto.
                     </p>
                   </div>
@@ -211,11 +211,11 @@ const IntegrationTeams = () => {
 
                 {connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' && (
                   <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 shrink-0" />
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 shrink-0" />
                       Administratörsgodkännande krävs
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       Din IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra.
                     </p>
                   </div>
@@ -224,11 +224,11 @@ const IntegrationTeams = () => {
                 {connectionIssue?.reason !== 'personal_account_not_supported_for_transcripts' && 
                  connectionIssue?.reason !== 'admin_consent_required_or_missing_permissions' && (
                   <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
                       Kontot behöver kopplas om
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {connectionIssue?.message || 'Microsoft returnerade för få behörigheter. Koppla om och godkänn alla begärda behörigheter.'}
                     </p>
                   </div>
@@ -236,9 +236,9 @@ const IntegrationTeams = () => {
 
                 {missingScopes && missingScopes.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    <span className="text-[10px] text-muted-foreground mr-1">Saknas:</span>
+                    <span className="text-xs text-muted-foreground mr-1">Saknas:</span>
                     {missingScopes.map(s => (
-                      <Badge key={s} variant="outline" className="text-[9px] font-mono border-amber-500/30 text-amber-700 dark:text-amber-400 px-1 py-0">
+                      <Badge key={s} variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-700 dark:text-amber-400 px-1.5 py-0">
                         {s}
                       </Badge>
                     ))}
@@ -246,13 +246,13 @@ const IntegrationTeams = () => {
                 )}
 
                 {lastError && (
-                  <p className="text-[10px] text-muted-foreground/60">
+                  <p className="text-xs text-muted-foreground/60">
                     Senaste fel: {ERROR_CODE_LABELS[lastError.code] || lastError.message || lastError.code}
                   </p>
                 )}
 
-                <Button onClick={handleConnect} disabled={di.state === 'connecting'} size="sm" className="gap-1.5 text-xs font-semibold">
-                  {di.state === 'connecting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                <Button onClick={handleConnect} disabled={di.state === 'connecting'} size="sm" className="gap-1.5 font-semibold">
+                  {di.state === 'connecting' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   Koppla om
                 </Button>
               </div>
@@ -260,29 +260,29 @@ const IntegrationTeams = () => {
 
             {/* ── Fully connected ── */}
             {isEnabled && isConfigured && di.isFullyConnected && account && (
-              <div className="px-4 pb-3 sm:px-5">
+              <div className="px-4 pb-3.5 sm:px-5">
                 <Separator className="mb-3" />
                 <Collapsible open={accountOpen} onOpenChange={setAccountOpen}>
                   <CollapsibleTrigger className="w-full flex items-center justify-between py-1 group cursor-pointer">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-medium text-foreground truncate">{account.email}</span>
+                      <span className="text-sm font-medium text-foreground truncate">{account.email}</span>
                       {account.displayName && (
-                        <span className="text-[11px] text-muted-foreground hidden sm:inline">({account.displayName})</span>
+                        <span className="text-xs text-muted-foreground hidden sm:inline">({account.displayName})</span>
                       )}
                     </div>
-                    <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${accountOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${accountOpen ? 'rotate-180' : ''}`} />
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="mt-2 space-y-2">
-                      <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border text-xs">
+                    <div className="mt-2.5 space-y-2.5">
+                      <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border text-sm">
                         {account.connectedAt && (
-                          <div className="flex items-center justify-between px-3 py-2">
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
                             <span className="text-muted-foreground">Kopplad sedan</span>
                             <span className="text-foreground">{formatDate(account.connectedAt)}</span>
                           </div>
                         )}
                         {account.lastImportAt && (
-                          <div className="flex items-center justify-between px-3 py-2">
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
                             <span className="text-muted-foreground">Senaste import</span>
                             <span className="text-foreground">{formatDate(account.lastImportAt)}</span>
                           </div>
@@ -290,9 +290,9 @@ const IntegrationTeams = () => {
                       </div>
 
                       {scopes && scopes.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {scopes.map((scope) => (
-                            <Badge key={scope} variant="outline" className="text-[9px] font-mono px-1 py-0">
+                            <Badge key={scope} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
                               {scope}
                             </Badge>
                           ))}
@@ -300,12 +300,12 @@ const IntegrationTeams = () => {
                       )}
 
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={handleDisconnect} className="gap-1 text-xs h-7 px-2.5">
-                          <Unlink className="w-3 h-3" />
+                        <Button variant="outline" size="sm" onClick={handleDisconnect} className="gap-1.5 h-8">
+                          <Unlink className="w-3.5 h-3.5" />
                           Koppla bort
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => di.checkStatus()} className="gap-1 text-xs h-7 px-2.5">
-                          <RefreshCw className="w-3 h-3" />
+                        <Button variant="ghost" size="sm" onClick={() => di.checkStatus()} className="gap-1.5 h-8">
+                          <RefreshCw className="w-3.5 h-3.5" />
                           Uppdatera
                         </Button>
                       </div>
@@ -321,11 +321,11 @@ const IntegrationTeams = () => {
                 <Separator />
                 {lastError && (
                   <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5">
-                    <p className="text-xs font-medium text-destructive flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
                       {lastError.code === 'microsoft_token_request_failed' ? 'Autentiseringen misslyckades' : 'Kopplingen misslyckades'}
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {lastError.message?.includes('AADSTS7000215')
                         ? 'Felaktig klienthemlighet i backend. Kontrollera att MICROSOFT_CLIENT_SECRET är satt till secret Value.'
                         : lastError.message || 'Ett okänt fel uppstod. Försök igen.'}
@@ -333,25 +333,25 @@ const IntegrationTeams = () => {
                   </div>
                 )}
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {['Koppla ditt Microsoft 365-konto', 'Välj ett Teams-möte med färdigt transkript', 'Importera och skapa protokoll i Tivly'].map((step, i) => (
-                    <div key={i} className="flex items-center gap-2.5 py-1">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                    <div key={i} className="flex items-center gap-3 py-0.5">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-primary">{i + 1}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">{step}</p>
+                      <p className="text-sm text-muted-foreground">{step}</p>
                     </div>
                   ))}
                 </div>
 
-                <Button onClick={handleConnect} disabled={di.state === 'connecting'} size="sm" className="gap-1.5 text-xs font-semibold">
-                  {di.state === 'connecting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                <Button onClick={handleConnect} disabled={di.state === 'connecting'} size="sm" className="gap-1.5 font-semibold">
+                  {di.state === 'connecting' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
                   Koppla Microsoft-konto
                 </Button>
 
-                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/20 border border-border/30">
-                  <Shield className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/20 border border-border/30">
+                  <Shield className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Kräver Microsoft 365 arbets-/skolkonto med Teams-transkribering. Du behöver vara organisatör.
                   </p>
                 </div>
@@ -362,13 +362,15 @@ const IntegrationTeams = () => {
           {/* ── Auto-import ── */}
           {di.isFullyConnected && (
             <section className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-4 py-3 sm:px-5">
+              <div className="px-4 py-3.5 sm:px-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <Zap className="w-4 h-4 text-primary" />
                     <div>
                       <h2 className="text-sm font-semibold text-foreground">Automatisk import</h2>
-                      <p className="text-[11px] text-muted-foreground">Hämtar möten automatiskt när transkriptet är klart</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Hämtar möten automatiskt när transkriptet är klart
+                      </p>
                     </div>
                   </div>
                   <Switch
@@ -379,10 +381,10 @@ const IntegrationTeams = () => {
                 </div>
 
                 {autoImport?.enabled && (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                      <Badge variant="secondary" className="text-[9px] bg-green-500/15 text-green-700 dark:text-green-400 gap-0.5 px-1.5 py-0">
-                        <CheckCircle2 className="w-2 h-2" />
+                  <div className="mt-3 space-y-2.5">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
                         Aktiv
                       </Badge>
                       {autoImport.lastRunAt && (
@@ -394,15 +396,15 @@ const IntegrationTeams = () => {
                     </div>
 
                     {autoImport.lastError && (
-                      <div className="p-2 rounded-lg border border-destructive/30 bg-destructive/5">
-                        <p className="text-[11px] text-destructive flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                      <div className="p-2.5 rounded-lg border border-destructive/30 bg-destructive/5">
+                        <p className="text-xs text-destructive flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                           {ERROR_CODE_LABELS[autoImport.lastError.code] || autoImport.lastError.message || autoImport.lastError.code}
                         </p>
                       </div>
                     )}
 
-                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                    <p className="text-xs text-muted-foreground/80 leading-relaxed">
                       Kontrollerar nya möten ca varje minut. Du får mejl till din Tivly-adress vid import. Raderade möten importeras inte igen automatiskt.
                     </p>
                   </div>
@@ -414,10 +416,10 @@ const IntegrationTeams = () => {
           {/* ── Importable meetings ── */}
           {di.isFullyConnected && (
             <section className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-4 py-3 sm:px-5 flex items-center justify-between">
+              <div className="px-4 py-3.5 sm:px-5 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">Importerbara möten</h2>
-                  <p className="text-[11px] text-muted-foreground">Möten med färdigt transkript i Microsoft 365</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Möten med färdigt transkript i Microsoft 365</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -425,17 +427,17 @@ const IntegrationTeams = () => {
                     size="sm"
                     onClick={handleRefreshMeetings}
                     disabled={di.state === 'loading_meetings' || refreshCooldown}
-                    className="gap-1 text-xs h-7 px-2"
+                    className="gap-1.5 h-8"
                   >
                     {di.state === 'loading_meetings' ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <RefreshCw className="w-3 h-3" />
+                      <RefreshCw className="w-3.5 h-3.5" />
                     )}
                     {refreshCooldown ? `${cooldownSeconds}s` : 'Uppdatera'}
                   </Button>
                   {refreshCooldown && (
-                    <div className="h-1 w-12 rounded-full bg-muted overflow-hidden">
+                    <div className="h-1 w-14 rounded-full bg-muted overflow-hidden">
                       <div 
                         className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
                         style={{ width: `${(cooldownSeconds / COOLDOWN_DURATION) * 100}%` }}
@@ -450,18 +452,18 @@ const IntegrationTeams = () => {
               {di.state === 'loading_meetings' && di.meetings.length === 0 && (
                 <div className="p-8 flex flex-col items-center gap-3 text-center">
                   <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-                  <p className="text-xs text-muted-foreground">Söker efter möten…</p>
+                  <p className="text-sm text-muted-foreground">Söker efter möten…</p>
                 </div>
               )}
 
               {di.state !== 'loading_meetings' && di.meetings.length === 0 && (
                 <div className="p-6 flex flex-col items-center gap-3 text-center">
-                  <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-xl bg-muted/50 flex items-center justify-center">
                     <FileText className="w-5 h-5 text-muted-foreground/30" />
                   </div>
                   <div className="max-w-xs space-y-1.5">
-                    <p className="text-xs font-medium text-foreground">Inga importerbara möten hittades</p>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    <p className="text-sm font-medium text-foreground">Inga importerbara möten hittades</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Aktivera transkribering i Teams och vänta tills transkriptet är klart efter mötet.
                     </p>
                   </div>
@@ -470,9 +472,9 @@ const IntegrationTeams = () => {
                     size="sm"
                     onClick={handleRefreshMeetings}
                     disabled={refreshCooldown}
-                    className="gap-1 text-xs h-7 mt-1"
+                    className="gap-1.5 h-8 mt-1"
                   >
-                    <RefreshCw className="w-3 h-3" />
+                    <RefreshCw className="w-3.5 h-3.5" />
                     {refreshCooldown ? `Vänta ${cooldownSeconds}s` : 'Sök igen'}
                   </Button>
                 </div>
@@ -481,11 +483,11 @@ const IntegrationTeams = () => {
               {di.meetings.length > 0 && (
                 <div className="divide-y divide-border">
                   {di.warnings && di.warnings.length > 0 && (
-                    <div className="px-4 py-2 sm:px-5 space-y-1">
+                    <div className="px-4 py-2.5 sm:px-5 space-y-1.5">
                       {di.warnings.map((w, i) => (
-                        <div key={i} className="flex items-start gap-1.5 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                          <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <p className="text-[10px] text-muted-foreground leading-relaxed">{w.message || w.code}</p>
+                        <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                          <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-muted-foreground leading-relaxed">{w.message || w.code}</p>
                         </div>
                       ))}
                     </div>
@@ -501,13 +503,13 @@ const IntegrationTeams = () => {
                         <div className="flex items-center gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">{meeting.title}</p>
-                            <div className="flex items-center gap-2.5 mt-0.5 text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
-                                <Clock className="w-2.5 h-2.5" />
+                                <Clock className="w-3 h-3" />
                                 {formatDateTime(meeting.startDateTime)}
                               </span>
                               {meeting.hasAttendanceReport && (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0">Närvaro</Badge>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Närvaro</Badge>
                               )}
                             </div>
                           </div>
@@ -516,12 +518,12 @@ const IntegrationTeams = () => {
                             variant="outline"
                             disabled={isImporting || di.state === 'importing'}
                             onClick={() => handleImport(meeting)}
-                            className="gap-1 shrink-0 text-xs h-7 px-2.5"
+                            className="gap-1.5 shrink-0 h-8"
                           >
                             {isImporting ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                              <Download className="w-3 h-3" />
+                              <Download className="w-3.5 h-3.5" />
                             )}
                             {isImporting ? 'Importerar…' : 'Importera'}
                           </Button>
@@ -534,8 +536,8 @@ const IntegrationTeams = () => {
 
               {di.error && di.state === 'error' && (
                 <div className="p-3 mx-4 mb-3 rounded-lg border border-destructive/30 bg-destructive/5">
-                  <p className="text-xs text-destructive flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <p className="text-sm text-destructive flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
                     {di.error}
                   </p>
                 </div>
@@ -547,7 +549,7 @@ const IntegrationTeams = () => {
           {isEnabled && isConfigured && (
             <Collapsible open={guideOpen} onOpenChange={setGuideOpen}>
               <section className="rounded-xl border border-border bg-card overflow-hidden">
-                <CollapsibleTrigger className="w-full px-4 py-3 sm:px-5 flex items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors">
+                <CollapsibleTrigger className="w-full px-4 py-3.5 sm:px-5 flex items-center justify-between cursor-pointer hover:bg-muted/20 transition-colors">
                   <div className="flex items-center gap-2.5">
                     <Info className="w-4 h-4 text-muted-foreground" />
                     <h2 className="text-sm font-semibold text-foreground">Så använder du Teams med Tivly</h2>
@@ -556,7 +558,7 @@ const IntegrationTeams = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <Separator />
-                  <div className="px-4 py-3 sm:px-5 space-y-2">
+                  <div className="px-4 py-3.5 sm:px-5 space-y-2.5">
                     {[
                       { step: '1', title: 'Gå med i mötet', desc: 'Öppna Teams och anslut till det schemalagda mötet.' },
                       { step: '2', title: 'Klicka "Mer" (⋯)', desc: 'I verktygsfältet högst upp.' },
@@ -566,20 +568,20 @@ const IntegrationTeams = () => {
                       { step: '6', title: 'Bekräfta & håll mötet', desc: 'Transkriberingen sker i bakgrunden.' },
                       { step: '7', title: 'Importera till Tivly', desc: 'Gå till Tivly efteråt, eller aktivera auto-import.' },
                     ].map((item) => (
-                      <div key={item.step} className="flex items-start gap-2.5 py-1">
-                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                          <span className="text-[10px] font-bold text-primary">{item.step}</span>
+                      <div key={item.step} className="flex items-start gap-3 py-1">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-xs font-bold text-primary">{item.step}</span>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-foreground">{item.title}</p>
-                          <p className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</p>
+                          <p className="text-sm font-medium text-foreground">{item.title}</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
                         </div>
                       </div>
                     ))}
 
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/20 border border-border/30 mt-2">
-                      <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/20 border border-border/30 mt-1">
+                      <Info className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         Transkriberingen utförs av Microsoft Teams. Tivly kör en automatisk förbättringsrunda på importerat transkript.
                       </p>
                     </div>
