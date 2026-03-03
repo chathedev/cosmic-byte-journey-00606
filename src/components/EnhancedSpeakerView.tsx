@@ -120,7 +120,13 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
   const [editedName, setEditedName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [localSpeakerNames, setLocalSpeakerNames] = useState<Record<string, string>>({});
-  const [showSpeakerPanel, setShowSpeakerPanel] = useState(true);
+  // Auto-collapse speaker panel when all speakers already have confirmed names (e.g. digital imports)
+  const allSpeakersNamed = useMemo(() => {
+    if (Object.keys(initialSpeakerNames).length === 0) return false;
+    return true;
+  }, [initialSpeakerNames]);
+
+  const [showSpeakerPanel, setShowSpeakerPanel] = useState(!allSpeakersNamed);
 
   // Merge speaker names with local edits taking priority
   const speakerNames = { ...initialSpeakerNames, ...localSpeakerNames };
