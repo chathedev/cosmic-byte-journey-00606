@@ -565,7 +565,7 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
 
                       {/* Combined text from all blocks in this group */}
                       <p className="text-sm leading-relaxed text-foreground pl-4 whitespace-pre-wrap">
-                        {group.blocks.map(b => b.text).join('\n\n')}
+                        {group.blocks.map(b => b.text).join('\n')}
                       </p>
                     </div>
                   </motion.div>
