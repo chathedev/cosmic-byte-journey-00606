@@ -72,6 +72,7 @@ export const ERROR_CODE_LABELS: Record<string, string> = {
   microsoft_token_storage_unavailable: 'Säker tokenlagring ej tillgänglig',
   microsoft_token_request_failed: 'Kunde inte autentisera med Microsoft',
   microsoft_graph_request_failed: 'Microsoft Graph-anrop misslyckades',
+  microsoft_graph_delegated_unsupported: 'Graph-endpoint stöds inte i delegated context. Backend använder nu kalenderbaserad listning.',
   microsoft_transcript_empty: 'Transkriptet var tomt',
   microsoft_missing_scopes: 'Microsoft-kontot saknar nödvändiga behörigheter för Teams-transkript',
   microsoft_personal_account_unsupported: 'Personliga Microsoft-konton stöds inte för transkript-import. Använd ett arbets- eller skolkonto.',
