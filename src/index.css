@@ -45,7 +45,7 @@ All colors MUST be HSL.
     --input: 214 32% 91%;
     --ring: 211 100% 50%;
 
-    --radius: 1rem;
+    --radius: 0.5rem;
 
     /* iOS gradients */
     --gradient-primary: linear-gradient(135deg, hsl(211 100% 50%), hsl(208 100% 47%));
