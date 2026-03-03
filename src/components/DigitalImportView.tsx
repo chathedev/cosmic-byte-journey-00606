@@ -5,9 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import type { ImportableMeeting, ImportStatus, ImportLastError, ImportWarning } from "@/hooks/useDigitalImport";
-import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiClient } from "@/lib/api";
 
 interface DigitalImportViewProps {
   importStatus: ImportStatus | null;
