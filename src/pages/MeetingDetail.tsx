@@ -2274,9 +2274,9 @@ const MeetingDetail = () => {
     groupedSegments.some((s) => (s as any)?.text && String((s as any).text).trim().length > 0);
 
   // Check if we have enhanced speaker blocks from backend (new format with speakerId, text, start, end)
+  // Speaker blocks are shown regardless of SIS status — they may originate from Microsoft Graph import
   const hasSpeakerBlocks = 
     !isEditing &&
-    !isSISDisabled &&
     ((speakerBlocksCleaned && speakerBlocksCleaned.length > 0) || 
      (speakerBlocksRaw && speakerBlocksRaw.length > 0));
 
