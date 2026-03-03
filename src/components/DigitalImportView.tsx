@@ -96,6 +96,7 @@ export const DigitalImportView = ({
   const [isImporting, setIsImporting] = useState(false);
   const [importedMeetingId, setImportedMeetingId] = useState<string | null>(null);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const hasAutoLoaded = useRef(false);
 
   const isConnected = importStatus?.connected === true;
@@ -114,7 +115,17 @@ export const DigitalImportView = ({
     if (refreshCooldown || state === 'loading_meetings') return;
     onLoadMeetings();
     setRefreshCooldown(true);
-    setTimeout(() => setRefreshCooldown(false), 5000);
+    setCooldownSeconds(5);
+    const interval = setInterval(() => {
+      setCooldownSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setRefreshCooldown(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   }, [refreshCooldown, state, onLoadMeetings]);
 
   const handleSelectMeeting = (meeting: ImportableMeeting) => {
@@ -320,10 +331,13 @@ export const DigitalImportView = ({
               size="icon"
               onClick={handleRefreshMeetings}
               disabled={state === 'loading_meetings' || refreshCooldown}
-              className="h-8 w-8"
-              title={refreshCooldown ? 'Vänta några sekunder…' : 'Uppdatera möteslistan'}
+              className="h-8 w-8 relative"
+              title={refreshCooldown ? `Vänta ${cooldownSeconds}s…` : 'Uppdatera möteslistan'}
             >
               <RefreshCw className={cn("w-4 h-4", state === 'loading_meetings' && "animate-spin")} />
+              {refreshCooldown && (
+                <span className="absolute -bottom-3 text-[9px] text-muted-foreground tabular-nums">{cooldownSeconds}s</span>
+              )}
             </Button>
             <Button
               variant="ghost"
@@ -341,9 +355,14 @@ export const DigitalImportView = ({
       {/* Loading */}
       {state === 'loading_meetings' && (
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center space-y-3">
-            <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
-            <p className="text-sm text-muted-foreground">Hämtar möten med transkript...</p>
+          <div className="text-center space-y-4">
+            <div className="relative mx-auto w-10 h-10">
+              <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Söker efter möten…</p>
+              <p className="text-xs text-muted-foreground">Kontrollerar dina Teams-möten i Microsoft 365</p>
+            </div>
           </div>
         </div>
       )}
@@ -351,9 +370,11 @@ export const DigitalImportView = ({
       {/* Importing */}
       {isImporting && (
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center space-y-3">
-            <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
-            <p className="text-sm font-medium text-foreground">Importerar möte...</p>
+          <div className="text-center space-y-4">
+            <div className="relative mx-auto w-10 h-10">
+              <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Importerar möte…</p>
             <p className="text-xs text-muted-foreground">Hämtar transkript och deltagare från Microsoft 365</p>
           </div>
         </div>
@@ -362,23 +383,42 @@ export const DigitalImportView = ({
       {/* Empty state */}
       {state === 'idle' && meetings.length === 0 && !isImporting && (
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center space-y-3 max-w-xs">
-            <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto" />
-            <p className="text-sm font-medium text-foreground">Inga möten med färdigt transkript</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Det finns inga Teams-möten med tillgängligt transkript just nu. 
-              Se till att Teams-transkribering var aktiverad under mötet och att transkriptet har hunnit bearbetas av Microsoft 365.
-            </p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleRefreshMeetings} 
-              disabled={refreshCooldown}
-              className="gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              {refreshCooldown ? 'Vänta…' : 'Sök igen'}
-            </Button>
+          <div className="text-center space-y-4 max-w-xs">
+            <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto">
+              <FileText className="w-7 h-7 text-muted-foreground/30" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Inga möten med transkribering hittades</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Dina senaste Teams-möten kontrollerades men inget av dem hade transkribering aktiverat eller färdigställt.
+              </p>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30 text-left">
+                <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground">Tips:</span> Det kan ta några minuter efter avslutat möte innan transkriptet blir tillgängligt i Microsoft 365.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRefreshMeetings} 
+                disabled={refreshCooldown}
+                className="gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                {refreshCooldown ? `Vänta ${cooldownSeconds}s…` : 'Sök igen'}
+              </Button>
+              {refreshCooldown && (
+                <div className="h-1 w-16 rounded-full bg-muted overflow-hidden">
+                  <div 
+                    className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
+                    style={{ width: `${(cooldownSeconds / 5) * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
