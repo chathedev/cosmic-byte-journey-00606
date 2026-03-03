@@ -86,7 +86,7 @@ export function AppSidebar() {
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
   const libraryLocked = planLoading ? false : isLibraryLocked(user, userPlan);
   const agendasLocked = planLoading ? false : (!unlimited && !plusAccess);
-  const chatLocked = planLoading ? false : (!unlimited && !plusAccess);
+  
 
   const meetingsUsed = !planLoading && userPlan ? (userPlan.meetingsUsed ?? 0) : 0;
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
