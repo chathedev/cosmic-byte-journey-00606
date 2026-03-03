@@ -32,6 +32,7 @@ export interface ImportLastError {
 export interface ConnectionIssue {
   reason: string;
   message: string;
+  adminConsentLikelyRequired?: boolean;
 }
 
 export interface ImportStatus {
@@ -63,7 +64,7 @@ export interface ImportResult {
 
 type ImportState = 'idle' | 'connecting' | 'loading_meetings' | 'importing' | 'done' | 'error';
 
-const ERROR_CODE_LABELS: Record<string, string> = {
+export const ERROR_CODE_LABELS: Record<string, string> = {
   digital_import_disabled: 'Importfunktionen är avstängd',
   microsoft_graph_not_configured: 'Microsoft Graph är inte konfigurerat',
   microsoft_account_not_connected: 'Microsoft-konto inte kopplat',
@@ -73,6 +74,8 @@ const ERROR_CODE_LABELS: Record<string, string> = {
   microsoft_graph_request_failed: 'Microsoft Graph-anrop misslyckades',
   microsoft_transcript_empty: 'Transkriptet var tomt',
   microsoft_missing_scopes: 'Microsoft-kontot saknar nödvändiga behörigheter för Teams-transkript',
+  microsoft_personal_account_unsupported: 'Personliga Microsoft-konton stöds inte för transkript-import. Använd ett arbets- eller skolkonto.',
+  microsoft_admin_consent_required: 'Organisationens administratör behöver godkänna appens behörigheter i Microsoft Entra.',
 };
 
 const getAuthToken = (): string | null => localStorage.getItem('authToken');

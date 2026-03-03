@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useDigitalImport, ImportableMeeting } from "@/hooks/useDigitalImport";
+import { useDigitalImport, ImportableMeeting, ERROR_CODE_LABELS } from "@/hooks/useDigitalImport";
 
 const formatDate = (dateStr: string) => {
   try {
@@ -159,45 +159,81 @@ const IntegrationTeams = () => {
             {/* ── Reconnect required ── */}
             {isEnabled && isConfigured && di.needsReconnect && (
               <div className="p-5 sm:p-6 space-y-5">
-                <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-2">
-                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    Microsoft-kontot behöver kopplas om
-                  </p>
-                  {connectionIssue?.message && (
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {connectionIssue.message}
+                {/* Personal account not supported */}
+                {connectionIssue?.reason === 'personal_account_not_supported_for_transcripts' && (
+                  <div className="p-4 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
+                    <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      Personligt Microsoft-konto stöds inte
                     </p>
-                  )}
-                  {!connectionIssue?.message && (
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Microsoft returnerade för få behörigheter för att kunna importera Teams-transkript. 
-                      Backend försökte automatiskt begära rätt behörigheter men det lyckades inte. 
-                      Koppla om ditt konto och godkänn alla begärda behörigheter.
+                      Teams-transkript kräver ett Microsoft 365 arbets- eller skolkonto. 
+                      Koppla bort och anslut igen med rätt kontotyp.
                     </p>
-                  )}
-                  {missingScopes && missingScopes.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground mb-1.5">Saknade behörigheter:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {missingScopes.map(s => (
-                          <Badge key={s} variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-700 dark:text-amber-400">
-                            {s}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {lastError && (
-                    <div className="mt-2 pt-2 border-t border-amber-500/15">
-                      <p className="text-[10px] text-muted-foreground/70">
-                        Senaste fel: {lastError.code === 'microsoft_missing_scopes' 
-                          ? 'Saknade scopes efter automatiskt retry' 
-                          : lastError.message || lastError.code}
+                  </div>
+                )}
+
+                {/* Admin consent required */}
+                {connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' && (
+                  <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-2">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                      <Shield className="w-4 h-4 shrink-0" />
+                      Administratörsgodkännande krävs
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Din organisations IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra 
+                      (Azure AD) för att transkript-import ska fungera. Kontakta din IT-avdelning och be dem 
+                      bevilja admin-consent för appen.
+                    </p>
+                    {connectionIssue.message && (
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">{connectionIssue.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Generic reconnect (legacy bot, missing scopes, etc.) */}
+                {connectionIssue?.reason !== 'personal_account_not_supported_for_transcripts' && 
+                 connectionIssue?.reason !== 'admin_consent_required_or_missing_permissions' && (
+                  <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 space-y-2">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      Microsoft-kontot behöver kopplas om
+                    </p>
+                    {connectionIssue?.message ? (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {connectionIssue.message}
                       </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Microsoft returnerade för få behörigheter för att kunna importera Teams-transkript. 
+                        Backend försökte automatiskt begära rätt behörigheter men det lyckades inte. 
+                        Koppla om ditt konto och godkänn alla begärda behörigheter.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {missingScopes && missingScopes.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">Saknade behörigheter:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {missingScopes.map(s => (
+                        <Badge key={s} variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-700 dark:text-amber-400">
+                          {s}
+                        </Badge>
+                      ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {lastError && (
+                  <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                    <p className="text-[10px] text-muted-foreground/70">
+                      Senaste fel: {ERROR_CODE_LABELS[lastError.code] || lastError.message || lastError.code}
+                      {lastError.updatedAt && ` · ${formatDate(lastError.updatedAt)}`}
+                    </p>
+                  </div>
+                )}
 
                 <Button
                   onClick={handleConnect}
