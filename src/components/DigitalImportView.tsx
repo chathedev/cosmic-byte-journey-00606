@@ -90,9 +90,9 @@ const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = 
     title: 'Administratörsgodkännande krävs',
     description: 'Din organisations IT-administratör behöver godkänna appens behörigheter i Microsoft Entra.',
   },
-  microsoft_adhoc_app_permission_missing: {
-    title: 'Ad hoc-möten kunde inte sökas',
-    description: 'Appen saknar behörigheten CallTranscripts.Read.All för att söka ad hoc-/chatmöten.',
+  microsoft_calendar_meetings_only: {
+    title: 'Endast kalenderbaserade möten stöds',
+    description: 'Ad hoc-/chatmöten utan kalenderhändelse stöds inte. Endast schemalagda Teams-möten kan importeras.',
   },
 };
 
@@ -576,9 +576,7 @@ export const DigitalImportView = ({
                 <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
                   <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    {w.code === 'microsoft_adhoc_app_permission_missing'
-                      ? 'Ad hoc-/chatmöten kunde inte sökas. Appen saknar behörigheten CallTranscripts.Read.All.'
-                      : w.message || w.code}
+                   {w.message || w.code}
                   </p>
                 </div>
               ))}
@@ -597,16 +595,9 @@ export const DigitalImportView = ({
                     <FileText className="w-4 h-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                        {meeting.title || 'Namnlöst möte'}
-                      </p>
-                      {meeting.sourceType === 'adhoc_call' && (
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0 border-primary/20 text-primary/70">
-                          Chattmöte
-                        </Badge>
-                      )}
-                    </div>
+                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      {meeting.title || 'Namnlöst möte'}
+                    </p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />

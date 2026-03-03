@@ -509,9 +509,7 @@ const IntegrationTeams = () => {
                         <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
                           <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                           <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            {w.code === 'microsoft_adhoc_app_permission_missing'
-                              ? 'Ad hoc-/chatmöten kunde inte sökas. Appen saknar behörigheten CallTranscripts.Read.All.'
-                              : w.message || w.code}
+                           {w.message || w.code}
                           </p>
                         </div>
                       ))}
@@ -530,14 +528,7 @@ const IntegrationTeams = () => {
                             <FileText className="w-4 h-4 text-primary/70" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-foreground truncate">{meeting.title}</p>
-                              {meeting.sourceType === 'adhoc_call' && (
-                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0 border-primary/20 text-primary/70">
-                                  Chattmöte
-                                </Badge>
-                              )}
-                            </div>
+                            <p className="text-sm font-medium text-foreground truncate">{meeting.title}</p>
                             <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
