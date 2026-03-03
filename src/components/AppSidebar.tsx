@@ -116,6 +116,7 @@ export function AppSidebar() {
     else if (path === "/agendas") setSelected("Agendor");
     else if (path === "/chat") setSelected("AI Chatt");
     else if (path === "/feedback") setSelected("Feedback");
+    else if (path === "/integrations") setSelected("Integrationer");
     else if (path === "/settings") setSelected("Inställningar");
     else if (path === "/enterprise/stats") setSelected("Översikt");
     else if (path === "/org/settings") setSelected("Team");
@@ -181,6 +182,7 @@ export function AppSidebar() {
     { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
+    { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
   ];
 
   const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
