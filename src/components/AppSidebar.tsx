@@ -179,7 +179,7 @@ export function AppSidebar() {
   const navItems = [
     { Icon: FiHome, title: "Hem", path: "/", locked: false },
     { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
-    { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
+    
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
     { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
