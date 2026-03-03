@@ -412,7 +412,17 @@ const IntegrationTeams = () => {
             )}
           </section>
 
-          {/* ── Meetings list ── */}
+          {/* ── Quality disclaimer (always visible) ── */}
+          {isEnabled && isConfigured && (
+            <div className="flex items-start gap-2.5 p-4 rounded-xl bg-muted/30 border border-border/50">
+              <Info className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="font-medium text-foreground">Om kvalitet:</span> Transkriberingen utförs av Microsoft Teams – inte av Tivly. 
+                Vi ansvarar inte för eventuella fel i text eller talarnamn, men vi kör en automatisk förbättringsrunda för att rätta till det mesta.
+              </p>
+            </div>
+          )}
+
           {di.isFullyConnected && (
             <section className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="p-5 sm:p-6 flex items-center justify-between">
