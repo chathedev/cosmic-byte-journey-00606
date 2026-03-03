@@ -553,7 +553,7 @@ const IntegrationTeams = () => {
                 <div className="mt-5 flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/15">
                   <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <span className="font-medium text-foreground">Automatisk import (kommer snart):</span> Vi arbetar på att automatiskt importera dina Teams-möten till Tivly direkt efter avslutat möte — utan att du behöver göra något manuellt.
+                    <span className="font-medium text-foreground">Tips:</span> Aktivera automatisk import ovan för att slippa importera manuellt — Tivly hämtar då dina möten automatiskt efter avslutat möte.
                   </p>
                 </div>
               </div>
