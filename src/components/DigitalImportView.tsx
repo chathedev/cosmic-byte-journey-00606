@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink } from "lucide-react";
+import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink, Shield, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import type { ImportableMeeting, ImportStatus, ImportLastError } from "@/hooks/useDigitalImport";
@@ -20,6 +21,8 @@ interface DigitalImportViewProps {
   onImport: (meeting: ImportableMeeting, meetingId?: string, title?: string) => Promise<any>;
   onReset: () => void;
   onClose: () => void;
+  isFullyConnected: boolean;
+  needsReconnect: boolean;
 }
 
 const formatDate = (dateStr: string) => {
@@ -74,6 +77,18 @@ const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = 
     title: 'Säker tokenlagring ej tillgänglig',
     description: 'Backend saknar säker lagringsmöjlighet för Microsoft-tokens.',
   },
+  microsoft_missing_scopes: {
+    title: 'Saknade behörigheter',
+    description: 'Microsoft returnerade för få behörigheter. Koppla om ditt konto och godkänn alla begärda behörigheter.',
+  },
+  microsoft_personal_account_unsupported: {
+    title: 'Personligt konto stöds inte',
+    description: 'Teams-transkript kräver ett Microsoft 365 arbets- eller skolkonto.',
+  },
+  microsoft_admin_consent_required: {
+    title: 'Administratörsgodkännande krävs',
+    description: 'Din organisations IT-administratör behöver godkänna appens behörigheter i Microsoft Entra.',
+  },
 };
 
 export const DigitalImportView = ({
@@ -88,6 +103,8 @@ export const DigitalImportView = ({
   onImport,
   onReset,
   onClose,
+  isFullyConnected,
+  needsReconnect,
 }: DigitalImportViewProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -102,6 +119,13 @@ export const DigitalImportView = ({
 
   const COOLDOWN_KEY = 'diview_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;
+
+  const isConnected = importStatus?.connected === true;
+  const isConfigured = importStatus?.configured === true;
+  const isEnabled = importStatus?.enabled === true;
+  const lastError = importStatus?.lastError;
+  const connectionIssue = importStatus?.connectionIssue;
+  const missingScopes = importStatus?.missingScopes;
 
   // Restore cooldown from sessionStorage on mount
   useEffect(() => {
@@ -120,6 +144,14 @@ export const DigitalImportView = ({
       if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     };
   }, []);
+
+  // Auto-load meetings once when fully connected
+  useEffect(() => {
+    if (isFullyConnected && !hasAutoLoaded.current && meetings.length === 0 && state === 'idle') {
+      hasAutoLoaded.current = true;
+      onLoadMeetings();
+    }
+  }, [isFullyConnected, state]);
 
   const startCooldownInterval = useCallback((seconds: number) => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
@@ -147,10 +179,6 @@ export const DigitalImportView = ({
     startCooldownInterval(COOLDOWN_DURATION);
   }, [refreshCooldown, state, onLoadMeetings, startCooldownInterval]);
 
-  const isConnected = importStatus?.connected === true;
-  const isConfigured = importStatus?.configured === true;
-  const isEnabled = importStatus?.enabled === true;
-
   const handleSelectMeeting = (meeting: ImportableMeeting) => {
     setSelectedMeeting(meeting);
     setShowParticipants(true);
@@ -162,7 +190,6 @@ export const DigitalImportView = ({
 
     setIsImporting(true);
     try {
-      // Create a meeting stub first if we have participants to attach
       let meetingId: string | undefined;
       if (participants.length > 0) {
         const now = new Date().toISOString();
@@ -258,9 +285,74 @@ export const DigitalImportView = ({
     );
   }
 
+  // Needs reconnect
+  if (needsReconnect) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center space-y-5">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">Microsoft-kontot behöver kopplas om</h2>
+          
+          {connectionIssue?.reason === 'personal_account_not_supported_for_transcripts' ? (
+            <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+              Personliga Microsoft-konton stöds inte för transkript-import. Koppla om med ett Microsoft 365 arbets- eller skolkonto.
+            </p>
+          ) : connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' ? (
+            <div className="space-y-2 max-w-xs">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Din organisations IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra för att transkript-import ska fungera.
+              </p>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-left">
+                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Be din IT-avdelning bevilja admin-consent för appen i Microsoft Entra (Azure AD).
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+              {connectionIssue?.message || 'Microsoft returnerade för få behörigheter. Koppla om ditt konto och godkänn alla begärda behörigheter.'}
+            </p>
+          )}
+        </div>
+
+        {missingScopes && missingScopes.length > 0 && (
+          <div className="flex flex-wrap gap-1 justify-center max-w-xs">
+            {missingScopes.map(s => (
+              <Badge key={s} variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-700 dark:text-amber-400">
+                {s}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {lastError && (
+          <p className="text-[10px] text-muted-foreground/60 max-w-xs">
+            Senaste fel: {lastError.message || lastError.code}
+          </p>
+        )}
+
+        <Button
+          onClick={onConnect}
+          disabled={state === 'connecting'}
+          className="w-full max-w-xs h-11 gap-2 rounded-xl text-sm font-semibold"
+        >
+          {state === 'connecting' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
+          Koppla om Microsoft-konto
+        </Button>
+      </div>
+    );
+  }
+
   // Not connected - show connect prompt
   if (!isConnected) {
-    const lastError = importStatus?.lastError;
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -269,7 +361,7 @@ export const DigitalImportView = ({
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-foreground">Importera från Teams</h2>
           <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-            Koppla ditt Microsoft-konto för att importera transkript från Teams-möten direkt till Tivly.
+            Koppla ditt Microsoft 365-konto för att importera transkript från Teams-möten direkt till Tivly.
           </p>
         </div>
 
@@ -290,24 +382,18 @@ export const DigitalImportView = ({
         )}
 
         <div className="space-y-3 w-full max-w-xs text-left">
-          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-              <span className="text-xs font-bold text-primary">1</span>
+          {[
+            'Koppla ditt Microsoft 365-konto',
+            'Välj ett möte med färdigt transkript',
+            'Importera och skapa protokoll',
+          ].map((step, i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-xs font-bold text-primary">{i + 1}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{step}</p>
             </div>
-            <p className="text-sm text-muted-foreground">Koppla ditt Microsoft 365-konto</p>
-          </div>
-          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-              <span className="text-xs font-bold text-primary">2</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Välj ett möte med färdigt transkript</p>
-          </div>
-          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-              <span className="text-xs font-bold text-primary">3</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Importera och skapa protokoll</p>
-          </div>
+          ))}
         </div>
 
         <Button
@@ -326,7 +412,7 @@ export const DigitalImportView = ({
         <div className="flex items-start gap-2 max-w-xs text-left">
           <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
           <p className="text-[11px] text-muted-foreground/50">
-            Teams-transkribering måste vara aktiverat för mötet. Du behöver vara organisatör för att kunna importera.
+            Kräver Microsoft 365 arbets- eller skolkonto med Teams-transkribering. Du behöver vara organisatör för mötet.
           </p>
         </div>
       </div>
@@ -349,19 +435,33 @@ export const DigitalImportView = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRefreshMeetings}
-              disabled={state === 'loading_meetings' || refreshCooldown}
-              className="h-8 w-8 relative"
-              title={refreshCooldown ? `Vänta ${cooldownSeconds}s…` : 'Uppdatera möteslistan'}
-            >
-              <RefreshCw className={cn("w-4 h-4", state === 'loading_meetings' && "animate-spin")} />
+            <div className="flex flex-col items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefreshMeetings}
+                disabled={state === 'loading_meetings' || refreshCooldown}
+                className="h-8 w-8"
+                title={refreshCooldown ? `Vänta ${cooldownSeconds}s…` : 'Uppdatera möteslistan'}
+              >
+                {state === 'loading_meetings' ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </Button>
               {refreshCooldown && (
-                <span className="absolute -bottom-3 text-[9px] text-muted-foreground tabular-nums">{cooldownSeconds}s</span>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-[9px] text-muted-foreground tabular-nums">{cooldownSeconds}s</span>
+                  <div className="h-0.5 w-6 rounded-full bg-muted overflow-hidden">
+                    <div 
+                      className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${(cooldownSeconds / COOLDOWN_DURATION) * 100}%` }}
+                    />
+                  </div>
+                </div>
               )}
-            </Button>
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -413,13 +513,21 @@ export const DigitalImportView = ({
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">Inga möten med transkribering hittades</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Dina senaste Teams-möten kontrollerades men inget av dem hade transkribering aktiverat eller färdigställt.
+                Dina senaste Teams-möten kontrollerades men inget av dem hade transkribering aktiverat eller färdigställt i Microsoft 365.
               </p>
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30 text-left">
-                <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground">Tips:</span> Det kan ta några minuter efter avslutat möte innan transkriptet blir tillgängligt i Microsoft 365.
-                </p>
+              <div className="space-y-2 text-left">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    <span className="font-medium text-foreground">Varför visas inga möten?</span> Endast möten där Teams-transkribering var aktiverad och har slutförts visas här. Du behöver vara organisatör för mötet.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Det kan ta några minuter efter avslutat möte innan transkriptet blir tillgängligt i Microsoft 365.
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex flex-col items-center gap-1.5">
@@ -437,7 +545,7 @@ export const DigitalImportView = ({
                 <div className="h-1 w-16 rounded-full bg-muted overflow-hidden">
                   <div 
                     className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${(cooldownSeconds / 5) * 100}%` }}
+                    style={{ width: `${(cooldownSeconds / COOLDOWN_DURATION) * 100}%` }}
                   />
                 </div>
               )}

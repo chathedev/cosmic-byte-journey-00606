@@ -378,6 +378,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             onImport={digitalImport.importMeeting}
             onReset={digitalImport.reset}
             onClose={() => setShowDigitalImport(false)}
+            isFullyConnected={digitalImport.isFullyConnected}
+            needsReconnect={digitalImport.needsReconnect}
           />
         </div>
       </div>

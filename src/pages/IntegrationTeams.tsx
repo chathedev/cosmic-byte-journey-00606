@@ -62,6 +62,14 @@ const IntegrationTeams = () => {
     };
   }, []);
 
+  // Auto-load meetings once when fully connected
+  useEffect(() => {
+    if (di.isFullyConnected && !hasAutoLoaded.current && di.meetings.length === 0 && di.state === 'idle') {
+      hasAutoLoaded.current = true;
+      di.loadMeetings();
+    }
+  }, [di.isFullyConnected, di.state]);
+
   const startCooldownInterval = (seconds: number) => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     let remaining = seconds;
@@ -452,14 +460,21 @@ const IntegrationTeams = () => {
                   <div className="max-w-sm space-y-2">
                     <p className="text-sm font-medium text-foreground">Inga möten med transkribering hittades</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Dina senaste Teams-möten kontrollerades men inget av dem hade transkribering aktiverat eller färdigställt. 
-                      Se till att transkribering var påslaget under mötet och att Microsoft 365 har hunnit bearbeta inspelningen.
+                      Dina senaste Teams-möten kontrollerades men inget av dem hade transkribering aktiverat eller färdigställt i Microsoft 365.
                     </p>
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30 text-left mt-3">
-                      <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        <span className="font-medium text-foreground">Tips:</span> Det kan ta några minuter efter avslutat möte innan transkriptet blir tillgängligt i Microsoft 365.
-                      </p>
+                    <div className="space-y-2 text-left mt-3">
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30">
+                        <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          <span className="font-medium text-foreground">Varför visas inga möten?</span> Endast möten där Teams-transkribering var aktiverad och har slutförts visas här. Du behöver vara organisatör för mötet.
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Det kan ta några minuter efter avslutat möte innan transkriptet blir tillgängligt i Microsoft 365.
+                        </p>
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-1.5 mt-1">
@@ -477,7 +492,7 @@ const IntegrationTeams = () => {
                       <div className="h-1 w-20 rounded-full bg-muted overflow-hidden">
                         <div 
                           className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
-                          style={{ width: `${(cooldownSeconds / 5) * 100}%` }}
+                          style={{ width: `${(cooldownSeconds / COOLDOWN_DURATION) * 100}%` }}
                         />
                       </div>
                     )}
