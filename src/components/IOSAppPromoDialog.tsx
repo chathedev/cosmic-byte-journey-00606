@@ -77,8 +77,8 @@ export const IOSAppPromoDialog = () => {
                 <Shield className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="font-medium text-sm">Offline-läge</p>
-                <p className="text-xs text-muted-foreground">Spela in även utan internet</p>
+                <p className="font-medium text-sm">Bakgrundsinspelning</p>
+                <p className="text-xs text-muted-foreground">Spela in med skärmen låst</p>
               </div>
             </div>
             
