@@ -62,7 +62,7 @@ export interface ImportResult {
   };
 }
 
-type ImportState = 'idle' | 'connecting' | 'loading_meetings' | 'importing' | 'done' | 'error';
+export type ImportState = 'idle' | 'connecting' | 'loading_meetings' | 'importing' | 'done' | 'error';
 
 export const ERROR_CODE_LABELS: Record<string, string> = {
   digital_import_disabled: 'Importfunktionen är avstängd',
