@@ -542,8 +542,9 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
 
                     <div
                       className={cn(
-                        "relative pl-4 py-2.5 border-l-2 transition-colors",
-                        styles?.border || "border-l-muted-foreground/30"
+                        "relative pl-4 py-2.5 border-l-2 rounded-r-lg transition-colors",
+                        styles?.border || "border-l-muted-foreground/30",
+                        styles?.bg || "hover:bg-muted/20"
                       )}
                     >
                       {/* Speaker header */}
