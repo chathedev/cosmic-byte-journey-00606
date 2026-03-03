@@ -543,7 +543,7 @@ const Settings = () => {
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <Shield className="w-4 h-4 text-primary shrink-0" />
-                      <span>Offline-läge – spela in utan internet</span>
+                      <span>Bakgrundsinspelning – spela in med skärmen låst</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <Sparkles className="w-4 h-4 text-primary shrink-0" />
