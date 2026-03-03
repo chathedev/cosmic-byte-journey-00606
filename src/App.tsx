@@ -36,7 +36,7 @@ import WebOnlyAccess from "./pages/WebOnlyAccess";
 import Library from "./pages/Library";
 import MeetingDetail from "./pages/MeetingDetail";
 import Agendas from "./pages/Agendas";
-import { Chat } from "./pages/Chat";
+
 import Feedback from "./pages/Feedback";
 import SubscribeSuccess from "./pages/SubscribeSuccess";
 import FreeTrial from "./pages/FreeTrial";
@@ -318,7 +318,7 @@ const AppContent = () => {
                 <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
                 <Route path="/meeting/:id" element={<ProtectedRoute><MeetingLegacyRedirect /></ProtectedRoute>} />
                 <Route path="/meetings/:id" element={<ProtectedRoute><MeetingDetail /></ProtectedRoute>} />
-                <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                
                 <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
                 <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
                 <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />

@@ -6,7 +6,7 @@ import {
   FiBookOpen,
   FiCalendar,
   FiMessageSquare,
-  FiMessageCircle,
+  
   FiUsers,
   FiMail,
   FiUserCheck,
@@ -86,7 +86,7 @@ export function AppSidebar() {
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
   const libraryLocked = planLoading ? false : isLibraryLocked(user, userPlan);
   const agendasLocked = planLoading ? false : (!unlimited && !plusAccess);
-  const chatLocked = planLoading ? false : (!unlimited && !plusAccess);
+  
 
   const meetingsUsed = !planLoading && userPlan ? (userPlan.meetingsUsed ?? 0) : 0;
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
@@ -114,7 +114,7 @@ export function AppSidebar() {
     if (path === "/") setSelected("Hem");
     else if (path === "/library") setSelected("Bibliotek");
     else if (path === "/agendas") setSelected("Agendor");
-    else if (path === "/chat") setSelected("AI Chatt");
+    
     else if (path === "/feedback") setSelected("Feedback");
     else if (path === "/integrations") setSelected("Integrationer");
     else if (path === "/settings") setSelected("Inställningar");
@@ -179,7 +179,7 @@ export function AppSidebar() {
   const navItems = [
     { Icon: FiHome, title: "Hem", path: "/", locked: false },
     { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
-    { Icon: FiMessageCircle, title: "AI Chatt", path: "/chat", locked: chatLocked },
+    
     { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
     { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
     { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
