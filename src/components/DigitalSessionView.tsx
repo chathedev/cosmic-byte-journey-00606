@@ -71,7 +71,10 @@ const formatBytes = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const getJoinStageLabel = (stage?: string, authRequired?: boolean, authenticated?: boolean): string => {
+const getJoinStageLabel = (stage?: string, authRequired?: boolean, authenticated?: boolean, joinUiState?: string): string => {
+  // Prejoin overrides auth_state display
+  if (joinUiState === 'prejoin_ready') return 'Redo att ansluta till mötet...';
+  if (joinUiState === 'prejoin_pending') return 'Förbereder anslutning till mötet...';
   if (stage === 'auth_state' && authenticated === false) return 'Loggar in i Teams...';
   switch (stage) {
     case 'auth_state': return 'Autentiserar...';
@@ -131,7 +134,8 @@ export const DigitalSessionView = ({
 
   const metadata = session?.metadata;
   const isLobby = metadata?.joinStage === 'lobby_waiting';
-  const isAuthStage = metadata?.joinStage === 'auth_state' && metadata?.authenticated === false;
+  const isPrejoinUi = metadata?.joinUiState === 'prejoin_ready' || metadata?.joinUiState === 'prejoin_pending';
+  const isAuthStage = metadata?.joinStage === 'auth_state' && metadata?.authenticated === false && !isPrejoinUi;
   const awaitingHost = metadata?.awaitingHostAdmission || metadata?.joinUiState === 'await_host_admission';
   const hostActionText = metadata?.hostActionText;
   const botName = metadata?.botDisplayName || 'Tivly Assistant';
@@ -246,7 +250,7 @@ export const DigitalSessionView = ({
               {status === 'joining' ? (
                 <>
                   <p className="text-base font-semibold text-foreground">
-                    {awaitingHost ? 'Väntar på att bli insläppt' : isLobby ? 'Väntar i lobbyn' : isAuthStage ? 'Loggar in i Teams' : getJoinStageLabel(metadata?.joinStage, metadata?.authRequired, metadata?.authenticated)}
+                    {awaitingHost ? 'Väntar på att bli insläppt' : isLobby ? 'Väntar i lobbyn' : isAuthStage ? 'Loggar in i Teams' : getJoinStageLabel(metadata?.joinStage, metadata?.authRequired, metadata?.authenticated, metadata?.joinUiState)}
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {awaitingHost
@@ -255,6 +259,8 @@ export const DigitalSessionView = ({
                       ? `${botName} väntar i lobbyn. Mötesvärden behöver släppa in den.`
                       : isAuthStage
                       ? `${botName} loggar in i Microsoft Teams. Det här kan ta en stund.`
+                      : isPrejoinUi
+                      ? `${botName} har nått mötet och förbereder anslutningen.`
                       : `${botName} ansluter till mötet. Det kan ta upp till en minut.`}
                   </p>
                   {/* Host admission callout */}
