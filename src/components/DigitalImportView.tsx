@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, ArrowRight, RefreshCw, Download, ChevronRight } from "lucide-react";
+import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import type { ImportableMeeting, ImportStatus } from "@/hooks/useDigitalImport";
 import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
-import { meetingStorage } from "@/utils/meetingStorage";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 
@@ -39,6 +38,37 @@ const formatDuration = (start: string, end: string) => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
+};
+
+const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = {
+  digital_import_disabled: {
+    title: 'Importfunktionen är avstängd',
+    description: 'Kontakta din administratör för att aktivera Teams-import.',
+  },
+  microsoft_graph_not_configured: {
+    title: 'Microsoft-integration inte konfigurerad',
+    description: 'Backend saknar nödvändig Microsoft Graph-konfiguration.',
+  },
+  microsoft_account_not_connected: {
+    title: 'Microsoft-konto inte kopplat',
+    description: 'Du behöver koppla ditt Microsoft-konto för att importera möten.',
+  },
+  microsoft_token_request_failed: {
+    title: 'Autentiseringen misslyckades',
+    description: 'Kunde inte autentisera med Microsoft. Försök koppla om ditt konto.',
+  },
+  microsoft_graph_request_failed: {
+    title: 'Microsoft Graph-anrop misslyckades',
+    description: 'Kunde inte hämta data från Microsoft. Försök igen om en stund.',
+  },
+  microsoft_transcript_empty: {
+    title: 'Tomt transkript',
+    description: 'Transkriptet hittades men innehöll ingen användbar text.',
+  },
+  missing_graph_identifiers: {
+    title: 'Mötes-ID saknas',
+    description: 'Nödvändiga identifierare för mötet saknas. Försök uppdatera möteslistan.',
+  },
 };
 
 export const DigitalImportView = ({
@@ -121,7 +151,7 @@ export const DigitalImportView = ({
           <Monitor className="w-8 h-8 text-muted-foreground" />
         </div>
         <div className="space-y-1.5">
-          <p className="text-base font-semibold text-foreground">Digital Mode inte tillgänglig</p>
+          <p className="text-base font-semibold text-foreground">Teams-import inte tillgänglig</p>
           <p className="text-sm text-muted-foreground max-w-xs">
             {!isEnabled
               ? 'Importfunktionen är för tillfället avstängd.'
@@ -156,14 +186,19 @@ export const DigitalImportView = ({
 
   // Error state
   if (state === 'error' && error) {
+    const errorInfo = ERROR_UI_LABELS[(error as any)] || null;
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center space-y-5">
         <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
           <AlertTriangle className="w-8 h-8 text-destructive" />
         </div>
         <div className="space-y-1.5">
-          <p className="text-base font-semibold text-foreground">Något gick fel</p>
-          <p className="text-sm text-muted-foreground max-w-xs">{error}</p>
+          <p className="text-base font-semibold text-foreground">
+            {errorInfo?.title || 'Något gick fel'}
+          </p>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            {errorInfo?.description || error}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onReset}>Försök igen</Button>
@@ -221,9 +256,12 @@ export const DigitalImportView = ({
           Koppla Microsoft-konto
         </Button>
 
-        <p className="text-[11px] text-muted-foreground/50 max-w-xs">
-          Teams-transkribering måste vara aktiverat för mötet. Du behöver vara organisatör.
-        </p>
+        <div className="flex items-start gap-2 max-w-xs text-left">
+          <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-muted-foreground/50">
+            Teams-transkribering måste vara aktiverat för mötet. Du behöver vara organisatör för att kunna importera.
+          </p>
+        </div>
       </div>
     );
   }
@@ -282,7 +320,7 @@ export const DigitalImportView = ({
           <div className="text-center space-y-3">
             <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
             <p className="text-sm font-medium text-foreground">Importerar möte...</p>
-            <p className="text-xs text-muted-foreground">Hämtar transkript och deltagare från Microsoft Graph</p>
+            <p className="text-xs text-muted-foreground">Hämtar transkript och deltagare från Microsoft 365</p>
           </div>
         </div>
       )}
@@ -294,7 +332,7 @@ export const DigitalImportView = ({
             <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto" />
             <p className="text-sm font-medium text-foreground">Inga importbara möten</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Möten visas här när Teams-transkribering har skapats. Se till att transkribering är aktiverat i Teams.
+              Här visas möten där Teams-transkribering redan har slutförts. Se till att transkribering är aktiverat i Teams och att du är organisatör.
             </p>
             <Button variant="outline" size="sm" onClick={onLoadMeetings} className="gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" />
@@ -307,15 +345,20 @@ export const DigitalImportView = ({
       {/* Meeting list */}
       {state === 'idle' && meetings.length > 0 && !isImporting && (
         <div className="flex-1 overflow-y-auto">
+          <div className="px-3 pt-2 pb-1">
+            <p className="text-xs text-muted-foreground">
+              {meetings.length} {meetings.length === 1 ? 'möte' : 'möten'} med färdigt transkript
+            </p>
+          </div>
           <div className="p-3 space-y-2">
             {meetings.map((meeting) => (
               <button
                 key={`${meeting.meetingId}-${meeting.transcriptId}`}
                 onClick={() => handleSelectMeeting(meeting)}
-                className="w-full p-3.5 rounded-xl border border-border/50 bg-card hover:border-primary/40 hover:bg-primary/3 transition-all text-left group"
+                className="w-full p-3.5 rounded-xl border border-border/50 bg-card hover:border-primary/40 hover:bg-primary/5 transition-all text-left group"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary/15 transition-colors">
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary/15 transition-colors">
                     <FileText className="w-4 h-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">

@@ -4,7 +4,6 @@ import { Users, Phone, ArrowRight, Mic, Monitor, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { debugLog } from "@/lib/debugLogger";
-import type { LockedSessionInfo } from "@/hooks/useDigitalSession";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
 
@@ -15,7 +14,6 @@ interface MeetingModeDialogProps {
   showDigitalOption?: boolean;
   digitalLocked?: boolean;
   digitalComingSoon?: boolean;
-  lockedSessionInfo?: LockedSessionInfo | null;
   showStartConfirmation?: boolean;
 }
 
@@ -53,7 +51,6 @@ export const MeetingModeDialog = ({
   showDigitalOption = false,
   digitalLocked = false,
   digitalComingSoon = false,
-  lockedSessionInfo,
   showStartConfirmation = false,
 }: MeetingModeDialogProps) => {
   const [hoveredOption, setHoveredOption] = useState<MeetingMode | null>(null);
@@ -178,14 +175,9 @@ export const MeetingModeDialog = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold text-sm sm:text-base text-foreground">{opt.title}</span>
-                      {isDigitalLocked ? (
+                    {isDigitalLocked ? (
                         <div className="mt-0.5">
                           <p className="text-xs sm:text-sm text-destructive font-medium">Upptagen just nu</p>
-                          {lockedSessionInfo?.meetingTitle && (
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                              Pågående: {lockedSessionInfo.meetingTitle}
-                            </p>
-                          )}
                         </div>
                       ) : isDigitalComingSoon ? (
                         <div className="mt-0.5">
