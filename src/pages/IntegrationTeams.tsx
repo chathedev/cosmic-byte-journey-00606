@@ -363,8 +363,8 @@ const IntegrationTeams = () => {
                 <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/20 border border-border/30">
                   <Shield className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <span className="font-medium text-foreground">Krav:</span> Teams-transkribering måste vara aktiverat för mötet 
-                    och du behöver vara organisatör. Stödjer både arbets-/skolkonton och personliga Microsoft-konton.
+                    <span className="font-medium text-foreground">Krav:</span> Microsoft 365 arbets- eller skolkonto med Teams-transkribering aktiverat. 
+                    Du behöver vara organisatör för mötet. Kräver behörigheterna Calendars.Read och OnlineMeetingTranscript.Read.All.
                   </p>
                 </div>
               </div>
