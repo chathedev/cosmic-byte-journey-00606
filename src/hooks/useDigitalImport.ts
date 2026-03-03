@@ -10,8 +10,13 @@ export interface MicrosoftAccount {
   lastAuthorizedAt?: string;
 }
 
+export type MeetingSourceType = 'scheduled_meeting' | 'adhoc_call';
+
 export interface ImportableMeeting {
+  sourceType?: MeetingSourceType;
   meetingId: string;
+  graphMeetingId?: string | null;
+  callId?: string | null;
   transcriptId: string;
   title: string;
   startDateTime: string;
@@ -21,6 +26,11 @@ export interface ImportableMeeting {
   organizerId?: string;
   organizerEmail?: string;
   hasAttendanceReport?: boolean;
+}
+
+export interface ImportWarning {
+  code: string;
+  message?: string;
 }
 
 export interface ImportLastError {
@@ -77,6 +87,7 @@ export const ERROR_CODE_LABELS: Record<string, string> = {
   microsoft_missing_scopes: 'Microsoft-kontot saknar nödvändiga behörigheter för Teams-transkript',
   microsoft_personal_account_unsupported: 'Personliga Microsoft-konton stöds inte för transkript-import. Använd ett arbets- eller skolkonto.',
   microsoft_admin_consent_required: 'Organisationens administratör behöver godkänna appens behörigheter i Microsoft Entra.',
+  microsoft_adhoc_app_permission_missing: 'Ad hoc-/chatmöten kunde inte sökas – appen saknar CallTranscripts.Read.All.',
 };
 
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
@@ -85,6 +96,7 @@ interface UseDigitalImportReturn {
   state: ImportState;
   importStatus: ImportStatus | null;
   meetings: ImportableMeeting[];
+  warnings: ImportWarning[];
   error: string | null;
   errorCode: string | null;
   importResult: ImportResult | null;
@@ -103,6 +115,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
   const [state, setState] = useState<ImportState>('idle');
   const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
   const [meetings, setMeetings] = useState<ImportableMeeting[]>([]);
+  const [warnings, setWarnings] = useState<ImportWarning[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -189,6 +202,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     try {
       const data = await fetchWithAuth('/digital-import/meetings');
       setMeetings(data.meetings || []);
+      setWarnings(data.warnings || []);
       setState('idle');
     } catch (err: any) {
       handleError(err, 'Kunde inte hämta möten');
@@ -204,14 +218,21 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     setError(null);
     setErrorCode(null);
     try {
+      const body: Record<string, any> = {
+        sourceType: meeting.sourceType || 'scheduled_meeting',
+        transcriptId: meeting.transcriptId,
+        title: title || meeting.title,
+      };
+      if (meeting.sourceType === 'adhoc_call') {
+        body.callId = meeting.callId || meeting.meetingId;
+      } else {
+        body.graphMeetingId = meeting.graphMeetingId || meeting.meetingId;
+      }
+      if (meetingId) body.meetingId = meetingId;
+
       const data = await fetchWithAuth('/digital-import/meetings/import', {
         method: 'POST',
-        body: JSON.stringify({
-          graphMeetingId: meeting.meetingId,
-          transcriptId: meeting.transcriptId,
-          meetingId,
-          title: title || meeting.title,
-        }),
+        body: JSON.stringify(body),
       });
       setImportResult(data);
       setState('done');
@@ -268,6 +289,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     state,
     importStatus,
     meetings,
+    warnings,
     error,
     errorCode,
     importResult,

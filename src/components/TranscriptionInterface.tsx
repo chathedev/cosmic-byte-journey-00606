@@ -369,6 +369,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           <DigitalImportView
             importStatus={digitalImport.importStatus}
             meetings={digitalImport.meetings}
+            warnings={digitalImport.warnings}
             state={digitalImport.state}
             error={digitalImport.error}
             errorCode={digitalImport.errorCode}
