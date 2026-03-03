@@ -491,7 +491,7 @@ const IntegrationTeams = () => {
                 )}
               </div>
             </section>
-          )
+          )}
 
           {/* ── Guide: Så använder du Teams med Tivly ── */}
           {isEnabled && isConfigured && (
