@@ -251,6 +251,23 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     }
   }, [fetchWithAuth, handleError]);
 
+  const toggleAutoImport = useCallback(async (enabled: boolean) => {
+    setError(null);
+    setErrorCode(null);
+    try {
+      await fetchWithAuth('/digital-import/auto-import', {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      });
+      setImportStatus(prev => prev ? {
+        ...prev,
+        autoImport: prev.autoImport ? { ...prev.autoImport, enabled } : { enabled, schedulerEnabled: true },
+      } : prev);
+    } catch (err: any) {
+      handleError(err, 'Kunde inte ändra automatisk import');
+    }
+  }, [fetchWithAuth, handleError]);
+
   const reset = useCallback(() => {
     setState('idle');
     setError(null);
