@@ -483,10 +483,21 @@ const IntegrationTeams = () => {
                       </div>
                     )}
 
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Tivly kontrollerar automatiskt efter nya Teams-möten med färdigt transkript ungefär varje minut. 
-                      Redan importerade möten importeras inte igen.
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Tivly kontrollerar automatiskt efter nya kalenderbaserade Teams-möten med färdigt transkript ungefär varje minut. 
+                        Redan importerade möten importeras inte igen.
+                      </p>
+                      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10">
+                        <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Du får ett kort mejl till din Tivly-adress när nya möten importeras automatiskt.
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                        Om du raderar ett auto-importerat möte i Tivly importeras det inte igen automatiskt, men du kan alltid återimportera det manuellt från listan nedan.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
