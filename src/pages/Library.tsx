@@ -1295,28 +1295,21 @@ const Library = () => {
                             </Badge>
                           </>
                         )}
-                        {/* Meeting visibility badge */}
-                        {isEnterprise && (
+                        {/* Team badge – only shown for team meetings */}
+                        {isEnterprise && (meeting as any).enterpriseTeamId && (
                           <>
                             <span className="text-border">·</span>
-                            {(meeting as any).enterpriseTeamId ? (
-                              <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-primary/8 border-primary/20 text-primary">
-                                <Users className="w-2.5 h-2.5" />
-                                {(meeting as any).enterpriseTeamName || 'Team'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-muted/50 border-border text-muted-foreground">
-                                <Lock className="w-2.5 h-2.5" />
-                                Individuellt
-                              </Badge>
-                            )}
-                            {(meeting as any).readOnly && (
-                              <Badge variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4">
-                                <Eye className="w-2.5 h-2.5" />
-                                Skrivskyddat
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4 bg-primary/8 border-primary/20 text-primary">
+                              <Users className="w-2.5 h-2.5" />
+                              {(meeting as any).enterpriseTeamName || 'Team'}
+                            </Badge>
                           </>
+                        )}
+                        {isEnterprise && (meeting as any).readOnly && (
+                          <Badge variant="secondary" className="flex items-center gap-1 text-[10px] px-2 py-0 h-4">
+                            <Eye className="w-2.5 h-2.5" />
+                            Skrivskyddat
+                          </Badge>
                         )}
                       </div>
                     </div>
