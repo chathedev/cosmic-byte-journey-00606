@@ -87,7 +87,7 @@ export const ERROR_CODE_LABELS: Record<string, string> = {
   microsoft_missing_scopes: 'Microsoft-kontot saknar nödvändiga behörigheter för Teams-transkript',
   microsoft_personal_account_unsupported: 'Personliga Microsoft-konton stöds inte för transkript-import. Använd ett arbets- eller skolkonto.',
   microsoft_admin_consent_required: 'Organisationens administratör behöver godkänna appens behörigheter i Microsoft Entra.',
-  microsoft_adhoc_app_permission_missing: 'Ad hoc-/chatmöten kunde inte sökas – appen saknar CallTranscripts.Read.All.',
+  microsoft_calendar_meetings_only: 'Endast kalenderbaserade Teams-möten stöds för Digital Import.',
 };
 
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
