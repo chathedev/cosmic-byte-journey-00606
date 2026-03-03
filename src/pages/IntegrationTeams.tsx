@@ -37,6 +37,7 @@ const IntegrationTeams = () => {
   const [searchParams] = useSearchParams();
   const di = useDigitalImport();
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [autoImportLoading, setAutoImportLoading] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const hasAutoLoaded = useRef(false);
