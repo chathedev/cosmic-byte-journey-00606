@@ -602,16 +602,6 @@ export const DigitalImportView = ({
         </div>
       )}
 
-      {/* Participants dialog */}
-      <ParticipantsInputDialog
-        open={showParticipants}
-        onOpenChange={setShowParticipants}
-        onConfirm={handleParticipantsConfirm}
-        title="Mötesdeltagare"
-        subtitle="Ange deltagarnas namn för bättre transkribering"
-        confirmLabel="Importera möte"
-        allowSkip={true}
-      />
     </div>
   );
 };
