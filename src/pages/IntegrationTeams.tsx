@@ -436,10 +436,10 @@ const IntegrationTeams = () => {
                     <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0">
                       <Zap className="w-4 h-4 text-primary" />
                     </div>
-                    <div>
+                  <div>
                       <h2 className="text-sm font-semibold text-foreground">Automatisk import</h2>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Importera Teams-möten automatiskt efter avslutat möte
+                        Hämta Teams-möten automatiskt när transkriptet är klart
                       </p>
                     </div>
                   </div>
