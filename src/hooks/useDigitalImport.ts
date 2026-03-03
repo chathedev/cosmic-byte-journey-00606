@@ -45,6 +45,16 @@ export interface ConnectionIssue {
   adminConsentLikelyRequired?: boolean;
 }
 
+export interface AutoImportStatus {
+  enabled: boolean;
+  schedulerEnabled: boolean;
+  intervalMs?: number;
+  lastRunAt?: string | null;
+  lastImportAt?: string | null;
+  lastImportedMeetingId?: string | null;
+  lastError?: ImportLastError | null;
+}
+
 export interface ImportStatus {
   enabled: boolean;
   configured: boolean;
@@ -55,6 +65,7 @@ export interface ImportStatus {
   authorityBase?: string;
   lastError?: ImportLastError | null;
   account?: MicrosoftAccount | null;
+  autoImport?: AutoImportStatus | null;
   scopes?: string[];
   grantedScopes?: string[];
   requiredScopes?: string[];
@@ -105,6 +116,7 @@ interface UseDigitalImportReturn {
   disconnect: () => Promise<void>;
   loadMeetings: () => Promise<void>;
   importMeeting: (meeting: ImportableMeeting, meetingId?: string, title?: string) => Promise<ImportResult | null>;
+  toggleAutoImport: (enabled: boolean) => Promise<void>;
   reset: () => void;
   clearError: () => void;
   isFullyConnected: boolean;
@@ -239,6 +251,23 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     }
   }, [fetchWithAuth, handleError]);
 
+  const toggleAutoImport = useCallback(async (enabled: boolean) => {
+    setError(null);
+    setErrorCode(null);
+    try {
+      await fetchWithAuth('/digital-import/auto-import', {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      });
+      setImportStatus(prev => prev ? {
+        ...prev,
+        autoImport: prev.autoImport ? { ...prev.autoImport, enabled } : { enabled, schedulerEnabled: true },
+      } : prev);
+    } catch (err: any) {
+      handleError(err, 'Kunde inte ändra automatisk import');
+    }
+  }, [fetchWithAuth, handleError]);
+
   const reset = useCallback(() => {
     setState('idle');
     setError(null);
@@ -294,6 +323,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     disconnect,
     loadMeetings,
     importMeeting,
+    toggleAutoImport,
     reset,
     clearError,
     isFullyConnected,

@@ -3,10 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Monitor, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Shield, Info, FileText, Clock, Users, Download, Sparkles,
-  ChevronRight, AlertCircle, ExternalLink
+  ChevronRight, AlertCircle, ExternalLink, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useDigitalImport, ImportableMeeting, ERROR_CODE_LABELS, type ImportWarning } from "@/hooks/useDigitalImport";
@@ -36,6 +37,7 @@ const IntegrationTeams = () => {
   const [searchParams] = useSearchParams();
   const di = useDigitalImport();
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [autoImportLoading, setAutoImportLoading] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const hasAutoLoaded = useRef(false);
@@ -119,10 +121,23 @@ const IntegrationTeams = () => {
     setImportingId(null);
     if (result?.imported) {
       toast({ title: 'Import klar', description: `"${result.meeting.title}" har importerats.` });
-      // Navigate to the imported meeting
       navigate(`/meeting/${result.meeting.id}`);
     }
   };
+
+  const handleToggleAutoImport = async (enabled: boolean) => {
+    setAutoImportLoading(true);
+    await di.toggleAutoImport(enabled);
+    setAutoImportLoading(false);
+    toast({
+      title: enabled ? 'Automatisk import aktiverad' : 'Automatisk import inaktiverad',
+      description: enabled
+        ? 'Tivly kontrollerar nu automatiskt efter nya Teams-möten.'
+        : 'Automatisk import har stängts av.',
+    });
+  };
+
+  const autoImport = di.importStatus?.autoImport;
 
   return (
     <div className="min-h-screen bg-background">
@@ -412,6 +427,72 @@ const IntegrationTeams = () => {
             )}
           </section>
 
+          {/* ── Auto-import ── */}
+          {di.isFullyConnected && (
+            <section className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0">
+                      <Zap className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">Automatisk import</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Importera Teams-möten automatiskt efter avslutat möte
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={autoImport?.enabled ?? false}
+                    onCheckedChange={handleToggleAutoImport}
+                    disabled={autoImportLoading}
+                  />
+                </div>
+
+                {autoImport?.enabled && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border">
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-xs text-muted-foreground">Status</span>
+                        <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
+                          Aktiv
+                        </Badge>
+                      </div>
+                      {autoImport.lastRunAt && (
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-muted-foreground">Senaste kontroll</span>
+                          <span className="text-xs text-foreground">{formatDateTime(autoImport.lastRunAt)}</span>
+                        </div>
+                      )}
+                      {autoImport.lastImportAt && (
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-muted-foreground">Senaste auto-import</span>
+                          <span className="text-xs text-foreground">{formatDateTime(autoImport.lastImportAt)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {autoImport.lastError && (
+                      <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                        <p className="text-xs text-destructive flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          {ERROR_CODE_LABELS[autoImport.lastError.code] || autoImport.lastError.message || autoImport.lastError.code}
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Tivly kontrollerar automatiskt efter nya Teams-möten med färdigt transkript ungefär varje minut. 
+                      Redan importerade möten importeras inte igen.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* ── Guide: Så använder du Teams med Tivly ── */}
           {isEnabled && isConfigured && (
             <section className="rounded-xl border border-border bg-card overflow-hidden">
@@ -472,7 +553,7 @@ const IntegrationTeams = () => {
                 <div className="mt-5 flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/15">
                   <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <span className="font-medium text-foreground">Automatisk import (kommer snart):</span> Vi arbetar på att automatiskt importera dina Teams-möten till Tivly direkt efter avslutat möte — utan att du behöver göra något manuellt.
+                    <span className="font-medium text-foreground">Tips:</span> Aktivera automatisk import ovan för att slippa importera manuellt — Tivly hämtar då dina möten automatiskt efter avslutat möte.
                   </p>
                 </div>
               </div>
