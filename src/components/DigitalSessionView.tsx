@@ -319,10 +319,16 @@ export const DigitalSessionView = ({
               <Loader2 className="w-7 h-7 text-muted-foreground animate-spin" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-base font-semibold text-foreground">Avslutar mötet...</p>
-              <p className="text-sm text-muted-foreground">Inspelningen skickas till transkribering.</p>
-              {metadata?.processingStage === 'finalizing_recording' && (
-                <p className="text-xs text-muted-foreground/60">Förbereder inspelningen...</p>
+              <p className="text-base font-semibold text-foreground">
+                {meetingEndedByHost ? 'Mötet avslutades av värden' : 'Avslutar mötet...'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {metadata?.processingStage
+                  ? PROCESSING_STAGE_LABELS[metadata.processingStage] || 'Skickar inspelningen till transkribering...'
+                  : 'Inspelningen skickas till transkribering.'}
+              </p>
+              {(metadata?.autoSubmitAudioFile || metadata?.batchFileAutoSubmitted) && (
+                <p className="text-xs text-muted-foreground/60">Automatisk överlämning till batchpipeline</p>
               )}
             </div>
           </div>

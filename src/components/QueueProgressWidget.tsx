@@ -17,7 +17,7 @@ interface QueueMetadata {
 
 interface QueueProgressWidgetProps {
   status: 'uploading' | 'queued' | 'processing' | 'done' | 'failed';
-  stage?: 'uploading' | 'queued' | 'transcribing' | 'sis_processing' | 'done' | 'error';
+  stage?: string; // ASR stage from backend (uploading, queued, transcribing, sis_processing, diarizing, finalizing_recording, etc.)
   uploadProgress?: number;
   backendProgress?: number; // Actual progress from backend (0-100)
   queueMetadata?: QueueMetadata;
@@ -99,12 +99,22 @@ export const QueueProgressWidget = ({
         return currentProgress;
       }
       
-      // SIS processing: 80-99%
-      if (stage === 'sis_processing') {
+      // SIS / diarization / cleanup: 80-99%
+      if (stage === 'sis_processing' || stage === 'diarizing' || stage === 'cleanup') {
         if (currentProgress < 99) {
           return Math.min(currentProgress + 0.4, 99);
         }
         return currentProgress;
+      }
+
+      // Digital mode early stages (finalizing → handoff): 10-30%
+      if (stage === 'finalizing_recording' || stage === 'stopping_capture' || stage === 'assembling_recording' || stage === 'analyzing_recording' || stage === 'handoff_to_asr') {
+        return Math.min(currentProgress + 0.3, 30);
+      }
+
+      // Preparing audio: 30-40%
+      if (stage === 'preparing_audio') {
+        return Math.min(currentProgress + 0.3, 40);
       }
       
       return currentProgress;
@@ -195,6 +205,16 @@ export const QueueProgressWidget = ({
         spin: true,
       };
     }
+
+    if (stage === 'diarizing') {
+      return {
+        title: 'Identifierar talare...',
+        subtitle: 'Separerar talare i inspelningen',
+        icon: Zap,
+        color: 'text-purple-500',
+        spin: true,
+      };
+    }
     
     if (status === 'processing' || stage === 'transcribing') {
       return {
@@ -202,6 +222,57 @@ export const QueueProgressWidget = ({
         subtitle: 'Konverterar ljud till text',
         icon: Loader2,
         color: 'text-primary',
+        spin: true,
+      };
+    }
+
+    // Digital mode early stages
+    if (stage === 'finalizing_recording' || stage === 'stopping_capture' || stage === 'assembling_recording') {
+      return {
+        title: 'Slutför inspelningen...',
+        subtitle: stage === 'assembling_recording' ? 'Sammanställer ljudfilen' : 'Förbereder inspelningen',
+        icon: Loader2,
+        color: 'text-primary',
+        spin: true,
+      };
+    }
+
+    if (stage === 'analyzing_recording') {
+      return {
+        title: 'Analyserar ljudfilen...',
+        subtitle: 'Kontrollerar ljudkvalitet',
+        icon: Loader2,
+        color: 'text-primary',
+        spin: true,
+      };
+    }
+
+    if (stage === 'handoff_to_asr') {
+      return {
+        title: 'Skickar till transkribering...',
+        subtitle: 'Överlämnar till batchpipeline',
+        icon: Loader2,
+        color: 'text-primary',
+        spin: true,
+      };
+    }
+
+    if (stage === 'preparing_audio') {
+      return {
+        title: 'Förbereder ljudet...',
+        subtitle: 'Optimerar för transkribering',
+        icon: Loader2,
+        color: 'text-primary',
+        spin: true,
+      };
+    }
+
+    if (stage === 'cleanup') {
+      return {
+        title: 'Rensar transkript...',
+        subtitle: 'AI-cleanup av text',
+        icon: Zap,
+        color: 'text-purple-500',
         spin: true,
       };
     }
@@ -277,11 +348,11 @@ export const QueueProgressWidget = ({
             </span>
           )}
           
-          {/* SIS info */}
-          {stage === 'sis_processing' && (
+          {/* SIS / diarization info */}
+          {(stage === 'sis_processing' || stage === 'diarizing' || stage === 'cleanup') && (
             <span className="flex items-center gap-1">
               <Users className="w-3 h-3" />
-              Talaridentifiering
+              {stage === 'diarizing' ? 'Talarseparation' : stage === 'cleanup' ? 'AI-cleanup' : 'Talaridentifiering'}
             </span>
           )}
         </div>
