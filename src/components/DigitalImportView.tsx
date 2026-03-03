@@ -98,35 +98,58 @@ export const DigitalImportView = ({
   const [refreshCooldown, setRefreshCooldown] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const hasAutoLoaded = useRef(false);
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isConnected = importStatus?.connected === true;
-  const isConfigured = importStatus?.configured === true;
-  const isEnabled = importStatus?.enabled === true;
+  const COOLDOWN_KEY = 'diview_refresh_cooldown_until';
+  const COOLDOWN_DURATION = 5;
 
-  // Auto-load meetings ONCE when connected
+  // Restore cooldown from sessionStorage on mount
   useEffect(() => {
-    if (isConnected && !hasAutoLoaded.current && state === 'idle') {
-      hasAutoLoaded.current = true;
-      onLoadMeetings();
+    const stored = sessionStorage.getItem(COOLDOWN_KEY);
+    if (stored) {
+      const remaining = Math.ceil((parseInt(stored, 10) - Date.now()) / 1000);
+      if (remaining > 0) {
+        setRefreshCooldown(true);
+        setCooldownSeconds(remaining);
+        startCooldownInterval(remaining);
+      } else {
+        sessionStorage.removeItem(COOLDOWN_KEY);
+      }
     }
-  }, [isConnected, state, onLoadMeetings]);
+    return () => {
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    };
+  }, []);
+
+  const startCooldownInterval = useCallback((seconds: number) => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    let remaining = seconds;
+    cooldownIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(cooldownIntervalRef.current!);
+        cooldownIntervalRef.current = null;
+        setRefreshCooldown(false);
+        setCooldownSeconds(0);
+        sessionStorage.removeItem(COOLDOWN_KEY);
+      } else {
+        setCooldownSeconds(remaining);
+      }
+    }, 1000);
+  }, []);
 
   const handleRefreshMeetings = useCallback(() => {
     if (refreshCooldown || state === 'loading_meetings') return;
     onLoadMeetings();
     setRefreshCooldown(true);
-    setCooldownSeconds(5);
-    const interval = setInterval(() => {
-      setCooldownSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setRefreshCooldown(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [refreshCooldown, state, onLoadMeetings]);
+    setCooldownSeconds(COOLDOWN_DURATION);
+    sessionStorage.setItem(COOLDOWN_KEY, String(Date.now() + COOLDOWN_DURATION * 1000));
+    startCooldownInterval(COOLDOWN_DURATION);
+  }, [refreshCooldown, state, onLoadMeetings, startCooldownInterval]);
+
+  const isConnected = importStatus?.connected === true;
+  const isConfigured = importStatus?.configured === true;
+  const isEnabled = importStatus?.enabled === true;
 
   const handleSelectMeeting = (meeting: ImportableMeeting) => {
     setSelectedMeeting(meeting);
