@@ -185,31 +185,11 @@ export const DigitalImportView = ({
     startCooldownInterval(COOLDOWN_DURATION);
   }, [refreshCooldown, state, onLoadMeetings, startCooldownInterval]);
 
-  const handleSelectMeeting = (meeting: ImportableMeeting) => {
+  const handleSelectMeeting = async (meeting: ImportableMeeting) => {
     setSelectedMeeting(meeting);
-    setShowParticipants(true);
-  };
-
-  const handleParticipantsConfirm = async (participants: string[]) => {
-    setShowParticipants(false);
-    if (!selectedMeeting) return;
-
     setIsImporting(true);
     try {
-      let meetingId: string | undefined;
-      if (participants.length > 0) {
-        const now = new Date().toISOString();
-        const result = await apiClient.createMeeting({
-          title: selectedMeeting.title || 'Importerat möte',
-          createdAt: now,
-          transcript: '',
-          participants,
-          ...(user?.uid ? { userId: user.uid } : {}),
-        });
-        meetingId = result.meeting?.id;
-      }
-
-      const result = await onImport(selectedMeeting, meetingId, selectedMeeting.title);
+      const result = await onImport(meeting, undefined, meeting.title);
       if (result?.meeting?.id) {
         setImportedMeetingId(result.meeting.id);
       }
