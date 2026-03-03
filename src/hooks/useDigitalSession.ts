@@ -34,6 +34,8 @@ export interface DigitalSessionMetadata {
   capturePaused?: boolean;
   botMediaMuted?: boolean;
   botDisplayName?: string;
+  authRequired?: boolean;
+  authenticated?: boolean;
   awaitingHostAdmission?: boolean;
   hostActionRequired?: boolean;
   hostActionType?: string;
