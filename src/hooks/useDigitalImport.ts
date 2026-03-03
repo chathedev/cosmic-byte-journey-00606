@@ -45,6 +45,16 @@ export interface ConnectionIssue {
   adminConsentLikelyRequired?: boolean;
 }
 
+export interface AutoImportStatus {
+  enabled: boolean;
+  schedulerEnabled: boolean;
+  intervalMs?: number;
+  lastRunAt?: string | null;
+  lastImportAt?: string | null;
+  lastImportedMeetingId?: string | null;
+  lastError?: ImportLastError | null;
+}
+
 export interface ImportStatus {
   enabled: boolean;
   configured: boolean;
@@ -55,6 +65,7 @@ export interface ImportStatus {
   authorityBase?: string;
   lastError?: ImportLastError | null;
   account?: MicrosoftAccount | null;
+  autoImport?: AutoImportStatus | null;
   scopes?: string[];
   grantedScopes?: string[];
   requiredScopes?: string[];
