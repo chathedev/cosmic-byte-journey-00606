@@ -114,7 +114,7 @@ export function AppSidebar() {
     if (path === "/") setSelected("Hem");
     else if (path === "/library") setSelected("Bibliotek");
     else if (path === "/agendas") setSelected("Agendor");
-    else if (path === "/chat") setSelected("AI Chatt");
+    
     else if (path === "/feedback") setSelected("Feedback");
     else if (path === "/integrations") setSelected("Integrationer");
     else if (path === "/settings") setSelected("Inställningar");
