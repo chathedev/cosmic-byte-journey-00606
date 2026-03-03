@@ -169,6 +169,13 @@ const IntegrationTeams = () => {
                       {connectionIssue.message}
                     </p>
                   )}
+                  {!connectionIssue?.message && (
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Microsoft returnerade för få behörigheter för att kunna importera Teams-transkript. 
+                      Backend försökte automatiskt begära rätt behörigheter men det lyckades inte. 
+                      Koppla om ditt konto och godkänn alla begärda behörigheter.
+                    </p>
+                  )}
                   {missingScopes && missingScopes.length > 0 && (
                     <div className="mt-2">
                       <p className="text-xs text-muted-foreground mb-1.5">Saknade behörigheter:</p>
@@ -181,12 +188,21 @@ const IntegrationTeams = () => {
                       </div>
                     </div>
                   )}
+                  {lastError && (
+                    <div className="mt-2 pt-2 border-t border-amber-500/15">
+                      <p className="text-[10px] text-muted-foreground/70">
+                        Senaste fel: {lastError.code === 'microsoft_missing_scopes' 
+                          ? 'Saknade scopes efter automatiskt retry' 
+                          : lastError.message || lastError.code}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <Button
                   onClick={handleConnect}
                   disabled={di.state === 'connecting'}
-                  className="w-full sm:w-auto h-11 gap-2 rounded-xl text-sm font-semibold"
+                  className="w-full sm:w-auto h-11 gap-2 text-sm font-semibold"
                 >
                   {di.state === 'connecting' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -298,7 +314,7 @@ const IntegrationTeams = () => {
                 <Button
                   onClick={handleConnect}
                   disabled={di.state === 'connecting'}
-                  className="w-full sm:w-auto h-11 gap-2 rounded-xl text-sm font-semibold"
+                  className="w-full sm:w-auto h-11 gap-2 text-sm font-semibold"
                 >
                   {di.state === 'connecting' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
