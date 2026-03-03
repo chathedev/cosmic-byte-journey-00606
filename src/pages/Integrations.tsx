@@ -7,7 +7,6 @@ const Integrations = () => {
   const navigate = useNavigate();
   const digitalImport = useDigitalImport();
 
-  const isConnected = digitalImport.importStatus?.connected === true;
   const isEnabled = digitalImport.importStatus?.enabled === true;
   const isConfigured = digitalImport.importStatus?.configured === true;
   const account = digitalImport.importStatus?.account;
@@ -42,17 +41,21 @@ const Integrations = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold text-foreground">Microsoft Teams</h2>
-                  {isConnected ? (
+                  {digitalImport.isFullyConnected ? (
                     <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
                       <CheckCircle2 className="w-2.5 h-2.5" />
                       Kopplad
+                    </Badge>
+                  ) : digitalImport.needsReconnect ? (
+                    <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
+                      Kräver omkoppling
                     </Badge>
                   ) : isEnabled && isConfigured ? (
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {isConnected && account?.email
+                  {digitalImport.isFullyConnected && account?.email
                     ? account.email
                     : 'Importera transkript från Teams-möten'}
                 </p>

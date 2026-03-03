@@ -29,15 +29,25 @@ export interface ImportLastError {
   updatedAt?: string;
 }
 
+export interface ConnectionIssue {
+  reason: string;
+  message: string;
+}
+
 export interface ImportStatus {
   enabled: boolean;
   configured: boolean;
   secureTokenStorage?: boolean;
   connected: boolean;
+  reconnectRequired?: boolean;
+  connectionIssue?: ConnectionIssue | null;
   authorityBase?: string;
   lastError?: ImportLastError | null;
   account?: MicrosoftAccount | null;
   scopes?: string[];
+  grantedScopes?: string[];
+  requiredScopes?: string[];
+  missingScopes?: string[];
 }
 
 export interface ImportResult {
@@ -80,6 +90,8 @@ interface UseDigitalImportReturn {
   importMeeting: (meeting: ImportableMeeting, meetingId?: string, title?: string) => Promise<ImportResult | null>;
   reset: () => void;
   clearError: () => void;
+  isFullyConnected: boolean;
+  needsReconnect: boolean;
 }
 
 export const useDigitalImport = (): UseDigitalImportReturn => {
@@ -90,6 +102,9 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const hasCheckedRef = useRef(false);
+
+  const isFullyConnected = importStatus?.connected === true && !importStatus?.reconnectRequired;
+  const needsReconnect = importStatus?.reconnectRequired === true;
 
   const handleError = useCallback((err: any, fallback: string) => {
     const code = err?.code || null;
@@ -124,12 +139,10 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     try {
       const data = await fetchWithAuth('/digital-import/status');
       setImportStatus(data);
-      if (data.connected && data.account) {
-        // Auto-load meetings if connected
+      if (data.connected && !data.reconnectRequired) {
         setState('idle');
       }
     } catch (err: any) {
-      // Non-fatal – just means import is not available
       setImportStatus({ enabled: false, configured: false, connected: false });
     }
   }, [fetchWithAuth]);
@@ -141,10 +154,9 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     try {
       const data = await fetchWithAuth('/digital-import/microsoft/connect');
       if (data.authorizationUrl) {
-        // Redirect to Microsoft OAuth
         window.location.href = data.authorizationUrl;
       } else if (data.connected) {
-        setImportStatus(prev => prev ? { ...prev, connected: true, account: data.account } : prev);
+        setImportStatus(prev => prev ? { ...prev, connected: true, reconnectRequired: false, account: data.account } : prev);
         setState('idle');
       }
     } catch (err: any) {
@@ -157,7 +169,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     setErrorCode(null);
     try {
       await fetchWithAuth('/digital-import/microsoft/disconnect', { method: 'POST' });
-      setImportStatus(prev => prev ? { ...prev, connected: false, account: null } : prev);
+      setImportStatus(prev => prev ? { ...prev, connected: false, reconnectRequired: false, account: null } : prev);
       setMeetings([]);
       setState('idle');
     } catch (err: any) {
@@ -233,7 +245,6 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     const integration = params.get('integration');
     
     if (integration === 'microsoft' && integrationStatus) {
-      // Clean URL
       const url = new URL(window.location.href);
       url.searchParams.delete('status');
       url.searchParams.delete('integration');
@@ -262,5 +273,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     importMeeting,
     reset,
     clearError,
+    isFullyConnected,
+    needsReconnect,
   };
 };
