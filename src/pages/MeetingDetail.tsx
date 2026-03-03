@@ -77,12 +77,21 @@ const MeetingDetail = () => {
     selectedLanguage?: 'sv-SE' | 'en-US';
     digitalRecording?: boolean;
     meetingMode?: MeetingMode;
+    source?: string;
   } | null;
   const [isRecordingMode, setIsRecordingMode] = useState(locationState?.startRecording === true);
   const isFreeTrialMode = locationState?.isFreeTrialMode || false;
   const selectedLanguage = locationState?.selectedLanguage || 'sv-SE';
   const isDigitalRecording = locationState?.digitalRecording === true;
   const selectedMeetingMode = locationState?.meetingMode ?? null;
+
+  // Digital session tracking — survives page refresh via sessionStorage
+  const isDigitalSession = locationState?.source === 'digital-session' || (!!id && sessionStorage.getItem(`digital_session_${id}`) === '1');
+  useEffect(() => {
+    if (locationState?.source === 'digital-session' && id) {
+      sessionStorage.setItem(`digital_session_${id}`, '1');
+    }
+  }, [id, locationState?.source]);
 
   // Determine if user has ASR access (Enterprise or Admin)
   // NOTE: plan can be non-string at runtime; coerce defensively.
@@ -467,7 +476,7 @@ const MeetingDetail = () => {
                 pendingMeeting.transcriptionStatus = uploadStatus.status === 'complete' ? 'processing' : 'uploading';
               }
               setMeeting(pendingMeeting);
-              setStatus(pendingMeeting.transcriptionStatus);
+              setStatus(pendingMeeting.transcriptionStatus || 'processing');
               sessionStorage.removeItem('pendingMeeting');
               setIsLoading(false);
               return;
@@ -654,6 +663,22 @@ const MeetingDetail = () => {
               setStatus('processing');
             }
           }
+        } else if (isDigitalSession) {
+          // Digital session: backend may still be finalizing the meeting.
+          // Create a minimal meeting stub and start polling — the ASR pipeline
+          // will register the job once the WAV handoff completes.
+          console.log('📡 Digital session meeting not found yet — starting ASR polling');
+          const stubTitle = sessionStorage.getItem(`digital_session_title_${id}`) || 'Digitalt möte';
+          setMeeting({
+            id,
+            title: stubTitle,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            transcript: '',
+            userId: user?.uid || '',
+            folder: '',
+          } as MeetingSession);
+          setStatus('processing');
         } else {
           toast({
             title: "Möte hittades inte",
@@ -927,6 +952,12 @@ const MeetingDetail = () => {
 
           setStatus('done');
           setStage('done');
+
+          // Clean up digital session flags from sessionStorage
+          if (id) {
+            sessionStorage.removeItem(`digital_session_${id}`);
+            sessionStorage.removeItem(`digital_session_title_${id}`);
+          }
 
           try {
             await apiClient.updateMeeting(id, {

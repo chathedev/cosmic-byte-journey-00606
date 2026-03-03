@@ -172,6 +172,9 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
       folder: '',
     };
     sessionStorage.setItem('pendingMeeting', JSON.stringify(pendingMeeting));
+    // Persist digital-session flag + title so MeetingDetail survives page refresh
+    sessionStorage.setItem(`digital_session_${meetingId}`, '1');
+    sessionStorage.setItem(`digital_session_title_${meetingId}`, meetingTitle);
 
     // Navigate to Meeting Detail — same page used by uploads and recordings.
     // MeetingDetail will pick up the pendingMeeting from sessionStorage,
