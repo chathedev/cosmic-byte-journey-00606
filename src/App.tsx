@@ -36,7 +36,7 @@ import WebOnlyAccess from "./pages/WebOnlyAccess";
 import Library from "./pages/Library";
 import MeetingDetail from "./pages/MeetingDetail";
 import Agendas from "./pages/Agendas";
-import { Chat } from "./pages/Chat";
+
 import Feedback from "./pages/Feedback";
 import SubscribeSuccess from "./pages/SubscribeSuccess";
 import FreeTrial from "./pages/FreeTrial";
