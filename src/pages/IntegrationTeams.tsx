@@ -37,6 +37,7 @@ const IntegrationTeams = () => {
   const di = useDigitalImport();
   const [importingId, setImportingId] = useState<string | null>(null);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const hasAutoLoaded = useRef(false);
 
   const isEnabled = di.importStatus?.enabled === true;
@@ -78,7 +79,17 @@ const IntegrationTeams = () => {
     if (refreshCooldown || di.state === 'loading_meetings') return;
     di.loadMeetings();
     setRefreshCooldown(true);
-    setTimeout(() => setRefreshCooldown(false), 5000);
+    setCooldownSeconds(5);
+    const interval = setInterval(() => {
+      setCooldownSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setRefreshCooldown(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleConnect = async () => {
@@ -389,51 +400,84 @@ const IntegrationTeams = () => {
                   <h2 className="text-base font-semibold text-foreground">Importerbara möten</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">Möten med färdigt transkript i Microsoft 365</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefreshMeetings}
-                  disabled={di.state === 'loading_meetings' || refreshCooldown}
-                  className="gap-1.5"
-                >
-                  {di.state === 'loading_meetings' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefreshMeetings}
+                    disabled={di.state === 'loading_meetings' || refreshCooldown}
+                    className="gap-1.5"
+                  >
+                    {di.state === 'loading_meetings' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    {refreshCooldown ? `${cooldownSeconds}s` : 'Uppdatera'}
+                  </Button>
+                  {refreshCooldown && (
+                    <div className="h-1 w-16 rounded-full bg-muted overflow-hidden">
+                      <div 
+                        className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
+                        style={{ width: `${(cooldownSeconds / 5) * 100}%` }}
+                      />
+                    </div>
                   )}
-                  {refreshCooldown ? 'Vänta…' : 'Uppdatera'}
-                </Button>
+                </div>
               </div>
 
               <Separator />
 
               {di.state === 'loading_meetings' && di.meetings.length === 0 && (
-                <div className="p-8 flex flex-col items-center gap-3 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Hämtar möten från Microsoft…</p>
+                <div className="p-10 flex flex-col items-center gap-4 text-center">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Söker efter möten…</p>
+                    <p className="text-xs text-muted-foreground">Kontrollerar dina Teams-möten i Microsoft 365</p>
+                  </div>
                 </div>
               )}
 
               {di.state !== 'loading_meetings' && di.meetings.length === 0 && (
-                <div className="p-8 flex flex-col items-center gap-3 text-center">
-                  <FileText className="w-8 h-8 text-muted-foreground/30" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Inga möten med färdigt transkript</p>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                      Det finns inga Teams-möten med tillgängligt transkript just nu. 
-                      Se till att Teams-transkribering var aktiverad under mötet och att transkriptet har hunnit bearbetas av Microsoft 365.
-                    </p>
+                <div className="p-10 flex flex-col items-center gap-4 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center">
+                    <FileText className="w-7 h-7 text-muted-foreground/30" />
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRefreshMeetings}
-                    disabled={refreshCooldown}
-                    className="gap-1.5 mt-2"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    {refreshCooldown ? 'Vänta…' : 'Sök igen'}
-                  </Button>
+                  <div className="max-w-sm space-y-2">
+                    <p className="text-sm font-medium text-foreground">Inga möten med transkribering hittades</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Dina senaste Teams-möten kontrollerades men inget av dem hade transkribering aktiverat eller färdigställt. 
+                      Se till att transkribering var påslaget under mötet och att Microsoft 365 har hunnit bearbeta inspelningen.
+                    </p>
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/30 text-left mt-3">
+                      <Info className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        <span className="font-medium text-foreground">Tips:</span> Det kan ta några minuter efter avslutat möte innan transkriptet blir tillgängligt i Microsoft 365.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1.5 mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefreshMeetings}
+                      disabled={refreshCooldown}
+                      className="gap-1.5"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      {refreshCooldown ? `Vänta ${cooldownSeconds}s…` : 'Sök igen'}
+                    </Button>
+                    {refreshCooldown && (
+                      <div className="h-1 w-20 rounded-full bg-muted overflow-hidden">
+                        <div 
+                          className="h-full bg-primary/40 rounded-full transition-all duration-1000 ease-linear"
+                          style={{ width: `${(cooldownSeconds / 5) * 100}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
