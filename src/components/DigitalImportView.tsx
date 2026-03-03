@@ -113,7 +113,7 @@ export const DigitalImportView = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [selectedMeeting, setSelectedMeeting] = useState<ImportableMeeting | null>(null);
-  const [showParticipants, setShowParticipants] = useState(false);
+  
   const [isImporting, setIsImporting] = useState(false);
   const [importedMeetingId, setImportedMeetingId] = useState<string | null>(null);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
