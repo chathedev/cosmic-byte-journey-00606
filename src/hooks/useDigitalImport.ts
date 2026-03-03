@@ -72,6 +72,7 @@ const ERROR_CODE_LABELS: Record<string, string> = {
   microsoft_token_request_failed: 'Kunde inte autentisera med Microsoft',
   microsoft_graph_request_failed: 'Microsoft Graph-anrop misslyckades',
   microsoft_transcript_empty: 'Transkriptet var tomt',
+  microsoft_missing_scopes: 'Microsoft-kontot saknar nödvändiga behörigheter för Teams-transkript',
 };
 
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
