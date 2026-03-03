@@ -51,6 +51,14 @@ export interface DigitalSessionMetadata {
   asrStreamUrl?: string;
   sharedAsrPipeline?: boolean;
   sharedBatchSender?: boolean;
+  autoSubmitAudioFile?: boolean;
+  batchFileAutoSubmitted?: boolean;
+  requiresManualUpload?: boolean;
+  samePipelineAsUploads?: boolean;
+  finalizedAudioPath?: string;
+  finalizedAudioExists?: boolean;
+  finalizedAudioMimeType?: string;
+  originalAudioName?: string;
   transcriptStreamingAvailable?: boolean;
   transcriptionFirst?: boolean;
   speakerDiarizationEnabled?: boolean;
