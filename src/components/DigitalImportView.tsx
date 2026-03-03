@@ -597,16 +597,9 @@ export const DigitalImportView = ({
                     <FileText className="w-4 h-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                        {meeting.title || 'Namnlöst möte'}
-                      </p>
-                      {meeting.sourceType === 'adhoc_call' && (
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0 border-primary/20 text-primary/70">
-                          Chattmöte
-                        </Badge>
-                      )}
-                    </div>
+                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      {meeting.title || 'Namnlöst möte'}
+                    </p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
