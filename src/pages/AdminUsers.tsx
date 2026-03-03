@@ -222,7 +222,7 @@ export default function AdminUsers() {
       fetchAdmins();
     }, 5000);
 
-    const presenceInterval = setInterval(fetchPresence, 15000);
+    const presenceInterval = setInterval(fetchPresence, 2000);
 
     return () => {
       clearInterval(dataInterval);
@@ -643,10 +643,10 @@ export default function AdminUsers() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredUsers.map((user, index) => (
+                      {filteredUsers.map((user) => (
                         <TableRow 
-                          key={index} 
-                          className={`cursor-pointer hover:bg-muted/50 ${isSuperAdmin(user.email) ? 'bg-primary/5' : ''}`}
+                          key={user.email} 
+                          className={`cursor-pointer hover:bg-muted/50 transition-colors duration-300 ${isSuperAdmin(user.email) ? 'bg-primary/5' : ''}`}
                           onClick={() => setSelectedUserDetail(user)}
                         >
                           <TableCell>
@@ -733,9 +733,9 @@ export default function AdminUsers() {
                             {(() => {
                               const presence = getPresenceLabel(user.email);
                               return (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 transition-opacity duration-500">
                                   <Circle
-                                    className={`h-2 w-2 flex-shrink-0 ${
+                                    className={`h-2 w-2 flex-shrink-0 transition-colors duration-500 ${
                                       presence.isOnline
                                         ? 'fill-green-500 text-green-500'
                                         : presence.status === 'never_active'
@@ -743,7 +743,7 @@ export default function AdminUsers() {
                                         : 'fill-muted-foreground/50 text-muted-foreground/50'
                                     }`}
                                   />
-                                  <span className={`text-xs ${
+                                  <span className={`text-xs transition-colors duration-500 ${
                                     presence.isOnline ? 'text-green-600 dark:text-green-400 font-medium' : 'text-muted-foreground'
                                   }`}>
                                     {presence.label || '—'}
@@ -802,10 +802,10 @@ export default function AdminUsers() {
 
                 {/* Mobile Card View */}
                 <div className="lg:hidden divide-y">
-                  {filteredUsers.map((user, index) => (
+                  {filteredUsers.map((user) => (
                     <div 
-                      key={index} 
-                      className={`p-4 cursor-pointer hover:bg-muted/30 transition-colors ${isSuperAdmin(user.email) ? 'bg-primary/5' : ''}`}
+                      key={user.email} 
+                      className={`p-4 cursor-pointer hover:bg-muted/30 transition-all duration-300 ${isSuperAdmin(user.email) ? 'bg-primary/5' : ''}`}
                       onClick={() => setSelectedUserDetail(user)}
                     >
                       {/* User Header */}
@@ -855,10 +855,10 @@ export default function AdminUsers() {
                               const presence = getPresenceLabel(user.email);
                               if (!presence.label) return null;
                               return (
-                                <span className={`flex items-center gap-1 text-xs ${
+                                <span className={`flex items-center gap-1 text-xs transition-colors duration-500 ${
                                   presence.isOnline ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
                                 }`}>
-                                  <Circle className={`h-1.5 w-1.5 ${
+                                  <Circle className={`h-1.5 w-1.5 transition-colors duration-500 ${
                                     presence.isOnline ? 'fill-green-500 text-green-500' : 'fill-muted-foreground/50 text-muted-foreground/50'
                                   }`} />
                                   {presence.label}
