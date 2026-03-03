@@ -323,6 +323,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     disconnect,
     loadMeetings,
     importMeeting,
+    toggleAutoImport,
     reset,
     clearError,
     isFullyConnected,
