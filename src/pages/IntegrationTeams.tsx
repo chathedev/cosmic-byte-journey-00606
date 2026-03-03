@@ -121,10 +121,23 @@ const IntegrationTeams = () => {
     setImportingId(null);
     if (result?.imported) {
       toast({ title: 'Import klar', description: `"${result.meeting.title}" har importerats.` });
-      // Navigate to the imported meeting
       navigate(`/meeting/${result.meeting.id}`);
     }
   };
+
+  const handleToggleAutoImport = async (enabled: boolean) => {
+    setAutoImportLoading(true);
+    await di.toggleAutoImport(enabled);
+    setAutoImportLoading(false);
+    toast({
+      title: enabled ? 'Automatisk import aktiverad' : 'Automatisk import inaktiverad',
+      description: enabled
+        ? 'Tivly kontrollerar nu automatiskt efter nya Teams-möten.'
+        : 'Automatisk import har stängts av.',
+    });
+  };
+
+  const autoImport = di.importStatus?.autoImport;
 
   return (
     <div className="min-h-screen bg-background">
