@@ -503,60 +503,69 @@ export const EnhancedSpeakerView: React.FC<EnhancedSpeakerViewProps> = ({
       <ScrollArea className="max-h-[55vh]">
         <div className="space-y-0 pr-2">
           <AnimatePresence mode="wait">
-            {speakerBlocks.map((block, index) => {
-              const styles = speakerStyleMap[block.speakerId];
-              const displayName = getSpeakerDisplayName(block.speakerId);
-              const prevBlock = index > 0 ? speakerBlocks[index - 1] : null;
-              const showDivider = prevBlock && prevBlock.speakerId !== block.speakerId;
-              const timestamp = formatTime(block.start);
+            {(() => {
+              // Group consecutive blocks from the same speaker
+              const groups: { speakerId: string; blocks: typeof speakerBlocks }[] = [];
+              speakerBlocks.forEach((block) => {
+                const last = groups[groups.length - 1];
+                if (last && last.speakerId === block.speakerId) {
+                  last.blocks.push(block);
+                } else {
+                  groups.push({ speakerId: block.speakerId, blocks: [block] });
+                }
+              });
 
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: Math.min(index * 0.02, 0.5) }}
-                >
-                  {/* Divider between different speakers */}
-                  {showDivider && (
-                    <div className="flex items-center gap-3 py-2.5">
-                      <div className="flex-1 h-px bg-border/40" />
-                    </div>
-                  )}
+              return groups.map((group, groupIndex) => {
+                const styles = speakerStyleMap[group.speakerId];
+                const displayName = getSpeakerDisplayName(group.speakerId);
+                const firstTimestamp = formatTime(group.blocks[0].start);
+                const showDivider = groupIndex > 0;
 
-                  {/* Speaker block */}
-                  <div
-                    className={cn(
-                      "relative pl-4 py-2.5 border-l-2 rounded-r-lg transition-colors",
-                      styles?.border || "border-l-muted-foreground/30",
-                      styles?.bg || "hover:bg-muted/20"
-                    )}
+                return (
+                  <motion.div
+                    key={groupIndex}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: Math.min(groupIndex * 0.03, 0.5) }}
                   >
-                    {/* Speaker header */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className={cn("w-2 h-2 rounded-full", styles?.dot || "bg-muted-foreground/50")} />
-                      <span className={cn("text-sm font-semibold", styles?.text || "text-muted-foreground")}>
-                        {displayName}
-                      </span>
-                      {/* Loading indicator for generic names */}
-                      {speakerNamesLoading && isGenericSpeakerName(displayName) && (
-                        <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                      )}
-                      {timestamp && (
-                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground/70 border-border/50">
-                          {timestamp}
-                        </Badge>
-                      )}
-                    </div>
+                    {showDivider && (
+                      <div className="flex items-center gap-3 py-2.5">
+                        <div className="flex-1 h-px bg-border/40" />
+                      </div>
+                    )}
 
-                    {/* Text content */}
-                    <p className="text-sm leading-relaxed text-foreground pl-4 whitespace-pre-wrap">
-                      {block.text}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+                    <div
+                      className={cn(
+                        "relative pl-4 py-2.5 border-l-2 rounded-r-lg transition-colors",
+                        styles?.border || "border-l-muted-foreground/30",
+                        styles?.bg || "hover:bg-muted/20"
+                      )}
+                    >
+                      {/* Speaker header */}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={cn("w-2 h-2 rounded-full", styles?.dot || "bg-muted-foreground/50")} />
+                        <span className={cn("text-sm font-semibold", styles?.text || "text-muted-foreground")}>
+                          {displayName}
+                        </span>
+                        {speakerNamesLoading && isGenericSpeakerName(displayName) && (
+                          <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                        )}
+                        {firstTimestamp && (
+                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-muted-foreground/70 border-border/50">
+                            {firstTimestamp}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Combined text from all blocks in this group */}
+                      <p className="text-sm leading-relaxed text-foreground pl-4 whitespace-pre-wrap">
+                        {group.blocks.map(b => b.text).join('\n\n')}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              });
+            })()}
           </AnimatePresence>
         </div>
       </ScrollArea>
