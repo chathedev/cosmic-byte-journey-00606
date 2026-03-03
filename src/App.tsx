@@ -64,6 +64,7 @@ import AttribrConnect from "./pages/AttribrConnect";
 import AuthHandoff from "./pages/AuthHandoff";
 import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
 import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
+import Integrations from "./pages/Integrations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -334,6 +335,7 @@ const AppContent = () => {
                 <Route path="/billing/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
                 <Route path="/billing/invoices/:invoiceId" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
