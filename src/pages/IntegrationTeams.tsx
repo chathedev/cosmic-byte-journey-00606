@@ -400,6 +400,14 @@ const IntegrationTeams = () => {
                     Du behöver vara organisatör för mötet. Kräver behörigheterna Calendars.Read och OnlineMeetingTranscript.Read.All.
                   </p>
                 </div>
+
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/20 border border-border/30">
+                  <Info className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <span className="font-medium text-foreground">Om kvalitet:</span> Transkriberingen utförs av Microsoft Teams – inte av Tivly. 
+                    Vi ansvarar inte för eventuella fel i text eller talarnamn, men vi kör en automatisk förbättringsrunda för att rätta till det mesta.
+                  </p>
+                </div>
               </div>
             )}
           </section>
