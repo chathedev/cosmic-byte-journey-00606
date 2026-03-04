@@ -218,20 +218,24 @@ export const orgZoomImportApi = {
         imports: normalizeCounts(data?.digitalImport?.zoomImport?.imports ?? data?.zoomImport?.imports),
       },
       members: Array.isArray(data?.members)
-        ? data.members.map((m: any) => ({
-            email: m?.email ?? '',
-            role: m?.role ?? 'member',
-            status: m?.status ?? 'active',
-            connected: Boolean(m?.connected),
-            accountEmail: m?.accountEmail,
-            displayName: m?.displayName,
-            autoImportEnabled: Boolean(m?.autoImportEnabled),
-            connectedAt: m?.connectedAt,
-            lastImportAt: m?.lastImportAt,
-            lastError: m?.lastError ?? null,
-            imports: normalizeCounts(m?.imports),
-            zoomImport: m?.zoomImport ?? undefined,
-          }))
+        ? data.members.map((m: any) => {
+            const zd = m?.zoomImport ?? {};
+            return {
+              email: m?.email ?? '',
+              role: m?.role ?? 'member',
+              status: m?.status ?? 'active',
+              connected: Boolean(zd.connected ?? false),
+              reconnectRequired: Boolean(zd.reconnectRequired ?? false),
+              accountEmail: zd.accountEmail ?? m?.accountEmail,
+              displayName: zd.displayName ?? m?.displayName,
+              autoImportEnabled: Boolean(zd.autoImportEnabled ?? false),
+              connectedAt: zd.connectedAt,
+              lastImportAt: zd.lastImportAt,
+              lastError: zd.lastError ?? null,
+              imports: normalizeCounts(zd.imports),
+              zoomImport: m?.zoomImport ?? undefined,
+            };
+          })
         : [],
       timestamp: data?.timestamp ?? new Date().toISOString(),
     })),

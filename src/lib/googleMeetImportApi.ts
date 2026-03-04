@@ -112,18 +112,21 @@ export const adminGoogleMeetImportApi = {
         },
         companies: Array.isArray(data?.companies)
           ? data.companies
-              .filter((c: any) => c?.googleMeetImport)
-              .map((c: any) => ({
-                company: {
-                  id: c?.company?.id ?? '',
-                  name: c?.company?.name ?? 'Okänt företag',
-                },
-                googleMeetImport: {
-                  connectedUserCount: Number(c.googleMeetImport?.connectedUserCount ?? 0),
-                  autoImportEnabledUserCount: Number(c.googleMeetImport?.autoImportEnabledUserCount ?? 0),
-                  imports: normalizeCounts(c.googleMeetImport?.imports),
-                },
-              }))
+              .filter((c: any) => c?.digitalImport?.googleMeetImport)
+              .map((c: any) => {
+                const gi = c.digitalImport.googleMeetImport;
+                return {
+                  company: {
+                    id: c?.company?.id ?? '',
+                    name: c?.company?.name ?? 'Okänt företag',
+                  },
+                  googleMeetImport: {
+                    connectedUserCount: Number(gi?.connectedUserCount ?? 0),
+                    autoImportEnabledUserCount: Number(gi?.autoImportEnabledUserCount ?? 0),
+                    imports: normalizeCounts(gi?.imports),
+                  },
+                };
+              })
           : [],
         users: Array.isArray(data?.users)
           ? data.users
