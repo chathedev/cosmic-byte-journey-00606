@@ -42,7 +42,7 @@ const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: str
     mode: 'digital',
     icon: Monitor,
     title: 'Importera digitalt möte',
-    desc: 'Importera transkript från Teams eller Zoom',
+    desc: 'Importera transkript från Teams, Zoom eller Google Meet',
     hint: 'Kräver transkribering aktiverad',
     hintIcon: Monitor,
   },
@@ -60,6 +60,12 @@ const DIGITAL_PROVIDERS: { id: DigitalProvider; logo: string; title: string; des
     logo: zoomLogo,
     title: 'Zoom',
     desc: 'Importera från Zoom Cloud Recordings',
+  },
+  {
+    id: 'google_meet',
+    logo: googleMeetLogo,
+    title: 'Google Meet',
+    desc: 'Importera från Google Meet-transkript',
   },
 ];
 
