@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
+import slackLogo from "@/assets/slack-logo.png";
 
 const AdminIntegrations = () => {
   const navigate = useNavigate();
