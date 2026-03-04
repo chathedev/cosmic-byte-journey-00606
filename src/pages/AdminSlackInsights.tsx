@@ -130,17 +130,17 @@ export default function AdminSlackInsights() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <SummaryCard icon={Users} label="Anslutna användare" value={s.connectedUsers} sub={`av ${s.totalUsers}`} />
           <SummaryCard icon={Send} label="Auto-delning aktiv" value={s.usersWithAutoShareEnabled} sub="användare" />
           <SummaryCard icon={Building2} label="Företag med anslutna" value={s.companiesWithConnectedUsers} sub={`av ${s.companies}`} />
           <SummaryCard icon={MessageSquare} label="Totala delningar" value={s.totalShares} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <MiniStat label="Auto-delningar" value={s.totalAutoShares} accent icon={Send} />
-          <MiniStat label="Manuella delningar" value={s.totalManualShares} icon={Hash} />
-          <MiniStat label="Reconnect krävs" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} icon={AlertCircle} />
+          <MiniStat label="Manuella" value={s.totalManualShares} icon={Hash} />
+          <MiniStat label="Reconnect" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} icon={AlertCircle} />
         </div>
 
         {/* Companies */}
@@ -153,8 +153,8 @@ export default function AdminSlackInsights() {
                 <Badge variant="secondary" className="text-[10px]">{data.companies.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
@@ -206,8 +206,8 @@ export default function AdminSlackInsights() {
               />
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            <Table>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Användare</TableHead>
@@ -367,13 +367,13 @@ export default function AdminSlackInsights() {
 function SummaryCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: number; sub?: string }) {
   return (
     <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-primary" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-lg font-semibold tabular-nums">{value}</p>
-          <p className="text-xs text-muted-foreground leading-tight">{label}{sub ? ` ${sub}` : ''}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight truncate">{label}{sub ? ` ${sub}` : ''}</p>
         </div>
       </CardContent>
     </Card>
