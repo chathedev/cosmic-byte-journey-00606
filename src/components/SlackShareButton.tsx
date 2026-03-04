@@ -4,8 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2, Hash } from "lucide-react";
+import { Loader2, CheckCircle2, Hash, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSlackIntegration } from "@/hooks/useSlackIntegration";
 import slackLogo from "@/assets/slack-logo.png";
@@ -24,6 +28,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shared, setShared] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Pre-select auto-share channel
   useEffect(() => {
@@ -42,19 +47,34 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
     }
   };
 
-  const handleShare = async () => {
+  const selectedChannelName = sl.channels.find(c => c.id === selectedChannel)?.name || "kanal";
+
+  const handleRequestShare = () => {
     if (!selectedChannel) {
       toast({ title: "Välj en kanal", description: "Du måste välja vilken Slack-kanal protokollet ska delas till.", variant: "destructive" });
       return;
     }
+    // Show confirmation
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmShare = async () => {
+    setConfirmOpen(false);
+    if (!selectedChannel) return;
+
     setSharing(true);
+
+    // First create/ensure share link exists
+    await sl.createShareLink(meetingId);
+
+    // Then share to Slack
     const result = await sl.shareToSlack(meetingId, selectedChannel);
     setSharing(false);
+
     if (result?.shared) {
       setShared(true);
       setOpen(false);
-      const channelName = sl.channels.find(c => c.id === selectedChannel)?.name || "kanal";
-      toast({ title: "Delat till Slack", description: `Protokollet har delats till #${channelName}.` });
+      toast({ title: "Delat till Slack", description: `Protokollet har delats till #${selectedChannelName}.` });
     } else if (sl.error) {
       toast({ title: "Kunde inte dela", description: sl.error, variant: "destructive" });
     }
@@ -70,24 +90,25 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
         disabled={shared}
       >
         {shared ? (
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+          <CheckCircle2 className="w-4 h-4 text-green-600" />
         ) : (
-          <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
+          <img src={slackLogo} alt="" className="w-5 h-5 object-contain" />
         )}
         {!compact && (
           <span>{shared ? "Delat" : "Dela via Slack"}</span>
         )}
       </Button>
 
+      {/* Channel selection dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2.5">
-              <img src={slackLogo} alt="Slack" className="w-6 h-6 object-contain" />
+              <img src={slackLogo} alt="Slack" className="w-7 h-7 object-contain" />
               <DialogTitle className="text-base">Dela till Slack</DialogTitle>
             </div>
             <DialogDescription>
-              Välj vilken kanal protokollet ska delas till.
+              Välj vilken kanal protokollet ska delas till. En sammanfattning och länk till hela protokollet skickas.
             </DialogDescription>
           </DialogHeader>
 
@@ -123,13 +144,20 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
                 Workspace: {sl.importStatus.account.workspaceName}
               </p>
             )}
+
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/30 border border-border/30">
+              <AlertTriangle className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                En publik länk till protokollet skapas. Alla med länken kan se det.
+              </p>
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Avbryt</Button>
             <Button
               size="sm"
-              onClick={handleShare}
+              onClick={handleRequestShare}
               disabled={!selectedChannel || sharing}
               className="gap-1.5"
             >
@@ -143,6 +171,25 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation dialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dela protokoll till #{selectedChannelName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              En sammanfattning och publik länk till protokollet skickas till <strong>#{selectedChannelName}</strong> i Slack. Alla i kanalen kommer kunna se det.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmShare} className="gap-1.5">
+              <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
+              Ja, dela
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
