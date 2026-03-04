@@ -133,7 +133,6 @@ const IntegrationTeams = () => {
       toast({ title: 'Kunde inte kopiera', variant: 'destructive' });
     }
   };
-  const connectionIssue = di.importStatus?.connectionIssue;
 
   const handleConnect = async () => { await di.connect(); };
   const handleDisconnect = async () => {
