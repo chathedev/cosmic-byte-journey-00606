@@ -151,12 +151,12 @@ export const MeetingModeDialog = ({
                   )}
                 >
                   <div className={cn(
-                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors overflow-hidden",
                     hoveredProvider === prov.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      ? "bg-primary/10"
+                      : "bg-muted"
                   )}>
-                    <prov.icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <img src={prov.logo} alt={prov.title} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="font-semibold text-sm sm:text-base text-foreground">{prov.title}</span>
