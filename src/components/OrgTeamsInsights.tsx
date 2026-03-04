@@ -106,9 +106,13 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
       {/* Consent status */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">Admin consent:</span>
-        {di.adminConsent.accepted ? (
+        {(di.adminConsent.accepted || di.adminConsent.acceptedTenants?.length > 0) ? (
           <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
             <CheckCircle2 className="w-2.5 h-2.5" /> Accepted
+          </Badge>
+        ) : di.adminConsent.status === 'not_applicable' ? (
+          <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1">
+            Ej tillämpligt
           </Badge>
         ) : (
           <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
