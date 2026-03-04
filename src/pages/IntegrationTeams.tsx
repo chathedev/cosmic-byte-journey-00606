@@ -45,6 +45,18 @@ const IntegrationTeams = () => {
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
+  const prevConnected = useRef(di.isFullyConnected);
+
+  // Show confirmation when transitioning to connected
+  useEffect(() => {
+    if (di.isFullyConnected && !prevConnected.current) {
+      setShowConnectedConfirm(true);
+      const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+      return () => clearTimeout(timer);
+    }
+    prevConnected.current = di.isFullyConnected;
+  }, [di.isFullyConnected]);
 
   const COOLDOWN_KEY = 'teams_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;
@@ -333,6 +345,29 @@ const IntegrationTeams = () => {
                   </div>
                 )}
 
+                {/* Admin approval notice */}
+                <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5">
+                  <div className="flex items-start gap-2.5">
+                    <Shield className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                        Administratörsgodkännande krävs
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Er organisations IT-administratör behöver godkänna Tivly i Microsoft Entra innan mötesprotokoll kan importeras. Be din IT-admin att:
+                      </p>
+                      <ol className="text-xs text-muted-foreground leading-relaxed list-decimal list-inside space-y-0.5 ml-0.5">
+                        <li>Gå till <span className="font-medium text-foreground">Microsoft Entra</span> → Företagsprogram</li>
+                        <li>Sök efter <span className="font-medium text-foreground">Tivly</span> och godkänn behörigheterna</li>
+                        <li>Bekräfta åtkomst till kalenderhändelser och transkript</li>
+                      </ol>
+                      <p className="text-xs text-muted-foreground/70 leading-relaxed pt-0.5">
+                        Efter godkännande kan du koppla ditt konto nedan.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   {['Koppla ditt Microsoft 365-konto', 'Välj ett Teams-möte med färdigt transkript', 'Importera och skapa protokoll i Tivly'].map((step, i) => (
                     <div key={i} className="flex items-center gap-3 py-0.5">
@@ -350,16 +385,29 @@ const IntegrationTeams = () => {
                 </Button>
 
                 <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/20 border border-border/30">
-                  <Shield className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+                  <Info className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Kräver Microsoft 365 arbets-/skolkonto med Teams-transkribering. Du behöver vara organisatör.
+                    Kräver Microsoft 365 arbets-/skolkonto med Teams-transkribering. Du behöver vara organisatör av mötet.
                   </p>
                 </div>
               </div>
             )}
           </section>
 
-          {/* ── Auto-import ── */}
+          {/* ── Connection success confirmation ── */}
+          {showConnectedConfirm && (
+            <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 flex items-start gap-3 animate-in fade-in-0 slide-in-from-top-2 duration-300">
+              <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-green-700 dark:text-green-300">Kontot är anslutet och godkänt</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Microsoft-kontot har kopplats och alla behörigheter har verifierats. Du kan nu importera Teams-möten.
+                </p>
+              </div>
+            </div>
+          )}
           {di.isFullyConnected && (
             <section className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="px-4 py-3.5 sm:px-5">
