@@ -32,6 +32,7 @@ import { TranscriptTextView } from "@/components/TranscriptTextView";
 import { EnhancedSpeakerView } from "@/components/EnhancedSpeakerView";
 import { SyncedTranscriptView } from "@/components/SyncedTranscriptView";
 import { hasPlusAccess } from "@/lib/accessCheck";
+import { SlackShareButton } from "@/components/SlackShareButton";
 import { useASRStream } from "@/hooks/useASRStream";
 import { LiveTranscriptView } from "@/components/LiveTranscriptView";
 
@@ -2514,6 +2515,7 @@ const MeetingDetail = () => {
                             <Button onClick={handleDownloadProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift">
                               <Download className="w-3.5 h-3.5" /> Ladda ner
                             </Button>
+                            {id && <SlackShareButton meetingId={id} />}
                             <div className="flex items-center gap-1 sm:ml-auto">
                               {canGenerateMoreProtocols && (
                                 <Button onClick={handleCreateProtocol} size="sm" variant="ghost" className="gap-1.5 h-9 text-xs text-muted-foreground no-hover-lift">

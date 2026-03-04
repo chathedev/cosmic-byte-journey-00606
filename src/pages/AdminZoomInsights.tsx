@@ -173,8 +173,8 @@ export default function AdminZoomInsights() {
                 <Badge variant="secondary" className="text-[10px]">{data.companies.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
@@ -226,8 +226,8 @@ export default function AdminZoomInsights() {
               />
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            <Table>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="min-w-[650px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Användare</TableHead>
@@ -385,13 +385,13 @@ export default function AdminZoomInsights() {
 function SummaryCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: number; sub?: string }) {
   return (
     <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+      <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-lg font-semibold tabular-nums">{value}</p>
-          <p className="text-xs text-muted-foreground leading-tight">{label}{sub ? ` ${sub}` : ''}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight truncate">{label}{sub ? ` ${sub}` : ''}</p>
         </div>
       </CardContent>
     </Card>

@@ -215,13 +215,13 @@ export default function AdminTeamsInsights() {
               {' '}<span className="font-medium">Att ta bort consent raderar tenant-posten helt</span> – den sätts inte till "avslagen".
             </p>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             {data.tenants.length === 0 ? (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 Inga tenants registrerade ännu.
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[700px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Tenant ID</TableHead>
@@ -292,8 +292,8 @@ export default function AdminTeamsInsights() {
                 Admin consent visas på organisationsnivå. Använd backendens admin consent-länk – inte en hårdkodad global URL.
               </p>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[800px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
@@ -387,8 +387,8 @@ export default function AdminTeamsInsights() {
               />
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            <Table>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Användare</TableHead>
@@ -659,13 +659,13 @@ function UserDetailContent({ user, onCopyUrl, copiedUrl }: { user: AdminUserRow;
 function SummaryCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: number; sub?: string }) {
   return (
     <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-primary" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-lg font-semibold tabular-nums">{value}</p>
-          <p className="text-xs text-muted-foreground leading-tight">{label}{sub ? ` ${sub}` : ''}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight truncate">{label}{sub ? ` ${sub}` : ''}</p>
         </div>
       </CardContent>
     </Card>
