@@ -45,6 +45,7 @@ const Index = () => {
 
   const handleNameComplete = () => {
     setShowNameDialog(false);
+    setShowEnterpriseWizard(false);
   };
 
   const handleOrgSelect = async (companyId: string) => {
