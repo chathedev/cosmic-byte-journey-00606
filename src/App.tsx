@@ -75,6 +75,7 @@ import AdminGoogleMeetInsights from "./pages/AdminGoogleMeetInsights";
 import AdminSlackInsights from "./pages/AdminSlackInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import IntegrationSlack from "./pages/IntegrationSlack";
+import SharedProtocol from "./pages/SharedProtocol";
 
 const queryClient = new QueryClient({
   defaultOptions: {
