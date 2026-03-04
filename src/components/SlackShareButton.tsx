@@ -72,7 +72,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
         {shared ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
         ) : (
-          <img src={slackLogo} alt="" className="w-3.5 h-3.5 object-contain" />
+          <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
         )}
         {!compact && (
           <span>{shared ? "Delat" : "Dela via Slack"}</span>
