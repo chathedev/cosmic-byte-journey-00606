@@ -173,8 +173,8 @@ export default function AdminZoomInsights() {
                 <Badge variant="secondary" className="text-[10px]">{data.companies.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
