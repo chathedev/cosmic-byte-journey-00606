@@ -86,7 +86,7 @@ const Integrations = () => {
           >
             <div className="p-4 sm:p-5 flex items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center shrink-0 overflow-hidden">
-                <img src={zoomLogo} alt="Zoom" className="w-9 h-9 object-contain" />
+                <img src={zoomLogo} alt="Zoom" className="w-11 h-11 object-contain scale-110" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

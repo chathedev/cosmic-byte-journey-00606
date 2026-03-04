@@ -163,7 +163,7 @@ export const MeetingModeDialog = ({
                       ? "bg-primary/10"
                       : "bg-muted"
                   )}>
-                    <img src={prov.logo} alt={prov.title} className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
+                    <img src={prov.logo} alt={prov.title} className={`object-contain ${prov.id === 'zoom' ? 'w-9 h-9 sm:w-10 sm:h-10' : 'w-7 h-7 sm:w-8 sm:h-8'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="font-semibold text-sm sm:text-base text-foreground">{prov.title}</span>
