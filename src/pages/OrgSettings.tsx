@@ -3,6 +3,7 @@ import { ArrowLeft, Building2, Users } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
+import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
