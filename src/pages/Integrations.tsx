@@ -50,8 +50,8 @@ const Integrations = () => {
             className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
           >
             <div className="p-4 sm:p-5 flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
-                <img src={teamsLogo} alt="Microsoft Teams" className="w-7 h-7 object-contain" />
+              <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+                <img src={teamsLogo} alt="Microsoft Teams" className="w-full h-full object-contain" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
