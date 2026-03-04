@@ -41,7 +41,7 @@ const Settings = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
-  // Redirect Microsoft OAuth callback to integrations/teams
+  // Redirect OAuth callbacks to integration pages
   useEffect(() => {
     const integration = searchParams.get('integration');
     if (integration === 'microsoft') {
@@ -49,6 +49,12 @@ const Settings = () => {
       const target = status
         ? `/integrations/teams?integration=microsoft&status=${status}`
         : '/integrations/teams';
+      navigate(target, { replace: true });
+    } else if (integration === 'google_meet') {
+      const status = searchParams.get('status');
+      const target = status
+        ? `/integrations/google-meet?integration=google_meet&status=${status}`
+        : '/integrations/google-meet';
       navigate(target, { replace: true });
     }
   }, [searchParams, navigate]);
