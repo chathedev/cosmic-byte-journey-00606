@@ -40,10 +40,6 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
     if (sl.channels.length === 0 && sl.state !== 'loading_channels') {
       sl.loadChannels();
     }
-    // Pre-select auto-share channel if set
-    if (sl.importStatus?.autoShare?.channelId && !selectedChannel) {
-      setSelectedChannel(sl.importStatus.autoShare.channelId);
-    }
   };
 
   const handleShare = async () => {
