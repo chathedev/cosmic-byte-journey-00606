@@ -13,7 +13,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  Loader2, RefreshCw, Users, Building2, Zap, Shield, RotateCcw, Play, CheckCircle2, XCircle, AlertTriangle,
+  Loader2, RefreshCw, Users, Building2, Zap, Shield, RotateCcw, Play,
+  CheckCircle2, XCircle, AlertTriangle, AlertCircle, ExternalLink,
 } from 'lucide-react';
 import {
   adminDigitalImportApi,
@@ -152,17 +153,18 @@ export default function AdminTeamsInsights() {
           <SummaryCard icon={Shield} label="Tenants" value={s.tenantsWithAdminConsentAccepted} sub={`av ${s.tenants} accepted`} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <MiniStat label="Aktiva importerade" value={s.activeImportedMeetings} />
           <MiniStat label="Auto" value={s.activeAutoImportedMeetings} accent />
           <MiniStat label="Manuella" value={s.activeManualImportedMeetings} />
+          <MiniStat label="Reconnect krävs" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} />
         </div>
 
         {/* Tenants */}
         {data.tenants.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Tenants</CardTitle>
+              <CardTitle className="text-sm font-medium">Tenants ({data.tenants.length})</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -170,7 +172,9 @@ export default function AdminTeamsInsights() {
                   <TableRow>
                     <TableHead className="text-xs">Tenant ID</TableHead>
                     <TableHead className="text-xs">Consent</TableHead>
+                    <TableHead className="text-xs">Accepted</TableHead>
                     <TableHead className="text-xs text-right">Användare</TableHead>
+                    <TableHead className="text-xs text-right">Admin-användare</TableHead>
                     <TableHead className="text-xs text-right">Företag</TableHead>
                     <TableHead className="text-xs text-right">Åtgärd</TableHead>
                   </TableRow>
@@ -182,8 +186,12 @@ export default function AdminTeamsInsights() {
                       <TableCell>
                         <StatusBadge ok={t.accepted} yesLabel="Accepted" noLabel="Pending" />
                       </TableCell>
-                      <TableCell className="text-right text-xs">{t.connectedUserCount}</TableCell>
-                      <TableCell className="text-right text-xs">{t.companyCount}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {t.acceptedAt ? new Date(t.acceptedAt).toLocaleDateString('sv-SE') : '–'}
+                      </TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{t.connectedUserCount}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{t.connectedAdminUserCount}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{t.companyCount}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
@@ -207,7 +215,7 @@ export default function AdminTeamsInsights() {
         {data.companies.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Företag</CardTitle>
+              <CardTitle className="text-sm font-medium">Företag ({data.companies.length})</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -215,20 +223,31 @@ export default function AdminTeamsInsights() {
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
                     <TableHead className="text-xs text-right">Anslutna</TableHead>
+                    <TableHead className="text-xs text-right">Admin</TableHead>
                     <TableHead className="text-xs text-right">Auto-import</TableHead>
                     <TableHead className="text-xs text-right">Auto</TableHead>
                     <TableHead className="text-xs text-right">Manuella</TableHead>
+                    <TableHead className="text-xs text-right">Papperskorg</TableHead>
                     <TableHead className="text-xs">Consent</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.companies.map((c) => (
                     <TableRow key={c.company.id}>
-                      <TableCell className="text-sm font-medium">{c.company.name}</TableCell>
-                      <TableCell className="text-right text-xs">{c.digitalImport.connectedUserCount}</TableCell>
-                      <TableCell className="text-right text-xs">{c.digitalImport.autoImportEnabledUserCount}</TableCell>
-                      <TableCell className="text-right text-xs">{c.digitalImport.imports.activeAuto}</TableCell>
-                      <TableCell className="text-right text-xs">{c.digitalImport.imports.activeManual}</TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium">{c.company.name}</span>
+                        {c.digitalImport.tenantIds.length > 0 && (
+                          <span className="block text-[10px] font-mono text-muted-foreground truncate max-w-[150px]">
+                            {c.digitalImport.tenantIds[0]}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.connectedUserCount}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.connectedAdminUserCount}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.autoImportEnabledUserCount}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeAuto}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeManual}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{c.digitalImport.imports.trashedTotal}</TableCell>
                       <TableCell>
                         <StatusBadge ok={c.digitalImport.adminConsent.accepted} yesLabel="Accepted" noLabel="Pending" />
                       </TableCell>
@@ -249,65 +268,87 @@ export default function AdminTeamsInsights() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">E-post</TableHead>
+                  <TableHead className="text-xs">Användare</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Consent</TableHead>
                   <TableHead className="text-xs">Auto</TableHead>
-                  <TableHead className="text-xs text-right">Import</TableHead>
+                  <TableHead className="text-xs text-right">Auto / Man</TableHead>
                   <TableHead className="text-xs">Fel</TableHead>
                   <TableHead className="text-xs text-right">Åtgärder</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.users.map((u) => (
-                  <TableRow key={u.email} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedUser(u)}>
-                    <TableCell>
-                      <div>
-                        <span className="text-sm">{u.email}</span>
-                        {u.displayName && <span className="block text-xs text-muted-foreground">{u.displayName}</span>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {u.reconnectRequired ? (
-                        <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600">Reconnect</Badge>
-                      ) : (
-                        <StatusBadge ok={u.connected} yesLabel="Ansluten" noLabel="Ej ansluten" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={u.autoImportEnabled}
-                        disabled={actionLoading === u.email || !u.connected}
-                        onCheckedChange={(val) => {
-                          // Stop event from triggering row click
-                          handleToggleAutoImport(u.email, val);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="scale-75"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className="text-xs tabular-nums">{u.imports.activeAuto}a / {u.imports.activeManual}m</span>
-                    </TableCell>
-                    <TableCell>
-                      {u.lastError ? (
-                        <span className="text-xs text-destructive truncate max-w-[150px] block">{u.lastError.code}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">–</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={(e) => { e.stopPropagation(); setResetTarget(u); }}
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Reset
-                      </Button>
+                {data.users.map((u) => {
+                  const consentApproved = u.adminConsent?.approved ?? u.adminConsentAcceptedForTenant ?? false;
+                  return (
+                    <TableRow key={u.email} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedUser(u)}>
+                      <TableCell>
+                        <div>
+                          <span className="text-sm">{u.displayName || u.email}</span>
+                          {u.displayName && <span className="block text-xs text-muted-foreground">{u.email}</span>}
+                          {u.accountEmail && u.accountEmail !== u.email && (
+                            <span className="block text-[10px] text-muted-foreground/60">{u.accountEmail}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {u.reconnectRequired ? (
+                          <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
+                            <AlertCircle className="w-2.5 h-2.5" /> Reconnect
+                          </Badge>
+                        ) : (
+                          <StatusBadge ok={u.connected} yesLabel="Ansluten" noLabel="Ej ansluten" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {u.connected ? (
+                          <StatusBadge ok={consentApproved} yesLabel="OK" noLabel="Pending" />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">–</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={u.autoImportEnabled}
+                          disabled={actionLoading === u.email || !u.connected}
+                          onCheckedChange={(val) => handleToggleAutoImport(u.email, val)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="scale-75"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="text-xs tabular-nums">{u.imports.activeAuto} / {u.imports.activeManual}</span>
+                      </TableCell>
+                      <TableCell>
+                        {u.lastError ? (
+                          <span className="text-xs text-destructive truncate max-w-[120px] block" title={u.lastError.message}>
+                            {u.lastError.code}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">–</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={(e) => { e.stopPropagation(); setResetTarget(u); }}
+                        >
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                          Reset
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {data.users.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">
+                      Inga användare har kopplat Microsoft Teams.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -343,29 +384,65 @@ export default function AdminTeamsInsights() {
             <DialogTitle className="text-base">{selectedUser?.displayName || selectedUser?.email}</DialogTitle>
             <DialogDescription>{selectedUser?.email}</DialogDescription>
           </DialogHeader>
-          {selectedUser && (
-            <div className="space-y-3 text-sm">
-              <DetailRow label="Microsoft-konto" value={selectedUser.accountEmail || '–'} />
-              <DetailRow label="Tenant" value={selectedUser.tenantId || '–'} mono />
-              <DetailRow label="Ansluten" value={selectedUser.connected ? 'Ja' : 'Nej'} />
-              <DetailRow label="Reconnect krävs" value={selectedUser.reconnectRequired ? 'Ja' : 'Nej'} />
-              <DetailRow label="Admin consent" value={selectedUser.adminConsentAcceptedForTenant ? 'Ja' : 'Nej'} />
-              <DetailRow label="Auto-import" value={selectedUser.autoImportEnabled ? 'Aktiv' : 'Av'} />
-              <DetailRow label="Aktiva auto" value={String(selectedUser.imports.activeAuto)} />
-              <DetailRow label="Aktiva manuella" value={String(selectedUser.imports.activeManual)} />
-              <DetailRow label="Papperskorgen" value={String(selectedUser.imports.trashedTotal)} />
-              {selectedUser.lastError && (
-                <div className="p-2 rounded bg-destructive/10 text-xs text-destructive">
-                  <strong>{selectedUser.lastError.code}</strong>: {selectedUser.lastError.message}
-                </div>
-              )}
-            </div>
-          )}
+          {selectedUser && <UserDetailContent user={selectedUser} />}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)}>Stäng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function UserDetailContent({ user }: { user: AdminUserRow }) {
+  const consentApproved = user.adminConsent?.approved ?? user.adminConsentAcceptedForTenant ?? false;
+
+  return (
+    <div className="space-y-3 text-sm">
+      <DetailRow label="Microsoft-konto" value={user.accountEmail || '–'} />
+      <DetailRow label="Tenant" value={user.tenantId || '–'} mono />
+      <DetailRow label="Ansluten" value={user.connected ? 'Ja' : 'Nej'} />
+      <DetailRow label="Reconnect krävs" value={user.reconnectRequired ? 'Ja' : 'Nej'} />
+      
+      <div className="flex items-center justify-between py-1">
+        <span className="text-muted-foreground">Admin consent</span>
+        <StatusBadge ok={consentApproved} yesLabel="Godkänd" noLabel="Ej godkänd" />
+      </div>
+      {user.adminConsent?.approvedAt && (
+        <DetailRow label="Consent godkänd" value={new Date(user.adminConsent.approvedAt).toLocaleString('sv-SE')} />
+      )}
+      {user.adminConsent?.pending && (
+        <div className="flex items-center gap-1.5 text-xs text-amber-600">
+          <AlertCircle className="w-3 h-3" />
+          Väntar på admin-godkännande
+        </div>
+      )}
+      {user.adminConsent?.adminConsentUrl && (
+        <a
+          href={user.adminConsent.adminConsentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          Admin consent-länk <ExternalLink className="w-3 h-3" />
+        </a>
+      )}
+
+      <DetailRow label="Auto-import" value={user.autoImportEnabled ? 'Aktiv' : 'Av'} />
+      <DetailRow label="Aktiva auto" value={String(user.imports.activeAuto)} />
+      <DetailRow label="Aktiva manuella" value={String(user.imports.activeManual)} />
+      <DetailRow label="Papperskorgen" value={String(user.imports.trashedTotal)} />
+      <DetailRow label="Totalt" value={String(user.imports.total)} />
+      
+      {user.lastError && (
+        <div className="p-2 rounded bg-destructive/10 text-xs text-destructive space-y-0.5">
+          <strong>{user.lastError.code}</strong>
+          <p className="text-destructive/80">{user.lastError.message}</p>
+          {user.lastError.updatedAt && (
+            <p className="text-destructive/60">{new Date(user.lastError.updatedAt).toLocaleString('sv-SE')}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -388,10 +465,10 @@ function SummaryCard({ icon: Icon, label, value, sub }: { icon: any; label: stri
   );
 }
 
-function MiniStat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+function MiniStat({ label, value, accent, warn }: { label: string; value: number; accent?: boolean; warn?: boolean }) {
   return (
-    <div className={`rounded-lg border px-4 py-3 ${accent ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}>
-      <p className="text-lg font-semibold tabular-nums">{value}</p>
+    <div className={`rounded-lg border px-4 py-3 ${accent ? 'bg-primary/5 border-primary/20' : warn ? 'bg-destructive/5 border-destructive/20' : 'bg-card'}`}>
+      <p className={`text-lg font-semibold tabular-nums ${warn ? 'text-destructive' : ''}`}>{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
@@ -403,7 +480,7 @@ function StatusBadge({ ok, yesLabel, noLabel }: { ok: boolean; yesLabel: string;
       <CheckCircle2 className="w-2.5 h-2.5" /> {yesLabel}
     </Badge>
   ) : (
-    <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground gap-1">
+    <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
       <XCircle className="w-2.5 h-2.5" /> {noLabel}
     </Badge>
   );
@@ -411,9 +488,9 @@ function StatusBadge({ ok, yesLabel, noLabel }: { ok: boolean; yesLabel: string;
 
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between items-center">
+    <div className="flex items-center justify-between py-1">
       <span className="text-muted-foreground">{label}</span>
-      <span className={mono ? 'font-mono text-xs' : ''}>{value}</span>
+      <span className={`text-foreground ${mono ? 'font-mono text-xs max-w-[200px] truncate' : ''}`}>{value}</span>
     </div>
   );
 }

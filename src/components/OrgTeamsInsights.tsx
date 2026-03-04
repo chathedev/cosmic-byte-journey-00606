@@ -10,7 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle,
+  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, AlertCircle,
 } from 'lucide-react';
 import {
   orgDigitalImportApi,
@@ -131,65 +131,97 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
               <TableRow>
                 <TableHead className="text-xs">Medlem</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Consent</TableHead>
                 <TableHead className="text-xs">Auto</TableHead>
-                <TableHead className="text-xs text-right">Auto / Manuell</TableHead>
+                <TableHead className="text-xs text-right">Auto / Man</TableHead>
                 <TableHead className="text-xs">Senaste import</TableHead>
+                <TableHead className="text-xs">Fel</TableHead>
                 {canManage && <TableHead className="text-xs text-right">Åtgärd</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.members.map((m) => (
-                <TableRow key={m.email}>
-                  <TableCell>
-                    <div>
-                      <span className="text-sm">{m.displayName || m.email}</span>
-                      {m.displayName && <span className="block text-xs text-muted-foreground">{m.email}</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {m.connected ? (
-                      <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600">Ansluten</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] text-muted-foreground">Ej ansluten</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {canManage ? (
-                      <Switch
-                        checked={m.autoImportEnabled}
-                        disabled={actionLoading === m.email || !m.connected}
-                        onCheckedChange={(val) => handleToggleAutoImport(m.email, val)}
-                        className="scale-75"
-                      />
-                    ) : (
-                      <span className="text-xs">{m.autoImportEnabled ? 'Ja' : 'Nej'}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right text-xs tabular-nums">
-                    {m.imports.activeAuto} / {m.imports.activeManual}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={!m.connected || actionLoading === m.email}
-                        onClick={() => setResetTarget(m)}
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Reset
-                      </Button>
+              {data.members.map((m) => {
+                const consentApproved = m.adminConsent?.approved ?? m.adminConsentAcceptedForTenant ?? false;
+                return (
+                  <TableRow key={m.email}>
+                    <TableCell>
+                      <div>
+                        <span className="text-sm">{m.displayName || m.email}</span>
+                        {m.displayName && <span className="block text-xs text-muted-foreground">{m.email}</span>}
+                        {m.accountEmail && m.accountEmail !== m.email && (
+                          <span className="block text-[10px] text-muted-foreground/60">{m.accountEmail}</span>
+                        )}
+                      </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    <TableCell>
+                      {m.connected ? (
+                        <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600">Ansluten</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Ej ansluten</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {m.connected ? (
+                        consentApproved ? (
+                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> OK
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
+                            <AlertCircle className="w-2.5 h-2.5" /> Pending
+                          </Badge>
+                        )
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {canManage ? (
+                        <Switch
+                          checked={m.autoImportEnabled}
+                          disabled={actionLoading === m.email || !m.connected}
+                          onCheckedChange={(val) => handleToggleAutoImport(m.email, val)}
+                          className="scale-75"
+                        />
+                      ) : (
+                        <span className="text-xs">{m.autoImportEnabled ? 'Ja' : 'Nej'}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">
+                      {m.imports.activeAuto} / {m.imports.activeManual}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}
+                    </TableCell>
+                    <TableCell>
+                      {m.lastError ? (
+                        <span className="text-xs text-destructive truncate max-w-[100px] block" title={m.lastError.message}>
+                          {m.lastError.code}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
+                    </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={!m.connected || actionLoading === m.email}
+                          onClick={() => setResetTarget(m)}
+                        >
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                          Reset
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
               {data.members.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 6 : 5} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={canManage ? 8 : 7} className="text-center text-sm text-muted-foreground py-6">
                     Inga medlemmar har kopplat Microsoft Teams ännu.
                   </TableCell>
                 </TableRow>

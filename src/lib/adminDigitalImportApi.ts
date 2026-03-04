@@ -23,7 +23,34 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   return res.json();
 }
 
-// ── Admin endpoints ──
+// ── Shared types ──
+
+export interface ImportCounts {
+  activeTotal: number;
+  activeAuto: number;
+  activeManual: number;
+  trashedTotal: number;
+  trashedAuto: number;
+  trashedManual: number;
+  total: number;
+}
+
+export interface AdminConsentInfo {
+  tenantId?: string;
+  required?: boolean;
+  pending?: boolean;
+  approved?: boolean;
+  approvedAt?: string;
+  adminConsentUrl?: string;
+}
+
+export interface CompanyAdminConsent {
+  status: string;
+  accepted: boolean;
+  acceptedTenants: Array<{ tenantId: string; acceptedAt: string }>;
+}
+
+// ── Admin types ──
 
 export interface AdminInsightsResponse {
   summary: {
@@ -58,26 +85,12 @@ export interface AdminInsightsResponse {
       autoImportEnabledUserCount: number;
       imports: ImportCounts;
       tenantIds: string[];
-      adminConsent: {
-        status: string;
-        accepted: boolean;
-        acceptedTenants: Array<{ tenantId: string; acceptedAt: string }>;
-      };
+      adminConsent: CompanyAdminConsent;
     };
     members: any[];
   }>;
   users: AdminUserRow[];
   timestamp: string;
-}
-
-export interface ImportCounts {
-  activeTotal: number;
-  activeAuto: number;
-  activeManual: number;
-  trashedTotal: number;
-  trashedAuto: number;
-  trashedManual: number;
-  total: number;
 }
 
 export interface AdminUserRow {
@@ -88,6 +101,7 @@ export interface AdminUserRow {
   displayName?: string;
   tenantId?: string;
   adminConsentAcceptedForTenant?: boolean;
+  adminConsent?: AdminConsentInfo | null;
   autoImportEnabled: boolean;
   imports: ImportCounts;
   lastError?: { code: string; message: string; updatedAt?: string } | null;
@@ -122,7 +136,7 @@ export const adminDigitalImportApi = {
     fetchWithAuth('/admin/digital-import/auto-import/run', { method: 'POST' }),
 };
 
-// ── Org endpoints ──
+// ── Org types ──
 
 export interface OrgDigitalImportInsights {
   company: { id: string; name: string };
@@ -133,11 +147,7 @@ export interface OrgDigitalImportInsights {
     autoImportEnabledUserCount: number;
     imports: ImportCounts;
     tenantIds: string[];
-    adminConsent: {
-      status: string;
-      accepted: boolean;
-      acceptedTenants: Array<{ tenantId: string; acceptedAt: string }>;
-    };
+    adminConsent: CompanyAdminConsent;
   };
   members: OrgMemberRow[];
   timestamp: string;
@@ -152,6 +162,7 @@ export interface OrgMemberRow {
   displayName?: string;
   tenantId?: string;
   adminConsentAcceptedForTenant?: boolean;
+  adminConsent?: AdminConsentInfo | null;
   autoImportEnabled: boolean;
   connectedAt?: string;
   lastAuthorizedAt?: string;
