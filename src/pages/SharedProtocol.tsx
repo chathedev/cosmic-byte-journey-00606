@@ -18,6 +18,8 @@ interface ActionItem {
 
 interface SharedProtocolData {
   title?: string;
+  fullText?: string;
+  html?: string;
   protocol?: string;
   summary?: string;
   mainPoints?: string[];
@@ -58,9 +60,15 @@ const SharedProtocol = () => {
         const json = await res.json();
         const m = json.meeting || {};
         const draft = m.protocolDraft || json.protocolDraft || {};
+
         setData({
           title: m.title || json.title || json.meetingTitle || json.fileName || "Mötesprotokoll",
-          protocol: json.protocol || json.content || json.html || null,
+          // Primary: fullText from protocolDraft
+          fullText: draft.fullText || null,
+          // Secondary: html string
+          html: json.html || null,
+          // Legacy fallback
+          protocol: json.protocol || json.content || null,
           summary: m.summary || json.summary || null,
           mainPoints: Array.isArray(draft.mainPoints) ? draft.mainPoints : (Array.isArray(json.mainPoints) ? json.mainPoints : null),
           decisions: Array.isArray(draft.decisions) ? draft.decisions : (Array.isArray(json.decisions) ? json.decisions : null),
@@ -87,20 +95,6 @@ const SharedProtocol = () => {
         day: "numeric",
         month: "long",
         year: "numeric",
-      });
-    } catch {
-      return "";
-    }
-  };
-
-  const formatDateTime = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString("sv-SE", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
       });
     } catch {
       return "";
@@ -145,6 +139,11 @@ const SharedProtocol = () => {
     );
   }
 
+  // Determine primary content source
+  const hasFullText = !!data.fullText;
+  const hasHtml = !!data.html;
+  const hasProtocol = !!data.protocol;
+  const hasPrimaryContent = hasFullText || hasHtml || hasProtocol;
   const hasMetadata = data.mainPoints?.length || data.decisions?.length || data.actionItems?.length;
 
   return (
@@ -206,110 +205,133 @@ const SharedProtocol = () => {
             </div>
           </div>
 
-          {/* Summary */}
-          {data.summary && (
-            <div className="rounded-xl border border-border bg-muted/20 p-4 sm:p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-2">Sammanfattning</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {data.summary}
-              </p>
+          {/* ── Rendering priority ── */}
+
+          {/* 1. fullText from protocolDraft — render as pre-wrapped text */}
+          {hasFullText && (
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
+                {data.fullText}
+              </div>
             </div>
           )}
 
-          {/* Structured metadata */}
-          {hasMetadata && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Main points */}
-              {data.mainPoints && data.mainPoints.length > 0 && (
-                <div className="rounded-xl border border-border bg-card p-4">
+          {/* 2. HTML string */}
+          {!hasFullText && hasHtml && (
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none
+                  prose-headings:text-foreground prose-p:text-muted-foreground
+                  prose-li:text-muted-foreground prose-strong:text-foreground
+                  prose-h2:text-base prose-h3:text-sm"
+                dangerouslySetInnerHTML={{ __html: data.html! }}
+              />
+            </div>
+          )}
+
+          {/* 3. Legacy protocol/content field */}
+          {!hasFullText && !hasHtml && hasProtocol && (
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none
+                  prose-headings:text-foreground prose-p:text-muted-foreground
+                  prose-li:text-muted-foreground prose-strong:text-foreground
+                  prose-h2:text-base prose-h3:text-sm"
+                dangerouslySetInnerHTML={{ __html: data.protocol! }}
+              />
+            </div>
+          )}
+
+          {/* 4. Fallback: structured metadata when no primary content exists */}
+          {!hasPrimaryContent && (
+            <>
+              {/* Summary */}
+              {data.summary && (
+                <div className="rounded-xl border border-border bg-muted/20 p-4 sm:p-5">
+                  <h2 className="text-sm font-semibold text-foreground mb-2">Sammanfattning</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {data.summary}
+                  </p>
+                </div>
+              )}
+
+              {/* Structured metadata */}
+              {hasMetadata && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {data.mainPoints && data.mainPoints.length > 0 && (
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ListChecks className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-foreground">Huvudpunkter</h3>
+                      </div>
+                      <ul className="space-y-2">
+                        {data.mainPoints.map((point, i) => (
+                          <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0 mt-1.5" />
+                            {point}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {data.decisions && data.decisions.length > 0 && (
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <CheckSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <h3 className="text-sm font-semibold text-foreground">Beslut</h3>
+                      </div>
+                      <ul className="space-y-2">
+                        {data.decisions.map((d, i) => (
+                          <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                            <CheckSquare className="w-3.5 h-3.5 text-green-500/50 shrink-0 mt-0.5" />
+                            {d}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action items */}
+              {data.actionItems && data.actionItems.length > 0 && (
+                <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <ListChecks className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground">Huvudpunkter</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Åtgärdspunkter</h3>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-auto">
+                      {data.actionItems.length}
+                    </Badge>
                   </div>
-                  <ul className="space-y-2">
-                    {data.mainPoints.map((point, i) => (
-                      <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0 mt-1.5" />
-                        {point}
-                      </li>
+                  <div className="space-y-2">
+                    {data.actionItems.map((item, i) => (
+                      <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/20 border border-border/30">
+                        <div className="w-5 h-5 rounded border border-border bg-background flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-[10px] font-bold text-muted-foreground">{i + 1}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground">{item.title || item.description}</p>
+                          {item.owner && (
+                            <p className="text-xs text-muted-foreground mt-0.5">Ansvarig: {item.owner}</p>
+                          )}
+                          {item.deadline && (
+                            <p className="text-xs text-muted-foreground">Deadline: {formatDate(item.deadline)}</p>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
 
-              {/* Decisions */}
-              {data.decisions && data.decisions.length > 0 && (
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <CheckSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <h3 className="text-sm font-semibold text-foreground">Beslut</h3>
-                  </div>
-                  <ul className="space-y-2">
-                    {data.decisions.map((d, i) => (
-                      <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <CheckSquare className="w-3.5 h-3.5 text-green-500/50 shrink-0 mt-0.5" />
-                        {d}
-                      </li>
-                    ))}
-                  </ul>
+              {!data.summary && !hasMetadata && (
+                <div className="text-center py-12">
+                  <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Inget protokollinnehåll tillgängligt.</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Action items */}
-          {data.actionItems && data.actionItems.length > 0 && (
-            <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <ListChecks className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Åtgärdspunkter</h3>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-auto">
-                  {data.actionItems.length}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {data.actionItems.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/20 border border-border/30">
-                    <div className="w-5 h-5 rounded border border-border bg-background flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[10px] font-bold text-muted-foreground">{i + 1}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">{item.title || item.description}</p>
-                      {item.owner && (
-                        <p className="text-xs text-muted-foreground mt-0.5">Ansvarig: {item.owner}</p>
-                      )}
-                      {item.deadline && (
-                        <p className="text-xs text-muted-foreground">Deadline: {formatDate(item.deadline)}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Full protocol */}
-          {data.protocol && (
-            <>
-              <Separator />
-              <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-                <h2 className="text-sm font-semibold text-foreground mb-4">Fullständigt protokoll</h2>
-                <div
-                  className="prose prose-sm dark:prose-invert max-w-none
-                    prose-headings:text-foreground prose-p:text-muted-foreground
-                    prose-li:text-muted-foreground prose-strong:text-foreground
-                    prose-h2:text-base prose-h3:text-sm"
-                  dangerouslySetInnerHTML={{ __html: data.protocol }}
-                />
-              </div>
             </>
-          )}
-
-          {!data.protocol && !data.summary && !hasMetadata && (
-            <div className="text-center py-12">
-              <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Inget protokollinnehåll tillgängligt.</p>
-            </div>
           )}
         </div>
       </main>
