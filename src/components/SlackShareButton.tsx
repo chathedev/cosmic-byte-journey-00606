@@ -83,7 +83,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2.5">
-              <img src={slackLogo} alt="Slack" className="w-5 h-5 object-contain" />
+              <img src={slackLogo} alt="Slack" className="w-6 h-6 object-contain" />
               <DialogTitle className="text-base">Dela till Slack</DialogTitle>
             </div>
             <DialogDescription>
