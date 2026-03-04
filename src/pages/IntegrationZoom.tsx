@@ -263,9 +263,14 @@ const IntegrationZoom = () => {
                 <Collapsible open={accountOpen} onOpenChange={setAccountOpen}>
                   <CollapsibleTrigger className="w-full flex items-center justify-between py-1.5 px-1 -mx-1 rounded-lg cursor-pointer hover:bg-muted/40 transition-colors outline-none">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-medium text-foreground truncate">{account.email}</span>
-                      {account.displayName && (
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {account.email || account.displayName || `Konto-ID: ${account.id?.slice(0, 12)}…`}
+                      </span>
+                      {account.email && account.displayName && (
                         <span className="text-xs text-muted-foreground hidden sm:inline">({account.displayName})</span>
+                      )}
+                      {!account.email && !account.displayName && account.id && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">{account.id}</Badge>
                       )}
                     </div>
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${accountOpen ? 'rotate-180' : ''}`} />
@@ -273,10 +278,28 @@ const IntegrationZoom = () => {
                   <CollapsibleContent>
                     <div className="mt-2.5 space-y-2.5">
                       <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border text-sm">
+                        {account.email && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">E-post</span>
+                            <span className="text-foreground">{account.email}</span>
+                          </div>
+                        )}
+                        {account.id && !account.email && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Konto-ID</span>
+                            <span className="text-foreground font-mono text-xs">{account.id}</span>
+                          </div>
+                        )}
                         {account.connectedAt && (
                           <div className="flex items-center justify-between px-3.5 py-2.5">
                             <span className="text-muted-foreground">Kopplad sedan</span>
                             <span className="text-foreground">{formatDate(account.connectedAt)}</span>
+                          </div>
+                        )}
+                        {account.lastAuthorizedAt && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Senast auktoriserad</span>
+                            <span className="text-foreground">{formatDateTime(account.lastAuthorizedAt)}</span>
                           </div>
                         )}
                         {account.lastImportAt && (
