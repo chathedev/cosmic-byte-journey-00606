@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -16,7 +17,7 @@ import {
 import {
   Loader2, RefreshCw, Users, Building2, Zap, Shield, RotateCcw, Play, Search,
   CheckCircle2, XCircle, AlertTriangle, AlertCircle, ExternalLink, ArrowLeft, Trash2,
-  Calendar, Clock, Mail, Monitor, Hash, FileText,
+  Calendar, Clock, Mail, Monitor, Hash, FileText, Copy,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -33,9 +34,11 @@ export default function AdminTeamsInsights() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<AdminUserRow | null>(null);
+  const [resetPreserveAutoImport, setResetPreserveAutoImport] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
   const [consentConfirm, setConsentConfirm] = useState<{ tenantId: string; accepted: boolean } | null>(null);
   const [userSearch, setUserSearch] = useState('');
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
@@ -78,12 +81,13 @@ export default function AdminTeamsInsights() {
     }
   };
 
-  const handleReset = async (email: string) => {
+  const handleReset = async (email: string, preserveAutoImport: boolean) => {
     setActionLoading(email);
     try {
-      await adminDigitalImportApi.resetUser(email);
+      await adminDigitalImportApi.resetUser(email, preserveAutoImport);
       toast({ title: 'Användare resetad', description: email });
       setResetTarget(null);
+      setResetPreserveAutoImport(false);
       fetchData();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
@@ -118,6 +122,17 @@ export default function AdminTeamsInsights() {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleCopyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(url);
+      toast({ title: 'Länk kopierad' });
+      setTimeout(() => setCopiedUrl(null), 3000);
+    } catch {
+      toast({ title: 'Kunde inte kopiera', variant: 'destructive' });
     }
   };
 
@@ -176,10 +191,11 @@ export default function AdminTeamsInsights() {
           <SummaryCard icon={Shield} label="Tenants accepted" value={s.tenantsWithAdminConsentAccepted} sub={`av ${s.tenants}`} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <MiniStat label="Aktiva importerade" value={s.activeImportedMeetings} icon={FileText} />
           <MiniStat label="Auto-importerade" value={s.activeAutoImportedMeetings} accent icon={Zap} />
           <MiniStat label="Manuellt importerade" value={s.activeManualImportedMeetings} icon={Hash} />
+          <MiniStat label="I papperskorgen" value={s.trashedImportedMeetings} icon={Trash2} />
           <MiniStat label="Reconnect krävs" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} icon={AlertCircle} />
         </div>
 
@@ -194,8 +210,9 @@ export default function AdminTeamsInsights() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Admin consent gäller hela organisationen/tenant. Varje användare måste fortfarande koppla sitt eget Microsoft-konto.
-              {' '}<span className="font-medium">Att ta bort consent raderar tenant-posten</span> – den sätts inte till "avslagen".
+              Admin consent gäller hela organisationen/tenant – inte per användare.
+              Varje användare måste fortfarande koppla sitt eget Microsoft-konto.
+              {' '}<span className="font-medium">Att ta bort consent raderar tenant-posten helt</span> – den sätts inte till "avslagen".
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -271,6 +288,9 @@ export default function AdminTeamsInsights() {
                 <CardTitle className="text-sm font-medium">Företag</CardTitle>
                 <Badge variant="secondary" className="text-[10px]">{data.companies.length}</Badge>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Admin consent visas på organisationsnivå. Använd backendens admin consent-länk – inte en hårdkodad global URL.
+              </p>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -283,12 +303,15 @@ export default function AdminTeamsInsights() {
                     <TableHead className="text-xs text-right">Auto-import</TableHead>
                     <TableHead className="text-xs text-right">Auto</TableHead>
                     <TableHead className="text-xs text-right">Manuella</TableHead>
+                    <TableHead className="text-xs text-right">Papperskorg</TableHead>
                     <TableHead className="text-xs text-right">Totalt</TableHead>
+                    <TableHead className="text-xs">Consent-länk</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.companies.map((c) => {
                     const accepted = isCompanyConsentAccepted(c.digitalImport.adminConsent);
+                    const consentUrl = c.digitalImport.adminConsent.adminConsentUrl;
                     return (
                       <TableRow key={c.company.id}>
                         <TableCell>
@@ -307,7 +330,29 @@ export default function AdminTeamsInsights() {
                         <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.autoImportEnabledUserCount}</TableCell>
                         <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeAuto}</TableCell>
                         <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeManual}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{c.digitalImport.imports.trashedTotal}</TableCell>
                         <TableCell className="text-right text-xs tabular-nums font-medium">{c.digitalImport.imports.activeTotal}</TableCell>
+                        <TableCell>
+                          {consentUrl ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => handleCopyUrl(consentUrl)}
+                            >
+                              {copiedUrl === consentUrl ? (
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              {copiedUrl === consentUrl ? 'Kopierad' : 'Kopiera'}
+                            </Button>
+                          ) : accepted ? (
+                            <span className="text-[10px] text-muted-foreground">–</span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">Ej tillgänglig</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -408,7 +453,7 @@ export default function AdminTeamsInsights() {
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs"
-                        onClick={(e) => { e.stopPropagation(); setResetTarget(u); }}
+                        onClick={(e) => { e.stopPropagation(); setResetTarget(u); setResetPreserveAutoImport(false); }}
                       >
                         <RotateCcw className="w-3 h-3 mr-1" />
                         Reset
@@ -434,18 +479,37 @@ export default function AdminTeamsInsights() {
       </div>
 
       {/* ── Reset Confirm ── */}
-      <AlertDialog open={!!resetTarget} onOpenChange={(o) => !o && setResetTarget(null)}>
+      <AlertDialog open={!!resetTarget} onOpenChange={(o) => { if (!o) { setResetTarget(null); setResetPreserveAutoImport(false); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Resetta Microsoft-koppling?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Detta rensar Microsoft-kopplingen, rensas senaste fel och scopes, och stänger av auto-import för{' '}
-              <strong>{resetTarget?.email}</strong>.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Detta rensar Microsoft-kopplingen, senaste fel och scopes för{' '}
+                  <strong>{resetTarget?.email}</strong>.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="preserveAutoImport"
+                    checked={resetPreserveAutoImport}
+                    onCheckedChange={(val) => setResetPreserveAutoImport(val === true)}
+                  />
+                  <label htmlFor="preserveAutoImport" className="text-sm cursor-pointer">
+                    Behåll auto-import-inställning
+                  </label>
+                </div>
+                {!resetPreserveAutoImport && (
+                  <p className="text-xs text-muted-foreground">
+                    Auto-import kommer att stängas av och nollställas.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={() => resetTarget && handleReset(resetTarget.email)}>
+            <AlertDialogAction onClick={() => resetTarget && handleReset(resetTarget.email, resetPreserveAutoImport)}>
               Resetta
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -459,12 +523,15 @@ export default function AdminTeamsInsights() {
             <AlertDialogTitle>
               {consentConfirm?.accepted ? 'Acceptera tenant consent?' : 'Ta bort tenant consent?'}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {consentConfirm?.accepted
-                ? 'Detta markerar tenanten som godkänd i Tivly. Det ersätter inte Microsofts riktiga permissionsmodell.'
-                : 'Detta tar bort tenant-posten helt ur Tivlys interna consent-register. Tenanten behandlas sedan som okänd/ej registrerad.'}
-              <br />
-              <span className="font-mono text-xs mt-1 block">{consentConfirm?.tenantId}</span>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  {consentConfirm?.accepted
+                    ? 'Detta markerar tenanten som godkänd i Tivly. Det ersätter inte Microsofts riktiga permissionsmodell.'
+                    : 'Detta tar bort tenant-posten helt ur Tivlys interna consent-register. Tenanten behandlas sedan som okänd/ej registrerad – inte som explicit avslagen.'}
+                </p>
+                <p className="font-mono text-xs">{consentConfirm?.tenantId}</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -486,7 +553,7 @@ export default function AdminTeamsInsights() {
             <DialogTitle className="text-base">{selectedUser?.displayName || selectedUser?.email}</DialogTitle>
             <DialogDescription>{selectedUser?.email}</DialogDescription>
           </DialogHeader>
-          {selectedUser && <UserDetailContent user={selectedUser} />}
+          {selectedUser && <UserDetailContent user={selectedUser} onCopyUrl={handleCopyUrl} copiedUrl={copiedUrl} />}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)}>Stäng</Button>
           </DialogFooter>
@@ -500,7 +567,7 @@ export default function AdminTeamsInsights() {
    User Detail Dialog Content
    ═══════════════════════════════════════════════════ */
 
-function UserDetailContent({ user }: { user: AdminUserRow }) {
+function UserDetailContent({ user, onCopyUrl, copiedUrl }: { user: AdminUserRow; onCopyUrl: (url: string) => void; copiedUrl: string | null }) {
   return (
     <div className="space-y-4">
       {/* Connection section */}
@@ -526,13 +593,27 @@ function UserDetailContent({ user }: { user: AdminUserRow }) {
           <DetailItem icon={Calendar} label="Consent godkänd" value={new Date(user.adminConsent.approvedAt).toLocaleString('sv-SE')} />
         )}
         {user.adminConsent?.adminConsentUrl && (
-          <a href={user.adminConsent.adminConsentUrl} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
-            Admin consent-länk <ExternalLink className="w-3 h-3" />
-          </a>
+          <div className="flex items-center gap-2 mt-1">
+            <a href={user.adminConsent.adminConsentUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              Admin consent-länk <ExternalLink className="w-3 h-3" />
+            </a>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs gap-1 px-2"
+              onClick={() => onCopyUrl(user.adminConsent!.adminConsentUrl!)}
+            >
+              {copiedUrl === user.adminConsent.adminConsentUrl ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </Button>
+          </div>
         )}
         <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-          Consent hanteras på tenant/organisationsnivå – inte per användare.
+          Consent hanteras på tenant/organisationsnivå – inte per användare. Använd backendens consent-länk med signerad state.
         </p>
       </div>
 
@@ -543,10 +624,11 @@ function UserDetailContent({ user }: { user: AdminUserRow }) {
           <DetailItem icon={Zap} label="Auto-import" value={user.autoImportEnabled ? 'Aktiv' : 'Av'} />
           <DetailItem icon={FileText} label="Totalt" value={String(user.imports.total)} />
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <MicroStat label="Auto (aktiva)" value={user.imports.activeAuto} />
           <MicroStat label="Manuella (aktiva)" value={user.imports.activeManual} />
-          <MicroStat label="Papperskorgen" value={user.imports.trashedTotal} />
+          <MicroStat label="Auto (trash)" value={user.imports.trashedAuto} />
+          <MicroStat label="Manuella (trash)" value={user.imports.trashedManual} />
         </div>
       </div>
 
