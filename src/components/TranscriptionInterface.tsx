@@ -7,10 +7,12 @@ import { SubscribeDialog } from "./SubscribeDialog";
 import { DigitalMeetingDialog } from "./DigitalMeetingDialog";
 import { TextPasteDialog } from "./TextPasteDialog";
 import { TeamSelectDialog } from "./TeamSelectDialog";
-import { MeetingModeDialog, type MeetingMode } from "./MeetingModeDialog";
+import { MeetingModeDialog, type MeetingMode, type DigitalProvider } from "./MeetingModeDialog";
 import { DigitalImportView } from "./DigitalImportView";
+import { ZoomImportView } from "./ZoomImportView";
 import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
+import { useZoomImport } from "@/hooks/useZoomImport";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -63,10 +65,12 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [showModeDialog, setShowModeDialog] = useState(false);
   const [showDigitalImport, setShowDigitalImport] = useState(false);
+  const [showZoomImport, setShowZoomImport] = useState(false);
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
   const [pendingParticipants, setPendingParticipants] = useState<string[]>([]);
 
   const digitalImport = useDigitalImport();
+  const zoomImport = useZoomImport();
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
 
@@ -125,13 +129,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowModeDialog(true);
   };
 
-  const handleModeSelect = async (mode: MeetingMode) => {
-    debugLog('[🏠 Home] handleModeSelect called with mode:', mode);
+  const handleModeSelect = async (mode: MeetingMode, provider?: DigitalProvider) => {
+    debugLog('[🏠 Home] handleModeSelect called with mode:', mode, 'provider:', provider);
     setShowModeDialog(false);
 
     if (mode === 'digital') {
-      // Open the Microsoft Graph Import view
-      setShowDigitalImport(true);
+      if (provider === 'zoom') {
+        setShowZoomImport(true);
+      } else {
+        setShowDigitalImport(true);
+      }
       return;
     }
 
@@ -381,6 +388,39 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
             onClose={() => setShowDigitalImport(false)}
             isFullyConnected={digitalImport.isFullyConnected}
             needsReconnect={digitalImport.needsReconnect}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Show Zoom Import view
+  if (showZoomImport) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col">
+        <div className="flex items-center gap-3 p-4 border-b border-border/50">
+          <Button variant="ghost" size="icon" onClick={() => setShowZoomImport(false)} className="shrink-0 -ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </Button>
+          <p className="text-sm font-medium text-foreground">Importera från Zoom</p>
+        </div>
+        <div className="flex-1">
+          <ZoomImportView
+            importStatus={zoomImport.importStatus}
+            recordings={zoomImport.recordings}
+            warnings={zoomImport.warnings}
+            state={zoomImport.state}
+            error={zoomImport.error}
+            errorCode={zoomImport.errorCode}
+            onConnect={zoomImport.connect}
+            onDisconnect={zoomImport.disconnect}
+            onLoadRecordings={zoomImport.loadRecordings}
+            onImport={zoomImport.importRecording}
+            onToggleAutoImport={zoomImport.toggleAutoImport}
+            onReset={zoomImport.reset}
+            onClose={() => setShowZoomImport(false)}
+            isFullyConnected={zoomImport.isFullyConnected}
+            needsReconnect={zoomImport.needsReconnect}
           />
         </div>
       </div>

@@ -66,8 +66,10 @@ import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
 import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
 import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
+import IntegrationZoom from "./pages/IntegrationZoom";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
+import AdminZoomInsights from "./pages/AdminZoomInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 
 const queryClient = new QueryClient({
@@ -342,6 +344,7 @@ const AppContent = () => {
                 <Route path="/admin/speaker-profiles" element={<AdminRoute><AdminSpeakerProfiles /></AdminRoute>} />
                 <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
                 <Route path="/admin/integrations/teams" element={<AdminRoute><AdminTeamsInsights /></AdminRoute>} />
+                <Route path="/admin/integrations/zoom" element={<AdminRoute><AdminZoomInsights /></AdminRoute>} />
                 <Route path="/admin/teams-insights" element={<Navigate to="/admin/integrations/teams" replace />} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                 <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
@@ -351,6 +354,7 @@ const AppContent = () => {
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
                 <Route path="/integrations/teams" element={<ProtectedRoute><IntegrationTeams /></ProtectedRoute>} />
+                <Route path="/integrations/zoom" element={<ProtectedRoute><IntegrationZoom /></ProtectedRoute>} />
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />

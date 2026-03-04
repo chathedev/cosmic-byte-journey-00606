@@ -1,16 +1,17 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Users, Phone, ArrowRight, Mic, Monitor, Lock } from "lucide-react";
+import { Users, Phone, ArrowRight, Mic, Monitor, Lock, ArrowLeft, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { debugLog } from "@/lib/debugLogger";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
+export type DigitalProvider = 'teams' | 'zoom';
 
 interface MeetingModeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (mode: MeetingMode) => void;
+  onSelect: (mode: MeetingMode, provider?: DigitalProvider) => void;
   showDigitalOption?: boolean;
   digitalLocked?: boolean;
   digitalComingSoon?: boolean;
@@ -37,10 +38,25 @@ const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: str
   {
     mode: 'digital',
     icon: Monitor,
-    title: 'Importera från Teams',
-    desc: 'Importera transkript direkt från ditt Teams-möte via Microsoft 365',
-    hint: 'Kräver Teams-transkribering',
+    title: 'Importera digitalt möte',
+    desc: 'Importera transkript från Teams eller Zoom',
+    hint: 'Kräver transkribering aktiverad',
     hintIcon: Monitor,
+  },
+];
+
+const DIGITAL_PROVIDERS: { id: DigitalProvider; icon: typeof Monitor; title: string; desc: string }[] = [
+  {
+    id: 'teams',
+    icon: Monitor,
+    title: 'Microsoft Teams',
+    desc: 'Importera från Microsoft 365 / Teams',
+  },
+  {
+    id: 'zoom',
+    icon: Video,
+    title: 'Zoom',
+    desc: 'Importera från Zoom Cloud Recordings',
   },
 ];
 
@@ -54,7 +70,9 @@ export const MeetingModeDialog = ({
   showStartConfirmation = false,
 }: MeetingModeDialogProps) => {
   const [hoveredOption, setHoveredOption] = useState<MeetingMode | null>(null);
+  const [hoveredProvider, setHoveredProvider] = useState<DigitalProvider | null>(null);
   const [pendingMode, setPendingMode] = useState<MeetingMode | null>(null);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
 
   const visibleOptions = showDigitalOption ? OPTIONS : OPTIONS.filter(o => o.mode !== 'digital');
 
@@ -62,20 +80,30 @@ export const MeetingModeDialog = ({
     debugLog('[📋 ModeDialog] open changed:', open);
     if (!open) {
       setPendingMode(null);
+      setShowProviderPicker(false);
     }
   }, [open]);
 
   const selectedOption = pendingMode ? OPTIONS.find((o) => o.mode === pendingMode) : null;
 
   const handleOptionSelect = (mode: MeetingMode) => {
-    debugLog('[📋 ModeDialog] option tapped:', mode, 'showStartConfirmation:', showStartConfirmation);
+    debugLog('[📋 ModeDialog] option tapped:', mode);
+
+    if (mode === 'digital') {
+      setShowProviderPicker(true);
+      return;
+    }
+
     if (showStartConfirmation) {
-      debugLog('[📋 ModeDialog] setting pendingMode:', mode);
       setPendingMode(mode);
       return;
     }
-    debugLog('[📋 ModeDialog] calling onSelect directly:', mode);
     onSelect(mode);
+  };
+
+  const handleProviderSelect = (provider: DigitalProvider) => {
+    debugLog('[📋 ModeDialog] provider selected:', provider);
+    onSelect('digital', provider);
   };
 
   return (
@@ -84,7 +112,65 @@ export const MeetingModeDialog = ({
         <VisuallyHidden>
           <DialogTitle>Välj inspelningsläge</DialogTitle>
         </VisuallyHidden>
-        {showStartConfirmation && pendingMode && selectedOption ? (
+
+        {/* Provider picker sub-view */}
+        {showProviderPicker ? (
+          <>
+            <div className="p-5 sm:p-6 pb-3 sm:pb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowProviderPicker(false)}
+                  className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  Välj plattform
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 ml-7">
+                Varifrån vill du importera transkript?
+              </p>
+            </div>
+
+            <div className="px-3 sm:px-4 pb-4 sm:pb-6 space-y-2 sm:space-y-3">
+              {DIGITAL_PROVIDERS.map((prov) => (
+                <button
+                  key={prov.id}
+                  onClick={() => handleProviderSelect(prov.id)}
+                  onMouseEnter={() => setHoveredProvider(prov.id)}
+                  onMouseLeave={() => setHoveredProvider(null)}
+                  className={cn(
+                    "w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all duration-200",
+                    "flex items-center gap-3 sm:gap-4 group",
+                    hoveredProvider === prov.id
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : "border-border hover:border-primary/50 bg-card"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                    hoveredProvider === prov.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}>
+                    <prov.icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-sm sm:text-base text-foreground">{prov.title}</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{prov.desc}</p>
+                  </div>
+                  <ArrowRight className={cn(
+                    "w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-all",
+                    hoveredProvider === prov.id
+                      ? "text-primary translate-x-0.5"
+                      : "text-muted-foreground/50"
+                  )} />
+                </button>
+              ))}
+            </div>
+          </>
+        ) : showStartConfirmation && pendingMode && selectedOption ? (
           <>
             <div className="p-5 sm:p-6 pb-3 text-center space-y-1 shrink-0">
               <h2 className="text-lg sm:text-xl font-semibold text-foreground">Starta möte</h2>
