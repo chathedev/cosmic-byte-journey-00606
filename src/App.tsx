@@ -67,6 +67,7 @@ import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
 import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
+import AdminTeamsInsights from "./pages/AdminTeamsInsights";
 
 const queryClient = new QueryClient({
   defaultOptions: {
