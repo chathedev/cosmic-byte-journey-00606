@@ -285,16 +285,11 @@ export const DigitalImportView = ({
               Personliga Microsoft-konton stöds inte för transkript-import. Koppla om med ett Microsoft 365 arbets- eller skolkonto.
             </p>
           ) : connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' ? (
-            <div className="space-y-2 max-w-xs">
+            <div className="space-y-3 max-w-xs">
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Din organisations IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra för att transkript-import ska fungera.
               </p>
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-left">
-                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Be din IT-avdelning bevilja admin-consent för appen i Microsoft Entra (Azure AD).
-                </p>
-              </div>
+              <AdminConsentLinkBox />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
