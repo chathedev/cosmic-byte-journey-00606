@@ -152,8 +152,8 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
               {shareResult.shareLink?.appUrl && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground">Publik länk</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 text-xs text-muted-foreground bg-muted/30 border border-border/50 rounded-lg px-3 py-2 truncate font-mono">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="flex-1 min-w-0 text-xs text-muted-foreground bg-muted/30 border border-border/50 rounded-lg px-3 py-2 truncate font-mono overflow-hidden">
                       {shareResult.shareLink.appUrl}
                     </div>
                     <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={handleCopyLink}>
