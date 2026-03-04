@@ -1,15 +1,21 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Monitor, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
+import { ArrowLeft, Monitor, Video, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
+import { useZoomImport } from "@/hooks/useZoomImport";
 
 const Integrations = () => {
   const navigate = useNavigate();
   const digitalImport = useDigitalImport();
+  const zoomImport = useZoomImport();
 
-  const isEnabled = digitalImport.importStatus?.enabled === true;
-  const isConfigured = digitalImport.importStatus?.configured === true;
-  const account = digitalImport.importStatus?.account;
+  const isTeamsEnabled = digitalImport.importStatus?.enabled === true;
+  const isTeamsConfigured = digitalImport.importStatus?.configured === true;
+  const teamsAccount = digitalImport.importStatus?.account;
+
+  const isZoomEnabled = zoomImport.importStatus?.enabled === true;
+  const isZoomConfigured = zoomImport.importStatus?.configured === true;
+  const zoomAccount = zoomImport.importStatus?.account;
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,14 +56,49 @@ const Integrations = () => {
                     <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
                       Kräver omkoppling
                     </Badge>
-                  ) : isEnabled && isConfigured ? (
+                  ) : isTeamsEnabled && isTeamsConfigured ? (
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {digitalImport.isFullyConnected && account?.email
-                    ? account.email
+                  {digitalImport.isFullyConnected && teamsAccount?.email
+                    ? teamsAccount.email
                     : 'Importera transkript från Teams-möten'}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+            </div>
+          </button>
+
+          {/* Zoom card */}
+          <button
+            onClick={() => navigate('/integrations/zoom')}
+            className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
+          >
+            <div className="p-4 sm:p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center shrink-0">
+                <Video className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-foreground">Zoom</h2>
+                  {zoomImport.isFullyConnected ? (
+                    <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      Kopplad
+                    </Badge>
+                  ) : zoomImport.needsReconnect ? (
+                    <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
+                      Kräver omkoppling
+                    </Badge>
+                  ) : isZoomEnabled && isZoomConfigured ? (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {zoomImport.isFullyConnected && zoomAccount?.email
+                    ? zoomAccount.email
+                    : 'Importera transkript från Zoom Cloud Recordings'}
                 </p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
