@@ -292,8 +292,8 @@ export default function AdminTeamsInsights() {
                 Admin consent visas på organisationsnivå. Använd backendens admin consent-länk – inte en hårdkodad global URL.
               </p>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[800px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
