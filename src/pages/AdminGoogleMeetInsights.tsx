@@ -15,10 +15,11 @@ import {
 } from '@/components/ui/dialog';
 import {
   Loader2, RefreshCw, Users, Building2, Zap, RotateCcw, Play, Search,
-  CheckCircle2, XCircle, AlertTriangle, AlertCircle, ArrowLeft, Trash2,
+  CheckCircle2, AlertTriangle, AlertCircle, ArrowLeft, Trash2,
   Clock, Mail, Video, Hash, FileText,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import googleMeetLogo from '@/assets/google-meet-logo.png';
 import {
   adminGoogleMeetImportApi,
   type GoogleMeetAdminInsightsResponse,
@@ -132,9 +133,14 @@ export default function AdminGoogleMeetInsights() {
             <button onClick={() => navigate('/admin/integrations')} className="p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
+            <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1">
+              <img src={googleMeetLogo} alt="Google Meet" className="w-full h-full object-contain" />
+            </div>
             <div>
               <h1 className="text-xl font-semibold">Google Meet Insights</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Global admin-överblick · {data.users.length} användare</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Admin-överblick · {data.users.length} användare
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -182,21 +188,22 @@ export default function AdminGoogleMeetInsights() {
                     <TableHead className="text-xs text-right">Auto-import</TableHead>
                     <TableHead className="text-xs text-right">Auto</TableHead>
                     <TableHead className="text-xs text-right">Manuella</TableHead>
+                    <TableHead className="text-xs text-right">Papperskorg</TableHead>
                     <TableHead className="text-xs text-right">Totalt</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.companies.map((c) => {
-                    const gi = c.googleMeetImport || ({} as any);
-                    const imports = gi.imports || {};
+                    const gi = c.googleMeetImport;
                     return (
                       <TableRow key={c.company.id}>
                         <TableCell><span className="text-sm font-medium">{c.company.name}</span></TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">{gi.connectedUserCount ?? 0}</TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">{gi.autoImportEnabledUserCount ?? 0}</TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">{imports.activeAuto ?? 0}</TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">{imports.activeManual ?? 0}</TableCell>
-                        <TableCell className="text-right text-xs tabular-nums font-medium">{imports.activeTotal ?? 0}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{gi.connectedUserCount}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{gi.autoImportEnabledUserCount}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{gi.imports.activeAuto}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{gi.imports.activeManual}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{gi.imports.trashedTotal}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums font-medium">{gi.imports.activeTotal}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -348,6 +355,12 @@ export default function AdminGoogleMeetInsights() {
                 <div className="grid grid-cols-2 gap-2">
                   <DetailItem icon={Zap} label="Auto-import" value={selectedUser.autoImportEnabled ? 'Aktiv' : 'Av'} />
                   <DetailItem icon={FileText} label="Totalt" value={String(selectedUser.imports.total)} />
+                  {selectedUser.connectedAt && (
+                    <DetailItem icon={Clock} label="Kopplad sedan" value={new Date(selectedUser.connectedAt).toLocaleDateString('sv-SE')} />
+                  )}
+                  {selectedUser.lastImportAt && (
+                    <DetailItem icon={Clock} label="Senaste import" value={new Date(selectedUser.lastImportAt).toLocaleString('sv-SE')} />
+                  )}
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <MicroStat label="Auto (aktiva)" value={selectedUser.imports.activeAuto} />
