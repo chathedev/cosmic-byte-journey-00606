@@ -121,6 +121,8 @@ const IntegrationTeams = () => {
   const scopes = di.importStatus?.scopes;
   const missingScopes = di.importStatus?.missingScopes;
   const connectionIssue = di.importStatus?.connectionIssue;
+  const adminConsent = di.importStatus?.adminConsent;
+  const isAdminConsentApproved = adminConsent?.approved === true;
   const isAdminConsentRequired = connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' || connectionIssue?.adminConsentLikelyRequired;
 
   const handleCopyAdminLink = async () => {
