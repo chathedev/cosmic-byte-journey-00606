@@ -85,7 +85,7 @@ const normalizeCounts = (counts: any): ZoomImportCounts => ({
 export const adminZoomImportApi = {
   getInsights: (): Promise<ZoomAdminInsightsResponse> =>
     fetchWithAuth('/admin/digital-import/insights').then((data) => {
-      const zm = data?.summary?.zoomSummary ?? {};
+      const zm = data?.zoomSummary ?? data?.summary?.zoomSummary ?? {};
       return {
         summary: {
           totalUsers: Number(data?.summary?.totalUsers ?? 0),
