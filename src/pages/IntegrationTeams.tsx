@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft, Monitor, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
+  ArrowLeft, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Shield, Info, FileText, Clock, Users, Download, Sparkles,
   ChevronRight, AlertCircle, ExternalLink, Zap, ChevronDown, Copy, Send
 } from "lucide-react";
+import teamsLogo from "@/assets/teams-logo.png";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
