@@ -130,17 +130,17 @@ export default function AdminSlackInsights() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <SummaryCard icon={Users} label="Anslutna användare" value={s.connectedUsers} sub={`av ${s.totalUsers}`} />
           <SummaryCard icon={Send} label="Auto-delning aktiv" value={s.usersWithAutoShareEnabled} sub="användare" />
           <SummaryCard icon={Building2} label="Företag med anslutna" value={s.companiesWithConnectedUsers} sub={`av ${s.companies}`} />
           <SummaryCard icon={MessageSquare} label="Totala delningar" value={s.totalShares} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <MiniStat label="Auto-delningar" value={s.totalAutoShares} accent icon={Send} />
-          <MiniStat label="Manuella delningar" value={s.totalManualShares} icon={Hash} />
-          <MiniStat label="Reconnect krävs" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} icon={AlertCircle} />
+          <MiniStat label="Manuella" value={s.totalManualShares} icon={Hash} />
+          <MiniStat label="Reconnect" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} icon={AlertCircle} />
         </div>
 
         {/* Companies */}
