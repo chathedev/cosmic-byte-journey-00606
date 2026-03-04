@@ -66,6 +66,7 @@ import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
 import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
 import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
+import AdminConsentVerified from "./pages/AdminConsentVerified";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -338,6 +339,7 @@ const AppContent = () => {
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
                 <Route path="/integrations/teams" element={<ProtectedRoute><IntegrationTeams /></ProtectedRoute>} />
+                <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
