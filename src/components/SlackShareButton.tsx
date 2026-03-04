@@ -150,30 +150,22 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
               </div>
 
               {shareResult.shareLink?.appUrl && (
-                <div className="space-y-1.5 min-w-0 overflow-hidden">
-                  <p className="text-xs font-medium text-muted-foreground">Publik länk</p>
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-full flex items-center gap-2 min-w-0 text-left bg-muted/30 border border-border/50 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer"
-                  >
-                    <span className="flex-1 min-w-0 text-[11px] text-muted-foreground font-mono truncate block overflow-hidden">
-                      {shareResult.shareLink.appUrl}
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full flex items-center gap-2 text-left bg-muted/30 border border-border/50 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer overflow-hidden"
+                >
+                  <span className="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
+                    {linkCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-[11px] font-medium text-foreground block">
+                      {linkCopied ? "Länk kopierad!" : "Kopiera publik länk"}
                     </span>
-                    <span className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-                      {linkCopied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-green-600" />
-                          <span className="text-green-600 text-[10px]">Kopierad</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span className="text-[10px]">Kopiera</span>
-                        </>
-                      )}
+                    <span className="text-[10px] text-muted-foreground block">
+                      app.tivly.se/shared/protocol/…
                     </span>
-                  </button>
-                </div>
+                  </span>
+                </button>
               )}
             </div>
           ) : (
