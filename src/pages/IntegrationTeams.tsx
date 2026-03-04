@@ -53,6 +53,9 @@ const IntegrationTeams = () => {
   // Detect teams_admin_required from URL (OAuth callback redirect)
   const teamsAdminRequired = searchParams.get('teams_admin_required') === 'true';
   const tenantFromUrl = searchParams.get('tenant');
+  const isOAuthSuccessReturn =
+    searchParams.get('integration') === 'microsoft' && searchParams.get('status') === 'success';
+  const hasInitializedConnectionState = useRef(false);
 
   // Clean up URL params after reading
   useEffect(() => {
@@ -64,20 +67,32 @@ const IntegrationTeams = () => {
     }
   }, []);
 
-  // Show confirmation when transitioning to connected — skip initial mount
+  // Show confirmation only after status is resolved to avoid refresh false-positives.
   useEffect(() => {
-    if (prevConnected.current === null) {
+    if (di.importStatus === null) return;
+
+    if (!hasInitializedConnectionState.current) {
+      hasInitializedConnectionState.current = true;
       prevConnected.current = di.isFullyConnected;
+
+      if (isOAuthSuccessReturn && di.isFullyConnected) {
+        setShowConnectedConfirm(true);
+        const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+        return () => clearTimeout(timer);
+      }
+
       return;
     }
+
     if (di.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
       const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
       prevConnected.current = di.isFullyConnected;
       return () => clearTimeout(timer);
     }
+
     prevConnected.current = di.isFullyConnected;
-  }, [di.isFullyConnected]);
+  }, [di.importStatus, di.isFullyConnected, isOAuthSuccessReturn]);
 
   const COOLDOWN_KEY = 'teams_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;

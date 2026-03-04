@@ -30,6 +30,7 @@ const formatDateTime = (dateStr: string) => {
 const IntegrationZoom = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const zi = useZoomImport();
   const [importingId, setImportingId] = useState<string | null>(null);
   const [autoImportLoading, setAutoImportLoading] = useState(false);
@@ -40,24 +41,40 @@ const IntegrationZoom = () => {
   const [accountOpen, setAccountOpen] = useState(false);
   const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
   const prevConnected = useRef<boolean | null>(null);
+  const hasInitializedConnectionState = useRef(false);
+
+  const isOAuthSuccessReturn =
+    searchParams.get('integration') === 'zoom' && searchParams.get('status') === 'success';
 
   const COOLDOWN_KEY = 'zoom_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;
 
   useEffect(() => {
-    // Skip the first status load to avoid showing the banner on every refresh
-    if (prevConnected.current === null) {
+    // Wait until backend status has resolved to avoid false "connected" transitions on page reload.
+    if (zi.importStatus === null) return;
+
+    if (!hasInitializedConnectionState.current) {
+      hasInitializedConnectionState.current = true;
       prevConnected.current = zi.isFullyConnected;
+
+      if (isOAuthSuccessReturn && zi.isFullyConnected) {
+        setShowConnectedConfirm(true);
+        const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+        return () => clearTimeout(timer);
+      }
+
       return;
     }
+
     if (zi.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
       const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
       prevConnected.current = zi.isFullyConnected;
       return () => clearTimeout(timer);
     }
+
     prevConnected.current = zi.isFullyConnected;
-  }, [zi.isFullyConnected]);
+  }, [zi.importStatus, zi.isFullyConnected, isOAuthSuccessReturn]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(COOLDOWN_KEY);
