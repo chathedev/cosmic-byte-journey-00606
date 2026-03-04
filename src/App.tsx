@@ -67,6 +67,7 @@ import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
 import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
 import IntegrationZoom from "./pages/IntegrationZoom";
+import IntegrationGoogleMeet from "./pages/IntegrationGoogleMeet";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
 import AdminZoomInsights from "./pages/AdminZoomInsights";
@@ -355,6 +356,7 @@ const AppContent = () => {
                 <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
                 <Route path="/integrations/teams" element={<ProtectedRoute><IntegrationTeams /></ProtectedRoute>} />
                 <Route path="/integrations/zoom" element={<ProtectedRoute><IntegrationZoom /></ProtectedRoute>} />
+                <Route path="/integrations/google-meet" element={<ProtectedRoute><IntegrationGoogleMeet /></ProtectedRoute>} />
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
