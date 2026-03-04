@@ -3,6 +3,7 @@ import { ArrowLeft, Building2, Users } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
+import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -76,6 +77,17 @@ export default function OrgSettings() {
           <section>
             <EnterpriseTeamManager />
           </section>
+
+          {/* Microsoft Teams Insights (owner/admin only) */}
+          {(role === 'owner' || role === 'admin') && enterpriseMembership.company?.id && (
+            <>
+              <Separator />
+              <section>
+                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Microsoft Teams</h2>
+                <OrgTeamsInsights companyId={enterpriseMembership.company.id} />
+              </section>
+            </>
+          )}
         </div>
       </div>
     </div>
