@@ -56,13 +56,15 @@ const SharedProtocol = () => {
           return;
         }
         const json = await res.json();
+        const m = json.meeting || {};
+        const draft = m.protocolDraft || json.protocolDraft || {};
         setData({
-          title: json.title || json.meetingTitle || json.fileName || "Mötesprotokoll",
+          title: m.title || json.title || json.meetingTitle || json.fileName || "Mötesprotokoll",
           protocol: json.protocol || json.content || json.html || null,
-          summary: json.summary || null,
-          mainPoints: Array.isArray(json.mainPoints) ? json.mainPoints : null,
-          decisions: Array.isArray(json.decisions) ? json.decisions : null,
-          actionItems: Array.isArray(json.actionItems) ? json.actionItems : null,
+          summary: m.summary || json.summary || null,
+          mainPoints: Array.isArray(draft.mainPoints) ? draft.mainPoints : (Array.isArray(json.mainPoints) ? json.mainPoints : null),
+          decisions: Array.isArray(draft.decisions) ? draft.decisions : (Array.isArray(json.decisions) ? json.decisions : null),
+          actionItems: Array.isArray(m.actionItems) ? m.actionItems : (Array.isArray(json.actionItems) ? json.actionItems : null),
           participants: Array.isArray(json.participants) ? json.participants : null,
           createdAt: json.createdAt || json.meetingDate || null,
           meetingDate: json.meetingDate || null,
