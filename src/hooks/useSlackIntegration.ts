@@ -59,6 +59,14 @@ export interface SlackShareResult {
   channelId: string;
   channelName?: string;
   messageTs?: string;
+  meetingId?: string;
+  shareLink?: {
+    token?: string;
+    url?: string;
+    appUrl?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
 }
 
 export type SlackState = 'idle' | 'connecting' | 'loading_channels' | 'sharing' | 'done' | 'error';
