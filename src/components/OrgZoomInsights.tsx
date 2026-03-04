@@ -90,17 +90,21 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
     );
   }
 
-  const zi = data.zoomImport;
-  const canManage = data.viewer.canManageMembers;
+  const zi = data.zoomImport ?? {
+    connectedUserCount: 0,
+    autoImportEnabledUserCount: 0,
+    imports: { activeAuto: 0, activeManual: 0 },
+  };
+  const canManage = data.viewer?.canManageMembers ?? false;
 
   return (
     <div className="space-y-5">
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MiniStat icon={Users} label="Anslutna medlemmar" value={zi.connectedUserCount} />
-        <MiniStat icon={Zap} label="Auto-import aktiv" value={zi.autoImportEnabledUserCount} />
-        <MiniStat label="Auto-importerade" value={zi.imports.activeAuto} accent />
-        <MiniStat label="Manuellt importerade" value={zi.imports.activeManual} />
+        <MiniStat icon={Users} label="Anslutna medlemmar" value={zi.connectedUserCount ?? 0} />
+        <MiniStat icon={Zap} label="Auto-import aktiv" value={zi.autoImportEnabledUserCount ?? 0} />
+        <MiniStat label="Auto-importerade" value={zi.imports?.activeAuto ?? 0} accent />
+        <MiniStat label="Manuellt importerade" value={zi.imports?.activeManual ?? 0} />
       </div>
 
       {/* Members table */}
@@ -164,7 +168,7 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right text-xs tabular-nums">
-                    {m.imports.activeAuto} / {m.imports.activeManual}
+                    {m.imports?.activeAuto ?? 0} / {m.imports?.activeManual ?? 0}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}

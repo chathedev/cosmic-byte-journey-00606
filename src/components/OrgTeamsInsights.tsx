@@ -104,19 +104,26 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
     );
   }
 
-  const di = data.digitalImport;
-  const canManage = data.viewer.canManageMembers;
+  const di = data.digitalImport ?? {
+    connectedUserCount: 0,
+    connectedAdminUserCount: 0,
+    autoImportEnabledUserCount: 0,
+    imports: { activeAuto: 0, activeManual: 0 },
+    tenantIds: [],
+    adminConsent: { status: 'unknown', accepted: false, pending: false, tenantIds: [], adminConsentUrl: null, acceptedTenants: [] },
+  };
+  const canManage = data.viewer?.canManageMembers ?? false;
   const orgConsentAccepted = isCompanyConsentAccepted(di.adminConsent);
-  const consentUrl = di.adminConsent.adminConsentUrl;
+  const consentUrl = di.adminConsent?.adminConsentUrl;
 
   return (
     <div className="space-y-5">
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MiniStat icon={Users} label="Anslutna medlemmar" value={di.connectedUserCount} />
-        <MiniStat icon={Zap} label="Auto-import aktiv" value={di.autoImportEnabledUserCount} />
-        <MiniStat label="Auto-importerade" value={di.imports.activeAuto} accent />
-        <MiniStat label="Manuellt importerade" value={di.imports.activeManual} />
+        <MiniStat icon={Users} label="Anslutna medlemmar" value={di.connectedUserCount ?? 0} />
+        <MiniStat icon={Zap} label="Auto-import aktiv" value={di.autoImportEnabledUserCount ?? 0} />
+        <MiniStat label="Auto-importerade" value={di.imports?.activeAuto ?? 0} accent />
+        <MiniStat label="Manuellt importerade" value={di.imports?.activeManual ?? 0} />
       </div>
 
       {/* ── Org-level consent banner ── */}
