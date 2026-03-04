@@ -1028,6 +1028,7 @@ export const AutoProtocolGenerator = ({
                 <Share2 className="w-4 h-4 sm:mr-2 flex-shrink-0" />
                 <span className="hidden sm:inline">Dela</span>
               </Button>
+              {meetingId && <SlackShareButton meetingId={meetingId} compact className="flex-1 sm:flex-none min-w-0" />}
               <Button
                 variant="outline"
                 size="sm"
