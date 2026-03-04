@@ -129,13 +129,16 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     setShowModeDialog(true);
   };
 
-  const handleModeSelect = async (mode: MeetingMode) => {
-    debugLog('[🏠 Home] handleModeSelect called with mode:', mode);
+  const handleModeSelect = async (mode: MeetingMode, provider?: DigitalProvider) => {
+    debugLog('[🏠 Home] handleModeSelect called with mode:', mode, 'provider:', provider);
     setShowModeDialog(false);
 
     if (mode === 'digital') {
-      // Open the Microsoft Graph Import view
-      setShowDigitalImport(true);
+      if (provider === 'zoom') {
+        setShowZoomImport(true);
+      } else {
+        setShowDigitalImport(true);
+      }
       return;
     }
 
