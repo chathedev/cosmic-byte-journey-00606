@@ -111,6 +111,7 @@ interface UseDigitalImportReturn {
   error: string | null;
   errorCode: string | null;
   importResult: ImportResult | null;
+  adminConsentTenant: string | null;
   checkStatus: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
