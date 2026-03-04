@@ -158,7 +158,7 @@ const Integrations = () => {
             className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
           >
             <div className="p-4 sm:p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-2">
+              <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
                 <img src={slackLogo} alt="Slack" className="w-full h-full object-contain" />
               </div>
               <div className="flex-1 min-w-0">

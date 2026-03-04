@@ -136,7 +136,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
               {sharing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <img src={slackLogo} alt="" className="w-3.5 h-3.5 object-contain" />
+                <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
               )}
               {sharing ? "Delar..." : "Dela till Slack"}
             </Button>
