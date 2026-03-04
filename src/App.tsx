@@ -68,6 +68,7 @@ import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
+import AdminIntegrations from "./pages/AdminIntegrations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
