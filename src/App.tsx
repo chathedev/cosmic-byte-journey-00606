@@ -68,6 +68,7 @@ import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
+import AdminIntegrations from "./pages/AdminIntegrations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -339,7 +340,9 @@ const AppContent = () => {
                 <Route path="/admin/enterprise/billing" element={<AdminRoute><AdminEnterpriseBilling /></AdminRoute>} />
                 <Route path="/admin/ai-costs" element={<AdminRoute><AdminAICosts /></AdminRoute>} />
                 <Route path="/admin/speaker-profiles" element={<AdminRoute><AdminSpeakerProfiles /></AdminRoute>} />
-                <Route path="/admin/teams-insights" element={<AdminRoute><AdminTeamsInsights /></AdminRoute>} />
+                <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
+                <Route path="/admin/integrations/teams" element={<AdminRoute><AdminTeamsInsights /></AdminRoute>} />
+                <Route path="/admin/teams-insights" element={<Navigate to="/admin/integrations/teams" replace />} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                 <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
                 <Route path="/org/billing" element={<ProtectedRoute><EnterpriseBilling /></ProtectedRoute>} />

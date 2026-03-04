@@ -132,7 +132,7 @@ export function AppSidebar() {
       else if (path.startsWith("/admin/enterprise")) setSelected("Enterprise");
       else if (path === "/admin/ai-costs") setSelected("AI Kostnader");
       else if (path === "/admin/speaker-profiles") setSelected("Röstprofiler");
-      else if (path === "/admin/teams-insights") setSelected("Teams Insights");
+      else if (path.startsWith("/admin/integrations")) setSelected("Integrationer (Admin)");
     }
 
     // Auto-expand org section if on an org page
@@ -206,7 +206,7 @@ export function AppSidebar() {
     { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
     { Icon: DollarSign, title: "AI Kostnader", path: "/admin/ai-costs" },
     { Icon: Mic, title: "Röstprofiler", path: "/admin/speaker-profiles" },
-    { Icon: FiZap, title: "Teams Insights", path: "/admin/teams-insights" },
+    { Icon: FiZap, title: "Integrationer (Admin)", path: "/admin/integrations" },
     { Icon: Eye, title: "Support Panel", action: () => setShowAdminSupport(true) },
   ];
 
