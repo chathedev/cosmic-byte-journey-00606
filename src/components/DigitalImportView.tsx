@@ -94,6 +94,44 @@ const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = 
   },
 };
 
+const ADMIN_CONSENT_URL = 'https://login.microsoftonline.com/common/adminconsent?client_id=ac5fc254-0617-43db-b53a-7a0a65b17a5c&redirect_uri=https://api.tivly.se/auth/microsoft/callback';
+
+const AdminConsentLinkBox = () => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(ADMIN_CONSENT_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {}
+  };
+  return (
+    <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2 text-left">
+      <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+        <Send className="w-3.5 h-3.5 text-primary" />
+        Skicka denna länk till din IT-admin
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 text-[10px] bg-background border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
+          {ADMIN_CONSENT_URL}
+        </code>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopy}
+          className="shrink-0 gap-1.5 h-8"
+        >
+          {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? 'Kopierad!' : 'Kopiera'}
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+        Admins klickar på länken, loggar in och godkänner behörigheterna. Därefter kan du koppla ditt konto.
+      </p>
+    </div>
+  );
+};
+
 export const DigitalImportView = ({
   importStatus,
   meetings,
