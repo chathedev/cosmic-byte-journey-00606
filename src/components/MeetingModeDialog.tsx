@@ -6,9 +6,10 @@ import { useEffect, useState } from "react";
 import { debugLog } from "@/lib/debugLogger";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
+import googleMeetLogo from "@/assets/google-meet-logo.png";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
-export type DigitalProvider = 'teams' | 'zoom';
+export type DigitalProvider = 'teams' | 'zoom' | 'google_meet';
 
 interface MeetingModeDialogProps {
   open: boolean;
