@@ -186,16 +186,20 @@ export default function AdminZoomInsights() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.companies.map((c) => (
+                  {data.companies.map((c) => {
+                    const zi = c.zoomImport || ({} as any);
+                    const imports = zi.imports || {};
+                    return (
                     <TableRow key={c.company.id}>
                       <TableCell><span className="text-sm font-medium">{c.company.name}</span></TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.zoomImport.connectedUserCount}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.zoomImport.autoImportEnabledUserCount}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.zoomImport.imports.activeAuto}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.zoomImport.imports.activeManual}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums font-medium">{c.zoomImport.imports.activeTotal}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{zi.connectedUserCount ?? 0}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{zi.autoImportEnabledUserCount ?? 0}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{imports.activeAuto ?? 0}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{imports.activeManual ?? 0}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums font-medium">{imports.activeTotal ?? 0}</TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
