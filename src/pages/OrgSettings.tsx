@@ -1,12 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Users } from "lucide-react";
+import { ArrowLeft, Building2, Users, Link2, Settings2 } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
 import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { OrgZoomInsights } from "@/components/OrgZoomInsights";
+import { OrgGoogleMeetInsights } from "@/components/OrgGoogleMeetInsights";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import teamsLogo from "@/assets/teams-logo.png";
+import zoomLogo from "@/assets/zoom-logo.png";
+import googleMeetLogo from "@/assets/google-meet-logo.png";
 
 export default function OrgSettings() {
   const navigate = useNavigate();
@@ -25,77 +29,110 @@ export default function OrgSettings() {
 
   const role = enterpriseMembership.membership?.role;
   const roleName = role === 'owner' ? 'Ägare' : role === 'admin' ? 'Admin' : 'Medlem';
+  const isAdminOrOwner = role === 'owner' || role === 'admin';
+  const companyId = enterpriseMembership.company?.id;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-3xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
             className="p-2 -ml-2 rounded-lg hover:bg-muted transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-semibold">Organisation</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-semibold">Organisation</h1>
+            <p className="text-sm text-muted-foreground mt-0.5 truncate">
+              {enterpriseMembership.company?.name || 'Enterprise'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="secondary" className="bg-primary/15 text-primary text-xs gap-1">
+              <Building2 className="w-3 h-3" />
+              {roleName}
+            </Badge>
+            <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+          </div>
         </div>
 
-        <div className="space-y-8">
-          {/* Company Info */}
-          <section>
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Företag</h2>
-            <div className="flex items-start gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Building2 className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold">{enterpriseMembership.company?.name || 'Enterprise'}</h3>
-                  <Badge variant="secondary" className="bg-primary/20 text-primary text-xs">Enterprise</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {roleName}
-                  {enterpriseMembership.membership?.title && ` • ${enterpriseMembership.membership.title}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span className="text-sm text-muted-foreground">Aktiv</span>
-              </div>
-            </div>
-          </section>
+        {/* Tabs */}
+        <Tabs defaultValue="team" className="w-full">
+          <TabsList className="w-full justify-start bg-muted/50 border border-border rounded-xl p-1 h-auto flex-wrap gap-1">
+            <TabsTrigger value="team" className="rounded-lg gap-1.5 text-xs sm:text-sm px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Users className="w-3.5 h-3.5" />
+              <span>Team</span>
+            </TabsTrigger>
+            {isAdminOrOwner && (
+              <TabsTrigger value="invite" className="rounded-lg gap-1.5 text-xs sm:text-sm px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <Settings2 className="w-3.5 h-3.5" />
+                <span>Bjud in</span>
+              </TabsTrigger>
+            )}
+            {isAdminOrOwner && companyId && (
+              <TabsTrigger value="integrations" className="rounded-lg gap-1.5 text-xs sm:text-sm px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Integrationer</span>
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-          <Separator />
-
-          {/* Invite Members (admin/owner only) */}
-          <section>
-            <EnterpriseInvitePanel />
-          </section>
-
-          <Separator />
-
-          {/* Teams */}
-          <section>
+          {/* Team tab */}
+          <TabsContent value="team" className="mt-6 space-y-6">
             <EnterpriseTeamManager />
-          </section>
+          </TabsContent>
 
-          {/* Microsoft Teams Insights (owner/admin only) */}
-          {(role === 'owner' || role === 'admin') && enterpriseMembership.company?.id && (
-            <>
-              <Separator />
-              <section>
-                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Microsoft Teams</h2>
-                <OrgTeamsInsights companyId={enterpriseMembership.company.id} />
-              </section>
-
-              <Separator />
-              <section>
-                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Zoom</h2>
-                <OrgZoomInsights companyId={enterpriseMembership.company.id} />
-              </section>
-            </>
+          {/* Invite tab */}
+          {isAdminOrOwner && (
+            <TabsContent value="invite" className="mt-6 space-y-6">
+              <EnterpriseInvitePanel />
+            </TabsContent>
           )}
-        </div>
+
+          {/* Integrations tab */}
+          {isAdminOrOwner && companyId && (
+            <TabsContent value="integrations" className="mt-6 space-y-6">
+              {/* Sub-tabs for each integration */}
+              <Tabs defaultValue="teams" className="w-full">
+                <TabsList className="w-full justify-start bg-transparent border-b border-border rounded-none p-0 h-auto gap-0">
+                  <TabsTrigger
+                    value="teams"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 gap-2 text-xs sm:text-sm"
+                  >
+                    <img src={teamsLogo} alt="" className="w-4 h-4 object-contain" />
+                    Teams
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="zoom"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 gap-2 text-xs sm:text-sm"
+                  >
+                    <img src={zoomLogo} alt="" className="w-4 h-4 object-contain" />
+                    Zoom
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="google-meet"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 gap-2 text-xs sm:text-sm"
+                  >
+                    <img src={googleMeetLogo} alt="" className="w-4 h-4 object-contain" />
+                    Google Meet
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="teams" className="mt-4">
+                  <OrgTeamsInsights companyId={companyId} />
+                </TabsContent>
+                <TabsContent value="zoom" className="mt-4">
+                  <OrgZoomInsights companyId={companyId} />
+                </TabsContent>
+                <TabsContent value="google-meet" className="mt-4">
+                  <OrgGoogleMeetInsights companyId={companyId} />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </div>
   );

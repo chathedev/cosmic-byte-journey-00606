@@ -1,6 +1,9 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Monitor, Video, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import teamsLogo from "@/assets/teams-logo.png";
+import zoomLogo from "@/assets/zoom-logo.png";
+import googleMeetLogo from "@/assets/google-meet-logo.png";
 
 const AdminIntegrations = () => {
   const navigate = useNavigate();
@@ -9,15 +12,23 @@ const AdminIntegrations = () => {
     {
       title: "Microsoft Teams",
       description: "Hantera Teams-kopplingar, auto-import och tenant consent",
-      icon: Monitor,
+      logo: teamsLogo,
       path: "/admin/integrations/teams",
       active: true,
     },
     {
       title: "Zoom",
       description: "Hantera Zoom-kopplingar, auto-import och cloud recordings",
-      icon: Video,
+      logo: zoomLogo,
       path: "/admin/integrations/zoom",
+      active: true,
+      logoClass: "p-2",
+    },
+    {
+      title: "Google Meet",
+      description: "Hantera Google Meet-kopplingar, auto-import och transkript",
+      logo: googleMeetLogo,
+      path: "/admin/integrations/google-meet",
       active: true,
     },
   ];
@@ -46,8 +57,8 @@ const AdminIntegrations = () => {
               className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
             >
               <div className="p-4 sm:p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0">
-                  <item.icon className="w-5 h-5 text-primary" />
+                <div className={`w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden ${item.logoClass || 'p-1.5'}`}>
+                  <img src={item.logo} alt={item.title} className="w-full h-full object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
