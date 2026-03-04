@@ -43,6 +43,7 @@ const IntegrationTeams = () => {
   const [autoImportLoading, setAutoImportLoading] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [copiedLink, setCopiedLink] = useState(false);
   const hasAutoLoaded = useRef(false);
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
