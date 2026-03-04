@@ -32,6 +32,13 @@ const AdminIntegrations = () => {
       path: "/admin/integrations/google-meet",
       active: true,
     },
+    {
+      title: "Slack",
+      description: "Hantera Slack-kopplingar, auto-delning och protokolldelning",
+      logo: slackLogo,
+      path: "/admin/integrations/slack",
+      active: true,
+    },
   ];
 
   return (

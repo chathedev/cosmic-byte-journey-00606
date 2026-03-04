@@ -362,6 +362,7 @@ const AppContent = () => {
                 <Route path="/integrations/teams" element={<ProtectedRoute><IntegrationTeams /></ProtectedRoute>} />
                 <Route path="/integrations/zoom" element={<ProtectedRoute><IntegrationZoom /></ProtectedRoute>} />
                 <Route path="/integrations/google-meet" element={<ProtectedRoute><IntegrationGoogleMeet /></ProtectedRoute>} />
+                <Route path="/integrations/slack" element={<ProtectedRoute><IntegrationSlack /></ProtectedRoute>} />
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
