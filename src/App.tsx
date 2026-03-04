@@ -75,6 +75,7 @@ import AdminGoogleMeetInsights from "./pages/AdminGoogleMeetInsights";
 import AdminSlackInsights from "./pages/AdminSlackInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import IntegrationSlack from "./pages/IntegrationSlack";
+import SharedProtocol from "./pages/SharedProtocol";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -298,6 +299,13 @@ const AppContent = () => {
   // Public standalone pages — no sidebar, no auth gates
   if (location.pathname === '/integrations/teams/admin-verified') {
     return <AdminConsentVerified />;
+  }
+  if (location.pathname.startsWith('/shared/protocol/')) {
+    return (
+      <Routes>
+        <Route path="/shared/protocol/:token" element={<SharedProtocol />} />
+      </Routes>
+    );
   }
 
   return (
