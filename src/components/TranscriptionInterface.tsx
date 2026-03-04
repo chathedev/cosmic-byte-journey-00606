@@ -425,7 +425,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         </div>
       </div>
     );
-  }
+
+  if (currentView === "analyzing") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-6 max-w-sm">
