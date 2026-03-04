@@ -66,10 +66,17 @@ const Index = () => {
       />
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
       
-      {/* Welcome name prompt for users without a name */}
+      {/* Welcome name prompt for non-enterprise users without a name */}
       <WelcomeNameDialog 
         open={showNameDialog} 
         onComplete={handleNameComplete} 
+      />
+
+      {/* Enterprise onboarding wizard for first-time enterprise users */}
+      <EnterpriseWelcomeWizard
+        open={showEnterpriseWizard}
+        companyName={enterpriseMembership?.company?.name || 'Enterprise'}
+        onComplete={handleNameComplete}
       />
 
       {/* Org chooser for multi-company users on first visit */}
