@@ -215,13 +215,13 @@ export default function AdminTeamsInsights() {
               {' '}<span className="font-medium">Att ta bort consent raderar tenant-posten helt</span> – den sätts inte till "avslagen".
             </p>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             {data.tenants.length === 0 ? (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 Inga tenants registrerade ännu.
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[700px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Tenant ID</TableHead>
