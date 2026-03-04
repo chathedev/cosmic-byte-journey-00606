@@ -285,6 +285,13 @@ const MeetingLegacyRedirect = () => {
 
 // Shared app content for all routes
 const AppContent = () => {
+  const location = useLocation();
+
+  // Public standalone pages — no sidebar, no auth gates
+  if (location.pathname === '/integrations/teams/admin-verified') {
+    return <AdminConsentVerified />;
+  }
+
   return (
     <PlanGate>
       <ScrollToTop />
