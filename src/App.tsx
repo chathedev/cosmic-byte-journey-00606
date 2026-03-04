@@ -71,6 +71,7 @@ import IntegrationGoogleMeet from "./pages/IntegrationGoogleMeet";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
 import AdminZoomInsights from "./pages/AdminZoomInsights";
+import AdminGoogleMeetInsights from "./pages/AdminGoogleMeetInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 
 const queryClient = new QueryClient({
