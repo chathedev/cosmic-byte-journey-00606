@@ -181,8 +181,38 @@ export interface ZoomOrgInsights {
 
 export const orgZoomImportApi = {
   getInsights: (companyId: string): Promise<ZoomOrgInsights> =>
-    fetchWithAuth(`/enterprise/companies/${encodeURIComponent(companyId)}/digital-import/insights`).then(data => ({
-      ...data,
+    fetchWithAuth(`/enterprise/companies/${encodeURIComponent(companyId)}/digital-import/insights`).then((data) => ({
+      company: {
+        id: data?.company?.id ?? companyId,
+        name: data?.company?.name ?? 'Organisation',
+      },
+      viewer: {
+        email: data?.viewer?.email ?? '',
+        role: data?.viewer?.role ?? 'member',
+        canManageMembers: Boolean(data?.viewer?.canManageMembers),
+        membershipSource: data?.viewer?.membershipSource ?? 'unknown',
+      },
+      zoomImport: {
+        connectedUserCount: Number(data?.zoomImport?.connectedUserCount ?? 0),
+        autoImportEnabledUserCount: Number(data?.zoomImport?.autoImportEnabledUserCount ?? 0),
+        imports: normalizeCounts(data?.zoomImport?.imports),
+      },
+      members: Array.isArray(data?.members)
+        ? data.members.map((m: any) => ({
+            email: m?.email ?? '',
+            role: m?.role ?? 'member',
+            status: m?.status ?? 'active',
+            connected: Boolean(m?.connected),
+            accountEmail: m?.accountEmail,
+            displayName: m?.displayName,
+            autoImportEnabled: Boolean(m?.autoImportEnabled),
+            connectedAt: m?.connectedAt,
+            lastImportAt: m?.lastImportAt,
+            lastError: m?.lastError ?? null,
+            imports: normalizeCounts(m?.imports),
+          }))
+        : [],
+      timestamp: data?.timestamp ?? new Date().toISOString(),
     })),
 
   resetUser: (companyId: string, email: string) =>

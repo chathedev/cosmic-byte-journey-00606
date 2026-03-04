@@ -168,7 +168,7 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right text-xs tabular-nums">
-                    {m.imports.activeAuto} / {m.imports.activeManual}
+                    {m.imports?.activeAuto ?? 0} / {m.imports?.activeManual ?? 0}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}
