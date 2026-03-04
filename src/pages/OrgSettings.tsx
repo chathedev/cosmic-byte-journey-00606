@@ -124,7 +124,7 @@ export default function OrgSettings() {
                     value="slack"
                     className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 gap-2 text-xs sm:text-sm"
                   >
-                    <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
+                    <img src={slackLogo} alt="" className="w-5 h-5 object-contain" />
                     Slack
                   </TabsTrigger>
                 </TabsList>

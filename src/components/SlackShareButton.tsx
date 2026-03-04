@@ -72,7 +72,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
         {shared ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
         ) : (
-          <img src={slackLogo} alt="" className="w-3.5 h-3.5 object-contain" />
+          <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
         )}
         {!compact && (
           <span>{shared ? "Delat" : "Dela via Slack"}</span>
@@ -83,7 +83,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2.5">
-              <img src={slackLogo} alt="Slack" className="w-5 h-5 object-contain" />
+              <img src={slackLogo} alt="Slack" className="w-6 h-6 object-contain" />
               <DialogTitle className="text-base">Dela till Slack</DialogTitle>
             </div>
             <DialogDescription>
@@ -136,7 +136,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
               {sharing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <img src={slackLogo} alt="" className="w-3.5 h-3.5 object-contain" />
+                <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
               )}
               {sharing ? "Delar..." : "Dela till Slack"}
             </Button>
