@@ -10,9 +10,11 @@ import { TeamSelectDialog } from "./TeamSelectDialog";
 import { MeetingModeDialog, type MeetingMode, type DigitalProvider } from "./MeetingModeDialog";
 import { DigitalImportView } from "./DigitalImportView";
 import { ZoomImportView } from "./ZoomImportView";
+import { GoogleMeetImportView } from "./GoogleMeetImportView";
 import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
+import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useSearchParams, useNavigate } from "react-router-dom";
