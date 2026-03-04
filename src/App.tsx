@@ -66,8 +66,10 @@ import EnterpriseOnboarding from "./pages/EnterpriseOnboarding";
 import EnterpriseEmailVerify from "./pages/EnterpriseEmailVerify";
 import Integrations from "./pages/Integrations";
 import IntegrationTeams from "./pages/IntegrationTeams";
+import IntegrationZoom from "./pages/IntegrationZoom";
 import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
+import AdminZoomInsights from "./pages/AdminZoomInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 
 const queryClient = new QueryClient({
