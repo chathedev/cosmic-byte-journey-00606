@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink, Shield, AlertCircle } from "lucide-react";
+import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink, Shield, AlertCircle, Copy, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
