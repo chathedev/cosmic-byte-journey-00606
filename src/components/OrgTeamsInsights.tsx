@@ -10,10 +10,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, AlertCircle,
+  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, Shield,
 } from 'lucide-react';
 import {
   orgDigitalImportApi,
+  isCompanyConsentAccepted,
   type OrgDigitalImportInsights,
   type OrgMemberRow,
 } from '@/lib/adminDigitalImportApi';
@@ -92,10 +93,11 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
 
   const di = data.digitalImport;
   const canManage = data.viewer.canManageMembers;
+  const orgConsentAccepted = isCompanyConsentAccepted(di.adminConsent);
 
   return (
     <div className="space-y-5">
-      {/* Summary */}
+      {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MiniStat icon={Users} label="Anslutna" value={di.connectedUserCount} />
         <MiniStat icon={Zap} label="Auto-import" value={di.autoImportEnabledUserCount} />
@@ -103,39 +105,66 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
         <MiniStat label="Manuella" value={di.imports.activeManual} />
       </div>
 
-      {/* Consent status */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Admin consent:</span>
-        {(di.adminConsent.accepted || di.adminConsent.acceptedTenants?.length > 0) ? (
-          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
-            <CheckCircle2 className="w-2.5 h-2.5" /> Accepted
-          </Badge>
-        ) : di.adminConsent.status === 'not_applicable' ? (
-          <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1">
-            Ej tillämpligt
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
-            <XCircle className="w-2.5 h-2.5" /> Pending
-          </Badge>
-        )}
-        <Button variant="ghost" size="icon" onClick={fetchData} className="h-7 w-7 ml-auto">
+      {/* ── Org-level consent banner ── */}
+      <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+        orgConsentAccepted
+          ? 'border-emerald-500/20 bg-emerald-500/5'
+          : 'border-amber-500/20 bg-amber-500/5'
+      }`}>
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+          orgConsentAccepted ? 'bg-emerald-500/15' : 'bg-amber-500/15'
+        }`}>
+          <Shield className={`w-4.5 h-4.5 ${orgConsentAccepted ? 'text-emerald-600' : 'text-amber-600'}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">
+              Organisationens admin consent
+            </p>
+            {orgConsentAccepted ? (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
+                <CheckCircle2 className="w-2.5 h-2.5" /> Godkänd
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
+                <XCircle className="w-2.5 h-2.5" /> Väntar
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            {orgConsentAccepted
+              ? 'IT-administratören har godkänt Tivly för organisationen. Varje medlem måste fortfarande koppla sitt eget Microsoft-konto.'
+              : 'IT-administratören har inte godkänt Tivly ännu. Medlemmar kan eventuellt inte importera Teams-transkript förrän consent är klart.'}
+          </p>
+          {di.adminConsent.acceptedTenants?.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {di.adminConsent.acceptedTenants.map((t) => (
+                <Badge key={t.tenantId} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                  {t.tenantId.slice(0, 8)}… {new Date(t.acceptedAt).toLocaleDateString('sv-SE')}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+        <Button variant="ghost" size="icon" onClick={fetchData} className="h-7 w-7 shrink-0">
           <RefreshCw className="w-3.5 h-3.5" />
         </Button>
       </div>
 
-      {/* Members table */}
+      {/* ── Members table (individual connections — no consent column) ── */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium">Medlemmar ({data.members.length})</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Individuell Microsoft-koppling per medlem
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">Medlem</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Consent</TableHead>
+                <TableHead className="text-xs">Koppling</TableHead>
                 <TableHead className="text-xs">Auto</TableHead>
                 <TableHead className="text-xs text-right">Auto / Man</TableHead>
                 <TableHead className="text-xs">Senaste import</TableHead>
@@ -144,88 +173,72 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.members.map((m) => {
-                const consentApproved = m.adminConsent?.approved ?? m.adminConsentAcceptedForTenant ?? false;
-                return (
-                  <TableRow key={m.email}>
-                    <TableCell>
-                      <div>
-                        <span className="text-sm">{m.displayName || m.email}</span>
-                        {m.displayName && <span className="block text-xs text-muted-foreground">{m.email}</span>}
-                        {m.accountEmail && m.accountEmail !== m.email && (
-                          <span className="block text-[10px] text-muted-foreground/60">{m.accountEmail}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {m.connected ? (
-                        <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600">Ansluten</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Ej ansluten</Badge>
+              {data.members.map((m) => (
+                <TableRow key={m.email}>
+                  <TableCell>
+                    <div>
+                      <span className="text-sm">{m.displayName || m.email}</span>
+                      {m.displayName && <span className="block text-xs text-muted-foreground">{m.email}</span>}
+                      {m.accountEmail && m.accountEmail !== m.email && (
+                        <span className="block text-[10px] text-muted-foreground/60">MS: {m.accountEmail}</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {m.connected ? (
-                        consentApproved ? (
-                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> OK
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
-                            <AlertCircle className="w-2.5 h-2.5" /> Pending
-                          </Badge>
-                        )
-                      ) : (
-                        <span className="text-xs text-muted-foreground">–</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {canManage ? (
-                        <Switch
-                          checked={m.autoImportEnabled}
-                          disabled={actionLoading === m.email || !m.connected}
-                          onCheckedChange={(val) => handleToggleAutoImport(m.email, val)}
-                          className="scale-75"
-                        />
-                      ) : (
-                        <span className="text-xs">{m.autoImportEnabled ? 'Ja' : 'Nej'}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-xs tabular-nums">
-                      {m.imports.activeAuto} / {m.imports.activeManual}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}
-                    </TableCell>
-                    <TableCell>
-                      {m.lastError ? (
-                        <span className="text-xs text-destructive truncate max-w-[100px] block" title={m.lastError.message}>
-                          {m.lastError.code}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">–</span>
-                      )}
-                    </TableCell>
-                    {canManage && (
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs"
-                          disabled={!m.connected || actionLoading === m.email}
-                          onClick={() => setResetTarget(m)}
-                        >
-                          <RotateCcw className="w-3 h-3 mr-1" />
-                          Reset
-                        </Button>
-                      </TableCell>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {m.connected ? (
+                      <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Ansluten
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">Ej ansluten</Badge>
                     )}
-                  </TableRow>
-                );
-              })}
+                  </TableCell>
+                  <TableCell>
+                    {canManage ? (
+                      <Switch
+                        checked={m.autoImportEnabled}
+                        disabled={actionLoading === m.email || !m.connected}
+                        onCheckedChange={(val) => handleToggleAutoImport(m.email, val)}
+                        className="scale-75"
+                      />
+                    ) : (
+                      <span className="text-xs">{m.autoImportEnabled ? 'Ja' : 'Nej'}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-xs tabular-nums">
+                    {m.imports.activeAuto} / {m.imports.activeManual}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}
+                  </TableCell>
+                  <TableCell>
+                    {m.lastError ? (
+                      <span className="text-xs text-destructive truncate max-w-[100px] block" title={m.lastError.message}>
+                        {m.lastError.code}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">–</span>
+                    )}
+                  </TableCell>
+                  {canManage && (
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={!m.connected || actionLoading === m.email}
+                        onClick={() => setResetTarget(m)}
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Reset
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
               {data.members.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 8 : 7} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={canManage ? 7 : 6} className="text-center text-sm text-muted-foreground py-6">
                     Inga medlemmar har kopplat Microsoft Teams ännu.
                   </TableCell>
                 </TableRow>

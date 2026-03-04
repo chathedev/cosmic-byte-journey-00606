@@ -35,6 +35,7 @@ export interface ImportCounts {
   total: number;
 }
 
+/** Per-user admin consent info (reflects the tenant consent state for that user's tenant) */
 export interface AdminConsentInfo {
   tenantId?: string;
   required?: boolean;
@@ -44,9 +45,13 @@ export interface AdminConsentInfo {
   adminConsentUrl?: string;
 }
 
+/** Company/org-level admin consent — this is a tenant/org signal, NOT per-user */
 export interface CompanyAdminConsent {
   status: string;
   accepted: boolean;
+  pending?: boolean;
+  tenantIds?: string[];
+  adminConsentUrl?: string | null;
   acceptedTenants: Array<{ tenantId: string; acceptedAt: string }>;
 }
 
@@ -186,3 +191,10 @@ export const orgDigitalImportApi = {
       body: JSON.stringify({ enabled }),
     }),
 };
+
+// ── Helpers ──
+
+/** Determine if company-level admin consent is accepted (checks both boolean and acceptedTenants array) */
+export function isCompanyConsentAccepted(consent: CompanyAdminConsent): boolean {
+  return consent.accepted || (consent.acceptedTenants?.length ?? 0) > 0;
+}
