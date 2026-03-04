@@ -132,22 +132,28 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.members.map((m) => (
+              {data.members.map((m) => {
+                const zm = m.zoomImport ?? { connected: false, reconnectRequired: false, accountEmail: null, displayName: null, autoImportEnabled: false, lastImportAt: null, lastError: null, autoImportLastError: null, imports: { activeAuto: 0, activeManual: 0 } };
+                return (
                 <TableRow key={m.email}>
                   <TableCell>
                     <div className="min-w-0">
-                      <span className="text-sm font-medium">{m.displayName || m.email}</span>
-                      {m.displayName && <span className="block text-xs text-muted-foreground truncate">{m.email}</span>}
-                      {m.accountEmail && m.accountEmail !== m.email && (
+                      <span className="text-sm font-medium">{zm.displayName || m.email}</span>
+                      {zm.displayName && <span className="block text-xs text-muted-foreground truncate">{m.email}</span>}
+                      {zm.accountEmail && zm.accountEmail !== m.email && (
                         <span className="block text-[10px] text-muted-foreground/60 truncate">
                           <Video className="w-2.5 h-2.5 inline mr-0.5" />
-                          {m.accountEmail}
+                          {zm.accountEmail}
                         </span>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    {m.connected ? (
+                    {zm.reconnectRequired ? (
+                      <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Reconnect
+                      </Badge>
+                    ) : zm.connected ? (
                       <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
                         <CheckCircle2 className="w-2.5 h-2.5" /> Ansluten
                       </Badge>
@@ -158,25 +164,25 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
                   <TableCell>
                     {canManage ? (
                       <Switch
-                        checked={m.autoImportEnabled}
-                        disabled={actionLoading === m.email || !m.connected}
+                        checked={zm.autoImportEnabled}
+                        disabled={actionLoading === m.email || !zm.connected}
                         onCheckedChange={(val) => handleToggleAutoImport(m.email, val)}
                         className="scale-75"
                       />
                     ) : (
-                      <span className="text-xs">{m.autoImportEnabled ? 'Ja' : 'Nej'}</span>
+                      <span className="text-xs">{zm.autoImportEnabled ? 'Ja' : 'Nej'}</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right text-xs tabular-nums">
-                    {m.imports?.activeAuto ?? 0} / {m.imports?.activeManual ?? 0}
+                    {zm.imports?.activeAuto ?? 0} / {zm.imports?.activeManual ?? 0}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {m.lastImportAt ? new Date(m.lastImportAt).toLocaleDateString('sv-SE') : '–'}
+                    {zm.lastImportAt ? new Date(zm.lastImportAt).toLocaleDateString('sv-SE') : '–'}
                   </TableCell>
                   <TableCell>
-                    {m.lastError ? (
-                      <span className="text-xs text-destructive truncate max-w-[100px] block" title={m.lastError.message}>
-                        {m.lastError.code}
+                    {(zm.lastError || zm.autoImportLastError) ? (
+                      <span className="text-xs text-destructive truncate max-w-[100px] block" title={(zm.lastError as any)?.message || (zm.autoImportLastError as any)?.message}>
+                        {(zm.lastError as any)?.code || (zm.autoImportLastError as any)?.code || 'Fel'}
                       </span>
                     ) : (
                       <span className="text-xs text-muted-foreground">–</span>
@@ -188,7 +194,7 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs"
-                        disabled={!m.connected || actionLoading === m.email}
+                        disabled={!zm.connected || actionLoading === m.email}
                         onClick={() => setResetTarget(m)}
                       >
                         <RotateCcw className="w-3 h-3 mr-1" />
@@ -197,7 +203,8 @@ export function OrgZoomInsights({ companyId }: OrgZoomInsightsProps) {
                     </TableCell>
                   )}
                 </TableRow>
-              ))}
+                );
+              })}
               {data.members.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={canManage ? 7 : 6} className="text-center text-sm text-muted-foreground py-8">
