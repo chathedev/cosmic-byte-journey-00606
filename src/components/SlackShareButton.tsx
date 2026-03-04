@@ -150,21 +150,29 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
               </div>
 
               {shareResult.shareLink?.appUrl && (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 min-w-0 overflow-hidden">
                   <p className="text-xs font-medium text-muted-foreground">Publik länk</p>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="flex-1 min-w-0 text-xs text-muted-foreground bg-muted/30 border border-border/50 rounded-lg px-3 py-2 truncate font-mono overflow-hidden">
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full flex items-center gap-2 min-w-0 text-left bg-muted/30 border border-border/50 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer"
+                  >
+                    <span className="flex-1 min-w-0 text-[11px] text-muted-foreground font-mono truncate block overflow-hidden">
                       {shareResult.shareLink.appUrl}
-                    </div>
-                    <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={handleCopyLink}>
-                      {linkCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
-                      <a href={shareResult.shareLink.appUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </Button>
-                  </div>
+                    </span>
+                    <span className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                      {linkCopied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-green-600" />
+                          <span className="text-green-600 text-[10px]">Kopierad</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span className="text-[10px]">Kopiera</span>
+                        </>
+                      )}
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
