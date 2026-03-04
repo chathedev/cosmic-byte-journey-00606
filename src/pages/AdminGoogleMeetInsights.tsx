@@ -398,13 +398,13 @@ export default function AdminGoogleMeetInsights() {
 function SummaryCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: number; sub?: string }) {
   return (
     <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-primary" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-lg font-semibold tabular-nums">{value}</p>
-          <p className="text-xs text-muted-foreground leading-tight">{label}{sub ? ` ${sub}` : ''}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight truncate">{label}{sub ? ` ${sub}` : ''}</p>
         </div>
       </CardContent>
     </Card>
