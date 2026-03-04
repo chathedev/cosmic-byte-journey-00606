@@ -45,6 +45,18 @@ const IntegrationTeams = () => {
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
+  const prevConnected = useRef(di.isFullyConnected);
+
+  // Show confirmation when transitioning to connected
+  useEffect(() => {
+    if (di.isFullyConnected && !prevConnected.current) {
+      setShowConnectedConfirm(true);
+      const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+      return () => clearTimeout(timer);
+    }
+    prevConnected.current = di.isFullyConnected;
+  }, [di.isFullyConnected]);
 
   const COOLDOWN_KEY = 'teams_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;
