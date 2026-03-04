@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,66 +10,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle,
+  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, AlertCircle,
 } from 'lucide-react';
-import googleMeetLogo from '@/assets/google-meet-logo.png';
-
-const API_BASE_URL = 'https://api.tivly.se';
-const getAuthToken = (): string | null => localStorage.getItem('authToken');
-
-const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
-  const token = getAuthToken();
-  if (!token) throw new Error('No auth token');
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(options.headers || {}) },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || data.error || `Request failed: ${res.status}`);
-  }
-  return res.json();
-};
-
-export interface GoogleMeetOrgMemberRow {
-  email: string;
-  displayName?: string;
-  connected: boolean;
-  reconnectRequired?: boolean;
-  autoImportEnabled?: boolean;
-  lastImportAt?: string | null;
-  totalImported?: number;
-}
-
-export interface GoogleMeetOrgInsights {
-  members: GoogleMeetOrgMemberRow[];
-  totalConnected: number;
-  totalAutoImport: number;
-}
-
-export const orgGoogleMeetImportApi = {
-  getInsights: (companyId: string): Promise<GoogleMeetOrgInsights> =>
-    fetchWithAuth(`/enterprise/companies/${encodeURIComponent(companyId)}/digital-import/insights`).then((data) => ({
-      members: (data.members || []).map((m: any) => ({
-        email: m.email,
-        displayName: m.displayName,
-        connected: m.googleMeetConnected ?? false,
-        reconnectRequired: m.googleMeetReconnectRequired ?? false,
-        autoImportEnabled: m.googleMeetAutoImportEnabled ?? false,
-        lastImportAt: m.googleMeetLastImportAt,
-        totalImported: m.googleMeetTotalImported ?? 0,
-      })),
-      totalConnected: data.googleMeetTotalConnected ?? 0,
-      totalAutoImport: data.googleMeetTotalAutoImport ?? 0,
-    })),
-  resetConnection: (companyId: string, email: string) =>
-    fetchWithAuth(`/enterprise/companies/${encodeURIComponent(companyId)}/google-meet-import/users/${encodeURIComponent(email)}/reset`, { method: 'POST' }),
-  toggleAutoImport: (companyId: string, email: string, enabled: boolean) =>
-    fetchWithAuth(`/enterprise/companies/${encodeURIComponent(companyId)}/google-meet-import/users/${encodeURIComponent(email)}/auto-import`, {
-      method: 'POST',
-      body: JSON.stringify({ enabled }),
-    }),
-};
+import {
+  orgGoogleMeetImportApi,
+  type GoogleMeetOrgInsights,
+  type GoogleMeetOrgMemberRow,
+} from '@/lib/googleMeetImportApi';
 
 interface OrgGoogleMeetInsightsProps {
   companyId: string;
@@ -105,7 +52,10 @@ export function OrgGoogleMeetInsights({ companyId }: OrgGoogleMeetInsightsProps)
       setData(prev => prev ? {
         ...prev,
         members: prev.members.map(m => m.email === member.email ? { ...m, autoImportEnabled: enabled } : m),
-        totalAutoImport: prev.totalAutoImport + (enabled ? 1 : -1),
+        googleMeetImport: {
+          ...prev.googleMeetImport,
+          autoImportEnabledUserCount: prev.googleMeetImport.autoImportEnabledUserCount + (enabled ? 1 : -1),
+        },
       } : prev);
       toast({ title: enabled ? 'Auto-import aktiverad' : 'Auto-import inaktiverad' });
     } catch (err: any) {
@@ -119,7 +69,7 @@ export function OrgGoogleMeetInsights({ companyId }: OrgGoogleMeetInsightsProps)
     if (!resetTarget) return;
     setActionLoading(resetTarget.email);
     try {
-      await orgGoogleMeetImportApi.resetConnection(companyId, resetTarget.email);
+      await orgGoogleMeetImportApi.resetUser(companyId, resetTarget.email);
       toast({ title: 'Koppling återställd' });
       fetchData();
     } catch (err: any) {
@@ -160,7 +110,7 @@ export function OrgGoogleMeetInsights({ companyId }: OrgGoogleMeetInsightsProps)
           <CardContent className="p-4 flex items-center gap-3">
             <Users className="w-4 h-4 text-muted-foreground" />
             <div>
-              <p className="text-lg font-semibold">{data.totalConnected}</p>
+              <p className="text-lg font-semibold">{data.googleMeetImport.connectedUserCount}</p>
               <p className="text-xs text-muted-foreground">Kopplade</p>
             </div>
           </CardContent>
@@ -169,7 +119,7 @@ export function OrgGoogleMeetInsights({ companyId }: OrgGoogleMeetInsightsProps)
           <CardContent className="p-4 flex items-center gap-3">
             <Zap className="w-4 h-4 text-muted-foreground" />
             <div>
-              <p className="text-lg font-semibold">{data.totalAutoImport}</p>
+              <p className="text-lg font-semibold">{data.googleMeetImport.autoImportEnabledUserCount}</p>
               <p className="text-xs text-muted-foreground">Auto-import</p>
             </div>
           </CardContent>
@@ -204,16 +154,19 @@ export function OrgGoogleMeetInsights({ companyId }: OrgGoogleMeetInsightsProps)
                     </TableCell>
                     <TableCell className="text-center">
                       {member.reconnectRequired ? (
-                        <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px]">Omkoppling</Badge>
+                        <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px]">
+                          <AlertCircle className="w-2.5 h-2.5 mr-0.5" />
+                          Omkoppling
+                        </Badge>
                       ) : member.connected ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
                       ) : (
                         <XCircle className="w-4 h-4 text-muted-foreground/30 mx-auto" />
                       )}
                     </TableCell>
                     <TableCell className="text-center">
                       <Switch
-                        checked={member.autoImportEnabled ?? false}
+                        checked={member.autoImportEnabled}
                         onCheckedChange={(v) => handleToggleAutoImport(member, v)}
                         disabled={actionLoading === member.email}
                       />
