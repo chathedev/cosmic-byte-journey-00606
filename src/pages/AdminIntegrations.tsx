@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Monitor, ChevronRight } from "lucide-react";
+import { ArrowLeft, Monitor, Video, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const AdminIntegrations = () => {
@@ -11,6 +11,13 @@ const AdminIntegrations = () => {
       description: "Hantera Teams-kopplingar, auto-import och tenant consent",
       icon: Monitor,
       path: "/admin/integrations/teams",
+      active: true,
+    },
+    {
+      title: "Zoom",
+      description: "Hantera Zoom-kopplingar, auto-import och cloud recordings",
+      icon: Video,
+      path: "/admin/integrations/zoom",
       active: true,
     },
   ];
