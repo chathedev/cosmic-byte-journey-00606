@@ -278,10 +278,28 @@ const IntegrationZoom = () => {
                   <CollapsibleContent>
                     <div className="mt-2.5 space-y-2.5">
                       <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border text-sm">
+                        {account.email && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">E-post</span>
+                            <span className="text-foreground">{account.email}</span>
+                          </div>
+                        )}
+                        {account.id && !account.email && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Konto-ID</span>
+                            <span className="text-foreground font-mono text-xs">{account.id}</span>
+                          </div>
+                        )}
                         {account.connectedAt && (
                           <div className="flex items-center justify-between px-3.5 py-2.5">
                             <span className="text-muted-foreground">Kopplad sedan</span>
                             <span className="text-foreground">{formatDate(account.connectedAt)}</span>
+                          </div>
+                        )}
+                        {account.lastAuthorizedAt && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Senast auktoriserad</span>
+                            <span className="text-foreground">{formatDateTime(account.lastAuthorizedAt)}</span>
                           </div>
                         )}
                         {account.lastImportAt && (
