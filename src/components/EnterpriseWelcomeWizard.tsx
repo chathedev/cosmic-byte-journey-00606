@@ -330,6 +330,6 @@ export function EnterpriseWelcomeWizard({ open, companyName, onComplete }: Enter
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </div>
   );
 }
