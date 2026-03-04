@@ -155,6 +155,20 @@ export interface ZoomOrgMemberRow {
   lastImportAt?: string;
   lastError?: { code: string; message: string; updatedAt?: string } | null;
   imports: ZoomImportCounts;
+  zoomImport?: {
+    connected: boolean;
+    reconnectRequired: boolean;
+    accountEmail?: string | null;
+    displayName?: string | null;
+    accountId?: string | null;
+    autoImportEnabled: boolean;
+    connectedAt?: string | null;
+    lastAuthorizedAt?: string | null;
+    lastImportAt?: string | null;
+    lastError?: any;
+    autoImportLastError?: any;
+    imports: ZoomImportCounts;
+  };
 }
 
 export interface ZoomOrgInsights {
@@ -183,9 +197,9 @@ export const orgZoomImportApi = {
         membershipSource: data?.viewer?.membershipSource ?? 'unknown',
       },
       zoomImport: {
-        connectedUserCount: Number(data?.zoomImport?.connectedUserCount ?? 0),
-        autoImportEnabledUserCount: Number(data?.zoomImport?.autoImportEnabledUserCount ?? 0),
-        imports: normalizeCounts(data?.zoomImport?.imports),
+        connectedUserCount: Number(data?.digitalImport?.zoomImport?.connectedUserCount ?? data?.zoomImport?.connectedUserCount ?? 0),
+        autoImportEnabledUserCount: Number(data?.digitalImport?.zoomImport?.autoImportEnabledUserCount ?? data?.zoomImport?.autoImportEnabledUserCount ?? 0),
+        imports: normalizeCounts(data?.digitalImport?.zoomImport?.imports ?? data?.zoomImport?.imports),
       },
       members: Array.isArray(data?.members)
         ? data.members.map((m: any) => ({
@@ -200,6 +214,7 @@ export const orgZoomImportApi = {
             lastImportAt: m?.lastImportAt,
             lastError: m?.lastError ?? null,
             imports: normalizeCounts(m?.imports),
+            zoomImport: m?.zoomImport ?? undefined,
           }))
         : [],
       timestamp: data?.timestamp ?? new Date().toISOString(),
