@@ -425,6 +425,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         </div>
       </div>
     );
+  }
 
   if (currentView === "analyzing") {
     return (
