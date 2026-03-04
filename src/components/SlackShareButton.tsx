@@ -25,6 +25,13 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
   const [sharing, setSharing] = useState(false);
   const [shared, setShared] = useState(false);
 
+  // Pre-select auto-share channel
+  useEffect(() => {
+    if (sl.importStatus?.autoShare?.channelId && !selectedChannel) {
+      setSelectedChannel(sl.importStatus.autoShare.channelId);
+    }
+  }, [sl.importStatus?.autoShare?.channelId]);
+
   // Don't render if Slack is not connected
   if (!sl.isFullyConnected) return null;
 
