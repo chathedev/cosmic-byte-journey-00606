@@ -112,24 +112,26 @@ export function AppSidebar() {
   useEffect(() => {
     const path = location.pathname;
     if (path === "/") setSelected("Hem");
-    else if (path === "/library") setSelected("Bibliotek");
-    else if (path === "/agendas") setSelected("Agendor");
-    
-    else if (path === "/feedback") setSelected("Feedback");
-    else if (path === "/integrations") setSelected("Integrationer");
-    else if (path === "/settings") setSelected("Inställningar");
-    else if (path === "/enterprise/stats") setSelected("Översikt");
-    else if (path === "/org/settings") setSelected("Team");
-    else if (path === "/org/billing") setSelected("Fakturering");
-    else if (path === "/billing/invoices") setSelected("Fakturor");
+    else if (path === "/library" || path.startsWith("/library/")) setSelected("Bibliotek");
+    else if (path === "/agendas" || path.startsWith("/agendas/")) setSelected("Agendor");
+    else if (path === "/feedback" || path.startsWith("/feedback/")) setSelected("Feedback");
+    else if (path.startsWith("/integrations")) setSelected("Integrationer");
+    else if (path === "/settings" || path.startsWith("/settings/")) setSelected("Inställningar");
+    else if (path === "/enterprise/stats" || path.startsWith("/enterprise/stats/")) setSelected("Översikt");
+    else if (path === "/org/settings" || path.startsWith("/org/settings/")) setSelected("Team");
+    else if (path === "/org/billing" || path.startsWith("/org/billing/")) setSelected("Fakturering");
+    else if (path.startsWith("/billing/invoices")) setSelected("Fakturor");
+    else if (path.startsWith("/meetings/")) setSelected("Hem");
+    else if (path === "/chat" || path.startsWith("/chat/")) setSelected("Hem");
     else if (path.startsWith("/admin")) {
       if (path === "/admin/users") setSelected("Användare");
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
       else if (path === "/admin/admins") setSelected("Admins");
       else if (path === "/admin/backend") setSelected("Backend");
-      else if (path === "/admin/enterprise") setSelected("Enterprise");
-      else if (path === "/admin/enterprise/billing") setSelected("Enterprise Billing");
+      else if (path.startsWith("/admin/enterprise/billing")) setSelected("Enterprise Billing");
+      else if (path.startsWith("/admin/enterprise")) setSelected("Enterprise");
       else if (path === "/admin/ai-costs") setSelected("AI Kostnader");
+      else if (path === "/admin/speaker-profiles") setSelected("Röstprofiler");
     }
 
     // Auto-expand org section if on an org page
