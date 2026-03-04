@@ -55,6 +55,18 @@ export interface AutoImportStatus {
   lastError?: ImportLastError | null;
 }
 
+export interface AdminConsentStatus {
+  tenantId?: string;
+  required?: boolean;
+  pending?: boolean;
+  approved?: boolean;
+  requestedAt?: string;
+  approvedAt?: string;
+  updatedAt?: string;
+  source?: string;
+  adminConsentUrl?: string;
+}
+
 export interface ImportStatus {
   enabled: boolean;
   configured: boolean;
@@ -66,6 +78,7 @@ export interface ImportStatus {
   lastError?: ImportLastError | null;
   account?: MicrosoftAccount | null;
   autoImport?: AutoImportStatus | null;
+  adminConsent?: AdminConsentStatus | null;
   scopes?: string[];
   grantedScopes?: string[];
   requiredScopes?: string[];

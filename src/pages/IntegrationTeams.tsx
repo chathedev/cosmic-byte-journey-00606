@@ -121,6 +121,8 @@ const IntegrationTeams = () => {
   const scopes = di.importStatus?.scopes;
   const missingScopes = di.importStatus?.missingScopes;
   const connectionIssue = di.importStatus?.connectionIssue;
+  const adminConsent = di.importStatus?.adminConsent;
+  const isAdminConsentApproved = adminConsent?.approved === true;
   const isAdminConsentRequired = connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' || connectionIssue?.adminConsentLikelyRequired;
 
   const handleCopyAdminLink = async () => {
@@ -386,44 +388,46 @@ const IntegrationTeams = () => {
                   </div>
                 )}
 
-                {/* Admin approval notice with shareable link */}
-                <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-                        Administratörsgodkännande kan krävas
-                      </p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Er organisations IT-administratör kan behöva godkänna Tivly i Microsoft Entra innan transkript kan importeras.
-                      </p>
+                {/* Admin approval notice — only when NOT approved */}
+                {!isAdminConsentApproved && (
+                  <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1.5">
+                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                          Administratörsgodkännande kan krävas
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Er organisations IT-administratör kan behöva godkänna Tivly i Microsoft Entra innan transkript kan importeras.
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="p-3 rounded-lg border border-border bg-background/50 space-y-2">
-                    <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                      <Send className="w-3.5 h-3.5 text-primary" />
-                      Skicka denna länk till din IT-admin
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 text-[10px] bg-muted border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
-                        {ADMIN_CONSENT_URL}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyAdminLink}
-                        className="shrink-0 gap-1.5 h-8"
-                      >
-                        {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedLink ? 'Kopierad!' : 'Kopiera'}
-                      </Button>
+                    <div className="p-3 rounded-lg border border-border bg-background/50 space-y-2">
+                      <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5 text-primary" />
+                        Skicka denna länk till din IT-admin
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-[10px] bg-muted border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
+                          {ADMIN_CONSENT_URL}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyAdminLink}
+                          className="shrink-0 gap-1.5 h-8"
+                        >
+                          {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedLink ? 'Kopierad!' : 'Kopiera'}
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                        Admins klickar på länken, loggar in med sitt Microsoft-konto och godkänner behörigheterna. Därefter kan du koppla ditt konto nedan.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-                      Admins klickar på länken, loggar in med sitt Microsoft-konto och godkänner behörigheterna. Därefter kan du koppla ditt konto nedan.
-                    </p>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   {['Koppla ditt Microsoft 365-konto', 'Välj ett Teams-möte med färdigt transkript', 'Importera och skapa protokoll i Tivly'].map((step, i) => (
