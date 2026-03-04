@@ -14,15 +14,18 @@ import {
 } from '@/components/ui/dialog';
 import {
   Loader2, RefreshCw, Users, Building2, Zap, Shield, RotateCcw, Play,
-  CheckCircle2, XCircle, AlertTriangle, AlertCircle, ExternalLink,
+  CheckCircle2, XCircle, AlertTriangle, AlertCircle, ExternalLink, ArrowLeft,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   adminDigitalImportApi,
+  isCompanyConsentAccepted,
   type AdminInsightsResponse,
   type AdminUserRow,
 } from '@/lib/adminDigitalImportApi';
 
 export default function AdminTeamsInsights() {
+  const navigate = useNavigate();
   const [data, setData] = useState<AdminInsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,17 +128,17 @@ export default function AdminTeamsInsights() {
       <div className="w-full max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Microsoft Teams Insights</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Global admin-överblick</p>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/admin/integrations')} className="p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-xl font-semibold">Microsoft Teams Insights</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Global admin-överblick</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTriggerRun}
-              disabled={actionLoading === 'run'}
-            >
+            <Button variant="outline" size="sm" onClick={handleTriggerRun} disabled={actionLoading === 'run'}>
               {actionLoading === 'run' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span className="ml-1.5">Kör auto-import</span>
             </Button>
@@ -147,10 +150,10 @@ export default function AdminTeamsInsights() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <SummaryCard icon={Users} label="Anslutna" value={s.connectedUsers} sub={`av ${s.totalUsers}`} />
+          <SummaryCard icon={Users} label="Anslutna användare" value={s.connectedUsers} sub={`av ${s.totalUsers}`} />
           <SummaryCard icon={Zap} label="Auto-import" value={s.usersWithAutoImportEnabled} sub="användare" />
           <SummaryCard icon={Building2} label="Företag" value={s.companiesWithConnectedUsers} sub={`av ${s.companies}`} />
-          <SummaryCard icon={Shield} label="Tenants" value={s.tenantsWithAdminConsentAccepted} sub={`av ${s.tenants} accepted`} />
+          <SummaryCard icon={Shield} label="Tenant consent" value={s.tenantsWithAdminConsentAccepted} sub={`av ${s.tenants} accepted`} />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -160,11 +163,17 @@ export default function AdminTeamsInsights() {
           <MiniStat label="Reconnect krävs" value={s.reconnectRequiredUsers} warn={s.reconnectRequiredUsers > 0} />
         </div>
 
-        {/* Tenants */}
+        {/* ── Tenants (org-level consent) ── */}
         {data.tenants.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Tenants ({data.tenants.length})</CardTitle>
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" />
+                <CardTitle className="text-sm font-medium">Tenant Admin Consent ({data.tenants.length})</CardTitle>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Admin consent gäller hela organisationen/tenant – inte enskilda användare. Varje användare måste fortfarande koppla sitt eget Microsoft-konto.
+              </p>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -172,9 +181,9 @@ export default function AdminTeamsInsights() {
                   <TableRow>
                     <TableHead className="text-xs">Tenant ID</TableHead>
                     <TableHead className="text-xs">Consent</TableHead>
-                    <TableHead className="text-xs">Accepted</TableHead>
-                    <TableHead className="text-xs text-right">Användare</TableHead>
-                    <TableHead className="text-xs text-right">Admin-användare</TableHead>
+                    <TableHead className="text-xs">Godkänd</TableHead>
+                    <TableHead className="text-xs text-right">Anslutna</TableHead>
+                    <TableHead className="text-xs text-right">Admin</TableHead>
                     <TableHead className="text-xs text-right">Företag</TableHead>
                     <TableHead className="text-xs text-right">Åtgärd</TableHead>
                   </TableRow>
@@ -184,7 +193,7 @@ export default function AdminTeamsInsights() {
                     <TableRow key={t.tenantId}>
                       <TableCell className="font-mono text-xs max-w-[200px] truncate">{t.tenantId}</TableCell>
                       <TableCell>
-                        <StatusBadge ok={t.accepted} yesLabel="Accepted" noLabel="Pending" />
+                        <ConsentBadge accepted={t.accepted} />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {t.acceptedAt ? new Date(t.acceptedAt).toLocaleDateString('sv-SE') : '–'}
@@ -211,7 +220,7 @@ export default function AdminTeamsInsights() {
           </Card>
         )}
 
-        {/* Companies */}
+        {/* ── Companies (consent is org-level) ── */}
         {data.companies.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
@@ -222,55 +231,61 @@ export default function AdminTeamsInsights() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">Företag</TableHead>
+                    <TableHead className="text-xs">Org consent</TableHead>
                     <TableHead className="text-xs text-right">Anslutna</TableHead>
                     <TableHead className="text-xs text-right">Admin</TableHead>
                     <TableHead className="text-xs text-right">Auto-import</TableHead>
                     <TableHead className="text-xs text-right">Auto</TableHead>
                     <TableHead className="text-xs text-right">Manuella</TableHead>
-                    <TableHead className="text-xs text-right">Papperskorg</TableHead>
-                    <TableHead className="text-xs">Consent</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.companies.map((c) => (
-                    <TableRow key={c.company.id}>
-                      <TableCell>
-                        <span className="text-sm font-medium">{c.company.name}</span>
-                        {c.digitalImport.tenantIds.length > 0 && (
-                          <span className="block text-[10px] font-mono text-muted-foreground truncate max-w-[150px]">
-                            {c.digitalImport.tenantIds[0]}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.connectedUserCount}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.connectedAdminUserCount}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.autoImportEnabledUserCount}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeAuto}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeManual}</TableCell>
-                      <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{c.digitalImport.imports.trashedTotal}</TableCell>
-                      <TableCell>
-                        <StatusBadge ok={c.digitalImport.adminConsent.accepted} yesLabel="Accepted" noLabel="Pending" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {data.companies.map((c) => {
+                    const accepted = isCompanyConsentAccepted(c.digitalImport.adminConsent);
+                    return (
+                      <TableRow key={c.company.id}>
+                        <TableCell>
+                          <span className="text-sm font-medium">{c.company.name}</span>
+                          {c.digitalImport.tenantIds.length > 0 && (
+                            <span className="block text-[10px] font-mono text-muted-foreground truncate max-w-[150px]">
+                              {c.digitalImport.tenantIds[0]}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <ConsentBadge accepted={accepted} />
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.connectedUserCount}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.connectedAdminUserCount}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.autoImportEnabledUserCount}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeAuto}</TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">{c.digitalImport.imports.activeManual}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         )}
 
-        {/* Users */}
+        {/* ── Users (individual connection status — NO consent column) ── */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Användare ({data.users.length})</CardTitle>
+            <div>
+              <CardTitle className="text-sm font-medium">Användare ({data.users.length})</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Individuell koppling – varje användare kopplar sitt eget Microsoft-konto. Admin consent hanteras på tenant-/organisationsnivå ovan.
+              </p>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Användare</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Consent</TableHead>
+                  <TableHead className="text-xs">Koppling</TableHead>
+                  <TableHead className="text-xs">Tenant</TableHead>
                   <TableHead className="text-xs">Auto</TableHead>
                   <TableHead className="text-xs text-right">Auto / Man</TableHead>
                   <TableHead className="text-xs">Fel</TableHead>
@@ -278,70 +293,73 @@ export default function AdminTeamsInsights() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.users.map((u) => {
-                  const consentApproved = u.adminConsent?.approved ?? u.adminConsentAcceptedForTenant ?? false;
-                  return (
-                    <TableRow key={u.email} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedUser(u)}>
-                      <TableCell>
-                        <div>
-                          <span className="text-sm">{u.displayName || u.email}</span>
-                          {u.displayName && <span className="block text-xs text-muted-foreground">{u.email}</span>}
-                          {u.accountEmail && u.accountEmail !== u.email && (
-                            <span className="block text-[10px] text-muted-foreground/60">{u.accountEmail}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {u.reconnectRequired ? (
-                          <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
-                            <AlertCircle className="w-2.5 h-2.5" /> Reconnect
-                          </Badge>
-                        ) : (
-                          <StatusBadge ok={u.connected} yesLabel="Ansluten" noLabel="Ej ansluten" />
+                {data.users.map((u) => (
+                  <TableRow key={u.email} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedUser(u)}>
+                    <TableCell>
+                      <div>
+                        <span className="text-sm">{u.displayName || u.email}</span>
+                        {u.displayName && <span className="block text-xs text-muted-foreground">{u.email}</span>}
+                        {u.accountEmail && u.accountEmail !== u.email && (
+                          <span className="block text-[10px] text-muted-foreground/60">MS: {u.accountEmail}</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {u.connected ? (
-                          <StatusBadge ok={consentApproved} yesLabel="OK" noLabel="Pending" />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">–</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={u.autoImportEnabled}
-                          disabled={actionLoading === u.email || !u.connected}
-                          onCheckedChange={(val) => handleToggleAutoImport(u.email, val)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="scale-75"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="text-xs tabular-nums">{u.imports.activeAuto} / {u.imports.activeManual}</span>
-                      </TableCell>
-                      <TableCell>
-                        {u.lastError ? (
-                          <span className="text-xs text-destructive truncate max-w-[120px] block" title={u.lastError.message}>
-                            {u.lastError.code}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">–</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={(e) => { e.stopPropagation(); setResetTarget(u); }}
-                        >
-                          <RotateCcw className="w-3 h-3 mr-1" />
-                          Reset
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {u.reconnectRequired ? (
+                        <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" /> Reconnect
+                        </Badge>
+                      ) : u.connected ? (
+                        <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Ansluten
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Ej ansluten</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {u.tenantId ? (
+                        <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[100px] block">
+                          {u.tenantId.slice(0, 8)}…
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={u.autoImportEnabled}
+                        disabled={actionLoading === u.email || !u.connected}
+                        onCheckedChange={(val) => handleToggleAutoImport(u.email, val)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="scale-75"
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-xs tabular-nums">{u.imports.activeAuto} / {u.imports.activeManual}</span>
+                    </TableCell>
+                    <TableCell>
+                      {u.lastError ? (
+                        <span className="text-xs text-destructive truncate max-w-[120px] block" title={u.lastError.message}>
+                          {u.lastError.code}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={(e) => { e.stopPropagation(); setResetTarget(u); }}
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Reset
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
                 {data.users.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">
@@ -395,45 +413,38 @@ export default function AdminTeamsInsights() {
 }
 
 function UserDetailContent({ user }: { user: AdminUserRow }) {
-  const consentApproved = user.adminConsent?.approved ?? user.adminConsentAcceptedForTenant ?? false;
-
   return (
     <div className="space-y-3 text-sm">
       <DetailRow label="Microsoft-konto" value={user.accountEmail || '–'} />
       <DetailRow label="Tenant" value={user.tenantId || '–'} mono />
       <DetailRow label="Ansluten" value={user.connected ? 'Ja' : 'Nej'} />
       <DetailRow label="Reconnect krävs" value={user.reconnectRequired ? 'Ja' : 'Nej'} />
-      
-      <div className="flex items-center justify-between py-1">
-        <span className="text-muted-foreground">Admin consent</span>
-        <StatusBadge ok={consentApproved} yesLabel="Godkänd" noLabel="Ej godkänd" />
-      </div>
-      {user.adminConsent?.approvedAt && (
-        <DetailRow label="Consent godkänd" value={new Date(user.adminConsent.approvedAt).toLocaleString('sv-SE')} />
-      )}
-      {user.adminConsent?.pending && (
-        <div className="flex items-center gap-1.5 text-xs text-amber-600">
-          <AlertCircle className="w-3 h-3" />
-          Väntar på admin-godkännande
-        </div>
-      )}
-      {user.adminConsent?.adminConsentUrl && (
-        <a
-          href={user.adminConsent.adminConsentUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          Admin consent-länk <ExternalLink className="w-3 h-3" />
-        </a>
-      )}
-
       <DetailRow label="Auto-import" value={user.autoImportEnabled ? 'Aktiv' : 'Av'} />
       <DetailRow label="Aktiva auto" value={String(user.imports.activeAuto)} />
       <DetailRow label="Aktiva manuella" value={String(user.imports.activeManual)} />
       <DetailRow label="Papperskorgen" value={String(user.imports.trashedTotal)} />
       <DetailRow label="Totalt" value={String(user.imports.total)} />
-      
+
+      {/* Tenant consent info — shown as org context, not user-owned */}
+      {user.tenantId && (
+        <div className="pt-2 border-t border-border space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Tenant consent (organisationsnivå)</p>
+          <div className="flex items-center justify-between py-1">
+            <span className="text-muted-foreground">Status</span>
+            <ConsentBadge accepted={user.adminConsent?.approved ?? user.adminConsentAcceptedForTenant ?? false} />
+          </div>
+          {user.adminConsent?.approvedAt && (
+            <DetailRow label="Godkänd" value={new Date(user.adminConsent.approvedAt).toLocaleString('sv-SE')} />
+          )}
+          {user.adminConsent?.adminConsentUrl && (
+            <a href={user.adminConsent.adminConsentUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              Admin consent-länk <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
+        </div>
+      )}
+
       {user.lastError && (
         <div className="p-2 rounded bg-destructive/10 text-xs text-destructive space-y-0.5">
           <strong>{user.lastError.code}</strong>
@@ -474,14 +485,14 @@ function MiniStat({ label, value, accent, warn }: { label: string; value: number
   );
 }
 
-function StatusBadge({ ok, yesLabel, noLabel }: { ok: boolean; yesLabel: string; noLabel: string }) {
-  return ok ? (
+function ConsentBadge({ accepted }: { accepted: boolean }) {
+  return accepted ? (
     <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
-      <CheckCircle2 className="w-2.5 h-2.5" /> {yesLabel}
+      <CheckCircle2 className="w-2.5 h-2.5" /> Accepted
     </Badge>
   ) : (
     <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1">
-      <XCircle className="w-2.5 h-2.5" /> {noLabel}
+      <XCircle className="w-2.5 h-2.5" /> Pending
     </Badge>
   );
 }
