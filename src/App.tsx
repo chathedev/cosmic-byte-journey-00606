@@ -300,6 +300,13 @@ const AppContent = () => {
   if (location.pathname === '/integrations/teams/admin-verified') {
     return <AdminConsentVerified />;
   }
+  if (location.pathname.startsWith('/shared/protocol/')) {
+    return (
+      <Routes>
+        <Route path="/shared/protocol/:token" element={<SharedProtocol />} />
+      </Routes>
+    );
+  }
 
   return (
     <PlanGate>
