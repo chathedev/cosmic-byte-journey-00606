@@ -72,7 +72,9 @@ import AdminConsentVerified from "./pages/AdminConsentVerified";
 import AdminTeamsInsights from "./pages/AdminTeamsInsights";
 import AdminZoomInsights from "./pages/AdminZoomInsights";
 import AdminGoogleMeetInsights from "./pages/AdminGoogleMeetInsights";
+import AdminSlackInsights from "./pages/AdminSlackInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
+import IntegrationSlack from "./pages/IntegrationSlack";
 
 const queryClient = new QueryClient({
   defaultOptions: {
