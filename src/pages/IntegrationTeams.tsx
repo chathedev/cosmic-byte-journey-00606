@@ -121,6 +121,19 @@ const IntegrationTeams = () => {
   const scopes = di.importStatus?.scopes;
   const missingScopes = di.importStatus?.missingScopes;
   const connectionIssue = di.importStatus?.connectionIssue;
+  const isAdminConsentRequired = connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' || connectionIssue?.adminConsentLikelyRequired;
+
+  const handleCopyAdminLink = async () => {
+    try {
+      await navigator.clipboard.writeText(ADMIN_CONSENT_URL);
+      setCopiedLink(true);
+      toast({ title: 'Länk kopierad', description: 'Skicka den till din IT-administratör.' });
+      setTimeout(() => setCopiedLink(false), 3000);
+    } catch {
+      toast({ title: 'Kunde inte kopiera', variant: 'destructive' });
+    }
+  };
+  const connectionIssue = di.importStatus?.connectionIssue;
 
   const handleConnect = async () => { await di.connect(); };
   const handleDisconnect = async () => {
