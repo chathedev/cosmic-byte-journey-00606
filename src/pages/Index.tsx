@@ -11,82 +11,68 @@ const Index = () => {
   const { userPlan, isLoading, enterpriseMembership, switchCompany } = useSubscription();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
-  const [showNameDialog, setShowNameDialog] = useState(false);
-  const [showEnterpriseWizard, setShowEnterpriseWizard] = useState(false);
   const [showOrgChooser, setShowOrgChooser] = useState(false);
-  const [readyToShow, setReadyToShow] = useState(false);
 
-  // Wait until auth + subscription are fully resolved before showing anything
   const fullyLoaded = !isAuthLoading && !isLoading;
+  const hasName = !!(user?.preferredName || user?.displayName);
+  const needsName = !!user && !hasName;
+  const isEnterpriseUser = !!(enterpriseMembership?.isMember || userPlan?.plan === "enterprise");
 
-  useEffect(() => {
-    if (!fullyLoaded || !user) return;
-
-    const hasName = !!(user.preferredName || user.displayName);
-    if (!hasName) {
-      if (enterpriseMembership?.isMember) {
-        setShowEnterpriseWizard(true);
-      } else {
-        setShowNameDialog(true);
-      }
-    }
-    // Mark ready — dashboard can render now
-    setReadyToShow(true);
-  }, [fullyLoaded, user, enterpriseMembership]);
+  const showEnterpriseWizard = fullyLoaded && needsName && isEnterpriseUser;
+  const showNameDialog = fullyLoaded && needsName && !isEnterpriseUser;
 
   // Show org chooser on startup if multiple memberships and no prior choice
   useEffect(() => {
-    if (!fullyLoaded || !user || !enterpriseMembership) return;
+    if (!fullyLoaded || !user || !enterpriseMembership || showEnterpriseWizard) return;
+
     const memberships = enterpriseMembership.memberships;
     if (memberships && memberships.length > 1) {
-      const previousChoice = localStorage.getItem('tivly_org_chosen');
+      const previousChoice = localStorage.getItem("tivly_org_chosen");
       if (!previousChoice) {
         setShowOrgChooser(true);
       }
     }
-  }, [fullyLoaded, user, enterpriseMembership]);
+  }, [fullyLoaded, user, enterpriseMembership, showEnterpriseWizard]);
 
-  const handleNameComplete = () => {
-    setShowNameDialog(false);
-    setShowEnterpriseWizard(false);
+  const handleEnterpriseNameComplete = () => {
+    // No local toggle needed; wizard closes automatically once user name exists in auth state.
+  };
+
+  const handleRegularNameComplete = () => {
+    // No local toggle needed; dialog closes automatically once user name exists in auth state.
   };
 
   const handleOrgSelect = async (companyId: string) => {
     await switchCompany(companyId);
   };
 
-  // Show a clean loading state until we know whether to show onboarding
-  if (!readyToShow) {
+  // Block dashboard until auth/subscription are fully resolved
+  if (!fullyLoaded) {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        </div>
+        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
+    );
+  }
+
+  // For enterprise users without name: show only the enterprise wizard (no dashboard flash behind)
+  if (showEnterpriseWizard) {
+    return (
+      <EnterpriseWelcomeWizard
+        open={showEnterpriseWizard}
+        companyName={enterpriseMembership?.company?.name || "Enterprise"}
+        onComplete={handleEnterpriseNameComplete}
+      />
     );
   }
 
   return (
     <>
-      {/* Enterprise onboarding wizard — renders OVER everything */}
-      {showEnterpriseWizard && (
-        <EnterpriseWelcomeWizard
-          open={showEnterpriseWizard}
-          companyName={enterpriseMembership?.company?.name || 'Enterprise'}
-          onComplete={handleNameComplete}
-        />
-      )}
-
-      {/* Non-enterprise name prompt */}
-      <WelcomeNameDialog
-        open={showNameDialog}
-        onComplete={handleNameComplete}
-      />
-
-      <TranscriptionInterface
-        isFreeTrialMode={userPlan?.plan === 'free'}
-      />
+      <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
+
+      {/* Name prompt for non-enterprise users only */}
+      <WelcomeNameDialog open={showNameDialog} onComplete={handleRegularNameComplete} />
 
       {/* Org chooser for multi-company users on first visit */}
       {enterpriseMembership?.memberships && enterpriseMembership.memberships.length > 1 && (
