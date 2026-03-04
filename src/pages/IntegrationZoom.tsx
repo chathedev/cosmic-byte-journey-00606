@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft, Video, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
+  ArrowLeft, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Info, FileText, Clock, Download,
   ChevronRight, AlertCircle, ChevronDown, Zap
 } from "lucide-react";
+import zoomLogo from "@/assets/zoom-logo.png";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -38,15 +39,21 @@ const IntegrationZoom = () => {
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
-  const prevConnected = useRef(zi.isFullyConnected);
+  const prevConnected = useRef<boolean | null>(null);
 
   const COOLDOWN_KEY = 'zoom_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;
 
   useEffect(() => {
+    // Skip the first status load to avoid showing the banner on every refresh
+    if (prevConnected.current === null) {
+      prevConnected.current = zi.isFullyConnected;
+      return;
+    }
     if (zi.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
       const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+      prevConnected.current = zi.isFullyConnected;
       return () => clearTimeout(timer);
     }
     prevConnected.current = zi.isFullyConnected;
@@ -151,8 +158,8 @@ const IntegrationZoom = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center">
-              <Video className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center overflow-hidden">
+              <img src={zoomLogo} alt="Zoom" className="w-7 h-7 object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-semibold">Zoom</h1>

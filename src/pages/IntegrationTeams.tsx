@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft, Monitor, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
+  ArrowLeft, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Shield, Info, FileText, Clock, Users, Download, Sparkles,
   ChevronRight, AlertCircle, ExternalLink, Zap, ChevronDown, Copy, Send
 } from "lucide-react";
+import teamsLogo from "@/assets/teams-logo.png";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -47,7 +48,7 @@ const IntegrationTeams = () => {
   const [accountOpen, setAccountOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
-  const prevConnected = useRef(di.isFullyConnected);
+  const prevConnected = useRef<boolean | null>(null);
 
   // Detect teams_admin_required from URL (OAuth callback redirect)
   const teamsAdminRequired = searchParams.get('teams_admin_required') === 'true';
@@ -63,11 +64,16 @@ const IntegrationTeams = () => {
     }
   }, []);
 
-  // Show confirmation when transitioning to connected
+  // Show confirmation when transitioning to connected — skip initial mount
   useEffect(() => {
+    if (prevConnected.current === null) {
+      prevConnected.current = di.isFullyConnected;
+      return;
+    }
     if (di.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
       const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+      prevConnected.current = di.isFullyConnected;
       return () => clearTimeout(timer);
     }
     prevConnected.current = di.isFullyConnected;
@@ -267,8 +273,8 @@ const IntegrationTeams = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
-              <Monitor className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center overflow-hidden">
+              <img src={teamsLogo} alt="Microsoft Teams" className="w-7 h-7 object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-semibold">Microsoft Teams</h1>
