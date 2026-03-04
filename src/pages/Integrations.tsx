@@ -15,6 +15,7 @@ const Integrations = () => {
   const digitalImport = useDigitalImport();
   const zoomImport = useZoomImport();
   const googleMeetImport = useGoogleMeetImport();
+  const slackIntegration = useSlackIntegration();
 
   const isTeamsEnabled = digitalImport.importStatus?.enabled === true;
   const isTeamsConfigured = digitalImport.importStatus?.configured === true;
