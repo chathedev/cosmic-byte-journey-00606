@@ -131,6 +131,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [adminConsentTenant, setAdminConsentTenant] = useState<string | null>(null);
   const hasCheckedRef = useRef(false);
 
   const isFullyConnected = importStatus?.connected === true && !importStatus?.reconnectRequired;
