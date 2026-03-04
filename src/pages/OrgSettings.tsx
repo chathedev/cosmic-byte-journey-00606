@@ -4,6 +4,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
 import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
+import { OrgZoomInsights } from "@/components/OrgZoomInsights";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -85,6 +86,12 @@ export default function OrgSettings() {
               <section>
                 <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Microsoft Teams</h2>
                 <OrgTeamsInsights companyId={enterpriseMembership.company.id} />
+              </section>
+
+              <Separator />
+              <section>
+                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Zoom</h2>
+                <OrgZoomInsights companyId={enterpriseMembership.company.id} />
               </section>
             </>
           )}

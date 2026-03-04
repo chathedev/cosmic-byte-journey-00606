@@ -394,7 +394,38 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     );
   }
 
-  if (currentView === "analyzing") {
+  // Show Zoom Import view
+  if (showZoomImport) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col">
+        <div className="flex items-center gap-3 p-4 border-b border-border/50">
+          <Button variant="ghost" size="icon" onClick={() => setShowZoomImport(false)} className="shrink-0 -ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </Button>
+          <p className="text-sm font-medium text-foreground">Importera från Zoom</p>
+        </div>
+        <div className="flex-1">
+          <ZoomImportView
+            importStatus={zoomImport.importStatus}
+            recordings={zoomImport.recordings}
+            warnings={zoomImport.warnings}
+            state={zoomImport.state}
+            error={zoomImport.error}
+            errorCode={zoomImport.errorCode}
+            onConnect={zoomImport.connect}
+            onDisconnect={zoomImport.disconnect}
+            onLoadRecordings={zoomImport.loadRecordings}
+            onImport={zoomImport.importRecording}
+            onToggleAutoImport={zoomImport.toggleAutoImport}
+            onReset={zoomImport.reset}
+            onClose={() => setShowZoomImport(false)}
+            isFullyConnected={zoomImport.isFullyConnected}
+            needsReconnect={zoomImport.needsReconnect}
+          />
+        </div>
+      </div>
+    );
+  }
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-6 max-w-sm">
