@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Monitor, Video, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
+import { ArrowLeft, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
+import teamsLogo from "@/assets/teams-logo.png";
+import zoomLogo from "@/assets/zoom-logo.png";
 
 const Integrations = () => {
   const navigate = useNavigate();
