@@ -355,6 +355,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     error,
     errorCode,
     importResult,
+    adminConsentTenant,
     checkStatus,
     connect,
     disconnect,
