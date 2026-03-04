@@ -32,6 +32,7 @@ import { TranscriptTextView } from "@/components/TranscriptTextView";
 import { EnhancedSpeakerView } from "@/components/EnhancedSpeakerView";
 import { SyncedTranscriptView } from "@/components/SyncedTranscriptView";
 import { hasPlusAccess } from "@/lib/accessCheck";
+import { SlackShareButton } from "@/components/SlackShareButton";
 import { useASRStream } from "@/hooks/useASRStream";
 import { LiveTranscriptView } from "@/components/LiveTranscriptView";
 
