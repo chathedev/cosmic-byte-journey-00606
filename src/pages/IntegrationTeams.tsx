@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Monitor, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Shield, Info, FileText, Clock, Users, Download, Sparkles,
-  ChevronRight, AlertCircle, ExternalLink, Zap, ChevronDown
+  ChevronRight, AlertCircle, ExternalLink, Zap, ChevronDown, Copy, Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
