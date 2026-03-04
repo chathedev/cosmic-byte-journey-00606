@@ -86,13 +86,13 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
         variant="outline"
         size="sm"
         onClick={handleOpen}
-        className={`gap-1.5 h-9 text-xs no-hover-lift ${className}`}
+        className={`gap-2 h-9 text-xs font-semibold no-hover-lift border-[#611f69]/20 bg-[#611f69]/5 hover:bg-[#611f69]/10 hover:border-[#611f69]/30 text-[#611f69] dark:text-[#e8a5ef] dark:border-[#e8a5ef]/20 dark:bg-[#e8a5ef]/5 dark:hover:bg-[#e8a5ef]/10 ${className}`}
         disabled={shared}
       >
         {shared ? (
-          <CheckCircle2 className="w-4 h-4 text-green-600" />
+          <CheckCircle2 className="w-4.5 h-4.5 text-green-600" />
         ) : (
-          <img src={slackLogo} alt="" className="w-5 h-5 object-contain" />
+          <img src={slackLogo} alt="" className="w-6 h-6 object-contain" />
         )}
         {!compact && (
           <span>{shared ? "Delat" : "Dela via Slack"}</span>
