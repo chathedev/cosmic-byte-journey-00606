@@ -245,13 +245,39 @@ const IntegrationSlack = () => {
                             <span className="text-foreground">{formatDate(account.connectedAt)}</span>
                           </div>
                         )}
+                        {account.lastAuthorizedAt && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Senast auktoriserad</span>
+                            <span className="text-foreground">{formatDateTime(account.lastAuthorizedAt)}</span>
+                          </div>
+                        )}
                         {account.lastSharedAt && (
                           <div className="flex items-center justify-between px-3.5 py-2.5">
                             <span className="text-muted-foreground">Senaste delning</span>
                             <span className="text-foreground">{formatDateTime(account.lastSharedAt)}</span>
                           </div>
                         )}
+                        {account.workspaceId && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Workspace-ID</span>
+                            <span className="text-foreground font-mono text-xs">{account.workspaceId}</span>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Scopes */}
+                      {sl.importStatus?.grantedScopes && sl.importStatus.grantedScopes.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">Behörigheter</p>
+                          <div className="flex flex-wrap gap-1">
+                            {sl.importStatus.grantedScopes.map(s => (
+                              <Badge key={s} variant="outline" className="text-[9px] font-mono px-1.5 py-0">
+                                {s}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={handleDisconnect} className="gap-1.5 h-8">
