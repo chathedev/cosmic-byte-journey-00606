@@ -10,7 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, Shield,
+  Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, Shield, Monitor,
 } from 'lucide-react';
 import {
   orgDigitalImportApi,
@@ -97,12 +97,12 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
 
   return (
     <div className="space-y-5">
-      {/* Summary stats */}
+      {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MiniStat icon={Users} label="Anslutna" value={di.connectedUserCount} />
-        <MiniStat icon={Zap} label="Auto-import" value={di.autoImportEnabledUserCount} />
-        <MiniStat label="Auto-möten" value={di.imports.activeAuto} accent />
-        <MiniStat label="Manuella" value={di.imports.activeManual} />
+        <MiniStat icon={Users} label="Anslutna medlemmar" value={di.connectedUserCount} />
+        <MiniStat icon={Zap} label="Auto-import aktiv" value={di.autoImportEnabledUserCount} />
+        <MiniStat label="Auto-importerade" value={di.imports.activeAuto} accent />
+        <MiniStat label="Manuellt importerade" value={di.imports.activeManual} />
       </div>
 
       {/* ── Org-level consent banner ── */}
@@ -117,7 +117,7 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
           <Shield className={`w-4.5 h-4.5 ${orgConsentAccepted ? 'text-emerald-600' : 'text-amber-600'}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold text-foreground">
               Organisationens admin consent
             </p>
@@ -133,14 +133,14 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
           </div>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
             {orgConsentAccepted
-              ? 'IT-administratören har godkänt Tivly för organisationen. Varje medlem måste fortfarande koppla sitt eget Microsoft-konto.'
-              : 'IT-administratören har inte godkänt Tivly ännu. Medlemmar kan eventuellt inte importera Teams-transkript förrän consent är klart.'}
+              ? 'IT-administratören har godkänt Tivly för organisationen. Varje medlem måste fortfarande koppla sitt eget Microsoft-konto individuellt.'
+              : 'IT-administratören har inte godkänt Tivly ännu. Medlemmar kan eventuellt inte importera Teams-transkript förrän godkännandet är klart.'}
           </p>
           {di.adminConsent.acceptedTenants?.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {di.adminConsent.acceptedTenants.map((t) => (
                 <Badge key={t.tenantId} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                  {t.tenantId.slice(0, 8)}… {new Date(t.acceptedAt).toLocaleDateString('sv-SE')}
+                  {t.tenantId.slice(0, 8)}… godkänd {new Date(t.acceptedAt).toLocaleDateString('sv-SE')}
                 </Badge>
               ))}
             </div>
@@ -151,12 +151,15 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
         </Button>
       </div>
 
-      {/* ── Members table (individual connections — no consent column) ── */}
+      {/* ── Members table (individual connections — NO consent column) ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Medlemmar ({data.members.length})</CardTitle>
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Medlemmar ({data.members.length})</CardTitle>
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Individuell Microsoft-koppling per medlem
+            Individuell Microsoft-koppling per medlem. Admin consent gäller hela organisationen ovan.
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -165,8 +168,8 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
               <TableRow>
                 <TableHead className="text-xs">Medlem</TableHead>
                 <TableHead className="text-xs">Koppling</TableHead>
-                <TableHead className="text-xs">Auto</TableHead>
-                <TableHead className="text-xs text-right">Auto / Man</TableHead>
+                <TableHead className="text-xs">Auto-import</TableHead>
+                <TableHead className="text-xs text-right">Auto / Manuell</TableHead>
                 <TableHead className="text-xs">Senaste import</TableHead>
                 <TableHead className="text-xs">Fel</TableHead>
                 {canManage && <TableHead className="text-xs text-right">Åtgärd</TableHead>}
@@ -176,11 +179,14 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
               {data.members.map((m) => (
                 <TableRow key={m.email}>
                   <TableCell>
-                    <div>
-                      <span className="text-sm">{m.displayName || m.email}</span>
-                      {m.displayName && <span className="block text-xs text-muted-foreground">{m.email}</span>}
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium">{m.displayName || m.email}</span>
+                      {m.displayName && <span className="block text-xs text-muted-foreground truncate">{m.email}</span>}
                       {m.accountEmail && m.accountEmail !== m.email && (
-                        <span className="block text-[10px] text-muted-foreground/60">MS: {m.accountEmail}</span>
+                        <span className="block text-[10px] text-muted-foreground/60 truncate">
+                          <Monitor className="w-2.5 h-2.5 inline mr-0.5" />
+                          {m.accountEmail}
+                        </span>
                       )}
                     </div>
                   </TableCell>
@@ -238,7 +244,7 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
               ))}
               {data.members.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 7 : 6} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={canManage ? 7 : 6} className="text-center text-sm text-muted-foreground py-8">
                     Inga medlemmar har kopplat Microsoft Teams ännu.
                   </TableCell>
                 </TableRow>
