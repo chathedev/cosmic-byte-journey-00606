@@ -468,8 +468,8 @@ const IntegrationSlack = () => {
                       <span className="text-xs font-bold text-primary">2</span>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Sammanfattning skickas</p>
-                      <p className="text-xs text-muted-foreground">En sammanfattning med länk till hela protokollet postas i din valda Slack-kanal.</p>
+                      <p className="text-sm font-medium text-foreground">Notis skickas</p>
+                      <p className="text-xs text-muted-foreground">En kort notis med protokolltitel och en knapp till det fullständiga protokollet postas i din valda Slack-kanal.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -478,7 +478,7 @@ const IntegrationSlack = () => {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">Publik länk</p>
-                      <p className="text-xs text-muted-foreground">Länken är unik och svårgissad — delbar med alla som har den.</p>
+                      <p className="text-xs text-muted-foreground">Mottagarna klickar för att läsa hela protokollet via en unik, svårgissad länk.</p>
                     </div>
                   </div>
                 </div>
