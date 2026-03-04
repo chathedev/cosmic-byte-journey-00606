@@ -140,6 +140,8 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
     if (mode === 'digital') {
       if (provider === 'zoom') {
         setShowZoomImport(true);
+      } else if (provider === 'google_meet') {
+        setShowGoogleMeetImport(true);
       } else {
         setShowDigitalImport(true);
       }
