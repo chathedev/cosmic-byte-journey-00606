@@ -209,8 +209,8 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
             Individuell Microsoft-koppling per medlem. Admin consent gäller hela organisationen ovan.
           </p>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[650px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">Medlem</TableHead>
