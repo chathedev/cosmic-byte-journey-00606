@@ -68,11 +68,13 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const [showModeDialog, setShowModeDialog] = useState(false);
   const [showDigitalImport, setShowDigitalImport] = useState(false);
   const [showZoomImport, setShowZoomImport] = useState(false);
+  const [showGoogleMeetImport, setShowGoogleMeetImport] = useState(false);
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
   const [pendingParticipants, setPendingParticipants] = useState<string[]>([]);
 
   const digitalImport = useDigitalImport();
   const zoomImport = useZoomImport();
+  const googleMeetImport = useGoogleMeetImport();
 
   const isEnterprise = enterpriseMembership?.isMember && !!enterpriseMembership?.company?.id;
 
