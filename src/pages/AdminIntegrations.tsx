@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
+import slackLogo from "@/assets/slack-logo.png";
 
 const AdminIntegrations = () => {
   const navigate = useNavigate();
@@ -29,6 +30,13 @@ const AdminIntegrations = () => {
       description: "Hantera Google Meet-kopplingar, auto-import och transkript",
       logo: googleMeetLogo,
       path: "/admin/integrations/google-meet",
+      active: true,
+    },
+    {
+      title: "Slack",
+      description: "Hantera Slack-kopplingar, auto-delning och protokolldelning",
+      logo: slackLogo,
+      path: "/admin/integrations/slack",
       active: true,
     },
   ];

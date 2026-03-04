@@ -4,15 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
 import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
+import { useSlackIntegration } from "@/hooks/useSlackIntegration";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
+import slackLogo from "@/assets/slack-logo.png";
 
 const Integrations = () => {
   const navigate = useNavigate();
   const digitalImport = useDigitalImport();
   const zoomImport = useZoomImport();
   const googleMeetImport = useGoogleMeetImport();
+  const slackIntegration = useSlackIntegration();
 
   const isTeamsEnabled = digitalImport.importStatus?.enabled === true;
   const isTeamsConfigured = digitalImport.importStatus?.configured === true;
@@ -149,6 +152,41 @@ const Integrations = () => {
             </div>
           </button>
 
+          {/* Slack card */}
+          <button
+            onClick={() => navigate('/integrations/slack')}
+            className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
+          >
+            <div className="p-4 sm:p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+                <img src={slackLogo} alt="Slack" className="w-full h-full object-contain" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-foreground">Slack</h2>
+                  {slackIntegration.isFullyConnected ? (
+                    <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      Kopplad
+                    </Badge>
+                  ) : slackIntegration.needsReconnect ? (
+                    <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
+                      Kräver omkoppling
+                    </Badge>
+                  ) : slackIntegration.importStatus?.enabled && slackIntegration.importStatus?.configured ? (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {slackIntegration.isFullyConnected && slackIntegration.importStatus?.account?.workspaceName
+                    ? slackIntegration.importStatus.account.workspaceName
+                    : 'Dela protokoll till Slack-kanaler'}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+            </div>
+          </button>
+
           {/* Coming soon */}
           <div className="w-full rounded-lg border border-border/50 bg-card/50 opacity-60 cursor-default">
             <div className="p-4 sm:p-5 flex items-center gap-4">
@@ -162,7 +200,7 @@ const Integrations = () => {
                     Kommer snart
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground/60 mt-0.5">Slack, Google Calendar, Outlook, Notion och mer</p>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">Google Calendar, Outlook, Notion och mer</p>
               </div>
             </div>
           </div>

@@ -6,11 +6,13 @@ import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
 import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { OrgZoomInsights } from "@/components/OrgZoomInsights";
 import { OrgGoogleMeetInsights } from "@/components/OrgGoogleMeetInsights";
+import { OrgSlackInsights } from "@/components/OrgSlackInsights";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
+import slackLogo from "@/assets/slack-logo.png";
 
 export default function OrgSettings() {
   const navigate = useNavigate();
@@ -118,6 +120,13 @@ export default function OrgSettings() {
                     <img src={googleMeetLogo} alt="" className="w-4 h-4 object-contain" />
                     Google Meet
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="slack"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 gap-2 text-xs sm:text-sm"
+                  >
+                    <img src={slackLogo} alt="" className="w-4 h-4 object-contain" />
+                    Slack
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="teams" className="mt-4">
@@ -128,6 +137,9 @@ export default function OrgSettings() {
                 </TabsContent>
                 <TabsContent value="google-meet" className="mt-4">
                   <OrgGoogleMeetInsights companyId={companyId} />
+                </TabsContent>
+                <TabsContent value="slack" className="mt-4">
+                  <OrgSlackInsights companyId={companyId} />
                 </TabsContent>
               </Tabs>
             </TabsContent>
