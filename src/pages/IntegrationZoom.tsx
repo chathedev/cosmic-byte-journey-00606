@@ -38,15 +38,21 @@ const IntegrationZoom = () => {
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
-  const prevConnected = useRef(zi.isFullyConnected);
+  const prevConnected = useRef<boolean | null>(null);
 
   const COOLDOWN_KEY = 'zoom_refresh_cooldown_until';
   const COOLDOWN_DURATION = 5;
 
   useEffect(() => {
+    // Skip the first status load to avoid showing the banner on every refresh
+    if (prevConnected.current === null) {
+      prevConnected.current = zi.isFullyConnected;
+      return;
+    }
     if (zi.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
       const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+      prevConnected.current = zi.isFullyConnected;
       return () => clearTimeout(timer);
     }
     prevConnected.current = zi.isFullyConnected;

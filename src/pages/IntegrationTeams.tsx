@@ -47,7 +47,7 @@ const IntegrationTeams = () => {
   const [accountOpen, setAccountOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
-  const prevConnected = useRef(di.isFullyConnected);
+  const prevConnected = useRef<boolean | null>(null);
 
   // Detect teams_admin_required from URL (OAuth callback redirect)
   const teamsAdminRequired = searchParams.get('teams_admin_required') === 'true';
@@ -63,11 +63,16 @@ const IntegrationTeams = () => {
     }
   }, []);
 
-  // Show confirmation when transitioning to connected
+  // Show confirmation when transitioning to connected — skip initial mount
   useEffect(() => {
+    if (prevConnected.current === null) {
+      prevConnected.current = di.isFullyConnected;
+      return;
+    }
     if (di.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
       const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
+      prevConnected.current = di.isFullyConnected;
       return () => clearTimeout(timer);
     }
     prevConnected.current = di.isFullyConnected;
