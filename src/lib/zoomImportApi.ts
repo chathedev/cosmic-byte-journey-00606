@@ -84,47 +84,63 @@ const normalizeCounts = (counts: any): ZoomImportCounts => ({
 
 export const adminZoomImportApi = {
   getInsights: (): Promise<ZoomAdminInsightsResponse> =>
-    fetchWithAuth('/admin/digital-import/insights').then((data) => ({
-      summary: {
-        totalUsers: Number(data?.summary?.totalUsers ?? 0),
-        connectedUsers: Number(data?.summary?.connectedUsers ?? 0),
-        reconnectRequiredUsers: Number(data?.summary?.reconnectRequiredUsers ?? 0),
-        usersWithAutoImportEnabled: Number(data?.summary?.usersWithAutoImportEnabled ?? 0),
-        activeImportedMeetings: Number(data?.summary?.activeImportedMeetings ?? 0),
-        activeAutoImportedMeetings: Number(data?.summary?.activeAutoImportedMeetings ?? 0),
-        activeManualImportedMeetings: Number(data?.summary?.activeManualImportedMeetings ?? 0),
-        trashedImportedMeetings: Number(data?.summary?.trashedImportedMeetings ?? 0),
-        companies: Number(data?.summary?.companies ?? 0),
-        companiesWithConnectedUsers: Number(data?.summary?.companiesWithConnectedUsers ?? 0),
-      },
-      companies: Array.isArray(data?.companies)
-        ? data.companies.map((c: any) => ({
-            company: {
-              id: c?.company?.id ?? '',
-              name: c?.company?.name ?? 'Okänt företag',
-            },
-            zoomImport: {
-              connectedUserCount: Number(c?.zoomImport?.connectedUserCount ?? 0),
-              autoImportEnabledUserCount: Number(c?.zoomImport?.autoImportEnabledUserCount ?? 0),
-              imports: normalizeCounts(c?.zoomImport?.imports),
-            },
-            members: Array.isArray(c?.members) ? c.members : [],
-          }))
-        : [],
-      users: Array.isArray(data?.users)
-        ? data.users.map((u: any) => ({
-            email: u?.email ?? '',
-            connected: Boolean(u?.connected),
-            reconnectRequired: Boolean(u?.reconnectRequired),
-            accountEmail: u?.accountEmail,
-            displayName: u?.displayName,
-            autoImportEnabled: Boolean(u?.autoImportEnabled),
-            imports: normalizeCounts(u?.imports),
-            lastError: u?.lastError ?? null,
-          }))
-        : [],
-      timestamp: data?.timestamp ?? new Date().toISOString(),
-    })),
+    fetchWithAuth('/admin/digital-import/insights').then((data) => {
+      const zm = data?.summary?.zoomSummary ?? {};
+      return {
+        summary: {
+          totalUsers: Number(data?.summary?.totalUsers ?? 0),
+          connectedUsers: Number(zm.connectedUsers ?? 0),
+          reconnectRequiredUsers: Number(zm.reconnectRequiredUsers ?? 0),
+          usersWithAutoImportEnabled: Number(zm.usersWithAutoImportEnabled ?? 0),
+          activeImportedMeetings: Number(zm.activeImportedMeetings ?? 0),
+          activeAutoImportedMeetings: Number(zm.activeAutoImportedMeetings ?? 0),
+          activeManualImportedMeetings: Number(zm.activeManualImportedMeetings ?? 0),
+          trashedImportedMeetings: Number(zm.trashedImportedMeetings ?? 0),
+          companies: Number(data?.summary?.companies ?? 0),
+          companiesWithConnectedUsers: Number(zm.companiesWithConnectedUsers ?? 0),
+        },
+        companies: Array.isArray(data?.companies)
+          ? data.companies
+              .filter((c: any) => c?.digitalImport?.zoomImport)
+              .map((c: any) => {
+                const zi = c.digitalImport.zoomImport;
+                return {
+                  company: {
+                    id: c?.company?.id ?? '',
+                    name: c?.company?.name ?? 'Okänt företag',
+                  },
+                  zoomImport: {
+                    connectedUserCount: Number(zi?.connectedUserCount ?? 0),
+                    autoImportEnabledUserCount: Number(zi?.autoImportEnabledUserCount ?? 0),
+                    imports: normalizeCounts(zi?.imports),
+                  },
+                  members: [],
+                };
+              })
+          : [],
+        users: Array.isArray(data?.users)
+          ? data.users
+              .filter((u: any) => {
+                const zd = u?.zoomImport;
+                return zd?.connected || zd?.accountEmail;
+              })
+              .map((u: any) => {
+                const zd = u?.zoomImport ?? {};
+                return {
+                  email: u?.email ?? '',
+                  connected: Boolean(zd.connected ?? false),
+                  reconnectRequired: Boolean(zd.reconnectRequired ?? false),
+                  accountEmail: zd.accountEmail,
+                  displayName: zd.displayName ?? u?.displayName,
+                  autoImportEnabled: Boolean(zd.autoImportEnabled ?? false),
+                  imports: normalizeCounts(zd.imports),
+                  lastError: zd.lastError ?? null,
+                };
+              })
+          : [],
+        timestamp: data?.timestamp ?? new Date().toISOString(),
+      };
+    }),
 
   resetUser: (email: string) =>
     fetchWithAuth(`/admin/zoom-import/users/${encodeURIComponent(email)}/reset`, {
