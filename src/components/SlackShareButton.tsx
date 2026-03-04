@@ -122,7 +122,7 @@ export function SlackShareButton({ meetingId, compact = false, className = "" }:
 
       {/* Channel selection / result dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] overflow-hidden">
           <DialogHeader>
             <div className="flex items-center gap-2.5">
               <img src={slackLogo} alt="Slack" className="w-7 h-7 object-contain" />
