@@ -72,11 +72,68 @@ export interface ZoomAdminInsightsResponse {
   timestamp: string;
 }
 
+const emptyCounts = (): ZoomImportCounts => ({
+  activeTotal: 0,
+  activeAuto: 0,
+  activeManual: 0,
+  trashedTotal: 0,
+  trashedAuto: 0,
+  trashedManual: 0,
+  total: 0,
+});
+
+const normalizeCounts = (counts: any): ZoomImportCounts => ({
+  activeTotal: Number(counts?.activeTotal ?? 0),
+  activeAuto: Number(counts?.activeAuto ?? 0),
+  activeManual: Number(counts?.activeManual ?? 0),
+  trashedTotal: Number(counts?.trashedTotal ?? 0),
+  trashedAuto: Number(counts?.trashedAuto ?? 0),
+  trashedManual: Number(counts?.trashedManual ?? 0),
+  total: Number(counts?.total ?? 0),
+});
+
 export const adminZoomImportApi = {
   getInsights: (): Promise<ZoomAdminInsightsResponse> =>
-    fetchWithAuth('/admin/digital-import/insights').then(data => ({
-      ...data,
-      // Extract Zoom-specific data from the shared insights endpoint
+    fetchWithAuth('/admin/digital-import/insights').then((data) => ({
+      summary: {
+        totalUsers: Number(data?.summary?.totalUsers ?? 0),
+        connectedUsers: Number(data?.summary?.connectedUsers ?? 0),
+        reconnectRequiredUsers: Number(data?.summary?.reconnectRequiredUsers ?? 0),
+        usersWithAutoImportEnabled: Number(data?.summary?.usersWithAutoImportEnabled ?? 0),
+        activeImportedMeetings: Number(data?.summary?.activeImportedMeetings ?? 0),
+        activeAutoImportedMeetings: Number(data?.summary?.activeAutoImportedMeetings ?? 0),
+        activeManualImportedMeetings: Number(data?.summary?.activeManualImportedMeetings ?? 0),
+        trashedImportedMeetings: Number(data?.summary?.trashedImportedMeetings ?? 0),
+        companies: Number(data?.summary?.companies ?? 0),
+        companiesWithConnectedUsers: Number(data?.summary?.companiesWithConnectedUsers ?? 0),
+      },
+      companies: Array.isArray(data?.companies)
+        ? data.companies.map((c: any) => ({
+            company: {
+              id: c?.company?.id ?? '',
+              name: c?.company?.name ?? 'Okänt företag',
+            },
+            zoomImport: {
+              connectedUserCount: Number(c?.zoomImport?.connectedUserCount ?? 0),
+              autoImportEnabledUserCount: Number(c?.zoomImport?.autoImportEnabledUserCount ?? 0),
+              imports: normalizeCounts(c?.zoomImport?.imports),
+            },
+            members: Array.isArray(c?.members) ? c.members : [],
+          }))
+        : [],
+      users: Array.isArray(data?.users)
+        ? data.users.map((u: any) => ({
+            email: u?.email ?? '',
+            connected: Boolean(u?.connected),
+            reconnectRequired: Boolean(u?.reconnectRequired),
+            accountEmail: u?.accountEmail,
+            displayName: u?.displayName,
+            autoImportEnabled: Boolean(u?.autoImportEnabled),
+            imports: normalizeCounts(u?.imports),
+            lastError: u?.lastError ?? null,
+          }))
+        : [],
+      timestamp: data?.timestamp ?? new Date().toISOString(),
     })),
 
   resetUser: (email: string) =>
