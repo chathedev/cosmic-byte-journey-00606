@@ -72,16 +72,6 @@ export interface ZoomAdminInsightsResponse {
   timestamp: string;
 }
 
-const emptyCounts = (): ZoomImportCounts => ({
-  activeTotal: 0,
-  activeAuto: 0,
-  activeManual: 0,
-  trashedTotal: 0,
-  trashedAuto: 0,
-  trashedManual: 0,
-  total: 0,
-});
-
 const normalizeCounts = (counts: any): ZoomImportCounts => ({
   activeTotal: Number(counts?.activeTotal ?? 0),
   activeAuto: Number(counts?.activeAuto ?? 0),
