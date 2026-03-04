@@ -1,6 +1,7 @@
 import { TranscriptionInterface } from "@/components/TranscriptionInterface";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
+import { EnterpriseWelcomeWizard } from "@/components/EnterpriseWelcomeWizard";
 import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,17 +12,23 @@ const Index = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showEnterpriseWizard, setShowEnterpriseWizard] = useState(false);
   const [showOrgChooser, setShowOrgChooser] = useState(false);
 
   // Check if user needs to set their name
   useEffect(() => {
-    if (!isAuthLoading && user) {
+    if (!isAuthLoading && !isLoading && user) {
       const hasName = !!(user.preferredName || user.displayName);
       if (!hasName) {
-        setShowNameDialog(true);
+        // Enterprise users get the full wizard, others get the simple dialog
+        if (enterpriseMembership?.isMember) {
+          setShowEnterpriseWizard(true);
+        } else {
+          setShowNameDialog(true);
+        }
       }
     }
-  }, [user, isAuthLoading]);
+  }, [user, isAuthLoading, isLoading, enterpriseMembership]);
 
   // Show org chooser on startup if multiple memberships and no prior choice
   useEffect(() => {
@@ -38,6 +45,7 @@ const Index = () => {
 
   const handleNameComplete = () => {
     setShowNameDialog(false);
+    setShowEnterpriseWizard(false);
   };
 
   const handleOrgSelect = async (companyId: string) => {
@@ -58,10 +66,17 @@ const Index = () => {
       />
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
       
-      {/* Welcome name prompt for users without a name */}
+      {/* Welcome name prompt for non-enterprise users without a name */}
       <WelcomeNameDialog 
         open={showNameDialog} 
         onComplete={handleNameComplete} 
+      />
+
+      {/* Enterprise onboarding wizard for first-time enterprise users */}
+      <EnterpriseWelcomeWizard
+        open={showEnterpriseWizard}
+        companyName={enterpriseMembership?.company?.name || 'Enterprise'}
+        onComplete={handleNameComplete}
       />
 
       {/* Org chooser for multi-company users on first visit */}
