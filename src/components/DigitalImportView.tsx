@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink, Shield, AlertCircle } from "lucide-react";
+import { Monitor, Link2, Unlink, Loader2, CheckCircle2, AlertTriangle, FileText, Calendar, Clock, Users, RefreshCw, ChevronRight, Info, ExternalLink, Shield, AlertCircle, Copy, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,44 @@ const ERROR_UI_LABELS: Record<string, { title: string; description: string }> = 
     title: 'Endast kalenderbaserade möten stöds',
     description: 'Ad hoc-/chatmöten utan kalenderhändelse stöds inte. Endast schemalagda Teams-möten kan importeras.',
   },
+};
+
+const ADMIN_CONSENT_URL = 'https://login.microsoftonline.com/common/adminconsent?client_id=ac5fc254-0617-43db-b53a-7a0a65b17a5c&redirect_uri=https://api.tivly.se/auth/microsoft/callback';
+
+const AdminConsentLinkBox = () => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(ADMIN_CONSENT_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {}
+  };
+  return (
+    <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2 text-left">
+      <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+        <Send className="w-3.5 h-3.5 text-primary" />
+        Skicka denna länk till din IT-admin
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 text-[10px] bg-background border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
+          {ADMIN_CONSENT_URL}
+        </code>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopy}
+          className="shrink-0 gap-1.5 h-8"
+        >
+          {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? 'Kopierad!' : 'Kopiera'}
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+        Admins klickar på länken, loggar in och godkänner behörigheterna. Därefter kan du koppla ditt konto.
+      </p>
+    </div>
+  );
 };
 
 export const DigitalImportView = ({
@@ -285,16 +323,11 @@ export const DigitalImportView = ({
               Personliga Microsoft-konton stöds inte för transkript-import. Koppla om med ett Microsoft 365 arbets- eller skolkonto.
             </p>
           ) : connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' ? (
-            <div className="space-y-2 max-w-xs">
+            <div className="space-y-3 max-w-xs">
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Din organisations IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra för att transkript-import ska fungera.
               </p>
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-left">
-                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Be din IT-avdelning bevilja admin-consent för appen i Microsoft Entra (Azure AD).
-                </p>
-              </div>
+              <AdminConsentLinkBox />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">

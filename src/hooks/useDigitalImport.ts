@@ -111,6 +111,7 @@ interface UseDigitalImportReturn {
   error: string | null;
   errorCode: string | null;
   importResult: ImportResult | null;
+  adminConsentTenant: string | null;
   checkStatus: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -131,6 +132,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [adminConsentTenant, setAdminConsentTenant] = useState<string | null>(null);
   const hasCheckedRef = useRef(false);
 
   const isFullyConnected = importStatus?.connected === true && !importStatus?.reconnectRequired;
@@ -294,7 +296,42 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     const params = new URLSearchParams(window.location.search);
     const integrationStatus = params.get('status');
     const integration = params.get('integration');
+    const teamsAdminRequired = params.get('teams_admin_required');
+    const tenant = params.get('tenant');
     
+    if (teamsAdminRequired === 'true') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('teams_admin_required');
+      url.searchParams.delete('tenant');
+      window.history.replaceState({}, '', url.toString());
+
+      // Set a special admin consent required state
+      setImportStatus(prev => prev ? {
+        ...prev,
+        connected: false,
+        reconnectRequired: true,
+        connectionIssue: {
+          reason: 'admin_consent_required_or_missing_permissions',
+          message: 'Din organisations IT-administratör behöver godkänna Tivly innan Teams-transkript kan importeras.',
+          adminConsentLikelyRequired: true,
+        },
+      } : {
+        enabled: true,
+        configured: true,
+        connected: false,
+        reconnectRequired: true,
+        connectionIssue: {
+          reason: 'admin_consent_required_or_missing_permissions',
+          message: 'Din organisations IT-administratör behöver godkänna Tivly innan Teams-transkript kan importeras.',
+          adminConsentLikelyRequired: true,
+        },
+      });
+      if (tenant) {
+        setAdminConsentTenant(tenant);
+      }
+      return;
+    }
+
     if (integration === 'microsoft' && integrationStatus) {
       const url = new URL(window.location.href);
       url.searchParams.delete('status');
@@ -318,6 +355,7 @@ export const useDigitalImport = (): UseDigitalImportReturn => {
     error,
     errorCode,
     importResult,
+    adminConsentTenant,
     checkStatus,
     connect,
     disconnect,
