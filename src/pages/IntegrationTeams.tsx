@@ -32,6 +32,8 @@ const formatDateTime = (dateStr: string) => {
   } catch { return ''; }
 };
 
+const ADMIN_CONSENT_URL = 'https://login.microsoftonline.com/common/adminconsent?client_id=ac5fc254-0617-43db-b53a-7a0a65b17a5c&redirect_uri=https://api.tivly.se/auth/microsoft/callback';
+
 const IntegrationTeams = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
