@@ -95,12 +95,11 @@ const normalizeCounts = (counts: any): GoogleMeetImportCounts => ({
 export const adminGoogleMeetImportApi = {
   getInsights: (): Promise<GoogleMeetAdminInsightsResponse> =>
     fetchWithAuth('/admin/digital-import/insights').then((data) => {
-      // Extract Google Meet specific summary counts (may be in googleMeetImport sub-object or top-level)
-      const gm = data?.summary?.googleMeetImport ?? data?.summary ?? {};
+      const gm = data?.summary?.googleMeetSummary ?? {};
 
       return {
         summary: {
-          totalUsers: Number(gm.totalUsers ?? data?.summary?.totalUsers ?? 0),
+          totalUsers: Number(data?.summary?.totalUsers ?? 0),
           connectedUsers: Number(gm.connectedUsers ?? 0),
           reconnectRequiredUsers: Number(gm.reconnectRequiredUsers ?? 0),
           usersWithAutoImportEnabled: Number(gm.usersWithAutoImportEnabled ?? 0),
@@ -108,23 +107,26 @@ export const adminGoogleMeetImportApi = {
           activeAutoImportedMeetings: Number(gm.activeAutoImportedMeetings ?? 0),
           activeManualImportedMeetings: Number(gm.activeManualImportedMeetings ?? 0),
           trashedImportedMeetings: Number(gm.trashedImportedMeetings ?? 0),
-          companies: Number(gm.companies ?? data?.summary?.companies ?? 0),
+          companies: Number(data?.summary?.companies ?? 0),
           companiesWithConnectedUsers: Number(gm.companiesWithConnectedUsers ?? 0),
         },
         companies: Array.isArray(data?.companies)
           ? data.companies
-              .filter((c: any) => c?.googleMeetImport)
-              .map((c: any) => ({
-                company: {
-                  id: c?.company?.id ?? '',
-                  name: c?.company?.name ?? 'Okänt företag',
-                },
-                googleMeetImport: {
-                  connectedUserCount: Number(c.googleMeetImport?.connectedUserCount ?? 0),
-                  autoImportEnabledUserCount: Number(c.googleMeetImport?.autoImportEnabledUserCount ?? 0),
-                  imports: normalizeCounts(c.googleMeetImport?.imports),
-                },
-              }))
+              .filter((c: any) => c?.digitalImport?.googleMeetImport)
+              .map((c: any) => {
+                const gi = c.digitalImport.googleMeetImport;
+                return {
+                  company: {
+                    id: c?.company?.id ?? '',
+                    name: c?.company?.name ?? 'Okänt företag',
+                  },
+                  googleMeetImport: {
+                    connectedUserCount: Number(gi?.connectedUserCount ?? 0),
+                    autoImportEnabledUserCount: Number(gi?.autoImportEnabledUserCount ?? 0),
+                    imports: normalizeCounts(gi?.imports),
+                  },
+                };
+              })
           : [],
         users: Array.isArray(data?.users)
           ? data.users
