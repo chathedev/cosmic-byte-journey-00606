@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft, Video, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
+  ArrowLeft, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Info, FileText, Clock, Download,
   ChevronRight, AlertCircle, ChevronDown, Zap
 } from "lucide-react";
+import zoomLogo from "@/assets/zoom-logo.png";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
