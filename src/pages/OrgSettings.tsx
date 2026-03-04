@@ -77,6 +77,17 @@ export default function OrgSettings() {
           <section>
             <EnterpriseTeamManager />
           </section>
+
+          {/* Microsoft Teams Insights (owner/admin only) */}
+          {(role === 'owner' || role === 'admin') && enterpriseMembership.company?.id && (
+            <>
+              <Separator />
+              <section>
+                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Microsoft Teams</h2>
+                <OrgTeamsInsights companyId={enterpriseMembership.company.id} />
+              </section>
+            </>
+          )}
         </div>
       </div>
     </div>
