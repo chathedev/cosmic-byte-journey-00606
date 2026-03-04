@@ -95,7 +95,7 @@ const normalizeCounts = (counts: any): GoogleMeetImportCounts => ({
 export const adminGoogleMeetImportApi = {
   getInsights: (): Promise<GoogleMeetAdminInsightsResponse> =>
     fetchWithAuth('/admin/digital-import/insights').then((data) => {
-      const gm = data?.summary?.googleMeetSummary ?? {};
+      const gm = data?.googleMeetSummary ?? data?.summary?.googleMeetSummary ?? {};
 
       return {
         summary: {
