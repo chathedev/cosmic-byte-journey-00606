@@ -155,6 +155,20 @@ export interface ZoomOrgMemberRow {
   lastImportAt?: string;
   lastError?: { code: string; message: string; updatedAt?: string } | null;
   imports: ZoomImportCounts;
+  zoomImport?: {
+    connected: boolean;
+    reconnectRequired: boolean;
+    accountEmail?: string | null;
+    displayName?: string | null;
+    accountId?: string | null;
+    autoImportEnabled: boolean;
+    connectedAt?: string | null;
+    lastAuthorizedAt?: string | null;
+    lastImportAt?: string | null;
+    lastError?: any;
+    autoImportLastError?: any;
+    imports: ZoomImportCounts;
+  };
 }
 
 export interface ZoomOrgInsights {
