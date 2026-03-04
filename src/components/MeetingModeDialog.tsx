@@ -47,16 +47,16 @@ const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: str
   },
 ];
 
-const DIGITAL_PROVIDERS: { id: DigitalProvider; icon: typeof Monitor; title: string; desc: string }[] = [
+const DIGITAL_PROVIDERS: { id: DigitalProvider; logo: string; title: string; desc: string }[] = [
   {
     id: 'teams',
-    icon: Monitor,
+    logo: teamsLogo,
     title: 'Microsoft Teams',
     desc: 'Importera från Microsoft 365 / Teams',
   },
   {
     id: 'zoom',
-    icon: Video,
+    logo: zoomLogo,
     title: 'Zoom',
     desc: 'Importera från Zoom Cloud Recordings',
   },
