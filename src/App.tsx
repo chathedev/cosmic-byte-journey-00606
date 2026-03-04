@@ -347,6 +347,7 @@ const AppContent = () => {
                 <Route path="/admin/integrations" element={<AdminRoute><AdminIntegrations /></AdminRoute>} />
                 <Route path="/admin/integrations/teams" element={<AdminRoute><AdminTeamsInsights /></AdminRoute>} />
                 <Route path="/admin/integrations/zoom" element={<AdminRoute><AdminZoomInsights /></AdminRoute>} />
+                <Route path="/admin/integrations/google-meet" element={<AdminRoute><AdminGoogleMeetInsights /></AdminRoute>} />
                 <Route path="/admin/teams-insights" element={<Navigate to="/admin/integrations/teams" replace />} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
                 <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
