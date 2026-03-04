@@ -1,9 +1,11 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Users, Phone, ArrowRight, Mic, Monitor, Lock, ArrowLeft, Video } from "lucide-react";
+import { Users, Phone, ArrowRight, Mic, Monitor, Lock, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { debugLog } from "@/lib/debugLogger";
+import teamsLogo from "@/assets/teams-logo.png";
+import zoomLogo from "@/assets/zoom-logo.png";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
 export type DigitalProvider = 'teams' | 'zoom';
