@@ -32,8 +32,6 @@ const formatDateTime = (dateStr: string) => {
   } catch { return ''; }
 };
 
-const ADMIN_CONSENT_URL = 'https://login.microsoftonline.com/common/adminconsent?client_id=ac5fc254-0617-43db-b53a-7a0a65b17a5c&redirect_uri=https://api.tivly.se/auth/microsoft/callback';
-
 const IntegrationTeams = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -50,6 +48,20 @@ const IntegrationTeams = () => {
   const [guideOpen, setGuideOpen] = useState(false);
   const [showConnectedConfirm, setShowConnectedConfirm] = useState(false);
   const prevConnected = useRef(di.isFullyConnected);
+
+  // Detect teams_admin_required from URL (OAuth callback redirect)
+  const teamsAdminRequired = searchParams.get('teams_admin_required') === 'true';
+  const tenantFromUrl = searchParams.get('tenant');
+
+  // Clean up URL params after reading
+  useEffect(() => {
+    if (teamsAdminRequired) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('teams_admin_required');
+      url.searchParams.delete('tenant');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
 
   // Show confirmation when transitioning to connected
   useEffect(() => {
@@ -123,11 +135,19 @@ const IntegrationTeams = () => {
   const connectionIssue = di.importStatus?.connectionIssue;
   const adminConsent = di.importStatus?.adminConsent;
   const isAdminConsentApproved = adminConsent?.approved === true;
-  const isAdminConsentRequired = connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' || connectionIssue?.adminConsentLikelyRequired;
+  const isAdminConsentPending = adminConsent?.pending === true;
+  const isAdminConsentRequired = adminConsent?.required === true ||
+    connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' ||
+    connectionIssue?.adminConsentLikelyRequired ||
+    teamsAdminRequired;
+
+  // Use backend's adminConsentUrl — NOT a hardcoded global URL
+  const adminConsentUrl = adminConsent?.adminConsentUrl || null;
 
   const handleCopyAdminLink = async () => {
+    if (!adminConsentUrl) return;
     try {
-      await navigator.clipboard.writeText(ADMIN_CONSENT_URL);
+      await navigator.clipboard.writeText(adminConsentUrl);
       setCopiedLink(true);
       toast({ title: 'Länk kopierad', description: 'Skicka den till din IT-administratör.' });
       setTimeout(() => setCopiedLink(false), 3000);
@@ -166,6 +186,75 @@ const IntegrationTeams = () => {
 
   const autoImport = di.importStatus?.autoImport;
 
+  // Build admin consent block content
+  const renderAdminConsentBlock = (context: 'reconnect' | 'fresh' | 'url_param') => {
+    // If consent is already approved, don't show the block
+    if (isAdminConsentApproved) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+            <Shield className="w-4 h-4 shrink-0" />
+            {context === 'url_param'
+              ? 'Organisationens administratör måste godkänna Tivly'
+              : 'Administratörsgodkännande krävs'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            {context === 'url_param'
+              ? 'Microsoft kräver att din organisations IT-administratör godkänner Tivly innan Teams-transkript kan importeras. Detta är inte ett vanligt anslutningsfel.'
+              : 'Din IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra innan transkript kan importeras.'}
+          </p>
+          {tenantFromUrl && context === 'url_param' && (
+            <p className="text-[10px] font-mono text-muted-foreground mt-1.5">
+              Tenant: {tenantFromUrl}
+            </p>
+          )}
+          {isAdminConsentPending && (
+            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 gap-1 mt-2">
+              <Clock className="w-2.5 h-2.5" /> Väntar på godkännande
+            </Badge>
+          )}
+        </div>
+
+        {adminConsentUrl && (
+          <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+            <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+              <Send className="w-3.5 h-3.5 text-primary" />
+              Skicka denna länk till din IT-admin
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[10px] bg-background border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
+                {adminConsentUrl}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyAdminLink}
+                className="shrink-0 gap-1.5 h-8"
+              >
+                {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? 'Kopierad!' : 'Kopiera'}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              IT-admins klickar på länken, loggar in med sitt Microsoft-konto och godkänner behörigheterna. Därefter kan du koppla ditt konto.
+            </p>
+          </div>
+        )}
+
+        {!adminConsentUrl && (
+          <div className="p-2.5 rounded-lg bg-muted/20 border border-border/30">
+            <p className="text-xs text-muted-foreground leading-relaxed flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              Admin consent-länken är inte tillgänglig ännu. Försök koppla ditt Microsoft-konto först.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="w-full max-w-3xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
@@ -189,6 +278,33 @@ const IntegrationTeams = () => {
         </div>
 
         <div className="space-y-4">
+          {/* ── Admin consent required from URL param ── */}
+          {teamsAdminRequired && !di.isFullyConnected && (
+            <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden p-4">
+              {renderAdminConsentBlock('url_param')}
+            </section>
+          )}
+
+          {/* ── Admin consent approved banner ── */}
+          {isAdminConsentApproved && !di.isFullyConnected && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Admin consent är godkänt</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Din organisations IT-administratör har godkänt Tivly. Du kan nu koppla ditt eget Microsoft-konto nedan.
+                </p>
+                {adminConsent?.approvedAt && (
+                  <p className="text-[10px] text-muted-foreground/60">
+                    Godkänt {new Date(adminConsent.approvedAt).toLocaleString('sv-SE')}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Connection Status ── */}
           <section className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="px-4 py-3.5 sm:px-5 flex items-center justify-between">
@@ -238,46 +354,13 @@ const IntegrationTeams = () => {
                   </div>
                 )}
 
-                {connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' && (
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                        <Shield className="w-4 h-4 shrink-0" />
-                        Administratörsgodkännande krävs
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Din IT-administratör behöver godkänna Tivlys behörigheter i Microsoft Entra innan transkript kan importeras.
-                      </p>
-                    </div>
-
-                    <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
-                      <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <Send className="w-3.5 h-3.5 text-primary" />
-                        Skicka denna länk till din IT-admin
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 text-[10px] bg-background border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
-                          {ADMIN_CONSENT_URL}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyAdminLink}
-                          className="shrink-0 gap-1.5 h-8"
-                        >
-                          {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copiedLink ? 'Kopierad!' : 'Kopiera'}
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-                        Admins klickar på länken, loggar in med sitt Microsoft-konto och godkänner behörigheterna. Därefter kan du koppla ditt konto.
-                      </p>
-                    </div>
-                  </div>
+                {(connectionIssue?.reason === 'admin_consent_required_or_missing_permissions' || connectionIssue?.adminConsentLikelyRequired) && (
+                  renderAdminConsentBlock('reconnect')
                 )}
 
                 {connectionIssue?.reason !== 'personal_account_not_supported_for_transcripts' && 
-                 connectionIssue?.reason !== 'admin_consent_required_or_missing_permissions' && (
+                 connectionIssue?.reason !== 'admin_consent_required_or_missing_permissions' &&
+                 !connectionIssue?.adminConsentLikelyRequired && (
                   <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
                     <p className="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -342,6 +425,14 @@ const IntegrationTeams = () => {
                             <span className="text-foreground">{formatDate(account.lastImportAt)}</span>
                           </div>
                         )}
+                        {isAdminConsentApproved && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5">
+                            <span className="text-muted-foreground">Admin consent</span>
+                            <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 gap-1">
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Godkänd
+                            </Badge>
+                          </div>
+                        )}
                       </div>
 
                       {scopes && scopes.length > 0 && (
@@ -388,8 +479,13 @@ const IntegrationTeams = () => {
                   </div>
                 )}
 
-                {/* Admin approval notice — only when NOT approved */}
-                {!isAdminConsentApproved && (
+                {/* Admin consent notice — use adminConsent from status, not old lastError */}
+                {!isAdminConsentApproved && !teamsAdminRequired && (isAdminConsentRequired || isAdminConsentPending) && (
+                  renderAdminConsentBlock('fresh')
+                )}
+
+                {/* Soft admin consent hint when not yet known */}
+                {!isAdminConsentApproved && !isAdminConsentRequired && !isAdminConsentPending && !teamsAdminRequired && (
                   <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-3">
                     <div className="flex items-start gap-2.5">
                       <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -403,29 +499,31 @@ const IntegrationTeams = () => {
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-lg border border-border bg-background/50 space-y-2">
-                      <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <Send className="w-3.5 h-3.5 text-primary" />
-                        Skicka denna länk till din IT-admin
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 text-[10px] bg-muted border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
-                          {ADMIN_CONSENT_URL}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyAdminLink}
-                          className="shrink-0 gap-1.5 h-8"
-                        >
-                          {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copiedLink ? 'Kopierad!' : 'Kopiera'}
-                        </Button>
+                    {adminConsentUrl && (
+                      <div className="p-3 rounded-lg border border-border bg-background/50 space-y-2">
+                        <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                          <Send className="w-3.5 h-3.5 text-primary" />
+                          Skicka denna länk till din IT-admin
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 text-[10px] bg-muted border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
+                            {adminConsentUrl}
+                          </code>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyAdminLink}
+                            className="shrink-0 gap-1.5 h-8"
+                          >
+                            {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedLink ? 'Kopierad!' : 'Kopiera'}
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                          IT-admins klickar på länken, loggar in med sitt Microsoft-konto och godkänner behörigheterna. Därefter kan du koppla ditt konto nedan.
+                        </p>
                       </div>
-                      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-                        Admins klickar på länken, loggar in med sitt Microsoft-konto och godkänner behörigheterna. Därefter kan du koppla ditt konto nedan.
-                      </p>
-                    </div>
+                    )}
                   </div>
                 )}
 

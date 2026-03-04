@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Loader2, RefreshCw, Users, Zap, CheckCircle2, XCircle, RotateCcw, AlertTriangle, Shield, Monitor,
+  ExternalLink, Copy,
 } from 'lucide-react';
 import {
   orgDigitalImportApi,
@@ -29,6 +30,7 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<OrgMemberRow | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
@@ -73,6 +75,17 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
     }
   };
 
+  const handleCopyConsentUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(true);
+      toast({ title: 'Admin consent-länk kopierad', description: 'Skicka den till din IT-administratör.' });
+      setTimeout(() => setCopiedUrl(false), 3000);
+    } catch {
+      toast({ title: 'Kunde inte kopiera', variant: 'destructive' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -94,6 +107,7 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
   const di = data.digitalImport;
   const canManage = data.viewer.canManageMembers;
   const orgConsentAccepted = isCompanyConsentAccepted(di.adminConsent);
+  const consentUrl = di.adminConsent.adminConsentUrl;
 
   return (
     <div className="space-y-5">
@@ -143,6 +157,32 @@ export function OrgTeamsInsights({ companyId }: OrgTeamsInsightsProps) {
                   {t.tenantId.slice(0, 8)}… godkänd {new Date(t.acceptedAt).toLocaleDateString('sv-SE')}
                 </Badge>
               ))}
+            </div>
+          )}
+          {/* Admin consent URL from backend – not hardcoded */}
+          {!orgConsentAccepted && consentUrl && (
+            <div className="mt-3 p-3 rounded-lg border border-border bg-background/50 space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-primary" />
+                Skicka denna länk till er IT-admin
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-[10px] bg-muted border rounded px-2 py-1.5 break-all text-muted-foreground select-all">
+                  {consentUrl}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCopyConsentUrl(consentUrl)}
+                  className="shrink-0 gap-1.5 h-8"
+                >
+                  {copiedUrl ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedUrl ? 'Kopierad!' : 'Kopiera'}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                IT-admins klickar på länken, loggar in i Microsoft Entra och godkänner behörigheterna. Därefter kan varje medlem koppla sitt eget konto.
+              </p>
             </div>
           )}
         </div>
