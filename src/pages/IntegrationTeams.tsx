@@ -273,8 +273,8 @@ const IntegrationTeams = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
-              <Monitor className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center overflow-hidden">
+              <img src={teamsLogo} alt="Microsoft Teams" className="w-7 h-7 object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-semibold">Microsoft Teams</h1>
