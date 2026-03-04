@@ -176,7 +176,7 @@ const IntegrationZoom = () => {
           </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center overflow-hidden">
-              <img src={zoomLogo} alt="Zoom" className="w-7 h-7 object-contain" />
+              <img src={zoomLogo} alt="Zoom" className="w-8 h-8 object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-semibold">Zoom</h1>

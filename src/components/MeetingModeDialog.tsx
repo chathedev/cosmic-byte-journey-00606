@@ -1,9 +1,11 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Users, Phone, ArrowRight, Mic, Monitor, Lock, ArrowLeft, Video } from "lucide-react";
+import { Users, Phone, ArrowRight, Mic, Monitor, Lock, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { debugLog } from "@/lib/debugLogger";
+import teamsLogo from "@/assets/teams-logo.png";
+import zoomLogo from "@/assets/zoom-logo.png";
 
 export type MeetingMode = 'in-person' | 'phone-call' | 'digital';
 export type DigitalProvider = 'teams' | 'zoom';
@@ -45,16 +47,16 @@ const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: str
   },
 ];
 
-const DIGITAL_PROVIDERS: { id: DigitalProvider; icon: typeof Monitor; title: string; desc: string }[] = [
+const DIGITAL_PROVIDERS: { id: DigitalProvider; logo: string; title: string; desc: string }[] = [
   {
     id: 'teams',
-    icon: Monitor,
+    logo: teamsLogo,
     title: 'Microsoft Teams',
     desc: 'Importera från Microsoft 365 / Teams',
   },
   {
     id: 'zoom',
-    icon: Video,
+    logo: zoomLogo,
     title: 'Zoom',
     desc: 'Importera från Zoom Cloud Recordings',
   },
@@ -149,12 +151,12 @@ export const MeetingModeDialog = ({
                   )}
                 >
                   <div className={cn(
-                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors overflow-hidden",
                     hoveredProvider === prov.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      ? "bg-primary/10"
+                      : "bg-muted"
                   )}>
-                    <prov.icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <img src={prov.logo} alt={prov.title} className="w-6 h-6 sm:w-7 sm:h-7 object-contain" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="font-semibold text-sm sm:text-base text-foreground">{prov.title}</span>
