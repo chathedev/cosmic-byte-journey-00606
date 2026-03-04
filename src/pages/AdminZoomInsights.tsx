@@ -187,7 +187,7 @@ export default function AdminZoomInsights() {
                 </TableHeader>
                 <TableBody>
                   {data.companies.map((c) => {
-                    const zi = c.zoomImport || c.digitalImport || {};
+                    const zi = c.zoomImport || ({} as any);
                     const imports = zi.imports || {};
                     return (
                     <TableRow key={c.company.id}>
