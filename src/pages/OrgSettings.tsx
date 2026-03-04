@@ -6,11 +6,13 @@ import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
 import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { OrgZoomInsights } from "@/components/OrgZoomInsights";
 import { OrgGoogleMeetInsights } from "@/components/OrgGoogleMeetInsights";
+import { OrgSlackInsights } from "@/components/OrgSlackInsights";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
+import slackLogo from "@/assets/slack-logo.png";
 
 export default function OrgSettings() {
   const navigate = useNavigate();
