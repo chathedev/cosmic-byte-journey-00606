@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
 import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
+import { useSlackIntegration } from "@/hooks/useSlackIntegration";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
+import slackLogo from "@/assets/slack-logo.png";
 
 const Integrations = () => {
   const navigate = useNavigate();
