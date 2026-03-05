@@ -151,6 +151,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Block viewers from accessing restricted pages
+const ViewerGuard = ({ children }: { children: React.ReactNode }) => {
+  const { isViewer } = useSubscription();
+  
+  if (isViewer) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 // Redirect authenticated users away from /auth (handles test mode too)
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
