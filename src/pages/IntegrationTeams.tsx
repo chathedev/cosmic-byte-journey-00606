@@ -6,6 +6,7 @@ import {
   ChevronRight, AlertCircle, ExternalLink, Zap, ChevronDown, Copy, Send
 } from "lucide-react";
 import teamsLogo from "@/assets/teams-logo.png";
+import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
