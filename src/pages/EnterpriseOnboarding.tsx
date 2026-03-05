@@ -931,7 +931,7 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField, e
                 <p className="font-semibold text-foreground">{plan.name}</p>
                 {isSelected && <Check className="h-4 w-4 text-foreground" />}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">{plan.seats} användare inkl.</p>
+              <p className="text-xs text-muted-foreground mt-1">{plan.seats} användare inkl. · Extra: {fmt(plan.extraSeatSek)} kr/st/mån</p>
               <p className="mt-3">
                 <span className="text-2xl font-semibold text-foreground">{fmt(plan.priceSek)}</span>
                 <span className="text-sm text-muted-foreground"> SEK/mån</span>
