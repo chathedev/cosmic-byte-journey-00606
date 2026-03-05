@@ -1273,8 +1273,8 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
     { label: 'Månadsavgift', value: `${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
     { label: 'Inkluderade användare', value: `${selectedPlan.seats} st`, icon: Users },
     { label: 'Totalt antal användare', value: `${seats} st`, icon: Users },
-    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån`, icon: Plus }] : []),
-    { label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock },
+    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(extraSeatSek)} SEK/mån`, icon: Plus }] : []),
+    ...(selectedPlan.activationSek > 0 ? [{ label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock }] : []),
   ];
 
   return (
