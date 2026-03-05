@@ -675,7 +675,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, [loadEnterpriseMembership, loadPlan]);
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, switchCompany, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, isViewer, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, switchCompany, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );
