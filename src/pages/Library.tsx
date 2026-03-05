@@ -1242,7 +1242,7 @@ const Library = () => {
                 layout
               >
               <div 
-                className="rounded-lg border border-border bg-card hover:border-primary/30 transition-colors cursor-pointer"
+                className="group rounded-lg border border-border bg-card hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
                 onClick={() => navigate(`/meetings/${meeting.id}`)}
               >
                 {/* Card header */}
