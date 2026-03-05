@@ -936,7 +936,7 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField, e
                 <span className="text-2xl font-semibold text-foreground">{fmt(plan.priceSek)}</span>
                 <span className="text-sm text-muted-foreground"> SEK/mån</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>
+              {plan.activationSek > 0 && <p className="text-xs text-muted-foreground mt-1.5">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>}
             </button>
           );
         })}
