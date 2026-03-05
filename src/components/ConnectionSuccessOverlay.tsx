@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ConnectionSuccessOverlayProps {
@@ -17,35 +17,35 @@ export const ConnectionSuccessOverlay = ({
   description,
   logo,
 }: ConnectionSuccessOverlayProps) => {
-  const [phase, setPhase] = useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
+  const [mounted, setMounted] = useState(false);
+  const [animateIn, setAnimateIn] = useState(false);
 
   useEffect(() => {
-    if (show && phase === "hidden") {
-      setPhase("entering");
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setPhase("visible"));
+    if (show) {
+      setMounted(true);
+      // Double rAF to ensure DOM paint before animating
+      const raf1 = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setAnimateIn(true));
       });
+      return () => cancelAnimationFrame(raf1);
+    } else {
+      setAnimateIn(false);
+      const t = setTimeout(() => setMounted(false), 300);
+      return () => clearTimeout(t);
     }
-  }, [show, phase]);
+  }, [show]);
 
   const handleClose = useCallback(() => {
-    if (phase === "leaving") return;
-    setPhase("leaving");
-    setTimeout(() => {
-      setPhase("hidden");
-      onClose();
-    }, 250);
-  }, [phase, onClose]);
+    onClose();
+  }, [onClose]);
 
-  if (phase === "hidden" && !show) return null;
-
-  const isActive = phase === "visible";
+  if (!mounted) return null;
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-4 transition-opacity duration-250",
-        isActive ? "opacity-100" : "opacity-0 pointer-events-none"
+        "fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-4 transition-opacity duration-300",
+        animateIn ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       onClick={handleClose}
     >
@@ -55,8 +55,8 @@ export const ConnectionSuccessOverlay = ({
       {/* Card */}
       <div
         className={cn(
-          "relative w-full max-w-[320px] rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-xl transition-all duration-250 ease-out",
-          isActive ? "scale-100 translate-y-0 opacity-100" : "scale-[0.97] translate-y-3 opacity-0"
+          "relative w-full max-w-[320px] rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-xl transition-all duration-300 ease-out",
+          animateIn ? "scale-100 translate-y-0 opacity-100" : "scale-[0.96] translate-y-4 opacity-0"
         )}
         onClick={(e) => e.stopPropagation()}
       >
