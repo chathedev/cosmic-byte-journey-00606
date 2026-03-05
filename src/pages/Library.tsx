@@ -75,7 +75,7 @@ const TranscriptionCompleteMessage = ({ meetingId, status }: { meetingId: string
 
 const Library = () => {
   const { user } = useAuth();
-  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership, isAdmin } = useSubscription();
+  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership, isAdmin, isViewer } = useSubscription();
   const [meetings, setMeetings] = useState<MeetingSession[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("Alla");
