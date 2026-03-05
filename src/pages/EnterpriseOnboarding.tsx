@@ -517,7 +517,7 @@ export default function EnterpriseOnboarding() {
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40" />
           <h1 className="text-lg font-semibold text-foreground">Onboarding ej tillgänglig</h1>
           <p className="text-sm text-muted-foreground">
-            Self-serve enterprise-onboarding är för tillfället inaktiverad. Kontakta oss för att komma igång.
+            Self-serve Team-onboarding är för tillfället inaktiverad. Kontakta oss för att komma igång.
           </p>
         </div>
       </div>
