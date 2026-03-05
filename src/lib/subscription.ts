@@ -68,7 +68,7 @@ export const subscriptionService = {
 
       // Always read the canonical plan from /me and use /meetings only for usage counts
       const defaultMeetingLimits: Record<string, number | null> = { free: 1, pro: 30, team: null, plus: null }; // Pro: 30/month, Team/Plus: unlimited
-      const defaultProtocolsLimits: Record<string, number> = { free: 1, pro: 1, plus: 1 };
+      const defaultProtocolsLimits: Record<string, number> = { free: 1, pro: 1, team: 999999, plus: 1 };
 
       let user: any = null;
       let snapshot: any = null;
