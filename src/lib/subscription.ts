@@ -282,7 +282,7 @@ export const subscriptionService = {
       const plan = await this.getUserPlan(userId);
       
       // Unlimited, enterprise plan or null limit = no restrictions
-      if (plan.plan === 'unlimited' || plan.plan === 'enterprise' || plan.meetingsLimit === null) {
+      if (plan.plan === 'unlimited' || plan.plan === 'team' || plan.plan === 'enterprise' || plan.meetingsLimit === null) {
         return { allowed: true };
       }
       
