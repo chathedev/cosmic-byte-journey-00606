@@ -377,7 +377,10 @@ export default function EnterpriseOnboarding() {
       saveStorageJSON(FORM_KEY, { form: f, step: s, touched: hasUserInteractedRef.current, updatedAt: Date.now() });
       if (f.companyName || f.workEmail) {
         navigator.sendBeacon?.('https://api.tivly.se/enterprise/onboarding/draft',
-          new Blob([JSON.stringify({
+      new Blob([JSON.stringify({
+            ...f, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
+            progressStep: s, progressPercent: Math.round(((s + 1) / STEPS.length) * 100),
+          })], { type: 'application/json' }));
             ...f, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
             progressStep: s, progressPercent: Math.round(((s + 1) / STEPS.length) * 100),
           })], { type: 'application/json' }));
