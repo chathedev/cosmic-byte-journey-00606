@@ -146,7 +146,7 @@ export const subscriptionService = {
 
       // Limits: gifts can raise numeric limits (from snapshot or user.plan), Plus, unlimited, and enterprise have unlimited meetings
       let meetingsLimit: number | null;
-      if (normalizedPlan === 'unlimited' || normalizedPlan === 'plus' || normalizedPlan === 'enterprise') {
+      if (normalizedPlan === 'unlimited' || normalizedPlan === 'plus' || normalizedPlan === 'team' || normalizedPlan === 'enterprise') {
         meetingsLimit = null; // Truly unlimited
       } else if (normalizedPlan === 'pro') {
         // Pro has a limit of 10 meetings per month
