@@ -24,7 +24,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const { toast } = useToast();
   const { refreshPlan, userPlan, paymentDomain } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'plus' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'pro' | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
