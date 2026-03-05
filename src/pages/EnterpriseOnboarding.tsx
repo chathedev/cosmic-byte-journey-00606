@@ -784,7 +784,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
           <span className="text-muted-foreground">Idag</span>
           <span className="text-foreground font-semibold">0 kr</span>
         </div>
-        <p className="text-[11px] text-muted-foreground">7 dagars gratis trial</p>
+        <p className="text-[11px] text-muted-foreground">7 dagars gratis trial · {selectedPlan.seats} användare</p>
       </div>
 
       <div className="px-4 py-3 space-y-1.5">
