@@ -646,7 +646,7 @@ export default function EnterpriseOnboarding() {
             <Info className="h-4 w-4 text-primary shrink-0" />
             <p className="text-sm text-foreground">
               Du är redan medlem i <span className="font-semibold">{enterpriseMembership.company.name || 'ett företag'}</span>.
-              Du kan fortfarande skapa ett nytt Enterprise-konto här.
+              Du kan fortfarande skapa ett nytt Team-konto här.
             </p>
             <Button variant="ghost" size="sm" className="ml-auto shrink-0 text-xs" onClick={() => navigate('/')}>
               Gå till appen
