@@ -375,18 +375,6 @@ export const EnterpriseHomeDashboard = ({
           </div>
         </div>
 
-        {/* Mobile usage footer */}
-        {userPlan && (
-          <div className="mt-8 text-center sm:hidden">
-            <p className="text-xs text-muted-foreground">
-              {userPlan.meetingsUsed ?? 0}
-              {userPlan.meetingsLimit != null ? ` / ${userPlan.meetingsLimit}` : ""} möten
-              {userPlan.renewDate && (
-                <span> · Förnyas {new Date(userPlan.renewDate).toLocaleDateString("sv-SE")}</span>
-              )}
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
