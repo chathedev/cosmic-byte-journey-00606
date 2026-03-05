@@ -2641,9 +2641,9 @@ class ApiClient {
     return response.json();
   }
 
-  // Enterprise Onboarding Auto feature flag
+  // Team Onboarding Auto feature flag
   async getEnterpriseOnboardingAuto(): Promise<{ enabled: boolean; updatedAt?: string }> {
-    const response = await fetch(`${API_BASE_URL}/enterprise/onboarding/auto`, {
+    const response = await fetch(`${API_BASE_URL}/team/onboarding/auto`, {
       headers: { 'Content-Type': 'application/json' },
     });
     if (!response.ok) throw new Error('Failed to fetch onboarding auto state');
@@ -2652,7 +2652,7 @@ class ApiClient {
   }
 
   async toggleEnterpriseOnboardingAuto(): Promise<{ enabled: boolean; updatedAt?: string }> {
-    const response = await this.fetchWithAuth(`/admin/enterprise/onboarding/auto/toggle`, {
+    const response = await this.fetchWithAuth(`/admin/team/onboarding/auto/toggle`, {
       method: 'POST',
     });
     if (!response.ok) throw new Error('Failed to toggle onboarding auto');
@@ -2661,7 +2661,7 @@ class ApiClient {
   }
 
   async setEnterpriseOnboardingAuto(enabled: boolean): Promise<{ enabled: boolean; updatedAt?: string }> {
-    const response = await this.fetchWithAuth(`/admin/enterprise/onboarding/auto`, {
+    const response = await this.fetchWithAuth(`/admin/team/onboarding/auto`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     });

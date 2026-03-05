@@ -239,7 +239,7 @@ function buildAuthQuery(opts?: OnboardingAuthOpts): string {
 export async function validateOnboarding(
   data: Partial<OnboardingFormData> & { requireCommitments?: boolean }
 ): Promise<ValidationResponse> {
-  return apiFetch('/enterprise/onboarding/validate', {
+  return apiFetch('/team/onboarding/validate', {
     method: 'POST',
     body: JSON.stringify({ ...data, countryCode: 'SE' }),
   });
@@ -268,7 +268,7 @@ export async function saveDraft(
     delete payload.resumeToken;
   }
 
-  return apiFetch('/enterprise/onboarding/draft', {
+  return apiFetch('/team/onboarding/draft', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -276,7 +276,7 @@ export async function saveDraft(
 
 // 3) Get draft
 export async function getDraft(draftId: string, resumeToken: string): Promise<DraftResponse> {
-  return apiFetch(`/enterprise/onboarding/draft/${draftId}?resumeToken=${encodeURIComponent(resumeToken)}`);
+  return apiFetch(`/team/onboarding/draft/${draftId}?resumeToken=${encodeURIComponent(resumeToken)}`);
 }
 
 // 4) Subscribe (draft-level, PRE-TRIAL) — creates Stripe SetupIntent for card collection
@@ -284,7 +284,7 @@ export async function subscribeDraft(
   draftId: string,
   resumeToken: string
 ): Promise<DraftSubscribeResponse> {
-  return apiFetch('/enterprise/onboarding/subscribe', {
+  return apiFetch('/team/onboarding/subscribe', {
     method: 'POST',
     body: JSON.stringify({ draftId, resumeToken }),
   });
@@ -294,7 +294,7 @@ export async function subscribeDraft(
 export async function startTrial(
   data: OnboardingFormData & { draftId?: string; resumeToken?: string }
 ): Promise<StartResponse> {
-  return apiFetch('/enterprise/onboarding/start', {
+  return apiFetch('/team/onboarding/start', {
     method: 'POST',
     body: JSON.stringify({ ...data, countryCode: 'SE' }),
   });
@@ -336,7 +336,7 @@ export async function sendOnboardingEmailVerification(data: { email: string; dra
   emailVerification?: { status: string; expiresAt?: string; method?: string };
   verifyUrl?: string;
 }> {
-  return apiFetch('/enterprise/onboarding/verify-email/send', {
+  return apiFetch('/team/onboarding/verify-email/send', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -358,5 +358,5 @@ export async function checkOnboardingEmailVerification(draftId: string): Promise
     attemptsRemaining?: number;
   };
 }> {
-  return apiFetch(`/enterprise/onboarding/verify-email/status?draftId=${encodeURIComponent(draftId)}`);
+  return apiFetch(`/team/onboarding/verify-email/status?draftId=${encodeURIComponent(draftId)}`);
 }

@@ -5,8 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import {
   ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle,
-  CheckCircle2, Minus, Plus, Info, Mail, CreditCard, Users, Building2,
-  FileCheck, Clock, Globe, Phone, User, Hash,
+  CheckCircle2, Info, Mail, CreditCard, Users, Building2,
+  Clock, Globe, Phone, User, Hash,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,7 @@ import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@
 const PLANS = [
   { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
 ];
-const STEPS = ['Team', 'Uppgifter', 'Bekräfta', 'Betalning'];
+const STEPS = ['Uppgifter', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_team_draft';
 const FORM_KEY = 'tivly_team_form';
 
@@ -122,8 +122,8 @@ export default function EnterpriseOnboarding() {
 
   useEffect(() => {
     const hasRestorableProgress = (f: Partial<OnboardingFormData>, s = 0) => {
-      const hasRealData = !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
-      const changedFromDefaults = Number(f.expectedSeats ?? 5) !== 5 || (f.planType && f.planType !== 'enterprise_small') || !!f.acceptedTerms || !!f.authorizedSignatory;
+    const hasRealData = !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
+      const changedFromDefaults = !!f.acceptedTerms || !!f.authorizedSignatory;
       return hasRealData || changedFromDefaults || s > 0;
     };
     const local = loadDraftLocal();
@@ -134,7 +134,7 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
           const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
-          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 2);
+          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 1);
           if (hasRestorableProgress(restored, restoredStep)) {
             hasUserInteractedRef.current = true;
             setForm(restored);
@@ -146,7 +146,7 @@ export default function EnterpriseOnboarding() {
     function restoreFromLocal() {
       const parsed = readStorageJSON<{ form?: Partial<OnboardingFormData>; step?: number; touched?: boolean }>(FORM_KEY);
       if (!parsed?.form) return;
-      const restoredStep = Math.min(parsed.step ?? 0, 2);
+      const restoredStep = Math.min(parsed.step ?? 0, 1);
       if (hasRestorableProgress(parsed.form, restoredStep)) {
         hasUserInteractedRef.current = true;
         setForm(prev => ({ ...prev, ...parsed.form }));
@@ -198,7 +198,7 @@ export default function EnterpriseOnboarding() {
 
   const [stepValidating, setStepValidating] = useState(false);
 
-  // Step 1 (Uppgifter): validate → company connection popup → email verification popup
+  // Step 0 (Uppgifter): validate → company connection popup → email verification popup
   const handleNextFromStep1 = async () => {
     hasUserInteractedRef.current = true;
     const missing: string[] = [];
@@ -217,7 +217,7 @@ export default function EnterpriseOnboarding() {
     
     // If both already verified, go straight to next step (Bekräfta)
     if (companyConnState === 'verified' && emailVerifyState === 'verified') {
-      setStep(2);
+      setStep(1);
       return;
     }
     
@@ -286,14 +286,14 @@ export default function EnterpriseOnboarding() {
   const proceedToEmailVerification = async () => {
     // If email already verified, go to next step
     if (emailVerifyState === 'verified') {
-      setStep(2);
+      setStep(1);
       return;
     }
 
     // Save draft to ensure draftId exists for verification
     const draftRes = await saveDraft({
       ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-      progressStep: 1, progressPercent: 40,
+      progressStep: 0, progressPercent: 30,
     } as any);
     if (draftRes.draft) {
       setDraftId(draftRes.draft.id);
@@ -320,14 +320,14 @@ export default function EnterpriseOnboarding() {
 
   // Email verification polling — auto-detect when user verifies via link in another tab
   useEffect(() => {
-    if (step !== 1 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
+    if (step !== 0 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
     const interval = setInterval(async () => {
       try {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
         if (res.emailVerification?.status === 'verified') {
           setEmailVerifyState('verified');
           toast({ title: 'E-post verifierad', description: 'Din företagsmail har bekräftats.' });
-          setTimeout(() => setStep(2), 1500);
+          setTimeout(() => setStep(1), 1500);
         }
       } catch {}
     }, 4000);
@@ -361,7 +361,7 @@ export default function EnterpriseOnboarding() {
     if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
-    if (step < 3) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step < 2) triggerDraftSave(form as Partial<OnboardingFormData>, step);
   }, [step]);
 
   useEffect(() => {
@@ -376,7 +376,7 @@ export default function EnterpriseOnboarding() {
       const s = stepRef.current;
       saveStorageJSON(FORM_KEY, { form: f, step: s, touched: hasUserInteractedRef.current, updatedAt: Date.now() });
       if (f.companyName || f.workEmail) {
-        navigator.sendBeacon?.('https://api.tivly.se/enterprise/onboarding/draft',
+        navigator.sendBeacon?.('https://api.tivly.se/team/onboarding/draft',
           new Blob([JSON.stringify({
             ...f, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
             progressStep: s, progressPercent: Math.round(((s + 1) / STEPS.length) * 100),
@@ -404,9 +404,8 @@ export default function EnterpriseOnboarding() {
     }
   }, [user]);
 
-  const selectedPlan = PLANS.find(p => p.id === form.planType) || PLANS[0];
-  const seats = form.expectedSeats || 5;
-  // Seats from step 0 is only a recommendation — no extra seats in onboarding
+  const selectedPlan = PLANS[0];
+  const seats = 5; // Fixed at 5 during trial
   const extraSeats = 0;
   const monthlyTotal = selectedPlan.priceSek;
 
@@ -439,7 +438,7 @@ export default function EnterpriseOnboarding() {
       }
       const draftRes = await saveDraft({
         ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 2, progressPercent: 75,
+        progressStep: 1, progressPercent: 66,
       } as any);
       const ensuredDraftId = draftRes.draft?.id;
       const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
@@ -464,14 +463,14 @@ export default function EnterpriseOnboarding() {
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
-        setStep(3);
+        setStep(2);
         return;
       }
       if (!pkKey) { setSubmitError('Stripe-konfigurationsfel (publishable key saknas). Kontakta support.'); setIsSubmitting(false); return; }
       if (!secret) { setSubmitError('Kunde inte initiera kortregistrering. Försök igen.'); setIsSubmitting(false); return; }
       setStripePublishableKey(pkKey);
       setSetupIntentClientSecret(secret);
-      setStep(3);
+      setStep(2);
     } catch (err: any) {
       const status = err?.status;
       const code = err?.code || err?.error;
@@ -535,9 +534,10 @@ export default function EnterpriseOnboarding() {
             </div>
           </div>
           <div className="text-center space-y-2">
-            <h1 className="text-xl font-semibold text-foreground">Trial aktiverad</h1>
+           <h1 className="text-xl font-semibold text-foreground">Trial aktiverad</h1>
             <p className="text-sm text-muted-foreground">
-              Välkommen till Tivly Team. Debitering sker automatiskt efter 7 dagar.
+              Välkommen till Tivly Team. Er 7-dagars trial har startat med <strong className="text-foreground">5 användare</strong>. 
+              Debitering sker automatiskt efter trialen.
             </p>
           </div>
 
@@ -565,13 +565,20 @@ export default function EnterpriseOnboarding() {
             {[
               { n: '1', icon: Mail, text: <>Öppna inbjudan i <span className="text-foreground font-medium">{completedEmail}</span></> },
               { n: '2', icon: ArrowRight, text: 'Klicka på länken för att logga in' },
-              { n: '3', icon: Users, text: 'Bjud in ditt team och börja använda Tivly' },
+              { n: '3', icon: Users, text: 'Börja använda Tivly med ert team (5 användare under trial)' },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3 p-4">
                 <item.icon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <span className="text-sm text-muted-foreground">{item.text}</span>
               </div>
             ))}
+          </div>
+
+          <div className="border border-border bg-muted/30 p-4 flex items-start gap-3">
+            <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              Under trialen ingår 5 användare. Efter trialen kan ni lägga till fler teammedlemmar via adminpanelen (199 kr/användare/mån).
+            </p>
           </div>
           <div className="text-center space-y-3">
             <a href="/auth" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors">
@@ -599,7 +606,7 @@ export default function EnterpriseOnboarding() {
               <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider">Test</span>
             )}
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 3 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 2 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
       </header>
@@ -660,8 +667,7 @@ export default function EnterpriseOnboarding() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Left: Form */}
           <main className="flex-1 min-w-0">
-            {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
-            {step === 1 && (
+            {step === 0 && (
               <StepDetails
                 form={form}
                 fieldErrors={fieldErrors}
@@ -679,8 +685,8 @@ export default function EnterpriseOnboarding() {
                 onResend={handleResendVerification}
               />
             )}
-            {step === 2 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
-            {step === 3 && draftId && resumeToken && (
+            {step === 1 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
+            {step === 2 && draftId && resumeToken && (
               <StepCardPayment
                 draftId={draftId}
                 resumeToken={resumeToken}
@@ -702,16 +708,6 @@ export default function EnterpriseOnboarding() {
             {/* Navigation */}
             {step === 0 && (
               <div className="flex items-center justify-end mt-8 pt-6 border-t border-border">
-                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
-                  Nästa <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {step === 1 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(0); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-                  <ChevronLeft className="h-4 w-4" /> Tillbaka
-                </Button>
                 {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && companyConnState !== 'verifying' && companyConnState !== 'verified' && (
                   <Button size="sm" onClick={handleNextFromStep1} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
                     {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
@@ -719,9 +715,9 @@ export default function EnterpriseOnboarding() {
                 )}
               </div>
             )}
-            {step === 2 && (
+            {step === 1 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
                 <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
@@ -731,8 +727,8 @@ export default function EnterpriseOnboarding() {
             )}
           </main>
 
-          {/* Right: Cost sidebar — desktop only, visible from step 2 (after plan chosen) */}
-          {step >= 2 && (
+          {/* Right: Cost sidebar — desktop only, visible from step 1 */}
+          {step >= 1 && (
             <aside className="hidden lg:block w-72 shrink-0">
               <div className="sticky top-[calc(3.5rem+3.5rem+1px)] space-y-4">
                 <CostSidebar
@@ -795,7 +791,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
           <span className="text-muted-foreground">Idag</span>
           <span className="text-foreground font-semibold">0 kr</span>
         </div>
-        <p className="text-[11px] text-muted-foreground">7 dagars gratis trial</p>
+        <p className="text-[11px] text-muted-foreground">7 dagars gratis trial · {selectedPlan.seats} användare</p>
       </div>
 
       <div className="px-4 py-3 space-y-1.5">
@@ -812,7 +808,13 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
         <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
       </div>
 
-      {step >= 2 && form.companyName && (
+      <div className="px-4 py-3">
+        <p className="text-[10px] text-muted-foreground">
+          Under trial: {selectedPlan.seats} användare. Fler kan läggas till efter trial ({fmt(selectedPlan.extraSeatSek)} kr/anv./mån).
+        </p>
+      </div>
+
+      {step >= 1 && form.companyName && (
         <div className="px-4 py-3 space-y-1">
           <p className="text-[11px] text-muted-foreground font-medium">Företag</p>
           <p className="text-sm text-foreground truncate">{form.companyName}</p>
@@ -830,69 +832,9 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
   );
 }
 
-/* ═══════════════════════════════════════════════════════ */
-/* STEP 0: Team Size                                       */
-/* ═══════════════════════════════════════════════════════ */
-function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number) => void }) {
-  const presets = [5, 10, 15, 25, 50];
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">Hur stort är ert team?</h2>
-        <p className="text-sm text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
-      </div>
-
-      <div className="border border-border p-6 sm:p-8">
-        <div className="flex items-center justify-center gap-6 sm:gap-8">
-          <button
-            onClick={() => onChange(Math.max(1, seats - 1))}
-            className="h-10 w-10 sm:h-12 sm:w-12 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <div className="text-center min-w-[90px]">
-            <span className="text-5xl sm:text-6xl font-semibold text-foreground tabular-nums block">{seats}</span>
-            <p className="text-xs text-muted-foreground mt-2">användare</p>
-          </div>
-          <button
-            onClick={() => onChange(Math.min(500, seats + 1))}
-            className="h-10 w-10 sm:h-12 sm:w-12 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        {presets.map(n => (
-          <button
-            key={n}
-            onClick={() => onChange(n)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors no-hover-lift border',
-              seats === n
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground',
-            )}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-
-      <div className="border border-border p-4 flex items-start gap-3">
-        <Users className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        <p className="text-sm text-muted-foreground">
-          Vi matchar en plan baserat på ert teamstorlek. Prisdetaljer visas i ett senare steg.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 2: Details + Inline Email Verification             */
+/* STEP 0: Details + Inline Email Verification             */
 /* ═══════════════════════════════════════════════════════ */
 function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, companyConnection,
   companyConnState, companyConnError,
@@ -1180,13 +1122,12 @@ function FieldInput({ label, id, placeholder, value, onChange, error, valid, hin
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 3: Confirm                                         */
+/* STEP 1: Confirm                                         */
 /* ═══════════════════════════════════════════════════════ */
 function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField, submitError, extraSeatSek }: {
   form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; monthlyTotal: number; extraSeats: number;
   updateField: (f: string, v: any) => void; submitError: string; extraSeatSek: number;
 }) {
-  const seats = form.expectedSeats || 0;
   const planLabel = selectedPlan.name;
   const rows = [
     { label: 'Företag', value: form.companyName || '–', icon: Building2 },
@@ -1196,10 +1137,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
     { label: 'Telefon', value: form.contactPhone || '–', icon: Phone },
     { label: 'Plan', value: planLabel, icon: CreditCard },
     { label: 'Månadsavgift', value: `${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
-    { label: 'Inkluderade användare', value: `${selectedPlan.seats} st`, icon: Users },
-    { label: 'Totalt antal användare', value: `${seats} st`, icon: Users },
-    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(extraSeatSek)} SEK/mån`, icon: Plus }] : []),
-    ...(selectedPlan.activationSek > 0 ? [{ label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock }] : []),
+    { label: 'Inkluderade användare (trial)', value: `${selectedPlan.seats} st`, icon: Users },
   ];
 
   return (
@@ -1221,11 +1159,28 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
         ))}
       </div>
 
+      {/* Trial user limit info */}
+      <div className="border border-border bg-muted/30 p-4 space-y-2">
+        <div className="flex items-start gap-3">
+          <Users className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">5 användare ingår under trial</p>
+            <p className="text-xs text-muted-foreground">
+              Under den kostnadsfria 7-dagars trial-perioden kan ert team använda Tivly med upp till <strong className="text-foreground">5 användare</strong>. 
+              Det går inte att lägga till fler under trialen.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Efter trialen kan ni enkelt bjuda in fler teammedlemmar via adminpanelen. Extra användare kostar <strong className="text-foreground">{fmt(selectedPlan.extraSeatSek)} kr/användare/mån</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-3">
         <label className="flex items-start gap-3 cursor-pointer">
           <Checkbox checked={form.acceptedTerms || false} onCheckedChange={(c) => updateField('acceptedTerms', c === true)} className="mt-0.5 rounded-none" />
           <span className="text-sm text-muted-foreground">
-            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-foreground underline">enterprise-villkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground underline">integritetspolicyn</a>.
+            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-foreground underline">teamvillkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground underline">integritetspolicyn</a>.
           </span>
         </label>
         <label className="flex items-start gap-3 cursor-pointer">
@@ -1244,7 +1199,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
       <div className="border border-border p-4 flex items-start gap-3">
         <CreditCard className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
-          I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden.</strong>
+          I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden (7 dagar).</strong>
         </p>
       </div>
     </div>
@@ -1252,7 +1207,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 4: Card Payment                                    */
+/* STEP 2: Card Payment                                    */
 /* ═══════════════════════════════════════════════════════ */
 function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, extraSeatSek, firstChargeEstimate, onCardConfirmed }: {
   draftId: string; resumeToken: string; initialClientSecret: string | null; stripePublishableKey: string | null;
@@ -1353,8 +1308,16 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
           <span className="text-sm font-semibold text-foreground">{fmt(showMonthly)} kr</span>
         </div>
         <div className="px-4 py-2.5">
-          <p className="text-[11px] text-muted-foreground">Exkl. moms · {expectedSeats} användare</p>
+          <p className="text-[11px] text-muted-foreground">Exkl. moms · {includedSeats} användare under trial</p>
         </div>
+      </div>
+
+      {/* Trial limit notice */}
+      <div className="border border-border bg-muted/30 p-3 flex items-start gap-3">
+        <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground">
+          Under trialen ingår <strong className="text-foreground">{includedSeats} användare</strong>. Fler kan läggas till efter trialen för {fmt(extraSeatSek)} kr/användare/mån.
+        </p>
       </div>
 
       {/* Email notice */}
