@@ -89,7 +89,7 @@ export default function OrgSettings() {
           {/* Invite tab */}
           {isAdminOrOwner && (
             <TabsContent value="invite" className="mt-6 space-y-6">
-              <EnterpriseInvitePanel />
+              <MemberRoleManager />
             </TabsContent>
           )}
 
