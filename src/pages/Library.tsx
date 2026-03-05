@@ -632,6 +632,11 @@ const Library = () => {
     // Use canCreateMeeting from context instead of canGenerateProtocol
   };
   const handleDeleteMeeting = async (id: string) => {
+    // Viewers cannot delete
+    if (isViewer) {
+      toast({ title: 'Läsbehörighet', description: 'Du kan inte ta bort möten.', variant: 'destructive' });
+      return;
+    }
     // Demo accounts can't delete - just silently ignore
     if (isDemoAccount) {
       return;
