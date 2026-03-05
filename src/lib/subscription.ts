@@ -165,7 +165,7 @@ export const subscriptionService = {
 
       const protocolsUsed = Math.max(0, Number((planRaw as any)?.protocolsUsed ?? 0) || 0);
       let protocolsLimit: number;
-      if (normalizedPlan === 'unlimited' || normalizedPlan === 'enterprise') {
+      if (normalizedPlan === 'unlimited' || normalizedPlan === 'team' || normalizedPlan === 'enterprise') {
         protocolsLimit = 999999;
       } else {
         const fromUserProt = Number((planRaw as any)?.protocolsLimit);
