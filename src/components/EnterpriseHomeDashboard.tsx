@@ -276,7 +276,12 @@ export const EnterpriseHomeDashboard = ({
                         </div>
                         {!step.completed && step.cta && (
                           <button
-                            onClick={() => navigate(step.cta!.path)}
+                            onClick={() => {
+                              // Remap invalid routes from backend
+                              let path = step.cta!.path;
+                              if (path === "/meetings" || path === "/meetings/") path = "/library";
+                              navigate(path);
+                            }}
                             className="shrink-0 text-[11px] text-primary hover:underline flex items-center gap-0.5 mt-0.5"
                           >
                             {step.cta.label}
