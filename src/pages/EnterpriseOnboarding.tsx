@@ -5,8 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import {
   ChevronRight, ChevronLeft, Check, Shield, ArrowRight, Loader2, AlertCircle,
-  CheckCircle2, Minus, Plus, Info, Mail, CreditCard, Users, Building2,
-  FileCheck, Clock, Globe, Phone, User, Hash,
+  CheckCircle2, Info, Mail, CreditCard, Users, Building2,
+  Clock, Globe, Phone, User, Hash,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
