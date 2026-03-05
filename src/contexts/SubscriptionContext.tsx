@@ -203,13 +203,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       const backendMeetingCount = user.meetingCount || 0;
       
       // Validate and normalize plan type (support common aliases)
-      const validPlans = ['free', 'pro', 'plus', 'unlimited', 'enterprise'] as const;
+      const validPlans = ['free', 'pro', 'team', 'plus', 'unlimited', 'enterprise'] as const;
       const aliasMap: Record<string, UserPlan['plan']> = {
         'gratis': 'free',
         'free plan': 'free',
         'standard': 'pro',
+        'plus': 'pro',
+        'max': 'pro',
         'obegränsad': 'unlimited',
         'obegränsat': 'unlimited',
+        'enterprise_scale': 'enterprise',
       };
       const planStr = String(backendPlanType || '').toLowerCase().trim();
       
