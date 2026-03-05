@@ -524,6 +524,53 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   const preferredName = (user as any)?.preferredName;
   const displayName = preferredName || user?.displayName?.split(' ')[0] || '';
 
+  // Enterprise users get the enhanced dashboard
+  if (isEnterprise && !isViewer) {
+    return (
+      <>
+        <EnterpriseHomeDashboard
+          onRecord={handleRecordClick}
+          onUpload={handleUploadClick}
+          onTextPaste={() => setShowTextPasteDialog(true)}
+          onOpenTeamsImport={() => setShowDigitalImport(true)}
+          onOpenZoomImport={() => setShowZoomImport(true)}
+          onOpenGoogleMeetImport={() => setShowGoogleMeetImport(true)}
+          isStartingRecording={isStartingRecording}
+        />
+
+        {/* Dialogs */}
+        <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
+        <DigitalMeetingDialog
+          open={showDigitalMeetingDialog}
+          onOpenChange={setShowDigitalMeetingDialog}
+          onTranscriptReady={handleDigitalMeetingUpload}
+          selectedLanguage={selectedLanguage}
+          teamId={selectedTeamId}
+        />
+        <TextPasteDialog open={showTextPasteDialog} onOpenChange={setShowTextPasteDialog} onTextReady={handleTextPaste} />
+        <TeamSelectDialog
+          open={showTeamSelect}
+          onOpenChange={(open) => { setShowTeamSelect(open); }}
+          onSelect={handleTeamSelected}
+        />
+        <MeetingModeDialog
+          open={showModeDialog}
+          onOpenChange={(open) => { setShowModeDialog(open); }}
+          onSelect={handleModeSelect}
+          showDigitalOption={true}
+          digitalComingSoon={false}
+          digitalLocked={false}
+        />
+        <ParticipantsInputDialog
+          open={showParticipantsDialog}
+          onOpenChange={setShowParticipantsDialog}
+          onConfirm={handleParticipantsConfirm}
+          confirmLabel="Starta inspelning"
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
