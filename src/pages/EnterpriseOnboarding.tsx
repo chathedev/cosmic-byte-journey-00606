@@ -773,9 +773,9 @@ export default function EnterpriseOnboarding() {
 /* ═══════════════════════════════════════════════════════ */
 /* Cost Sidebar                                            */
 /* ═══════════════════════════════════════════════════════ */
-function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form }: {
+function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form, extraSeatSek }: {
   selectedPlan: typeof PLANS[0]; seats: number; extraSeats: number; monthlyTotal: number; step: number;
-  form: Partial<OnboardingFormData>;
+  form: Partial<OnboardingFormData>; extraSeatSek: number;
 }) {
   const trialDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
   return (
