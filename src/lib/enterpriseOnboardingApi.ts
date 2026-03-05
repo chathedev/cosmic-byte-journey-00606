@@ -276,7 +276,7 @@ export async function saveDraft(
 
 // 3) Get draft
 export async function getDraft(draftId: string, resumeToken: string): Promise<DraftResponse> {
-  return apiFetch(`/enterprise/onboarding/draft/${draftId}?resumeToken=${encodeURIComponent(resumeToken)}`);
+  return apiFetch(`/team/onboarding/draft/${draftId}?resumeToken=${encodeURIComponent(resumeToken)}`);
 }
 
 // 4) Subscribe (draft-level, PRE-TRIAL) — creates Stripe SetupIntent for card collection
