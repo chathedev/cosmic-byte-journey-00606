@@ -43,6 +43,7 @@ export interface EnterpriseMembership {
     slug: string;
     status: string;
     planTier: string;
+    planType?: string;
     speakerIdentificationEnabled?: boolean;
     trial?: {
       enabled: boolean;
@@ -457,6 +458,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             slug: u.enterprise?.companySlug || u.company?.slug || '',
             status: 'active',
             planTier: 'enterprise',
+            planType: u.enterprise?.planType || u.company?.planType,
             speakerIdentificationEnabled: sisEnabled,
           },
           membership: {
@@ -485,6 +487,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             slug: u.enterprise?.companySlug || u.company?.slug || '',
             status: 'active',
             planTier: 'enterprise',
+            planType: u.enterprise?.planType || u.company?.planType,
             speakerIdentificationEnabled: u?.enterprise?.speakerIdentificationEnabled || u?.company?.speakerIdentificationEnabled,
           },
           membership: {

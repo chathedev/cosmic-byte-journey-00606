@@ -42,13 +42,14 @@ const IntegrationTeams = () => {
   const { enterpriseMembership } = useSubscription();
   const di = useDigitalImport();
 
-  // Gate: Teams integration is enterprise-only
+  // Gate: Teams integration is enterprise-only (not team/enterprise_small)
+  const planType = enterpriseMembership?.company?.planType;
   const planTier = enterpriseMembership?.company?.planTier;
   useEffect(() => {
-    if (planTier && planTier !== 'enterprise') {
+    if (planTier && (planTier !== 'enterprise' || planType === 'enterprise_small')) {
       navigate('/integrations', { replace: true });
     }
-  }, [planTier, navigate]);
+  }, [planTier, planType, navigate]);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [autoImportLoading, setAutoImportLoading] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(false);

@@ -30,9 +30,9 @@ const Integrations = () => {
   const { enterpriseMembership } = useSubscription();
   const hasHandledCallback = useRef(false);
 
-  // Microsoft Teams is only available for enterprise planTier, not team
-  const planTier = enterpriseMembership?.company?.planTier;
-  const isTeamsAvailable = planTier === 'enterprise';
+  // Microsoft Teams is only available for Enterprise plan, not Team (enterprise_small)
+  const planType = enterpriseMembership?.company?.planType;
+  const isTeamsAvailable = enterpriseMembership?.company?.planTier === 'enterprise' && planType !== 'enterprise_small';
 
   const [successOverlay, setSuccessOverlay] = useState<{
     show: boolean;
