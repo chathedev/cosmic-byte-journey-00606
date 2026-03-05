@@ -889,16 +889,10 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
         ))}
       </div>
 
-      <div className="border border-border p-4 space-y-1">
-        <div className="flex items-center gap-3">
-          <Info className="h-4 w-4 text-muted-foreground shrink-0" />
-          <p className="text-sm text-muted-foreground">
-            Rekommenderad plan: <span className="text-foreground font-medium">{seats <= 10 ? 'Small' : 'Standard'}</span>
-            {' — '}{seats <= 10 ? `${fmt(2490)} SEK/mån (upp till 10 platser)` : `${fmt(5990)} SEK/mån (upp till 30 platser)`}
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground pl-7">
-          Fler platser kan läggas till efter onboarding.
+      <div className="border border-border p-4 flex items-start gap-3">
+        <Users className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-sm text-muted-foreground">
+          Vi matchar en plan baserat på ert teamstorlek. Prisdetaljer visas i ett senare steg.
         </p>
       </div>
     </div>
