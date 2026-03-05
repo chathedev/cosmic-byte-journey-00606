@@ -60,9 +60,8 @@ const IntegrationSlack = () => {
 
     if (sl.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
-      const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
       prevConnected.current = sl.isFullyConnected;
-      return () => clearTimeout(timer);
+      return;
     }
 
     prevConnected.current = sl.isFullyConnected;

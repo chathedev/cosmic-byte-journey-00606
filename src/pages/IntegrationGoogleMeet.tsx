@@ -67,9 +67,8 @@ const IntegrationGoogleMeet = () => {
 
     if (gm.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
-      const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
       prevConnected.current = gm.isFullyConnected;
-      return () => clearTimeout(timer);
+      return;
     }
 
     prevConnected.current = gm.isFullyConnected;
