@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt, XCircle, Calendar } from "lucide-react";
+import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt, XCircle, Calendar, CreditCard, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { addVat } from "@/lib/enterpriseVat";
