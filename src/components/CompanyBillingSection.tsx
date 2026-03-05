@@ -139,6 +139,8 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     try {
       const data = await apiClient.getEnterpriseCompanyBillingHistory(companyId);
       setBillingHistory(data.billingHistory || []);
+      setBillingCompany(data.company || null);
+      setBillingStatus(data.billingStatus || data.company?.billingStatus || null);
     } catch (error: any) {
       console.error('Failed to load billing history:', error);
       if (showLoader && error.message && !error.message.includes('404') && !error.message.includes('not found')) {
