@@ -903,8 +903,8 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 1: Plan                                            */
 /* ═══════════════════════════════════════════════════════ */
-function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }: {
-  form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; extraSeats: number; monthlyTotal: number; updateField: (f: string, v: any) => void;
+function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField, extraSeatSek }: {
+  form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; extraSeats: number; monthlyTotal: number; updateField: (f: string, v: any) => void; extraSeatSek: number;
 }) {
   return (
     <div className="space-y-6">
