@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Building2, Users, Link2, Settings2 } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
-import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
+import { MemberRoleManager } from "@/components/MemberRoleManager";
 import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { OrgZoomInsights } from "@/components/OrgZoomInsights";
 import { OrgGoogleMeetInsights } from "@/components/OrgGoogleMeetInsights";
