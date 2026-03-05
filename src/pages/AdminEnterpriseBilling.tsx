@@ -150,12 +150,16 @@ export default function AdminEnterpriseBilling() {
     try {
       const data = await apiClient.getEnterpriseCompanyBillingHistory(companyId);
       setBillingHistory(data.billingHistory || []);
+      setBillingCompany(data.company || null);
+      setBillingStatusValue(data.billingStatus || data.company?.billingStatus || null);
     } catch (error: any) {
       console.error('Failed to load billing history:', error);
       if (error.message && !error.message.includes('404') && !error.message.includes('not found')) {
         toast.error('Kunde inte ladda faktureringshistorik');
       }
       setBillingHistory([]);
+      setBillingCompany(null);
+      setBillingStatusValue(null);
     } finally {
       setLoadingHistory(false);
     }
