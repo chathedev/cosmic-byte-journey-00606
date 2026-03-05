@@ -801,6 +801,12 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
         <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
       </div>
 
+      <div className="px-4 py-3">
+        <p className="text-[10px] text-muted-foreground">
+          Under trial: {selectedPlan.seats} användare. Fler kan läggas till efter trial ({fmt(selectedPlan.extraSeatSek)} kr/anv./mån).
+        </p>
+      </div>
+
       {step >= 1 && form.companyName && (
         <div className="px-4 py-3 space-y-1">
           <p className="text-[11px] text-muted-foreground font-medium">Företag</p>
