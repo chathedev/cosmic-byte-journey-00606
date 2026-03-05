@@ -820,7 +820,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
 
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 2: Details + Inline Email Verification             */
+/* STEP 0: Details + Inline Email Verification             */
 /* ═══════════════════════════════════════════════════════ */
 function StepDetails({ form, fieldErrors, fieldChecks, availability, companyRegistry, companyConnection,
   companyConnState, companyConnError,
