@@ -659,8 +659,7 @@ export default function EnterpriseOnboarding() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Left: Form */}
           <main className="flex-1 min-w-0">
-            {step === 0 && <StepTeamSize seats={seats} onChange={(v) => updateField('expectedSeats', v)} />}
-            {step === 1 && (
+            {step === 0 && (
               <StepDetails
                 form={form}
                 fieldErrors={fieldErrors}
@@ -678,8 +677,8 @@ export default function EnterpriseOnboarding() {
                 onResend={handleResendVerification}
               />
             )}
-            {step === 2 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
-            {step === 3 && draftId && resumeToken && (
+            {step === 1 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
+            {step === 2 && draftId && resumeToken && (
               <StepCardPayment
                 draftId={draftId}
                 resumeToken={resumeToken}
@@ -701,16 +700,6 @@ export default function EnterpriseOnboarding() {
             {/* Navigation */}
             {step === 0 && (
               <div className="flex items-center justify-end mt-8 pt-6 border-t border-border">
-                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 no-hover-lift rounded-none px-6">
-                  Nästa <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {step === 1 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(0); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-                  <ChevronLeft className="h-4 w-4" /> Tillbaka
-                </Button>
                 {emailVerifyState !== 'pending' && emailVerifyState !== 'sending' && companyConnState !== 'verifying' && companyConnState !== 'verified' && (
                   <Button size="sm" onClick={handleNextFromStep1} disabled={stepValidating} className="gap-1.5 no-hover-lift rounded-none px-6 min-w-[140px]">
                     {stepValidating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validerar...</> : <>Nästa <ChevronRight className="h-4 w-4" /></>}
@@ -718,9 +707,9 @@ export default function EnterpriseOnboarding() {
                 )}
               </div>
             )}
-            {step === 2 && (
+            {step === 1 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                <Button variant="ghost" size="sm" onClick={() => setStep(0)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
                 <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
@@ -730,8 +719,8 @@ export default function EnterpriseOnboarding() {
             )}
           </main>
 
-          {/* Right: Cost sidebar — desktop only, visible from step 2 (after plan chosen) */}
-          {step >= 2 && (
+          {/* Right: Cost sidebar — desktop only, visible from step 1 */}
+          {step >= 1 && (
             <aside className="hidden lg:block w-72 shrink-0">
               <div className="sticky top-[calc(3.5rem+3.5rem+1px)] space-y-4">
                 <CostSidebar
