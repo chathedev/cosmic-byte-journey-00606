@@ -124,6 +124,7 @@ interface SubscriptionContextType {
   paymentDomain: PaymentDomain;
   enterpriseMembership: EnterpriseMembership | null;
   isAdmin: boolean;
+  isViewer: boolean;
   refreshPlan: () => Promise<void>;
   refreshEnterpriseMembership: () => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
