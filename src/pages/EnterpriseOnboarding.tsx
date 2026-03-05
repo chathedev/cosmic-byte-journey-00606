@@ -320,7 +320,7 @@ export default function EnterpriseOnboarding() {
 
   // Email verification polling — auto-detect when user verifies via link in another tab
   useEffect(() => {
-    if (step !== 1 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
+    if (step !== 0 || emailVerifyState !== 'pending' || !draftIdRef.current) return;
     const interval = setInterval(async () => {
       try {
         const res = await checkOnboardingEmailVerification(draftIdRef.current!);
