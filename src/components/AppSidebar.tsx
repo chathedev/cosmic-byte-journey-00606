@@ -344,7 +344,8 @@ export function AppSidebar() {
                           {enterpriseMembership.membership?.role && (
                             <span className="text-muted-foreground/70">
                               {enterpriseMembership.membership.role === 'admin' ? 'Admin' : 
-                               enterpriseMembership.membership.role === 'owner' ? 'Ägare' : 'Medlem'}
+                               enterpriseMembership.membership.role === 'owner' ? 'Ägare' : 
+                               enterpriseMembership.membership.role === 'viewer' ? 'Läsare' : 'Medlem'}
                             </span>
                           )}
                         </span>
