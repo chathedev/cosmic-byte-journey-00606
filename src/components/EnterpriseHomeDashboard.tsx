@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Mic, Upload, ClipboardPaste, CheckCircle2, Circle, Building2,
-  ArrowRight, Loader2, ChevronDown, ChevronUp, BarChart3
+  Mic, Upload, ClipboardPaste, CheckCircle2, Circle,
+  ArrowRight, Loader2, ChevronDown, ChevronUp,
+  Users, FileText, TrendingUp, Library
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
@@ -100,10 +100,7 @@ export const EnterpriseHomeDashboard = ({
       const data = await apiClient.getEnterpriseChecklist();
       if (data?.checklist) {
         setChecklist(data.checklist);
-        // Auto-collapse if completed
-        if (data.checklist.completed) {
-          setChecklistExpanded(false);
-        }
+        if (data.checklist.completed) setChecklistExpanded(false);
       }
     } catch (e) {
       console.warn("Failed to load checklist:", e);
@@ -127,236 +124,273 @@ export const EnterpriseHomeDashboard = ({
     loadStats();
   }, [loadChecklist, loadStats]);
 
-  const connectedIntegrations = [
+  const importActions = [
     { key: "microsoftConnected", label: "Teams", logo: teamsLogo, onImport: onOpenTeamsImport },
     { key: "zoomConnected", label: "Zoom", logo: zoomLogo, onImport: onOpenZoomImport },
-    { key: "googleMeetConnected", label: "Google Meet", logo: googleMeetLogo, onImport: onOpenGoogleMeetImport },
+    { key: "googleMeetConnected", label: "Meet", logo: googleMeetLogo, onImport: onOpenGoogleMeetImport },
   ];
 
   const slackConnected = integrations?.slackConnected;
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col">
-      <div className="flex-1 flex flex-col p-5 md:p-8 max-w-2xl mx-auto w-full">
+    <div className="min-h-[100dvh] bg-background">
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-1">
-            <Building2 className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        {/* Header row */}
+        <div className="flex items-end justify-between mb-8 sm:mb-10">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">
               {companyName}
-            </span>
+            </p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">
+              {displayName ? `${getGreeting()}, ${displayName}` : getGreeting()}
+            </h1>
           </div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-            {displayName ? `${getGreeting()}, ${displayName}` : getGreeting()}
-          </h1>
-        </div>
-
-        {/* Quick Stats Row */}
-        {stats && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="rounded-lg border border-border bg-card p-3">
-              <p className="text-xs text-muted-foreground">Teammedlemmar</p>
-              <p className="text-lg font-semibold text-foreground">{stats.memberCount ?? 0}</p>
-            </div>
-            <button
-              onClick={() => navigate("/library")}
-              className="rounded-lg border border-border bg-card p-3 text-left hover:border-primary/40 hover:shadow-sm transition-all"
-            >
-              <p className="text-xs text-muted-foreground">Totala möten</p>
-              <p className="text-lg font-semibold text-foreground">{stats.totalMeetingCount ?? 0}</p>
-            </button>
-            <div className="rounded-lg border border-border bg-card p-3">
-              <p className="text-xs text-muted-foreground">Snitt/medlem</p>
-              <p className="text-lg font-semibold text-foreground">
-                {stats.averageMeetingsPerMember != null
-                  ? Number(stats.averageMeetingsPerMember).toFixed(1)
-                  : "0"}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Import Section */}
-        <div className="mb-6">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Snabbimport
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {connectedIntegrations.map((int) => {
-              const connected = integrations?.[int.key as keyof typeof integrations];
-              return (
-                <button
-                  key={int.key}
-                  onClick={connected ? int.onImport : () => navigate("/integrations")}
-                  className={`relative flex flex-col items-center gap-2 rounded-lg border p-4 transition-all ${
-                    connected
-                      ? "border-border bg-card hover:border-primary/40 hover:shadow-sm cursor-pointer"
-                      : "border-dashed border-border/60 bg-muted/20 hover:bg-muted/40 cursor-pointer"
-                  }`}
-                >
-                  <div className="w-8 h-8 flex items-center justify-center">
-                    <img src={int.logo} alt={int.label} className="w-7 h-7 object-contain" />
-                  </div>
-                  <span className="text-xs font-medium text-foreground">{int.label}</span>
-                  {connected ? (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-0">
-                      Kopplad
-                    </Badge>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">Koppla</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {/* Slack status */}
-          {slackConnected && (
-            <div className="mt-2 flex items-center gap-2 px-1">
-              <img src={slackLogo} alt="Slack" className="w-4 h-4 object-contain" />
-              <span className="text-xs text-muted-foreground">Slack kopplad</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            </div>
+          {userPlan && (
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              {userPlan.meetingsUsed ?? 0}
+              {userPlan.meetingsLimit != null ? ` / ${userPlan.meetingsLimit}` : ""} möten
+              {userPlan.renewDate && (
+                <span> · Förnyas {new Date(userPlan.renewDate).toLocaleDateString("sv-SE")}</span>
+              )}
+            </p>
           )}
         </div>
 
-        {/* Checklist Section */}
-        {checklist && checklist.enabled && (
-          <div className="mb-6 rounded-lg border border-border bg-card overflow-hidden">
-            <button
-              onClick={() => setChecklistExpanded(!checklistExpanded)}
-              className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                  {checklist.completed ? (
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
-                  ) : (
-                    <BarChart3 className="w-4 h-4 text-primary" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">
-                    {checklist.completed ? "Checklista klar" : "Kom igång"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {checklist.completedSteps} av {checklist.totalSteps} steg klara
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <Progress value={checklist.progressPercent} className="w-20 h-1.5" />
-                {checklistExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                )}
-              </div>
-            </button>
+        {/* Two-column layout on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
 
-            {checklistExpanded && (
-              <div className="px-4 pb-4 space-y-1">
-                {checklist.steps.map((step) => (
-                  <div
-                    key={step.id}
-                    className={`flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors ${
-                      step.completed ? "opacity-60" : "hover:bg-muted/30"
-                    }`}
-                  >
-                    {step.completed ? (
-                      <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-muted-foreground/40 mt-0.5 shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm ${
-                          step.completed
-                            ? "line-through text-muted-foreground"
-                            : "text-foreground font-medium"
-                        }`}
-                      >
-                        {step.title}
-                      </p>
-                      {!step.completed && step.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
+          {/* Left column — primary actions (3/5) */}
+          <div className="lg:col-span-3 space-y-6">
+
+            {/* Record CTA */}
+            <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-foreground mb-1">Nytt möte</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Spela in live, ladda upp en fil eller klistra in text
+                  </p>
+                </div>
+                <Button
+                  onClick={onRecord}
+                  disabled={isStartingRecording}
+                  className="h-10 px-5 gap-2 text-sm shrink-0"
+                >
+                  {isStartingRecording ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                  {isStartingRecording ? "Startar…" : "Spela in"}
+                </Button>
+              </div>
+
+              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                <Button
+                  onClick={onUpload}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-9 text-xs gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Ladda upp
+                </Button>
+                <Button
+                  onClick={onTextPaste}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-9 text-xs gap-1.5"
+                >
+                  <ClipboardPaste className="w-3.5 h-3.5" />
+                  Klistra in
+                </Button>
+              </div>
+            </div>
+
+            {/* Checklist */}
+            {checklist && checklist.enabled && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <button
+                  onClick={() => setChecklistExpanded(!checklistExpanded)}
+                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
+                      checklist.completed ? "bg-primary/10" : "bg-muted"
+                    }`}>
+                      {checklist.completed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                      ) : (
+                        <span className="text-xs font-bold text-foreground">
+                          {checklist.completedSteps}
+                        </span>
                       )}
                     </div>
-                    {!step.completed && step.cta && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0 text-xs h-7 px-2 text-primary hover:text-primary"
-                        onClick={() => navigate(step.cta!.path)}
-                      >
-                        {step.cta.label}
-                        <ArrowRight className="w-3 h-3 ml-1" />
-                      </Button>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {checklist.completed ? "Onboarding klar" : "Kom igång"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {checklist.completedSteps}/{checklist.totalSteps} steg
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <Progress value={checklist.progressPercent} className="w-16 h-1" />
+                    {checklistExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
-                ))}
+                </button>
+
+                {checklistExpanded && (
+                  <div className="px-5 pb-4 space-y-0.5">
+                    {checklist.steps.map((step) => (
+                      <div
+                        key={step.id}
+                        className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
+                          step.completed ? "opacity-50" : "hover:bg-muted/20"
+                        }`}
+                      >
+                        {step.completed ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                        ) : (
+                          <Circle className="w-3.5 h-3.5 text-border mt-0.5 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[13px] leading-snug ${
+                            step.completed
+                              ? "line-through text-muted-foreground"
+                              : "text-foreground"
+                          }`}>
+                            {step.title}
+                          </p>
+                          {!step.completed && step.description && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                              {step.description}
+                            </p>
+                          )}
+                        </div>
+                        {!step.completed && step.cta && (
+                          <button
+                            onClick={() => navigate(step.cta!.path)}
+                            className="shrink-0 text-[11px] text-primary hover:underline flex items-center gap-0.5 mt-0.5"
+                          >
+                            {step.cta.label}
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {checklistLoading && (
+              <div className="rounded-lg border border-border bg-card p-8 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               </div>
             )}
           </div>
-        )}
 
-        {checklistLoading && (
-          <div className="mb-6 rounded-lg border border-border bg-card p-6 flex items-center justify-center">
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
+          {/* Right column — stats + integrations (2/5) */}
+          <div className="lg:col-span-2 space-y-6">
 
-        {/* Action buttons */}
-        <div className="space-y-2.5 mb-6">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Skapa nytt
-          </p>
-          <Button
-            onClick={onRecord}
-            size="lg"
-            disabled={isStartingRecording}
-            className="w-full h-12 text-sm gap-2.5 rounded-lg"
-          >
-            {isStartingRecording ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Mic className="w-4 h-4" />
+            {/* Stats */}
+            {stats && (
+              <div className="rounded-lg border border-border bg-card divide-y divide-border">
+                <button
+                  onClick={() => navigate("/org/settings")}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-foreground flex-1">Teammedlemmar</span>
+                  <span className="text-sm font-semibold text-foreground tabular-nums">
+                    {stats.memberCount ?? 0}
+                  </span>
+                </button>
+                <button
+                  onClick={() => navigate("/library")}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-foreground flex-1">Totala möten</span>
+                  <span className="text-sm font-semibold text-foreground tabular-nums">
+                    {stats.totalMeetingCount ?? 0}
+                  </span>
+                </button>
+                <div className="flex items-center gap-3 px-5 py-3.5">
+                  <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-foreground flex-1">Snitt/medlem</span>
+                  <span className="text-sm font-semibold text-foreground tabular-nums">
+                    {stats.averageMeetingsPerMember != null
+                      ? Number(stats.averageMeetingsPerMember).toFixed(1)
+                      : "0"}
+                  </span>
+                </div>
+              </div>
             )}
-            {isStartingRecording ? "Startar..." : "Spela in möte"}
-          </Button>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <Button
-              onClick={onUpload}
-              variant="outline"
-              size="lg"
-              className="h-12 text-sm gap-2 rounded-lg"
+            {/* Integrations */}
+            <div className="rounded-lg border border-border bg-card">
+              <div className="px-5 py-3 border-b border-border">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Integrationer
+                </p>
+              </div>
+              <div className="divide-y divide-border">
+                {importActions.map((int) => {
+                  const connected = integrations?.[int.key as keyof typeof integrations];
+                  return (
+                    <button
+                      key={int.key}
+                      onClick={connected ? int.onImport : () => navigate("/integrations")}
+                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors"
+                    >
+                      <img src={int.logo} alt={int.label} className="w-5 h-5 object-contain shrink-0" />
+                      <span className="text-sm text-foreground flex-1 text-left">{int.label}</span>
+                      {connected ? (
+                        <span className="text-[11px] text-primary font-medium">Importera →</span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">Koppla</span>
+                      )}
+                    </button>
+                  );
+                })}
+                {slackConnected && (
+                  <div className="flex items-center gap-3 px-5 py-3">
+                    <img src={slackLogo} alt="Slack" className="w-5 h-5 object-contain shrink-0" />
+                    <span className="text-sm text-foreground flex-1">Slack</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick library link */}
+            <button
+              onClick={() => navigate("/library")}
+              className="w-full rounded-lg border border-border bg-card px-5 py-3.5 flex items-center gap-3 hover:bg-muted/20 transition-colors"
             >
-              <Upload className="w-4 h-4" />
-              Ladda upp
-            </Button>
-            <Button
-              onClick={onTextPaste}
-              variant="outline"
-              size="lg"
-              className="h-12 text-sm gap-2 rounded-lg"
-            >
-              <ClipboardPaste className="w-4 h-4" />
-              Klistra in
-            </Button>
+              <Library className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-sm text-foreground flex-1 text-left">Bibliotek</span>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
 
-        {/* Meeting usage */}
+        {/* Mobile usage footer */}
         {userPlan && (
-          <div className="text-center">
+          <div className="mt-8 text-center sm:hidden">
             <p className="text-xs text-muted-foreground">
               {userPlan.meetingsUsed ?? 0}
-              {userPlan.meetingsLimit != null ? ` / ${userPlan.meetingsLimit}` : ""} möten använda
+              {userPlan.meetingsLimit != null ? ` / ${userPlan.meetingsLimit}` : ""} möten
               {userPlan.renewDate && (
-                <span className="ml-1">
-                  · Förnyas {new Date(userPlan.renewDate).toLocaleDateString("sv-SE")}
-                </span>
+                <span> · Förnyas {new Date(userPlan.renewDate).toLocaleDateString("sv-SE")}</span>
               )}
             </p>
           </div>
