@@ -339,7 +339,7 @@ export function AppSidebar() {
                       {enterpriseMembership?.isMember ? (
                         <span className="flex items-center gap-1">
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 border-primary/20 text-primary">
-                            Enterprise
+                            {enterpriseMembership.company?.planType === 'enterprise' ? 'Enterprise' : 'Team'}
                           </Badge>
                           {enterpriseMembership.membership?.role && (
                             <span className="text-muted-foreground/70">
@@ -351,6 +351,7 @@ export function AppSidebar() {
                         </span>
                       ) : (
                         userPlan?.plan === 'enterprise' ? 'Enterprise' : 
+                        userPlan?.plan === 'team' ? 'Team' :
                         userPlan?.plan === 'unlimited' ? 'Unlimited' : 
                         userPlan?.plan === 'plus' ? 'Plus' : 
                         userPlan?.plan === 'pro' ? 'Pro' : 'Free'
