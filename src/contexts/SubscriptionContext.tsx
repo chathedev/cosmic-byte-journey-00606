@@ -216,10 +216,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       };
       const planStr = String(backendPlanType || '').toLowerCase().trim();
       
-      // Detect enterprise membership from user payload hints
+      // Detect team/enterprise membership from user payload hints
       const u: any = user;
+      const teamDetected = (
+        planStr === 'team' ||
+        u?.planTier === 'team' ||
+        (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
+        (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'))
+      );
       const enterpriseDetected = (
-        planStr === 'enterprise' ||
+        planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
         u?.enterprise?.status === 'active' ||
