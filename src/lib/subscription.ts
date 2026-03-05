@@ -118,10 +118,13 @@ export const subscriptionService = {
         'enterprise_scale': 'enterprise',
       };
 
-      // Detect enterprise membership hints from backend user payload
+      // Detect enterprise/team membership hints from backend user payload
       const u: any = user;
+      const teamDetected = planStr === 'team' || u?.planTier === 'team' ||
+        (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
+        (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'));
       const enterpriseDetected = (
-        planStr === 'enterprise' ||
+        planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
         u?.enterprise?.status === 'active' ||
