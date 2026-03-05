@@ -470,7 +470,7 @@ const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
 // Renders fully public pages (no auth required) before any auth providers
 const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
-  const publicPaths = ['/enterprise/onboarding', '/enterprise/onboarding/verify-email', '/free-trial'];
+  const publicPaths = ['/team/onboarding', '/team/onboarding/verify-email', '/free-trial'];
   const isPublic = publicPaths.includes(location.pathname);
 
   if (!isPublic) return <>{children}</>;
