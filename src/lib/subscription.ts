@@ -18,7 +18,7 @@ export interface UserPlan {
 
 export interface SubscriptionCheckoutParams {
   userId: string;
-  planName: 'pro' | 'plus';
+  planName: 'pro';
   customerEmail?: string;
   successUrl?: string;
   cancelUrl?: string;
