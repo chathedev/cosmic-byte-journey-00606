@@ -721,17 +721,7 @@ export default function EnterpriseOnboarding() {
             )}
             {step === 2 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-                  <ChevronLeft className="h-4 w-4" /> Tillbaka
-                </Button>
-                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(3); }} className="gap-1.5 no-hover-lift rounded-none px-6">
-                  Nästa <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {step === 3 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
                 <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
