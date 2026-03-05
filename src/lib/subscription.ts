@@ -224,7 +224,7 @@ export const subscriptionService = {
 
   // Create subscription intent for custom Elements checkout
   async createSubscriptionIntent(params: {
-    plan: 'pro' | 'plus';
+    plan: 'pro';
   }): Promise<{
     publishableKey: string;
     clientSecret: string;
