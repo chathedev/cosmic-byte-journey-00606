@@ -24,7 +24,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
   const { toast } = useToast();
   const { refreshPlan, userPlan, paymentDomain } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'plus' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'pro' | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
@@ -257,36 +257,31 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   const plans = [
     {
-      name: 'Free',
+      name: 'Gratis',
       price: '0 kr',
       period: '/mån',
       features: [
         { text: '1 möte per månad', included: true },
-        { text: 'Transkribering', included: true },
-        { text: 'AI-genererat mötesprotokoll', included: true },
-        { text: 'Export 1 gång/månad', included: true },
-        { text: 'Delning 1 gång/månad', included: true },
-        { text: 'Möten sparas inte', included: false },
-        { text: 'Ingen möteshistorik', included: false },
-        { text: 'Inga avancerade AI-funktioner', included: false },
+        { text: 'Automatisk transkription', included: true },
+        { text: 'AI-genererat protokoll', included: true },
+        { text: 'Export till Word', included: true },
+        { text: 'Begränsat bibliotek', included: true },
       ],
       cta: 'Nuvarande plan',
       variant: 'outline' as const,
+      isCurrent: userPlan?.plan === 'free',
     },
     {
       name: 'Pro',
-      price: '99 kr',
+      price: '149 kr',
       period: '/mån',
       features: [
-        { text: '10 möten per månad', included: true },
-        { text: 'Transkribering & AI-protokoll', included: true },
-        { text: 'Action items', included: true },
-        { text: 'Obegränsad export (Word & PDF)', included: true },
-        { text: 'Obegränsad delning', included: true },
-        { text: 'Sparade möten (30 dagar)', included: true },
-        { text: 'Normal bearbetning', included: true },
-        { text: 'Inga teamfunktioner', included: false },
-        { text: 'Ingen prioriterad support', included: false },
+        { text: '30 möten per månad', included: true },
+        { text: 'Premium transkription', included: true },
+        { text: 'Avancerade protokollfunktioner', included: true },
+        { text: 'Word + PDF export', included: true },
+        { text: 'Fullständigt protokollbibliotek', included: true },
+        { text: 'Längre möten', included: true },
       ],
       cta: 'Välj Pro',
       variant: 'default' as const,
@@ -294,24 +289,52 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       highlight: true,
     },
     {
+      name: 'Team',
+      price: 'Från 1 990 kr',
+      period: '/mån',
+      features: [
+        { text: 'Upp till 5 användare', included: true },
+        { text: 'Obegränsade möten', included: true },
+        { text: 'Delat protokollbibliotek', included: true },
+        { text: 'Talaridentifiering', included: true },
+        { text: 'Adminpanel & workspace', included: true },
+        { text: 'Extra användare: 199 kr/st/mån', included: true },
+      ],
+      cta: 'Starta onboarding',
+      variant: 'outline' as const,
+      isOnboarding: true,
+    },
+    {
       name: 'Enterprise',
-      price: 'Kontakta oss',
+      price: 'Från 4 990 kr',
+      period: '/mån',
+      features: [
+        { text: 'Upp till 20 användare', included: true },
+        { text: 'Obegränsade möten', included: true },
+        { text: 'Teams/Zoom/Meet auto-import', included: true },
+        { text: 'Admin-dashboard & roller', included: true },
+        { text: 'EU-hosting & prioriterad support', included: true },
+        { text: 'Extra användare: 249 kr/st/mån', included: true },
+      ],
+      cta: 'Starta onboarding',
+      variant: 'outline' as const,
+      isOnboarding: true,
+    },
+    {
+      name: 'Enterprise Scale',
+      price: 'Custom',
       period: '',
       features: [
-        { text: 'Obegränsade möten', included: true },
-        { text: 'Team-dashboard & flera användare', included: true },
-        { text: 'Full historik', included: true },
-        { text: 'Transkribering & AI-protokoll', included: true },
-        { text: 'Obegränsad export & delning', included: true },
-        { text: 'Avancerade AI-funktioner', included: true },
-        { text: 'Egen subdomän', included: true },
-        { text: 'Prioriterad bearbetning', included: true },
-        { text: 'Dedikerad kontaktperson', included: true },
-        { text: 'Onboarding & utbildning', included: true },
-        { text: 'SLA vid behov', included: true },
+        { text: 'SSO (Microsoft / Google)', included: true },
+        { text: 'SLA-avtal', included: true },
+        { text: 'API-access', included: true },
+        { text: 'Anpassade integrationer', included: true },
+        { text: 'Dedikerad onboarding', included: true },
+        { text: 'Offentlig sektor-avtal', included: true },
       ],
       cta: 'Kontakta oss',
       variant: 'outline' as const,
+      isContact: true,
     },
   ];
 
@@ -333,7 +356,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm font-medium text-muted-foreground">Totalt</span>
                 <div className="text-right">
-                  <div className="text-xl sm:text-2xl font-bold text-foreground">99 kr</div>
+                  <div className="text-xl sm:text-2xl font-bold text-foreground">149 kr</div>
                   <div className="text-xs text-muted-foreground">per månad</div>
                 </div>
               </div>
@@ -432,18 +455,20 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm sm:max-w-4xl">
+      <DialogContent className="max-w-sm sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Välj din plan</DialogTitle>
           {userPlan && (
             <DialogDescription className="text-xs">
-              Aktiv plan: <span className="font-medium capitalize text-foreground">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
+              Aktiv plan: <span className="font-medium capitalize text-foreground">
+                {userPlan.plan === 'free' ? 'Gratis' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan === 'team' ? 'Team' : userPlan.plan === 'enterprise' ? 'Enterprise' : userPlan.plan}
+              </span>
             </DialogDescription>
           )}
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 py-3">
-          {plans.map((plan, index) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 py-3">
+          {plans.map((plan) => (
             <Card
               key={plan.name}
               className={cn(
@@ -456,58 +481,56 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                   Mest populär
                 </div>
               )}
-              <CardHeader className={cn("p-3 sm:p-4 space-y-1", 'highlight' in plan && plan.highlight && "pt-7 sm:pt-8")}>
-                <CardTitle className="text-base sm:text-lg font-bold">{plan.name}</CardTitle>
+              <CardHeader className={cn("p-3 space-y-1", 'highlight' in plan && plan.highlight && "pt-7")}>
+                <CardTitle className="text-sm font-bold">{plan.name}</CardTitle>
                 <div>
-                  <span className="text-xl sm:text-2xl font-bold text-foreground">{plan.price}</span>
-                  {plan.period && <span className="text-xs text-muted-foreground">{plan.period}</span>}
+                  <span className="text-lg font-bold text-foreground">{plan.price}</span>
+                  {plan.period && <span className="text-[10px] text-muted-foreground">{plan.period}</span>}
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col p-3 sm:p-4 pt-0">
-                <ul className="space-y-1.5 mb-3 flex-1 text-xs">
-                  {plan.features.slice(0, 6).map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className={cn(
-                        "mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold",
-                        feature.included ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                      )}>
-                        {feature.included ? '✓' : '−'}
-                      </span>
-                      <span className={cn(
-                        feature.included ? "text-foreground" : "text-muted-foreground"
-                      )}>
-                        {feature.text}
-                      </span>
+              <CardContent className="flex-1 flex flex-col p-3 pt-0">
+                <ul className="space-y-1 mb-3 flex-1 text-[11px]">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <Check className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                      <span className="text-foreground">{feature.text}</span>
                     </li>
                   ))}
-                  {plan.features.length > 6 && (
-                    <li className="text-[10px] text-muted-foreground pl-6">
-                      +{plan.features.length - 6} fler
-                    </li>
-                  )}
                 </ul>
                 {'planId' in plan ? (
                   <Button
-                    onClick={() => handleSubscribe(plan.planId)}
+                    onClick={() => handleSubscribe((plan as any).planId)}
                     disabled={isLoading}
-                    variant={plan.variant}
+                    variant={(plan as any).variant}
                     className={cn("w-full", 'highlight' in plan && plan.highlight && "shadow-sm")}
                     size="sm"
                   >
                     {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : plan.cta}
                   </Button>
-                ) : plan.name === 'Enterprise' ? (
+                ) : 'isOnboarding' in plan ? (
                   <Button
-                    variant={plan.variant}
+                    variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => window.open('mailto:kontakt@tivly.se?subject=Enterprise-förfrågan', '_blank')}
+                    onClick={() => {
+                      onOpenChange(false);
+                      window.location.href = '/enterprise/onboarding';
+                    }}
+                  >
+                    {plan.cta}
+                  </Button>
+                ) : 'isContact' in plan ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open('mailto:enterprise@tivly.se?subject=Enterprise Scale-förfrågan', '_blank')}
                   >
                     {plan.cta}
                   </Button>
                 ) : (
-                  <Button variant={plan.variant} size="sm" className="w-full" disabled>
-                    {plan.cta}
+                  <Button variant="outline" size="sm" className="w-full" disabled={'isCurrent' in plan && (plan as any).isCurrent}>
+                    {'isCurrent' in plan && (plan as any).isCurrent ? 'Nuvarande plan' : plan.cta}
                   </Button>
                 )}
               </CardContent>

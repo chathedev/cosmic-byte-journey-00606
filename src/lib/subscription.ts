@@ -3,7 +3,7 @@ import { apiClient } from './api';
 const BACKEND_URL = 'https://api.tivly.se';
 
 export interface UserPlan {
-  plan: 'free' | 'pro' | 'plus' | 'unlimited' | 'enterprise';
+  plan: 'free' | 'pro' | 'team' | 'plus' | 'unlimited' | 'enterprise';
   meetingsUsed: number;
   meetingsLimit: number | null; // null = unlimited
   protocolsUsed: number;
@@ -18,7 +18,7 @@ export interface UserPlan {
 
 export interface SubscriptionCheckoutParams {
   userId: string;
-  planName: 'pro' | 'plus';
+  planName: 'pro';
   customerEmail?: string;
   successUrl?: string;
   cancelUrl?: string;
@@ -30,7 +30,8 @@ const normalizePlan = (raw: any, meetingCount: number = 0): UserPlan => {
 
   const defaults: Record<string, { meetingsLimit: number | null; protocolsLimit: number }> = {
     free: { meetingsLimit: 1, protocolsLimit: 1 },
-    pro: { meetingsLimit: 10, protocolsLimit: 1 }, // 10 meetings per month
+    pro: { meetingsLimit: 30, protocolsLimit: 1 }, // 30 meetings per month
+    team: { meetingsLimit: null, protocolsLimit: 999999 }, // Team unlimited
     plus: { meetingsLimit: null, protocolsLimit: 1 }, // Truly unlimited
     enterprise: { meetingsLimit: null, protocolsLimit: 999999 }, // Enterprise unlimited
   };
@@ -66,8 +67,8 @@ export const subscriptionService = {
       }
 
       // Always read the canonical plan from /me and use /meetings only for usage counts
-      const defaultMeetingLimits: Record<string, number | null> = { free: 1, pro: 10, plus: null }; // Pro: 10/month, Plus: unlimited
-      const defaultProtocolsLimits: Record<string, number> = { free: 1, pro: 1, plus: 1 };
+      const defaultMeetingLimits: Record<string, number | null> = { free: 1, pro: 30, team: null, plus: null }; // Pro: 30/month, Team/Plus: unlimited
+      const defaultProtocolsLimits: Record<string, number> = { free: 1, pro: 1, team: 999999, plus: 1 };
 
       let user: any = null;
       let snapshot: any = null;
@@ -109,15 +110,21 @@ export const subscriptionService = {
         'gratis': 'free',
         'free plan': 'free',
         'standard': 'pro',
+        'plus': 'pro',
+        'max': 'pro',
         'obegränsad': 'unlimited',
         'obegränsat': 'unlimited',
         'unlimited': 'unlimited',
+        'enterprise_scale': 'enterprise',
       };
 
-      // Detect enterprise membership hints from backend user payload
+      // Detect enterprise/team membership hints from backend user payload
       const u: any = user;
+      const teamDetected = planStr === 'team' || u?.planTier === 'team' ||
+        (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
+        (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'));
       const enterpriseDetected = (
-        planStr === 'enterprise' ||
+        planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
         u?.enterprise?.status === 'active' ||
@@ -127,25 +134,27 @@ export const subscriptionService = {
         (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'enterprise' && (c?.status ?? 'active') === 'active'))
       );
 
-      const validPlans = ['free','pro','plus','unlimited','enterprise'] as const;
+      const validPlans = ['free','pro','team','plus','unlimited','enterprise'] as const;
       const normalizedPlan: UserPlan['plan'] = enterpriseDetected
         ? 'enterprise'
-        : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')) as UserPlan['plan']);
+        : (teamDetected
+            ? 'team'
+            : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')) as UserPlan['plan']));
 
       // Use cumulative count from /me only
       const meetingsUsed = Math.max(0, Number((user as any)?.meetingCount ?? 0) || 0);
 
       // Limits: gifts can raise numeric limits (from snapshot or user.plan), Plus, unlimited, and enterprise have unlimited meetings
       let meetingsLimit: number | null;
-      if (normalizedPlan === 'unlimited' || normalizedPlan === 'plus' || normalizedPlan === 'enterprise') {
+      if (normalizedPlan === 'unlimited' || normalizedPlan === 'plus' || normalizedPlan === 'team' || normalizedPlan === 'enterprise') {
         meetingsLimit = null; // Truly unlimited
       } else if (normalizedPlan === 'pro') {
-        // Pro has a limit of 10 meetings per month
+        // Pro has a limit of 30 meetings per month
         const fromSnapshot = Number((snapshot as any)?.meetingLimit);
         const fromUser = Number((planRaw as any)?.meetingsLimit);
         meetingsLimit = Number.isFinite(fromSnapshot) && fromSnapshot > 0
           ? fromSnapshot
-          : (Number.isFinite(fromUser) && fromUser > 0 ? fromUser : 10);
+          : (Number.isFinite(fromUser) && fromUser > 0 ? fromUser : 30);
       } else {
         const fromSnapshot = Number((snapshot as any)?.meetingLimit);
         const fromUser = Number((planRaw as any)?.meetingsLimit);
@@ -156,7 +165,7 @@ export const subscriptionService = {
 
       const protocolsUsed = Math.max(0, Number((planRaw as any)?.protocolsUsed ?? 0) || 0);
       let protocolsLimit: number;
-      if (normalizedPlan === 'unlimited' || normalizedPlan === 'enterprise') {
+      if (normalizedPlan === 'unlimited' || normalizedPlan === 'team' || normalizedPlan === 'enterprise') {
         protocolsLimit = 999999;
       } else {
         const fromUserProt = Number((planRaw as any)?.protocolsLimit);
@@ -215,7 +224,7 @@ export const subscriptionService = {
 
   // Create subscription intent for custom Elements checkout
   async createSubscriptionIntent(params: {
-    plan: 'pro' | 'plus';
+    plan: 'pro';
   }): Promise<{
     publishableKey: string;
     clientSecret: string;
@@ -273,7 +282,7 @@ export const subscriptionService = {
       const plan = await this.getUserPlan(userId);
       
       // Unlimited, enterprise plan or null limit = no restrictions
-      if (plan.plan === 'unlimited' || plan.plan === 'enterprise' || plan.meetingsLimit === null) {
+      if (plan.plan === 'unlimited' || plan.plan === 'team' || plan.plan === 'enterprise' || plan.meetingsLimit === null) {
         return { allowed: true };
       }
       
@@ -303,8 +312,8 @@ export const subscriptionService = {
       
       const plan = await this.getUserPlan(userId);
       
-      // Unlimited or enterprise plan = no protocol limits
-      if (plan.plan === 'unlimited' || plan.plan === 'enterprise') {
+      // Unlimited, team, or enterprise plan = no protocol limits
+      if (plan.plan === 'unlimited' || plan.plan === 'team' || plan.plan === 'enterprise') {
         return { allowed: true };
       }
       

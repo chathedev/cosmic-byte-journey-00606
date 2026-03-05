@@ -203,20 +203,29 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       const backendMeetingCount = user.meetingCount || 0;
       
       // Validate and normalize plan type (support common aliases)
-      const validPlans = ['free', 'pro', 'plus', 'unlimited', 'enterprise'] as const;
+      const validPlans = ['free', 'pro', 'team', 'plus', 'unlimited', 'enterprise'] as const;
       const aliasMap: Record<string, UserPlan['plan']> = {
         'gratis': 'free',
         'free plan': 'free',
         'standard': 'pro',
+        'plus': 'pro',
+        'max': 'pro',
         'obegränsad': 'unlimited',
         'obegränsat': 'unlimited',
+        'enterprise_scale': 'enterprise',
       };
       const planStr = String(backendPlanType || '').toLowerCase().trim();
       
-      // Detect enterprise membership from user payload hints
+      // Detect team/enterprise membership from user payload hints
       const u: any = user;
+      const teamDetected = (
+        planStr === 'team' ||
+        u?.planTier === 'team' ||
+        (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
+        (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'))
+      );
       const enterpriseDetected = (
-        planStr === 'enterprise' ||
+        planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
         u?.enterprise?.status === 'active' ||
@@ -230,9 +239,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         ? 'unlimited'
         : (enterpriseDetected
             ? 'enterprise'
-            : ((validPlans as readonly string[]).includes(planStr)
-                ? (planStr as UserPlan['plan'])
-                : (aliasMap[planStr] ?? 'free')));
+            : (teamDetected
+                ? 'team'
+                : ((validPlans as readonly string[]).includes(planStr)
+                    ? (planStr as UserPlan['plan'])
+                    : (aliasMap[planStr] ?? 'free'))));
       
       console.log(`[SubscriptionContext] 📋 Plan normalization:`, {
         platform,
@@ -244,11 +255,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         normalizedPlan
       });
       // For unlimited and enterprise plans, set no limits
-      const isUnlimited = normalizedPlan === 'unlimited' || normalizedPlan === 'enterprise';
+      const isUnlimited = normalizedPlan === 'unlimited' || normalizedPlan === 'team' || normalizedPlan === 'enterprise';
 
       // Default limits per plan
-      const defaultMeetingLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 10, plus: 30, unlimited: 0, enterprise: 0 };
-      const defaultProtocolsLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 1, plus: 5, unlimited: 999999, enterprise: 999999 };
+      const defaultMeetingLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 30, team: 0, plus: 30, unlimited: 0, enterprise: 0 };
+      const defaultProtocolsLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 1, team: 999999, plus: 5, unlimited: 999999, enterprise: 999999 };
 
       // Determine limits: trust backend plan; gifts can raise numeric limits but don't change plan
       const used = backendMeetingCount;
@@ -336,7 +347,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           
           console.log(`[SubscriptionContext] 🎯 Final background plan (admin=${admin}):`, latestPlan);
           
-          const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
+          const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, team: 2, plus: 2, unlimited: 3, enterprise: 4 };
           setUserPlan(prev => {
             if (!prev) return latestPlan;
             if (JSON.stringify(prev) === JSON.stringify(latestPlan)) return prev;
@@ -518,7 +529,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setUserPlan(prev => {
         if (!prev) return plan;
         if (JSON.stringify(prev) === JSON.stringify(plan)) return prev;
-        const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
+        const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, team: 2, plus: 2, unlimited: 3, enterprise: 4 };
         return rank[plan.plan] >= rank[prev.plan]
           ? plan
           : { ...prev, ...plan, plan: prev.plan };

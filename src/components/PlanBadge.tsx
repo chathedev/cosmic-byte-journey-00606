@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Sparkles, TrendingUp, Shield } from 'lucide-react';
+import { Sparkles, TrendingUp, Shield, Users } from 'lucide-react';
 import { SubscribeDialog } from './SubscribeDialog';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api';
@@ -32,16 +32,11 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
         return;
       }
       
-      const platform = window.location.hostname.includes('io.tivly.se') ? 'IOS' : 'WEB';
-      console.log(`[PlanBadge] 🔐 [${platform}] Checking admin for: ${user.email}`);
-      
       try {
         const roleData = await apiClient.getUserRole(user.email.toLowerCase());
         const adminStatus = roleData && (roleData.role === 'admin' || roleData.role === 'owner');
-        console.log(`[PlanBadge] ✅ [${platform}] Admin result for ${user.email}:`, adminStatus, roleData);
         setIsAdmin(adminStatus);
       } catch (error) {
-        console.log(`[PlanBadge] ❌ [${platform}] Admin check failed:`, error);
         setIsAdmin(false);
       }
     };
@@ -61,21 +56,12 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
 
   const used = userPlan.meetingsUsed;
   const limit = userPlan.meetingsLimit;
-  // Enterprise has unlimited access, Pro has meeting limits
+  // Team, Enterprise, unlimited have no limits
   const isUnlimited = isAdmin || 
     limit === null || 
+    userPlan.plan === 'team' ||
     userPlan.plan === 'enterprise';
   const progress = isUnlimited ? 0 : Math.min((used / limit) * 100, 100);
-
-  const platform = window.location.hostname.includes('io.tivly.se') ? 'IOS' : 'WEB';
-  console.log(`[PlanBadge] 📊 [${platform}] Display state:`, {
-    email: user?.email,
-    isAdmin,
-    plan: userPlan.plan,
-    used,
-    limit,
-    isUnlimited
-  });
 
   const getPlanTitle = () => {
     if (isAdmin) return 'Admin';
@@ -85,6 +71,8 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
         return 'Gratis';
       case 'pro':
         return 'Pro';
+      case 'team':
+        return 'Team';
       case 'enterprise':
         return 'Enterprise';
       default:
@@ -92,18 +80,19 @@ export const PlanBadge = ({ className }: PlanBadgeProps) => {
     }
   };
 
-  // ASR for live recording: Enterprise only (and Admins)
-  // Pro gets ASR only via file upload, Free uses browser transcription
-  const hasASR = isAdmin || userPlan.plan === 'enterprise';
+  const getPlanIcon = () => {
+    if (isAdmin) return <Shield className="h-3.5 w-3.5 text-primary" aria-hidden="true" />;
+    if (userPlan.plan === 'team') return <Users className="h-3.5 w-3.5 text-primary" aria-hidden="true" />;
+    return <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />;
+  };
+
+  // ASR for live recording: Team and Enterprise (and Admins)
+  const hasASR = isAdmin || userPlan.plan === 'team' || userPlan.plan === 'enterprise';
 
   return (
     <div className={cn('inline-flex flex-col gap-0.5', className)}>
       <div className="inline-flex items-center gap-2 rounded-md border border-border bg-card/80 text-card-foreground px-3 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/70">
-        {isAdmin ? (
-          <Shield className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-        ) : (
-          <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-        )}
+        {getPlanIcon()}
         <span className="text-xs font-medium whitespace-nowrap">{getPlanTitle()}</span>
         {!isUnlimited && (
           <div className="flex items-center gap-1">

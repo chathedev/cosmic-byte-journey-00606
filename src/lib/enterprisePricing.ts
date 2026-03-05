@@ -1,33 +1,33 @@
-export type PricingTier = 'Entry' | 'Growth' | 'Core' | 'Scale';
+export type PricingTier = 'Team' | 'Enterprise' | 'Scale';
 
 export const PRICING_TIERS: Record<PricingTier, { price: number; minUsers: number; maxUsers: number | null }> = {
-  Entry: { price: 2000, minUsers: 1, maxUsers: 5 },
-  Growth: { price: 3900, minUsers: 6, maxUsers: 10 },
-  Core: { price: 6900, minUsers: 11, maxUsers: 20 },
-  Scale: { price: 14900, minUsers: 21, maxUsers: null },
+  Team: { price: 1990, minUsers: 1, maxUsers: 5 },
+  Enterprise: { price: 4990, minUsers: 1, maxUsers: 20 },
+  Scale: { price: 0, minUsers: 21, maxUsers: null }, // Custom pricing
 };
 
 const TIER_RANK: Record<PricingTier, number> = {
-  Entry: 0,
-  Growth: 1,
-  Core: 2,
-  Scale: 3,
+  Team: 0,
+  Enterprise: 1,
+  Scale: 2,
 };
 
 export function normalizeTier(value: unknown): PricingTier | null {
   if (!value) return null;
   const v = String(value).trim().toLowerCase();
   if (!v) return null;
-  if (v === 'entry') return 'Entry';
-  if (v === 'growth') return 'Growth';
-  if (v === 'core') return 'Core';
-  if (v === 'scale') return 'Scale';
+  // Legacy aliases
+  if (v === 'entry' || v === 'growth' || v === 'small' || v === 'enterprise_small') return 'Team';
+  if (v === 'core' || v === 'standard' || v === 'enterprise_standard') return 'Enterprise';
+  if (v === 'scale' || v === 'enterprise_scale') return 'Scale';
+  if (v === 'team') return 'Team';
+  if (v === 'enterprise') return 'Enterprise';
   return null;
 }
 
 export function maxTier(...tiers: Array<PricingTier | null | undefined>): PricingTier {
   const filtered = tiers.filter(Boolean) as PricingTier[];
-  if (filtered.length === 0) return 'Entry';
+  if (filtered.length === 0) return 'Team';
   return filtered.reduce((best, t) => (TIER_RANK[t] > TIER_RANK[best] ? t : best), filtered[0]);
 }
 
@@ -67,17 +67,15 @@ export function parseEmployeeCountRange(raw: unknown): { min?: number; max?: num
 export function tierFromEmployees(employees: { min?: number; max?: number }): PricingTier | null {
   const max = employees.max ?? employees.min;
   if (!max) return null;
-  if (max > 50) return 'Core';
-  if (max > 20) return 'Growth';
-  if (max < 10) return 'Entry';
-  return 'Growth';
+  if (max > 20) return 'Scale';
+  if (max > 5) return 'Enterprise';
+  return 'Team';
 }
 
 export function tierFromMemberLimit(memberLimit: number | null | undefined): PricingTier | null {
   if (memberLimit === null || memberLimit === undefined) return null;
   if (memberLimit >= 21) return 'Scale';
-  if (memberLimit >= 11) return 'Core';
-  if (memberLimit >= 6) return 'Growth';
-  if (memberLimit >= 1) return 'Entry';
+  if (memberLimit >= 6) return 'Enterprise';
+  if (memberLimit >= 1) return 'Team';
   return null;
 }

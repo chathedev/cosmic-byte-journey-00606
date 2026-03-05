@@ -34,10 +34,9 @@ import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@
 
 /* ─── Constants ─── */
 const PLANS = [
-  { id: 'enterprise_small' as const, name: 'Small', priceSek: 2490, seats: 10, activationSek: 4900 },
-  { id: 'enterprise_standard' as const, name: 'Standard', priceSek: 5990, seats: 30, activationSek: 9900 },
+  { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
+  { id: 'enterprise_standard' as const, name: 'Enterprise', priceSek: 4990, seats: 20, activationSek: 0, extraSeatSek: 249 },
 ];
-const EXTRA_SEAT_PRICE = 249;
 const STEPS = ['Team', 'Uppgifter', 'Plan', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
@@ -681,8 +680,8 @@ export default function EnterpriseOnboarding() {
                 onResend={handleResendVerification}
               />
             )}
-            {step === 2 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
-            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
+            {step === 2 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} extraSeatSek={selectedPlan.extraSeatSek} />}
+            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
             {step === 4 && draftId && resumeToken && (
               <StepCardPayment
                 draftId={draftId}
@@ -696,6 +695,7 @@ export default function EnterpriseOnboarding() {
                 includedSeats={selectedPlan.seats}
                 expectedSeats={seats}
                 extraSeats={extraSeats}
+                extraSeatSek={selectedPlan.extraSeatSek}
                 firstChargeEstimate={firstChargeEstimate}
                 onCardConfirmed={handleCardConfirmedStartTrial}
               />
@@ -754,6 +754,7 @@ export default function EnterpriseOnboarding() {
                   monthlyTotal={monthlyTotal}
                   step={step}
                   form={form}
+                  extraSeatSek={selectedPlan.extraSeatSek}
                 />
               </div>
             </aside>
@@ -773,9 +774,9 @@ export default function EnterpriseOnboarding() {
 /* ═══════════════════════════════════════════════════════ */
 /* Cost Sidebar                                            */
 /* ═══════════════════════════════════════════════════════ */
-function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form }: {
+function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form, extraSeatSek }: {
   selectedPlan: typeof PLANS[0]; seats: number; extraSeats: number; monthlyTotal: number; step: number;
-  form: Partial<OnboardingFormData>;
+  form: Partial<OnboardingFormData>; extraSeatSek: number;
 }) {
   const trialDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
   return (
@@ -796,7 +797,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
         {extraSeats > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Extra platser</span>
-            <span className="text-foreground font-medium">{extraSeats} × {fmt(EXTRA_SEAT_PRICE)} kr</span>
+            <span className="text-foreground font-medium">{extraSeats} × {fmt(extraSeatSek)} kr</span>
           </div>
         )}
       </div>
@@ -814,10 +815,12 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
           <span className="text-muted-foreground">Från {trialDate}</span>
           <span className="text-foreground font-semibold">{fmt(monthlyTotal)} kr/mån</span>
         </div>
-        <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Aktivering (engång)</span>
-          <span className="text-muted-foreground">{fmt(selectedPlan.activationSek)} kr</span>
-        </div>
+        {selectedPlan.activationSek > 0 && (
+          <div className="flex justify-between text-[11px]">
+            <span className="text-muted-foreground">Aktivering (engång)</span>
+            <span className="text-muted-foreground">{fmt(selectedPlan.activationSek)} kr</span>
+          </div>
+        )}
         <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
       </div>
 
@@ -902,8 +905,8 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 1: Plan                                            */
 /* ═══════════════════════════════════════════════════════ */
-function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }: {
-  form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; extraSeats: number; monthlyTotal: number; updateField: (f: string, v: any) => void;
+function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField, extraSeatSek }: {
+  form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; extraSeats: number; monthlyTotal: number; updateField: (f: string, v: any) => void; extraSeatSek: number;
 }) {
   return (
     <div className="space-y-6">
@@ -930,12 +933,12 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
                 <p className="font-semibold text-foreground">{plan.name}</p>
                 {isSelected && <Check className="h-4 w-4 text-foreground" />}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">{plan.seats} användare inkl.</p>
+              <p className="text-xs text-muted-foreground mt-1">{plan.seats} användare inkl. · Extra: {fmt(plan.extraSeatSek)} kr/st/mån</p>
               <p className="mt-3">
                 <span className="text-2xl font-semibold text-foreground">{fmt(plan.priceSek)}</span>
                 <span className="text-sm text-muted-foreground"> SEK/mån</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>
+              {plan.activationSek > 0 && <p className="text-xs text-muted-foreground mt-1.5">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>}
             </button>
           );
         })}
@@ -949,8 +952,8 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField }:
         </div>
         {extraSeats > 0 && (
           <div className="flex justify-between px-4 py-3 text-sm">
-            <span className="text-muted-foreground">{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} SEK</span>
-            <span className="text-foreground font-medium">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK/mån</span>
+            <span className="text-muted-foreground">{extraSeats} extra × {fmt(extraSeatSek)} SEK</span>
+            <span className="text-foreground font-medium">{fmt(extraSeats * extraSeatSek)} SEK/mån</span>
           </div>
         )}
         <div className="flex justify-between px-4 py-3 text-sm font-semibold">
@@ -1256,12 +1259,12 @@ function FieldInput({ label, id, placeholder, value, onChange, error, valid, hin
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 3: Confirm                                         */
 /* ═══════════════════════════════════════════════════════ */
-function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField, submitError }: {
+function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField, submitError, extraSeatSek }: {
   form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; monthlyTotal: number; extraSeats: number;
-  updateField: (f: string, v: any) => void; submitError: string;
+  updateField: (f: string, v: any) => void; submitError: string; extraSeatSek: number;
 }) {
   const seats = form.expectedSeats || 0;
-  const planLabel = selectedPlan.name === 'Small' ? 'Enterprise Small' : 'Enterprise Standard';
+  const planLabel = selectedPlan.name;
   const rows = [
     { label: 'Företag', value: form.companyName || '–', icon: Building2 },
     { label: 'Orgnr', value: form.organizationNumber || '–', icon: Hash },
@@ -1272,8 +1275,8 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
     { label: 'Månadsavgift', value: `${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
     { label: 'Inkluderade användare', value: `${selectedPlan.seats} st`, icon: Users },
     { label: 'Totalt antal användare', value: `${seats} st`, icon: Users },
-    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(EXTRA_SEAT_PRICE)} SEK/mån`, icon: Plus }] : []),
-    { label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock },
+    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(extraSeatSek)} SEK/mån`, icon: Plus }] : []),
+    ...(selectedPlan.activationSek > 0 ? [{ label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock }] : []),
   ];
 
   return (
@@ -1328,9 +1331,9 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 4: Card Payment                                    */
 /* ═══════════════════════════════════════════════════════ */
-function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, firstChargeEstimate, onCardConfirmed }: {
+function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, extraSeatSek, firstChargeEstimate, onCardConfirmed }: {
   draftId: string; resumeToken: string; initialClientSecret: string | null; stripePublishableKey: string | null;
-  email: string; monthlyTotal: number; planBaseSek: number; activationFeeSek: number; includedSeats: number; expectedSeats: number; extraSeats: number;
+  email: string; monthlyTotal: number; planBaseSek: number; activationFeeSek: number; includedSeats: number; expectedSeats: number; extraSeats: number; extraSeatSek: number;
   firstChargeEstimate: any; onCardConfirmed: () => Promise<void>;
 }) {
   const [loading, setLoading] = useState(!initialClientSecret);
@@ -1417,9 +1420,9 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
             <span className="text-sm font-semibold text-foreground">{fmt(showTotal)} kr</span>
           </div>
           <div className="text-xs text-muted-foreground space-y-1">
-            <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(showActivation)} kr</span></div>
+            {showActivation > 0 && <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(showActivation)} kr</span></div>}
             <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
-            {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
+            {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(extraSeatSek)} kr</span><span>{fmt(extraSeats * extraSeatSek)} kr</span></div>}
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-3">
