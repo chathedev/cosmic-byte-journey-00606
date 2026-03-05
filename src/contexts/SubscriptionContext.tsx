@@ -347,7 +347,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           
           console.log(`[SubscriptionContext] 🎯 Final background plan (admin=${admin}):`, latestPlan);
           
-          const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
+          const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, team: 2, plus: 2, unlimited: 3, enterprise: 4 };
           setUserPlan(prev => {
             if (!prev) return latestPlan;
             if (JSON.stringify(prev) === JSON.stringify(latestPlan)) return prev;
