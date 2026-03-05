@@ -284,7 +284,7 @@ export async function subscribeDraft(
   draftId: string,
   resumeToken: string
 ): Promise<DraftSubscribeResponse> {
-  return apiFetch('/enterprise/onboarding/subscribe', {
+  return apiFetch('/team/onboarding/subscribe', {
     method: 'POST',
     body: JSON.stringify({ draftId, resumeToken }),
   });
