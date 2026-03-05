@@ -5,6 +5,7 @@ import {
   CheckCircle2, Info, ChevronDown, AlertCircle, Hash, Send, MessageSquare,
 } from "lucide-react";
 import slackLogo from "@/assets/slack-logo.png";
+import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -337,20 +338,13 @@ const IntegrationSlack = () => {
             )}
           </section>
 
-          {/* Connection success confirmation */}
-          {showConnectedConfirm && (
-            <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 flex items-start gap-3 animate-in fade-in-0 slide-in-from-top-2 duration-300">
-              <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold text-green-700 dark:text-green-300">Slack-workspace anslutet</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Du kan nu dela protokoll till Slack-kanaler.
-                </p>
-              </div>
-            </div>
-          )}
+          <ConnectionSuccessOverlay
+            show={showConnectedConfirm}
+            onClose={() => setShowConnectedConfirm(false)}
+            serviceName="Slack"
+            description="Du kan nu dela protokoll till Slack-kanaler."
+            logo={slackLogo}
+          />
 
           {/* Auto-share settings */}
           {sl.isFullyConnected && (
