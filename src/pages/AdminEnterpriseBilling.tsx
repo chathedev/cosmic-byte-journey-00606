@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical, XCircle } from "lucide-react";
+import { ArrowLeft, Building2, Receipt, ExternalLink, Loader2, Check, ChevronsUpDown, RefreshCw, Send, Trash2, MoreVertical, XCircle, CreditCard, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
