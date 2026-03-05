@@ -78,8 +78,7 @@ const IntegrationTeams = () => {
 
       if (isOAuthSuccessReturn && di.isFullyConnected) {
         setShowConnectedConfirm(true);
-        const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
-        return () => clearTimeout(timer);
+        return;
       }
 
       return;
@@ -87,9 +86,8 @@ const IntegrationTeams = () => {
 
     if (di.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
-      const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
       prevConnected.current = di.isFullyConnected;
-      return () => clearTimeout(timer);
+      return;
     }
 
     prevConnected.current = di.isFullyConnected;

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { CheckCircle2, X } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ConnectionSuccessOverlayProps {
@@ -17,100 +17,85 @@ export const ConnectionSuccessOverlay = ({
   description,
   logo,
 }: ConnectionSuccessOverlayProps) => {
-  const [visible, setVisible] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  const [phase, setPhase] = useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
 
   useEffect(() => {
-    if (show) {
-      // Small delay for mount animation
-      requestAnimationFrame(() => setVisible(true));
-      const timer = setTimeout(() => handleClose(), 4000);
-      return () => clearTimeout(timer);
+    if (show && phase === "hidden") {
+      setPhase("entering");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setPhase("visible"));
+      });
     }
-  }, [show]);
+  }, [show, phase]);
 
-  const handleClose = () => {
-    setLeaving(true);
+  const handleClose = useCallback(() => {
+    if (phase === "leaving") return;
+    setPhase("leaving");
     setTimeout(() => {
-      setVisible(false);
-      setLeaving(false);
+      setPhase("hidden");
       onClose();
-    }, 300);
-  };
+    }, 250);
+  }, [phase, onClose]);
 
-  if (!show) return null;
+  if (phase === "hidden" && !show) return null;
+
+  const isActive = phase === "visible";
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-300",
-        visible && !leaving ? "opacity-100" : "opacity-0 pointer-events-none"
+        "fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-4 transition-opacity duration-250",
+        isActive ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       onClick={handleClose}
     >
       {/* Backdrop */}
-      <div className={cn(
-        "absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300",
-        visible && !leaving ? "opacity-100" : "opacity-0"
-      )} />
+      <div className="absolute inset-0 bg-background/60 backdrop-blur-[6px]" />
 
       {/* Card */}
       <div
         className={cn(
-          "relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl p-8 flex flex-col items-center gap-5 text-center transition-all duration-300",
-          visible && !leaving ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
+          "relative w-full max-w-[320px] rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-xl transition-all duration-250 ease-out",
+          isActive ? "scale-100 translate-y-0 opacity-100" : "scale-[0.97] translate-y-3 opacity-0"
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close */}
-        <button
-          onClick={handleClose}
-          className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        {/* Success icon with logo */}
-        <div className="relative">
-          <div className="w-20 h-20 rounded-full bg-green-500/10 border-2 border-green-500/20 flex items-center justify-center">
+        <div className="p-6 flex flex-col items-center gap-4 text-center">
+          {/* Logo + check badge */}
+          <div className="relative">
             {logo ? (
-              <img src={logo} alt={serviceName} className="w-10 h-10 object-contain" />
+              <div className="w-14 h-14 rounded-2xl bg-muted/60 border border-border/40 flex items-center justify-center p-2">
+                <img src={logo} alt={serviceName} className="w-full h-full object-contain" />
+              </div>
             ) : (
-              <CheckCircle2 className="w-10 h-10 text-green-500" />
+              <div className="w-14 h-14 rounded-2xl bg-muted/60 border border-border/40 flex items-center justify-center">
+                <Check className="w-7 h-7 text-foreground" />
+              </div>
             )}
+            <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center ring-2 ring-card">
+              <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+            </div>
           </div>
-          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-green-500 flex items-center justify-center shadow-lg">
-            <CheckCircle2 className="w-4 h-4 text-white" />
+
+          {/* Text */}
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold text-foreground">
+              {serviceName} anslutet
+            </h2>
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
+              {description || `Ditt ${serviceName}-konto har kopplats till Tivly.`}
+            </p>
           </div>
-        </div>
 
-        {/* Text */}
-        <div className="space-y-1.5">
-          <h2 className="text-lg font-semibold text-foreground">
-            {serviceName} anslutet
-          </h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {description || `Ditt ${serviceName}-konto har kopplats till Tivly.`}
-          </p>
-        </div>
-
-        {/* Progress bar auto-close indicator */}
-        <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
-          <div
-            className="h-full bg-green-500 rounded-full"
-            style={{
-              animation: visible && !leaving ? "shrink-bar 4s linear forwards" : "none",
-            }}
-          />
+          {/* Dismiss button */}
+          <button
+            onClick={handleClose}
+            className="w-full mt-1 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.98] transition-all"
+          >
+            Stäng
+          </button>
         </div>
       </div>
-
-      <style>{`
-        @keyframes shrink-bar {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-      `}</style>
     </div>
   );
 };

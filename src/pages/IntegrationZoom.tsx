@@ -60,8 +60,7 @@ const IntegrationZoom = () => {
 
       if (isOAuthSuccessReturn && zi.isFullyConnected) {
         setShowConnectedConfirm(true);
-        const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
-        return () => clearTimeout(timer);
+        return;
       }
 
       return;
@@ -69,9 +68,8 @@ const IntegrationZoom = () => {
 
     if (zi.isFullyConnected && !prevConnected.current) {
       setShowConnectedConfirm(true);
-      const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
       prevConnected.current = zi.isFullyConnected;
-      return () => clearTimeout(timer);
+      return;
     }
 
     prevConnected.current = zi.isFullyConnected;
