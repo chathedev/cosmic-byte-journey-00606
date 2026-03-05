@@ -295,39 +295,37 @@ export const EnterpriseHomeDashboard = ({
           <div className="lg:col-span-2 space-y-6">
 
             {/* Stats */}
-            {stats && (
-              <div className="rounded-lg border border-border bg-card divide-y divide-border">
-                <button
-                  onClick={() => navigate("/org/settings")}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
-                >
-                  <Users className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-foreground flex-1">Teammedlemmar</span>
-                  <span className="text-sm font-semibold text-foreground tabular-nums">
-                    {stats.memberCount ?? 0}
-                  </span>
-                </button>
-                <button
-                  onClick={() => navigate("/library")}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
-                >
-                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-foreground flex-1">Totala möten</span>
+            <div className="rounded-lg border border-border bg-card divide-y divide-border">
+              <button
+                onClick={() => navigate("/org/settings")}
+                className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+              >
+                <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-foreground flex-1">Teammedlemmar</span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">
+                  {stats?.memberCount ?? 0}
+                </span>
+              </button>
+              <button
+                onClick={() => navigate("/library")}
+                className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+              >
+                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-foreground flex-1">Dina möten</span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">
+                  {userPlan?.meetingsUsed ?? 0}
+                </span>
+              </button>
+              {stats && (
+                <div className="flex items-center gap-3 px-5 py-3.5">
+                  <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-foreground flex-1">Org. möten</span>
                   <span className="text-sm font-semibold text-foreground tabular-nums">
                     {stats.totalMeetingCount ?? 0}
                   </span>
-                </button>
-                <div className="flex items-center gap-3 px-5 py-3.5">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-foreground flex-1">Snitt/medlem</span>
-                  <span className="text-sm font-semibold text-foreground tabular-nums">
-                    {stats.averageMeetingsPerMember != null
-                      ? Number(stats.averageMeetingsPerMember).toFixed(1)
-                      : "0"}
-                  </span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Integrations */}
             <div className="rounded-lg border border-border bg-card">
