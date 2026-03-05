@@ -2687,6 +2687,85 @@ class ApiClient {
     return response.json();
   }
 
+  // Enterprise member management (non-admin, company-scoped)
+  async getEnterpriseMembers(companyId: string): Promise<{
+    members: Array<{
+      email: string;
+      preferredName?: string;
+      role: string;
+      status: string;
+      verified?: boolean;
+      lastLoginAt?: string;
+    }>;
+    viewer: {
+      email: string;
+      role: string;
+      canManageMembers: boolean;
+    };
+  }> {
+    const response = await this.fetchWithAuth(`/enterprise/companies/${companyId}/members`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Failed to fetch members');
+    }
+    return response.json();
+  }
+
+  async updateEnterpriseMember(companyId: string, memberEmail: string, data: {
+    role?: string;
+    status?: string;
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/companies/${companyId}/members/${encodeURIComponent(memberEmail)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: any = new Error(errorData.message || errorData.error || 'Failed to update member');
+      error.code = errorData.code;
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  }
+
+  async removeEnterpriseMember(companyId: string, memberEmail: string): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/companies/${companyId}/members/${encodeURIComponent(memberEmail)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: any = new Error(errorData.message || errorData.error || 'Failed to remove member');
+      error.code = errorData.code;
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  }
+
+  async sendEnterpriseMemberInvite(companyId: string, memberEmail: string): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/companies/${companyId}/members/${encodeURIComponent(memberEmail)}/invite`,
+      {
+        method: 'POST',
+      }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: any = new Error(errorData.message || errorData.error || 'Failed to send invite');
+      error.code = errorData.code;
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  }
+
   async getEnterpriseCompanyStats(companyId: string): Promise<{
     company: any;
     scope: { type: string; memberCount: number };
