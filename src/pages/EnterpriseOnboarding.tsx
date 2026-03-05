@@ -1108,13 +1108,12 @@ function FieldInput({ label, id, placeholder, value, onChange, error, valid, hin
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 3: Confirm                                         */
+/* STEP 1: Confirm                                         */
 /* ═══════════════════════════════════════════════════════ */
 function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField, submitError, extraSeatSek }: {
   form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; monthlyTotal: number; extraSeats: number;
   updateField: (f: string, v: any) => void; submitError: string; extraSeatSek: number;
 }) {
-  const seats = form.expectedSeats || 0;
   const planLabel = selectedPlan.name;
   const rows = [
     { label: 'Företag', value: form.companyName || '–', icon: Building2 },
@@ -1124,10 +1123,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
     { label: 'Telefon', value: form.contactPhone || '–', icon: Phone },
     { label: 'Plan', value: planLabel, icon: CreditCard },
     { label: 'Månadsavgift', value: `${fmt(selectedPlan.priceSek)} SEK/mån`, icon: CreditCard },
-    { label: 'Inkluderade användare', value: `${selectedPlan.seats} st`, icon: Users },
-    { label: 'Totalt antal användare', value: `${seats} st`, icon: Users },
-    ...(extraSeats > 0 ? [{ label: 'Extra användare', value: `${extraSeats} st × ${fmt(extraSeatSek)} SEK/mån`, icon: Plus }] : []),
-    ...(selectedPlan.activationSek > 0 ? [{ label: 'Aktiveringsavgift', value: `${fmt(selectedPlan.activationSek)} SEK (efter trial)`, icon: Clock }] : []),
+    { label: 'Inkluderade användare (trial)', value: `${selectedPlan.seats} st`, icon: Users },
   ];
 
   return (
@@ -1149,11 +1145,28 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
         ))}
       </div>
 
+      {/* Trial user limit info */}
+      <div className="border border-border bg-muted/30 p-4 space-y-2">
+        <div className="flex items-start gap-3">
+          <Users className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">5 användare ingår under trial</p>
+            <p className="text-xs text-muted-foreground">
+              Under den kostnadsfria 7-dagars trial-perioden kan ert team använda Tivly med upp till <strong className="text-foreground">5 användare</strong>. 
+              Det går inte att lägga till fler under trialen.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Efter trialen kan ni enkelt bjuda in fler teammedlemmar via adminpanelen. Extra användare kostar <strong className="text-foreground">{fmt(selectedPlan.extraSeatSek)} kr/användare/mån</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-3">
         <label className="flex items-start gap-3 cursor-pointer">
           <Checkbox checked={form.acceptedTerms || false} onCheckedChange={(c) => updateField('acceptedTerms', c === true)} className="mt-0.5 rounded-none" />
           <span className="text-sm text-muted-foreground">
-            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-foreground underline">enterprise-villkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground underline">integritetspolicyn</a>.
+            Jag godkänner <a href="https://www.tivly.se/enterprise-villkor" target="_blank" rel="noopener noreferrer" className="text-foreground underline">teamvillkoren</a> och <a href="https://www.tivly.se/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground underline">integritetspolicyn</a>.
           </span>
         </label>
         <label className="flex items-start gap-3 cursor-pointer">
@@ -1172,7 +1185,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
       <div className="border border-border p-4 flex items-start gap-3">
         <CreditCard className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
-          I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden.</strong>
+          I nästa steg registrerar du ett betalkort. <strong className="text-foreground">Ingen debitering sker under trial-perioden (7 dagar).</strong>
         </p>
       </div>
     </div>
