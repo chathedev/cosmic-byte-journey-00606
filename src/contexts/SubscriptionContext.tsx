@@ -563,6 +563,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const canGenerateProtocol = async (meetingId: string, protocolCount: number = 0) => {
     if (!user) return { allowed: false, reason: 'Du måste vara inloggad' };
     
+    // Viewers cannot generate protocols
+    if (isViewer) return { allowed: false, reason: 'Du har läsbehörighet och kan inte generera protokoll' };
+    
     // Admins always allowed
     if (isAdmin) return { allowed: true };
     
