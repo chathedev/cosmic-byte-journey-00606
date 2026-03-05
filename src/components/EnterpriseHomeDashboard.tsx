@@ -311,7 +311,10 @@ export const EnterpriseHomeDashboard = ({
                 className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
               >
                 <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="text-sm text-foreground flex-1">Dina möten</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-foreground">Dina möten</span>
+                  <p className="text-[10px] text-muted-foreground leading-tight">Historiskt antal</p>
+                </div>
                 <span className="text-sm font-semibold text-foreground tabular-nums">
                   {userPlan?.meetingsUsed ?? 0}
                 </span>
@@ -319,7 +322,10 @@ export const EnterpriseHomeDashboard = ({
               {stats && (
                 <div className="flex items-center gap-3 px-5 py-3.5">
                   <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-foreground flex-1">Org. möten</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-foreground">Org. möten</span>
+                    <p className="text-[10px] text-muted-foreground leading-tight">Aktiva i organisationen</p>
+                  </div>
                   <span className="text-sm font-semibold text-foreground tabular-nums">
                     {stats.totalMeetingCount ?? 0}
                   </span>
