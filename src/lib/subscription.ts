@@ -149,12 +149,12 @@ export const subscriptionService = {
       if (normalizedPlan === 'unlimited' || normalizedPlan === 'plus' || normalizedPlan === 'team' || normalizedPlan === 'enterprise') {
         meetingsLimit = null; // Truly unlimited
       } else if (normalizedPlan === 'pro') {
-        // Pro has a limit of 10 meetings per month
+        // Pro has a limit of 30 meetings per month
         const fromSnapshot = Number((snapshot as any)?.meetingLimit);
         const fromUser = Number((planRaw as any)?.meetingsLimit);
         meetingsLimit = Number.isFinite(fromSnapshot) && fromSnapshot > 0
           ? fromSnapshot
-          : (Number.isFinite(fromUser) && fromUser > 0 ? fromUser : 10);
+          : (Number.isFinite(fromUser) && fromUser > 0 ? fromUser : 30);
       } else {
         const fromSnapshot = Number((snapshot as any)?.meetingLimit);
         const fromUser = Number((planRaw as any)?.meetingsLimit);
