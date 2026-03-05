@@ -212,7 +212,7 @@ export const EnterpriseHomeDashboard = ({
             <div className="mt-2 flex items-center gap-2 px-1">
               <img src={slackLogo} alt="Slack" className="w-4 h-4 object-contain" />
               <span className="text-xs text-muted-foreground">Slack kopplad</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             </div>
           )}
         </div>
