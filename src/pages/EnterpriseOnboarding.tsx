@@ -438,7 +438,7 @@ export default function EnterpriseOnboarding() {
       }
       const draftRes = await saveDraft({
         ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 2, progressPercent: 75,
+        progressStep: 1, progressPercent: 66,
       } as any);
       const ensuredDraftId = draftRes.draft?.id;
       const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
