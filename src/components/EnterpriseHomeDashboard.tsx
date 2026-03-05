@@ -350,9 +350,9 @@ export const EnterpriseHomeDashboard = ({
             <p className="text-xs text-muted-foreground">
               {userPlan.meetingsUsed ?? 0}
               {userPlan.meetingsLimit != null ? ` / ${userPlan.meetingsLimit}` : ""} möten använda
-              {userPlan.renewsAt && (
+              {userPlan.renewDate && (
                 <span className="ml-1">
-                  · Förnyas {new Date(userPlan.renewsAt).toLocaleDateString("sv-SE")}
+                  · Förnyas {new Date(userPlan.renewDate).toLocaleDateString("sv-SE")}
                 </span>
               )}
             </p>
