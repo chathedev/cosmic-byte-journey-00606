@@ -27,7 +27,12 @@ const Integrations = () => {
   const zoomImport = useZoomImport();
   const googleMeetImport = useGoogleMeetImport();
   const slackIntegration = useSlackIntegration();
+  const { enterpriseMembership } = useSubscription();
   const hasHandledCallback = useRef(false);
+
+  // Microsoft Teams is only available for enterprise planTier, not team
+  const planTier = enterpriseMembership?.company?.planTier;
+  const isTeamsAvailable = planTier === 'enterprise';
 
   const [successOverlay, setSuccessOverlay] = useState<{
     show: boolean;
