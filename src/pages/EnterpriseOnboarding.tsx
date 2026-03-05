@@ -34,10 +34,9 @@ import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@
 
 /* ─── Constants ─── */
 const PLANS = [
-  { id: 'enterprise_small' as const, name: 'Small', priceSek: 2490, seats: 10, activationSek: 4900 },
-  { id: 'enterprise_standard' as const, name: 'Standard', priceSek: 5990, seats: 30, activationSek: 9900 },
+  { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
+  { id: 'enterprise_standard' as const, name: 'Enterprise', priceSek: 4990, seats: 20, activationSek: 0, extraSeatSek: 249 },
 ];
-const EXTRA_SEAT_PRICE = 249;
 const STEPS = ['Team', 'Uppgifter', 'Plan', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
