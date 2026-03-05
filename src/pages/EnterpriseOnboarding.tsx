@@ -134,7 +134,7 @@ export default function EnterpriseOnboarding() {
           setResumeToken(res.draft.resumeToken);
           const raw = res.draft.rawFields || {};
           const restored = { ...form, ...raw, expectedSeats: raw.expectedSeats ? Number(raw.expectedSeats) : form.expectedSeats };
-          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 2);
+          const restoredStep = Math.min(res.draft.progress?.step ?? 0, 1);
           if (hasRestorableProgress(restored, restoredStep)) {
             hasUserInteractedRef.current = true;
             setForm(restored);
