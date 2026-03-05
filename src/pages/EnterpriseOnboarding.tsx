@@ -565,13 +565,20 @@ export default function EnterpriseOnboarding() {
             {[
               { n: '1', icon: Mail, text: <>Öppna inbjudan i <span className="text-foreground font-medium">{completedEmail}</span></> },
               { n: '2', icon: ArrowRight, text: 'Klicka på länken för att logga in' },
-              { n: '3', icon: Users, text: 'Bjud in ditt team och börja använda Tivly' },
+              { n: '3', icon: Users, text: 'Börja använda Tivly med ert team (5 användare under trial)' },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3 p-4">
                 <item.icon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <span className="text-sm text-muted-foreground">{item.text}</span>
               </div>
             ))}
+          </div>
+
+          <div className="border border-border bg-muted/30 p-4 flex items-start gap-3">
+            <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              Under trialen ingår 5 användare. Efter trialen kan ni lägga till fler teammedlemmar via adminpanelen (199 kr/användare/mån).
+            </p>
           </div>
           <div className="text-center space-y-3">
             <a href="/auth" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors">
