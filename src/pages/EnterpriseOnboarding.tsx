@@ -215,7 +215,7 @@ export default function EnterpriseOnboarding() {
       return;
     }
     
-    // If both already verified, go straight to next step (Plan)
+    // If both already verified, go straight to next step (Bekräfta)
     if (companyConnState === 'verified' && emailVerifyState === 'verified') {
       setStep(2);
       return;
