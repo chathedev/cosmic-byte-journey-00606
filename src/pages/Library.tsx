@@ -1449,7 +1449,15 @@ const Library = () => {
                 )}
 
                 {/* Actions */}
-                <div className="px-4 pb-4 flex gap-2 flex-wrap items-center" onClick={e => e.stopPropagation()}>
+                <div
+                  className="px-4 pb-4 flex gap-2 flex-wrap items-center"
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest("button, [role='button'], input, textarea, select, a")) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
                   <Button
                     onClick={() => handleCreateProtocol(meeting)}
                     size="sm"
