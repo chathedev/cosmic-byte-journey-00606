@@ -327,7 +327,7 @@ export default function EnterpriseOnboarding() {
         if (res.emailVerification?.status === 'verified') {
           setEmailVerifyState('verified');
           toast({ title: 'E-post verifierad', description: 'Din företagsmail har bekräftats.' });
-          setTimeout(() => setStep(2), 1500);
+          setTimeout(() => setStep(1), 1500);
         }
       } catch {}
     }, 4000);
