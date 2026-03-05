@@ -294,6 +294,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       cta: 'Nuvarande plan',
       variant: 'outline' as const,
       isCurrent: userPlan?.plan === 'free',
+      disabled: true,
     },
     {
       name: 'Pro',
@@ -327,9 +328,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Adminpanel & workspace', included: true },
         { text: 'Extra användare: 199 kr/st/mån', included: true },
       ],
-      cta: 'Starta onboarding',
+      cta: userPlan?.plan === 'team' ? 'Nuvarande plan' : 'Starta onboarding',
       variant: 'outline' as const,
-      isOnboarding: true,
+      isOnboarding: userPlan?.plan !== 'team',
+      isCurrent: userPlan?.plan === 'team',
+      
     },
     {
       name: 'Enterprise',
@@ -346,9 +349,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Anpassade integrationer', included: true },
         { text: 'Dedikerad onboarding', included: true },
       ],
-      cta: 'Kontakta oss',
+      cta: userPlan?.plan === 'enterprise' ? 'Nuvarande plan' : 'Kontakta oss',
       variant: 'outline' as const,
-      isContact: true,
+      isContact: userPlan?.plan !== 'enterprise',
+      isCurrent: userPlan?.plan === 'enterprise',
     },
   ];
 

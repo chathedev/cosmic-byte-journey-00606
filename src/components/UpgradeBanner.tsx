@@ -25,13 +25,17 @@ export const UpgradeBanner = () => {
   const getPlanTitle = () => {
     switch (userPlan.plan) {
       case 'free':
-        return 'Free';
+        return 'Gratis';
       case 'pro':
         return 'Pro';
       case 'plus':
         return 'Plus';
       case 'unlimited':
         return 'Unlimited';
+      case 'team':
+        return 'Team';
+      case 'enterprise':
+        return 'Enterprise';
       default:
         return 'Din Plan';
     }
