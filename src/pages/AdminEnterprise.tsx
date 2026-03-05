@@ -651,8 +651,8 @@ export default function AdminEnterprise() {
           </div>
         </div>
 
-        {/* Onboarding Auto Toggle */}
-        <AdminOnboardingAutoToggle />
+
+
 
         {/* Statistik */}
         <div className="grid gap-4 md:grid-cols-3">
