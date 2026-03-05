@@ -235,7 +235,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
-  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/enterprise/onboarding' || location.pathname === '/enterprise/onboarding/verify-email';
+  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/team/onboarding' || location.pathname === '/team/onboarding/verify-email';
   const isRecordingPage = location.pathname === '/recording';
   const isNative = isNativeApp();
 
