@@ -1257,9 +1257,9 @@ function FieldInput({ label, id, placeholder, value, onChange, error, valid, hin
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 3: Confirm                                         */
 /* ═══════════════════════════════════════════════════════ */
-function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField, submitError }: {
+function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField, submitError, extraSeatSek }: {
   form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; monthlyTotal: number; extraSeats: number;
-  updateField: (f: string, v: any) => void; submitError: string;
+  updateField: (f: string, v: any) => void; submitError: string; extraSeatSek: number;
 }) {
   const seats = form.expectedSeats || 0;
   const planLabel = selectedPlan.name === 'Small' ? 'Enterprise Small' : 'Enterprise Standard';
