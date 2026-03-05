@@ -528,8 +528,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  // Viewer detection: enterprise member with viewer role = read-only
+  const isViewer = useMemo(() => {
+    if (!enterpriseMembership?.isMember) return false;
+    const role = enterpriseMembership.membership?.role;
+    return role === 'viewer';
+  }, [enterpriseMembership]);
+
   const canCreateMeeting = async () => {
     if (!user) return { allowed: false, reason: 'Du måste vara inloggad' };
+    
+    // Viewers cannot create meetings
+    if (isViewer) return { allowed: false, reason: 'Du har läsbehörighet och kan inte skapa möten' };
     
     // Admins always allowed
     if (isAdmin) return { allowed: true };
