@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Building2, Users, Link2, Settings2 } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
-import { EnterpriseInvitePanel } from "@/components/EnterpriseInvitePanel";
+import { MemberRoleManager } from "@/components/MemberRoleManager";
 import { OrgTeamsInsights } from "@/components/OrgTeamsInsights";
 import { OrgZoomInsights } from "@/components/OrgZoomInsights";
 import { OrgGoogleMeetInsights } from "@/components/OrgGoogleMeetInsights";
@@ -70,7 +70,7 @@ export default function OrgSettings() {
             {isAdminOrOwner && (
               <TabsTrigger value="invite" className="rounded-lg gap-1.5 text-xs sm:text-sm px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 <Settings2 className="w-3.5 h-3.5" />
-                <span>Bjud in</span>
+                <span>Medlemmar</span>
               </TabsTrigger>
             )}
             {isAdminOrOwner && companyId && (
@@ -89,7 +89,7 @@ export default function OrgSettings() {
           {/* Invite tab */}
           {isAdminOrOwner && (
             <TabsContent value="invite" className="mt-6 space-y-6">
-              <EnterpriseInvitePanel />
+              <MemberRoleManager />
             </TabsContent>
           )}
 
