@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
+import { ArrowLeft, ChevronRight, CheckCircle2, Puzzle, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
 import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useSlackIntegration } from "@/hooks/useSlackIntegration";
 import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import teamsLogo from "@/assets/teams-logo.png";
