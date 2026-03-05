@@ -796,7 +796,7 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
         {extraSeats > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Extra platser</span>
-            <span className="text-foreground font-medium">{extraSeats} × {fmt(EXTRA_SEAT_PRICE)} kr</span>
+            <span className="text-foreground font-medium">{extraSeats} × {fmt(extraSeatSek)} kr</span>
           </div>
         )}
       </div>
