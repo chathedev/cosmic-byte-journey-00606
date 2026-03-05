@@ -338,9 +338,12 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       features: [
         { text: 'Allt i Team, plus:', included: true },
         { text: 'Microsoft Teams auto-import', included: true },
-        { text: 'SSO (Microsoft / Google)', included: true },
+        { text: 'Automatisk mötesimport', included: true },
         { text: 'Avancerade behörigheter', included: true },
+        { text: 'SSO (Microsoft / Google)', included: true },
+        { text: 'Avancerad admin-kontroll', included: true },
         { text: 'EU-hosting & SLA', included: true },
+        { text: 'Anpassade integrationer', included: true },
         { text: 'Dedikerad onboarding', included: true },
       ],
       cta: 'Kontakta oss',
