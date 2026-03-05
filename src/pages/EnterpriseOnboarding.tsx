@@ -122,8 +122,8 @@ export default function EnterpriseOnboarding() {
 
   useEffect(() => {
     const hasRestorableProgress = (f: Partial<OnboardingFormData>, s = 0) => {
-      const hasRealData = !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
-      const changedFromDefaults = Number(f.expectedSeats ?? 5) !== 5 || (f.planType && f.planType !== 'enterprise_small') || !!f.acceptedTerms || !!f.authorizedSignatory;
+    const hasRealData = !!(f.companyName || f.workEmail || f.contactName || f.organizationNumber);
+      const changedFromDefaults = !!f.acceptedTerms || !!f.authorizedSignatory;
       return hasRealData || changedFromDefaults || s > 0;
     };
     const local = loadDraftLocal();
