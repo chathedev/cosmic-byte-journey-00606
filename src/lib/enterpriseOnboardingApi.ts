@@ -294,7 +294,7 @@ export async function subscribeDraft(
 export async function startTrial(
   data: OnboardingFormData & { draftId?: string; resumeToken?: string }
 ): Promise<StartResponse> {
-  return apiFetch('/enterprise/onboarding/start', {
+  return apiFetch('/team/onboarding/start', {
     method: 'POST',
     body: JSON.stringify({ ...data, countryCode: 'SE' }),
   });
