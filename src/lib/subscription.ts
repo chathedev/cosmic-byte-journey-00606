@@ -110,9 +110,12 @@ export const subscriptionService = {
         'gratis': 'free',
         'free plan': 'free',
         'standard': 'pro',
+        'plus': 'pro',
+        'max': 'pro',
         'obegränsad': 'unlimited',
         'obegränsat': 'unlimited',
         'unlimited': 'unlimited',
+        'enterprise_scale': 'enterprise',
       };
 
       // Detect enterprise membership hints from backend user payload
