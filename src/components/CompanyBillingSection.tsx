@@ -514,9 +514,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : billingHistory.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Ingen faktureringshistorik
-              </div>
+              <BillingStatusOverview company={billingCompany} billingStatus={billingStatus} />
             ) : (
               <div className="overflow-x-auto -mx-4 px-4">
                 <Table>
