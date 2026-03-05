@@ -150,6 +150,12 @@ export function MemberRoleManager() {
         description: 'Det måste alltid finnas minst en aktiv ägare i organisationen.',
         variant: 'destructive',
       });
+    } else if (error.status === 409 && error.code === 'team_trial_member_limit_reached') {
+      toast({
+        title: 'Maxgräns under trial',
+        description: 'Under trial-perioden kan teamet ha max 5 aktiva medlemmar. Fler kan läggas till efter trialen.',
+        variant: 'destructive',
+      });
     } else if (error.status === 403) {
       toast({
         title: 'Åtkomst nekad',
@@ -219,6 +225,7 @@ export function MemberRoleManager() {
       await loadMembers();
     } catch (error: any) {
       handleError(error);
+      await loadMembers();
     } finally {
       setIsInviting(false);
     }
