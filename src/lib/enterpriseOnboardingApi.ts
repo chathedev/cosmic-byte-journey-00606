@@ -336,7 +336,7 @@ export async function sendOnboardingEmailVerification(data: { email: string; dra
   emailVerification?: { status: string; expiresAt?: string; method?: string };
   verifyUrl?: string;
 }> {
-  return apiFetch('/enterprise/onboarding/verify-email/send', {
+  return apiFetch('/team/onboarding/verify-email/send', {
     method: 'POST',
     body: JSON.stringify(data),
   });
