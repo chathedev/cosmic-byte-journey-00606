@@ -198,7 +198,7 @@ export default function EnterpriseOnboarding() {
 
   const [stepValidating, setStepValidating] = useState(false);
 
-  // Step 1 (Uppgifter): validate → company connection popup → email verification popup
+  // Step 0 (Uppgifter): validate → company connection popup → email verification popup
   const handleNextFromStep1 = async () => {
     hasUserInteractedRef.current = true;
     const missing: string[] = [];
