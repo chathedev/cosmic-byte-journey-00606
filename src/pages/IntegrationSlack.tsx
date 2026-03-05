@@ -5,6 +5,7 @@ import {
   CheckCircle2, Info, ChevronDown, AlertCircle, Hash, Send, MessageSquare,
 } from "lucide-react";
 import slackLogo from "@/assets/slack-logo.png";
+import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
