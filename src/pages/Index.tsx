@@ -3,6 +3,7 @@ import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
 import { EnterpriseWelcomeWizard } from "@/components/EnterpriseWelcomeWizard";
 import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
+import { ViewerDashboard } from "@/components/ViewerDashboard";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
