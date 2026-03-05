@@ -529,7 +529,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setUserPlan(prev => {
         if (!prev) return plan;
         if (JSON.stringify(prev) === JSON.stringify(plan)) return prev;
-        const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, plus: 2, unlimited: 3, enterprise: 4 };
+        const rank: Record<UserPlan['plan'], number> = { free: 0, pro: 1, team: 2, plus: 2, unlimited: 3, enterprise: 4 };
         return rank[plan.plan] >= rank[prev.plan]
           ? plan
           : { ...prev, ...plan, plan: prev.plan };
