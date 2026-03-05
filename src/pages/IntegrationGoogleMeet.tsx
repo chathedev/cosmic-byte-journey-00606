@@ -59,8 +59,7 @@ const IntegrationGoogleMeet = () => {
 
       if (isOAuthSuccessReturn && gm.isFullyConnected) {
         setShowConnectedConfirm(true);
-        const timer = setTimeout(() => setShowConnectedConfirm(false), 5000);
-        return () => clearTimeout(timer);
+        return;
       }
 
       return;
