@@ -6,6 +6,7 @@ import {
   ChevronRight, AlertCircle, ChevronDown, Zap
 } from "lucide-react";
 import zoomLogo from "@/assets/zoom-logo.png";
+import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
