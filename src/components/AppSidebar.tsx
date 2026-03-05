@@ -619,13 +619,15 @@ export function AppSidebar() {
               </div>
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => navigate('/settings')}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-                >
-                  <FiSettings className="text-base" />
-                  <span>Inställningar</span>
-                </button>
+                {!isEnterpriseViewer && (
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                  >
+                    <FiSettings className="text-base" />
+                    <span>Inställningar</span>
+                  </button>
+                )}
                 <button
                   onClick={handleLogout}
                   className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
