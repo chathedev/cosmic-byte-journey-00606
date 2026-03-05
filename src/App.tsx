@@ -151,6 +151,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Block viewers from accessing restricted pages
+const ViewerGuard = ({ children }: { children: React.ReactNode }) => {
+  const { isViewer } = useSubscription();
+  
+  if (isViewer) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 // Redirect authenticated users away from /auth (handles test mode too)
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -336,15 +347,15 @@ const AppContent = () => {
                 <Route path="/free-trial" element={<FreeTrial />} />
                 <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
                 <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
-                <Route path="/generate-protocol" element={<GenerateProtocol />} />
-                <Route path="/recording" element={<ProtectedRoute><Recording /></ProtectedRoute>} />
-                <Route path="/protocol" element={<ProtectedRoute><Protocol /></ProtectedRoute>} />
-                <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                <Route path="/meeting/:id" element={<ProtectedRoute><MeetingLegacyRedirect /></ProtectedRoute>} />
-                <Route path="/meetings/:id" element={<ProtectedRoute><MeetingDetail /></ProtectedRoute>} />
+                <Route path="/generate-protocol" element={<ViewerGuard><GenerateProtocol /></ViewerGuard>} />
+                <Route path="/recording" element={<ProtectedRoute><ViewerGuard><Recording /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/protocol" element={<ProtectedRoute><ViewerGuard><Protocol /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/library" element={<ProtectedRoute><ViewerGuard><Library /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/meeting/:id" element={<ProtectedRoute><ViewerGuard><MeetingLegacyRedirect /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/meetings/:id" element={<ProtectedRoute><ViewerGuard><MeetingDetail /></ViewerGuard></ProtectedRoute>} />
                 
-                <Route path="/agendas" element={<ProtectedRoute><Agendas /></ProtectedRoute>} />
-                <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+                <Route path="/agendas" element={<ProtectedRoute><ViewerGuard><Agendas /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/feedback" element={<ProtectedRoute><ViewerGuard><Feedback /></ViewerGuard></ProtectedRoute>} />
                 <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
                 <Route path="/admin/admins" element={<AdminRoute><AdminAdmins /></AdminRoute>} />
                 <Route path="/admin/backend" element={<AdminRoute><AdminBackend /></AdminRoute>} />
@@ -361,16 +372,16 @@ const AppContent = () => {
                 <Route path="/admin/integrations/slack" element={<AdminRoute><AdminSlackInsights /></AdminRoute>} />
                 <Route path="/admin/teams-insights" element={<Navigate to="/admin/integrations/teams" replace />} />
                 <Route path="/admin/marketing" element={<Navigate to="/" replace />} />
-                <Route path="/enterprise/stats" element={<ProtectedRoute><EnterpriseStats /></ProtectedRoute>} />
-                <Route path="/org/billing" element={<ProtectedRoute><EnterpriseBilling /></ProtectedRoute>} />
-                <Route path="/billing/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
-                <Route path="/billing/invoices/:invoiceId" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-                <Route path="/integrations/teams" element={<ProtectedRoute><IntegrationTeams /></ProtectedRoute>} />
-                <Route path="/integrations/zoom" element={<ProtectedRoute><IntegrationZoom /></ProtectedRoute>} />
-                <Route path="/integrations/google-meet" element={<ProtectedRoute><IntegrationGoogleMeet /></ProtectedRoute>} />
-                <Route path="/integrations/slack" element={<ProtectedRoute><IntegrationSlack /></ProtectedRoute>} />
+                <Route path="/enterprise/stats" element={<ProtectedRoute><ViewerGuard><EnterpriseStats /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/org/billing" element={<ProtectedRoute><ViewerGuard><EnterpriseBilling /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/billing/invoices" element={<ProtectedRoute><ViewerGuard><BillingInvoices /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/billing/invoices/:invoiceId" element={<ProtectedRoute><ViewerGuard><BillingInvoiceDetail /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><ViewerGuard><Settings /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/integrations" element={<ProtectedRoute><ViewerGuard><Integrations /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/integrations/teams" element={<ProtectedRoute><ViewerGuard><IntegrationTeams /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/integrations/zoom" element={<ProtectedRoute><ViewerGuard><IntegrationZoom /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/integrations/google-meet" element={<ProtectedRoute><ViewerGuard><IntegrationGoogleMeet /></ViewerGuard></ProtectedRoute>} />
+                <Route path="/integrations/slack" element={<ProtectedRoute><ViewerGuard><IntegrationSlack /></ViewerGuard></ProtectedRoute>} />
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />

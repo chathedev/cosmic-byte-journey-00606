@@ -179,24 +179,35 @@ export function AppSidebar() {
   const isEnterpriseOwner = enterpriseMembership?.isMember && 
     enterpriseMembership.membership?.role === 'owner';
 
-  const navItems = [
-    { Icon: FiHome, title: "Hem", path: "/", locked: false },
-    { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
-    
-    { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
-    { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
-    { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
-  ];
+  // Viewer = read-only investor-style access
+  const isEnterpriseViewer = enterpriseMembership?.isMember && 
+    enterpriseMembership.membership?.role === 'viewer';
+
+  const navItems = isEnterpriseViewer
+    ? [
+        { Icon: FiHome, title: "Hem", path: "/", locked: false },
+      ]
+    : [
+        { Icon: FiHome, title: "Hem", path: "/", locked: false },
+        { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
+        { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
+        { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
+        { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
+      ];
 
   const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
     (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
 
-  const orgSubItems = [
-    ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
-    { Icon: Users, title: "Team", path: "/org/settings" },
-    { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
-    { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
-  ];
+  const orgSubItems = isEnterpriseViewer
+    ? [
+        { Icon: Users, title: "Team", path: "/org/settings" },
+      ]
+    : [
+        ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
+        { Icon: Users, title: "Team", path: "/org/settings" },
+        { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
+        { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
+      ];
 
   const adminItems = [
     { Icon: FiUsers, title: "Användare", path: "/admin/users" },
@@ -333,7 +344,8 @@ export function AppSidebar() {
                           {enterpriseMembership.membership?.role && (
                             <span className="text-muted-foreground/70">
                               {enterpriseMembership.membership.role === 'admin' ? 'Admin' : 
-                               enterpriseMembership.membership.role === 'owner' ? 'Ägare' : 'Medlem'}
+                               enterpriseMembership.membership.role === 'owner' ? 'Ägare' : 
+                               enterpriseMembership.membership.role === 'viewer' ? 'Läsare' : 'Medlem'}
                             </span>
                           )}
                         </span>
@@ -537,7 +549,7 @@ export function AppSidebar() {
           );
         })()}
 
-        {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && 
+        {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && !isEnterpriseViewer &&
          !(typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se') && (
           <div className="shrink-0 p-3 border-t border-border">
             <div className="text-xs text-muted-foreground mb-2 px-1">
@@ -554,7 +566,7 @@ export function AppSidebar() {
         )}
 
         {/* Meeting Counter - For Pro users (no upgrade button) */}
-        {!planLoading && userPlan && userPlan.plan === 'pro' && meetingsLeft !== null && !collapsed && (
+        {!planLoading && userPlan && userPlan.plan === 'pro' && meetingsLeft !== null && !collapsed && !isEnterpriseViewer && (
           <div className="shrink-0 p-3 border-t border-border">
             <div className="text-xs text-muted-foreground px-1">
               {meetingsLeft} möten kvar
@@ -571,13 +583,15 @@ export function AppSidebar() {
                   {user?.email?.[0]?.toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <button
-                onClick={() => navigate('/settings')}
-                className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-                title="Inställningar"
-              >
-                <FiSettings className="text-base" />
-              </button>
+              {!isEnterpriseViewer && (
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                  title="Inställningar"
+                >
+                  <FiSettings className="text-base" />
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
@@ -605,13 +619,15 @@ export function AppSidebar() {
               </div>
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => navigate('/settings')}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-                >
-                  <FiSettings className="text-base" />
-                  <span>Inställningar</span>
-                </button>
+                {!isEnterpriseViewer && (
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                  >
+                    <FiSettings className="text-base" />
+                    <span>Inställningar</span>
+                  </button>
+                )}
                 <button
                   onClick={handleLogout}
                   className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"

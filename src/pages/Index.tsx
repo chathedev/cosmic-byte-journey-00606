@@ -3,12 +3,13 @@ import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
 import { EnterpriseWelcomeWizard } from "@/components/EnterpriseWelcomeWizard";
 import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
+import { ViewerDashboard } from "@/components/ViewerDashboard";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 
 const Index = () => {
-  const { userPlan, isLoading, enterpriseMembership, switchCompany } = useSubscription();
+  const { userPlan, isLoading, enterpriseMembership, switchCompany, isViewer } = useSubscription();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showOrgChooser, setShowOrgChooser] = useState(false);
@@ -64,6 +65,11 @@ const Index = () => {
         }}
       />
     );
+  }
+
+  // Viewers get a simple read-only dashboard
+  if (isViewer) {
+    return <ViewerDashboard />;
   }
 
   return (
