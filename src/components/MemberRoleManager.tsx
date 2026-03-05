@@ -225,6 +225,7 @@ export function MemberRoleManager() {
       await loadMembers();
     } catch (error: any) {
       handleError(error);
+      await loadMembers();
     } finally {
       setIsInviting(false);
     }
