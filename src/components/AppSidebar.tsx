@@ -548,7 +548,7 @@ export function AppSidebar() {
           );
         })()}
 
-        {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && 
+        {!planLoading && userPlan && userPlan.plan === 'free' && meetingsLeft !== null && !collapsed && !isEnterpriseViewer &&
          !(typeof window !== 'undefined' && window.location.hostname === 'io.tivly.se') && (
           <div className="shrink-0 p-3 border-t border-border">
             <div className="text-xs text-muted-foreground mb-2 px-1">
