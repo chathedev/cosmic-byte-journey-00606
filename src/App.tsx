@@ -345,8 +345,11 @@ const AppContent = () => {
                 
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/free-trial" element={<FreeTrial />} />
-                <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
-                <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
+                <Route path="/team/onboarding" element={<EnterpriseOnboarding />} />
+                <Route path="/team/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
+                {/* Legacy redirects */}
+                <Route path="/enterprise/onboarding" element={<Navigate to="/team/onboarding" replace />} />
+                <Route path="/enterprise/onboarding/verify-email" element={<Navigate to="/team/onboarding/verify-email" replace />} />
                 <Route path="/generate-protocol" element={<ViewerGuard><GenerateProtocol /></ViewerGuard>} />
                 <Route path="/recording" element={<ProtectedRoute><ViewerGuard><Recording /></ViewerGuard></ProtectedRoute>} />
                 <Route path="/protocol" element={<ProtectedRoute><ViewerGuard><Protocol /></ViewerGuard></ProtectedRoute>} />
