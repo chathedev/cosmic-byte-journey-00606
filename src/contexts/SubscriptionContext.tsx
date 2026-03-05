@@ -420,6 +420,12 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           sisSample = { status: 'disabled' };
         }
         
+        // Normalize planType from internal (enterprise_small/enterprise_standard) to commercial (team/enterprise)
+        const rawPlanType = membership.company?.planType;
+        const normalizedPlanType = rawPlanType === 'enterprise_small' ? 'team'
+          : rawPlanType === 'enterprise_standard' ? 'enterprise'
+          : rawPlanType; // pass through if already 'team'/'enterprise' or unknown
+
         setEnterpriseMembership({
           ...membership,
           isMultiCompanyMember: membership.isMultiCompanyMember,
@@ -427,6 +433,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           memberships: membership.memberships,
           company: {
             ...membership.company,
+            planType: normalizedPlanType,
             speakerIdentificationEnabled: sisEnabled,
           },
           sisSample,
