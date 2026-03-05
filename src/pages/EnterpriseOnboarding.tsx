@@ -754,6 +754,7 @@ export default function EnterpriseOnboarding() {
                   monthlyTotal={monthlyTotal}
                   step={step}
                   form={form}
+                  extraSeatSek={selectedPlan.extraSeatSek}
                 />
               </div>
             </aside>
