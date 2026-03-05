@@ -365,7 +365,7 @@ export function MemberRoleManager() {
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Roll</Label>
             <div className="flex gap-1.5">
-              {(['member', 'admin', ...(viewerIsOwner ? ['owner'] : [])] as string[]).map(r => (
+              {(['viewer', 'member', 'admin', ...(viewerIsOwner ? ['owner'] : [])] as string[]).map(r => (
                 <button
                   key={r}
                   onClick={() => setInviteRole(r)}
