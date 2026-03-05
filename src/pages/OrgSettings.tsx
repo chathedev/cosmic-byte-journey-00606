@@ -52,7 +52,7 @@ export default function OrgSettings() {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-semibold">Organisation</h1>
             <p className="text-sm text-muted-foreground mt-0.5 truncate">
-              {enterpriseMembership.company?.name || 'Enterprise'}
+              {enterpriseMembership.company?.name || (commercialPlan === 'enterprise' ? 'Enterprise' : 'Team')}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">

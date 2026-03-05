@@ -338,8 +338,10 @@ const Settings = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold">{enterpriseMembership?.company?.name || 'Enterprise'}</h3>
-                      <Badge variant="secondary" className="bg-primary/20 text-primary text-xs">Enterprise</Badge>
+                      <h3 className="font-semibold">{enterpriseMembership?.company?.name || (enterpriseMembership?.company?.planType === 'enterprise' ? 'Enterprise' : 'Team')}</h3>
+                      <Badge variant="secondary" className="bg-primary/20 text-primary text-xs">
+                        {enterpriseMembership?.company?.planType === 'enterprise' ? 'Enterprise' : 'Team'}
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       {enterpriseMembership?.membership?.role === 'admin' ? 'Admin' :
