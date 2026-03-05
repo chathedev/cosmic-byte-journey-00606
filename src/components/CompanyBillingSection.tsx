@@ -57,6 +57,8 @@ interface CompanyBillingSectionProps {
 
 export function CompanyBillingSection({ companyId, companyName, contactEmail }: CompanyBillingSectionProps) {
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
+  const [billingCompany, setBillingCompany] = useState<any>(null);
+  const [billingStatus, setBillingStatus] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recurringInterval, setRecurringInterval] = useState<'monthly' | 'yearly'>('monthly');
