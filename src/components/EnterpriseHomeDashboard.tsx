@@ -137,24 +137,13 @@ export const EnterpriseHomeDashboard = ({
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
         {/* Header row */}
-        <div className="flex items-end justify-between mb-8 sm:mb-10">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">
-              {companyName}
-            </p>
-            <h1 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">
-              {displayName ? `${getGreeting()}, ${displayName}` : getGreeting()}
-            </h1>
-          </div>
-          {userPlan && (
-            <p className="text-xs text-muted-foreground hidden sm:block">
-              {userPlan.meetingsUsed ?? 0}
-              {userPlan.meetingsLimit != null ? ` / ${userPlan.meetingsLimit}` : ""} möten
-              {userPlan.renewDate && (
-                <span> · Förnyas {new Date(userPlan.renewDate).toLocaleDateString("sv-SE")}</span>
-              )}
-            </p>
-          )}
+        <div className="mb-8 sm:mb-10">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">
+            {companyName}
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">
+            {displayName ? `${getGreeting()}, ${displayName}` : getGreeting()}
+          </h1>
         </div>
 
         {/* Two-column layout on desktop */}
