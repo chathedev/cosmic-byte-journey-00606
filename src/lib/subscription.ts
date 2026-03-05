@@ -134,10 +134,12 @@ export const subscriptionService = {
         (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'enterprise' && (c?.status ?? 'active') === 'active'))
       );
 
-      const validPlans = ['free','pro','plus','unlimited','enterprise'] as const;
+      const validPlans = ['free','pro','team','plus','unlimited','enterprise'] as const;
       const normalizedPlan: UserPlan['plan'] = enterpriseDetected
         ? 'enterprise'
-        : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')) as UserPlan['plan']);
+        : (teamDetected
+            ? 'team'
+            : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')) as UserPlan['plan']));
 
       // Use cumulative count from /me only
       const meetingsUsed = Math.max(0, Number((user as any)?.meetingCount ?? 0) || 0);
