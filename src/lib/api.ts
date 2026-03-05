@@ -1754,13 +1754,58 @@ class ApiClient {
       invoiceId?: string;
       portalUrl?: string;
       subscriptionId?: string;
+      subscriptionStatus?: string;
+      cancelAt?: string;
+      oneTimeAmountSek?: number;
       createdAt: string;
-      createdBy: string;
+      createdBy?: string;
     }>;
     summary?: {
       activeSubscriptions: number;
       totalInvoices: number;
       totalRevenue: number;
+    };
+    billingStatus?: string;
+    company?: {
+      id: string;
+      name: string;
+      status: string;
+      planTier?: string;
+      planType?: string;
+      memberLimit?: number;
+      billingStatus?: string;
+      billingCustomerId?: string;
+      stripeCustomerId?: string;
+      subscriptionId?: string;
+      trial?: {
+        enabled: boolean;
+        startsAt: string;
+        endsAt: string;
+        daysTotal: number;
+        daysRemaining: number;
+        expired: boolean;
+      };
+      trialEndsAt?: string;
+      trialExpired?: boolean;
+      softLock?: {
+        active: boolean;
+        type?: string;
+        readOnly?: boolean;
+        banner?: { title?: string; message?: string; cta?: string } | null;
+      };
+      pricing?: {
+        planType?: string;
+        planName?: string;
+        memberCount?: number;
+        includedUsers?: number;
+        extraUsers?: number;
+        monthlyBaseSek?: number;
+        monthlyExtraSek?: number;
+        monthlyTotalSek?: number;
+        extraUserUnitSek?: number;
+        activationFeeSek?: number;
+      };
+      metadata?: Record<string, any>;
     };
   }> {
     const response = await this.fetchWithAuth(
