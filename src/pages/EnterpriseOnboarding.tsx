@@ -599,7 +599,7 @@ export default function EnterpriseOnboarding() {
               <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider">Test</span>
             )}
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 3 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
       </header>
