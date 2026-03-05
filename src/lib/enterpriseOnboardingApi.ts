@@ -239,7 +239,7 @@ function buildAuthQuery(opts?: OnboardingAuthOpts): string {
 export async function validateOnboarding(
   data: Partial<OnboardingFormData> & { requireCommitments?: boolean }
 ): Promise<ValidationResponse> {
-  return apiFetch('/enterprise/onboarding/validate', {
+  return apiFetch('/team/onboarding/validate', {
     method: 'POST',
     body: JSON.stringify({ ...data, countryCode: 'SE' }),
   });
