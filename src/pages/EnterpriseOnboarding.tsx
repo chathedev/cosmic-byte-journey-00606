@@ -534,9 +534,10 @@ export default function EnterpriseOnboarding() {
             </div>
           </div>
           <div className="text-center space-y-2">
-            <h1 className="text-xl font-semibold text-foreground">Trial aktiverad</h1>
+           <h1 className="text-xl font-semibold text-foreground">Trial aktiverad</h1>
             <p className="text-sm text-muted-foreground">
-              Välkommen till Tivly Team. Debitering sker automatiskt efter 7 dagar.
+              Välkommen till Tivly Team. Er 7-dagars trial har startat med <strong className="text-foreground">5 användare</strong>. 
+              Debitering sker automatiskt efter trialen.
             </p>
           </div>
 
