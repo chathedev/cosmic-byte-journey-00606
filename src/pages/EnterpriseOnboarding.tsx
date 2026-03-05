@@ -1262,7 +1262,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
   updateField: (f: string, v: any) => void; submitError: string; extraSeatSek: number;
 }) {
   const seats = form.expectedSeats || 0;
-  const planLabel = selectedPlan.name === 'Small' ? 'Enterprise Small' : 'Enterprise Standard';
+  const planLabel = selectedPlan.name;
   const rows = [
     { label: 'Företag', value: form.companyName || '–', icon: Building2 },
     { label: 'Orgnr', value: form.organizationNumber || '–', icon: Hash },
