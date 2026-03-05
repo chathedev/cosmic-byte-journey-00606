@@ -471,7 +471,7 @@ export default function EnterpriseOnboarding() {
       if (!secret) { setSubmitError('Kunde inte initiera kortregistrering. Försök igen.'); setIsSubmitting(false); return; }
       setStripePublishableKey(pkKey);
       setSetupIntentClientSecret(secret);
-      setStep(4);
+      setStep(3);
     } catch (err: any) {
       const status = err?.status;
       const code = err?.code || err?.error;
