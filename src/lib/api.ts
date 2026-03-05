@@ -922,6 +922,7 @@ class ApiClient {
       slug: string;
       status: string;
       planTier: string;
+      planType?: string;
       billingStatus?: string;
       billingHistory?: any[];
       speakerIdentificationEnabled?: boolean;
