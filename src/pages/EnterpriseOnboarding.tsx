@@ -815,10 +815,12 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
           <span className="text-muted-foreground">Från {trialDate}</span>
           <span className="text-foreground font-semibold">{fmt(monthlyTotal)} kr/mån</span>
         </div>
-        <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Aktivering (engång)</span>
-          <span className="text-muted-foreground">{fmt(selectedPlan.activationSek)} kr</span>
-        </div>
+        {selectedPlan.activationSek > 0 && (
+          <div className="flex justify-between text-[11px]">
+            <span className="text-muted-foreground">Aktivering (engång)</span>
+            <span className="text-muted-foreground">{fmt(selectedPlan.activationSek)} kr</span>
+          </div>
+        )}
         <p className="text-[10px] text-muted-foreground">Exkl. moms</p>
       </div>
 
