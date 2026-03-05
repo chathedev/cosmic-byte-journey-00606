@@ -3,7 +3,7 @@ import { apiClient } from './api';
 const BACKEND_URL = 'https://api.tivly.se';
 
 export interface UserPlan {
-  plan: 'free' | 'pro' | 'plus' | 'unlimited' | 'enterprise';
+  plan: 'free' | 'pro' | 'team' | 'plus' | 'unlimited' | 'enterprise';
   meetingsUsed: number;
   meetingsLimit: number | null; // null = unlimited
   protocolsUsed: number;
