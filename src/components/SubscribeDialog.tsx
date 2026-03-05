@@ -356,7 +356,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm font-medium text-muted-foreground">Totalt</span>
                 <div className="text-right">
-                  <div className="text-xl sm:text-2xl font-bold text-foreground">99 kr</div>
+                  <div className="text-xl sm:text-2xl font-bold text-foreground">149 kr</div>
                   <div className="text-xs text-muted-foreground">per månad</div>
                 </div>
               </div>
