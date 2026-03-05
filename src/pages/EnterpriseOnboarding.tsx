@@ -1193,7 +1193,7 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* STEP 4: Card Payment                                    */
+/* STEP 2: Card Payment                                    */
 /* ═══════════════════════════════════════════════════════ */
 function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, extraSeatSek, firstChargeEstimate, onCardConfirmed }: {
   draftId: string; resumeToken: string; initialClientSecret: string | null; stripePublishableKey: string | null;
