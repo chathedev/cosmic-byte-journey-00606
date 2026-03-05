@@ -565,7 +565,7 @@ export function AppSidebar() {
         )}
 
         {/* Meeting Counter - For Pro users (no upgrade button) */}
-        {!planLoading && userPlan && userPlan.plan === 'pro' && meetingsLeft !== null && !collapsed && (
+        {!planLoading && userPlan && userPlan.plan === 'pro' && meetingsLeft !== null && !collapsed && !isEnterpriseViewer && (
           <div className="shrink-0 p-3 border-t border-border">
             <div className="text-xs text-muted-foreground px-1">
               {meetingsLeft} möten kvar

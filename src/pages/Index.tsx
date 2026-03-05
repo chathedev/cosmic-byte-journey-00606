@@ -67,6 +67,11 @@ const Index = () => {
     );
   }
 
+  // Viewers get a simple read-only dashboard
+  if (isViewer) {
+    return <ViewerDashboard />;
+  }
+
   return (
     <>
       <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
