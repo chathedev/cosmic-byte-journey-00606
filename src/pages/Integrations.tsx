@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
+import { ArrowLeft, ChevronRight, CheckCircle2, Puzzle, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
 import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useSlackIntegration } from "@/hooks/useSlackIntegration";
 import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import teamsLogo from "@/assets/teams-logo.png";
@@ -26,7 +27,12 @@ const Integrations = () => {
   const zoomImport = useZoomImport();
   const googleMeetImport = useGoogleMeetImport();
   const slackIntegration = useSlackIntegration();
+  const { enterpriseMembership } = useSubscription();
   const hasHandledCallback = useRef(false);
+
+  // Microsoft Teams is only available for enterprise planTier, not team
+  const planTier = enterpriseMembership?.company?.planTier;
+  const isTeamsAvailable = planTier === 'enterprise';
 
   const [successOverlay, setSuccessOverlay] = useState<{
     show: boolean;
@@ -93,40 +99,62 @@ const Integrations = () => {
         </div>
 
         <div className="space-y-3">
-          {/* Microsoft Teams card */}
-          <button
-            onClick={() => navigate('/integrations/teams')}
-            className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
-          >
-            <div className="p-4 sm:p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
-                <img src={teamsLogo} alt="Microsoft Teams" className="w-full h-full object-contain" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-foreground">Microsoft Teams</h2>
-                  {digitalImport.isFullyConnected ? (
-                    <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
-                      <CheckCircle2 className="w-2.5 h-2.5" />
-                      Kopplad
-                    </Badge>
-                  ) : digitalImport.needsReconnect ? (
-                    <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
-                      Kräver omkoppling
-                    </Badge>
-                  ) : isTeamsEnabled && isTeamsConfigured ? (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
-                  ) : null}
+          {/* Microsoft Teams card - Enterprise only */}
+          {isTeamsAvailable ? (
+            <button
+              onClick={() => navigate('/integrations/teams')}
+              className="w-full text-left rounded-xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden"
+            >
+              <div className="p-4 sm:p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+                  <img src={teamsLogo} alt="Microsoft Teams" className="w-full h-full object-contain" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {digitalImport.isFullyConnected && teamsAccount?.email
-                    ? teamsAccount.email
-                    : 'Importera transkript från Teams-möten'}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-foreground">Microsoft Teams</h2>
+                    {digitalImport.isFullyConnected ? (
+                      <Badge variant="secondary" className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400 gap-1 px-1.5 py-0">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        Kopplad
+                      </Badge>
+                    ) : digitalImport.needsReconnect ? (
+                      <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 gap-1 px-1.5 py-0">
+                        Kräver omkoppling
+                      </Badge>
+                    ) : isTeamsEnabled && isTeamsConfigured ? (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Ej kopplad</Badge>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {digitalImport.isFullyConnected && teamsAccount?.email
+                      ? teamsAccount.email
+                      : 'Importera transkript från Teams-möten'}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+            </button>
+          ) : (
+            <div className="w-full rounded-xl border border-border/50 bg-card/50 opacity-60 cursor-default">
+              <div className="p-4 sm:p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+                  <img src={teamsLogo} alt="Microsoft Teams" className="w-full h-full object-contain opacity-50" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-medium text-foreground/70">Microsoft Teams</h2>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground border-border/50 gap-1">
+                      <Lock className="w-2.5 h-2.5" />
+                      Enterprise
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground/60 mt-0.5">
+                    Tillgänglig med Enterprise-planen. Kontakta enterprise@tivly.se
+                  </p>
+                </div>
+              </div>
             </div>
-          </button>
+          )}
 
           {/* Zoom card */}
           <button

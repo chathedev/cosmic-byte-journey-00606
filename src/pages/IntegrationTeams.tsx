@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import {
   ArrowLeft, Link2, Unlink, Loader2, AlertTriangle, RefreshCw,
   CheckCircle2, Shield, Info, FileText, Clock, Users, Download, Sparkles,
@@ -38,7 +39,16 @@ const IntegrationTeams = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const { enterpriseMembership } = useSubscription();
   const di = useDigitalImport();
+
+  // Gate: Teams integration is enterprise-only
+  const planTier = enterpriseMembership?.company?.planTier;
+  useEffect(() => {
+    if (planTier && planTier !== 'enterprise') {
+      navigate('/integrations', { replace: true });
+    }
+  }, [planTier, navigate]);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [autoImportLoading, setAutoImportLoading] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
