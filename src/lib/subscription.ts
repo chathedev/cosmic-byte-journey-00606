@@ -312,8 +312,8 @@ export const subscriptionService = {
       
       const plan = await this.getUserPlan(userId);
       
-      // Unlimited or enterprise plan = no protocol limits
-      if (plan.plan === 'unlimited' || plan.plan === 'enterprise') {
+      // Unlimited, team, or enterprise plan = no protocol limits
+      if (plan.plan === 'unlimited' || plan.plan === 'team' || plan.plan === 'enterprise') {
         return { allowed: true };
       }
       
