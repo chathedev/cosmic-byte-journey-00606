@@ -1294,8 +1294,16 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
           <span className="text-sm font-semibold text-foreground">{fmt(showMonthly)} kr</span>
         </div>
         <div className="px-4 py-2.5">
-          <p className="text-[11px] text-muted-foreground">Exkl. moms · {expectedSeats} användare</p>
+          <p className="text-[11px] text-muted-foreground">Exkl. moms · {includedSeats} användare under trial</p>
         </div>
+      </div>
+
+      {/* Trial limit notice */}
+      <div className="border border-border bg-muted/30 p-3 flex items-start gap-3">
+        <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground">
+          Under trialen ingår <strong className="text-foreground">{includedSeats} användare</strong>. Fler kan läggas till efter trialen för {fmt(extraSeatSek)} kr/användare/mån.
+        </p>
       </div>
 
       {/* Email notice */}
