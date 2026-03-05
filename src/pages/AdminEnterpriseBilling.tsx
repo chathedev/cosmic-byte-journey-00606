@@ -82,6 +82,8 @@ export default function AdminEnterpriseBilling() {
   ]);
   
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
+  const [billingCompany, setBillingCompany] = useState<any>(null);
+  const [billingStatusValue, setBillingStatusValue] = useState<string | null>(null);
   
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successDialogData, setSuccessDialogData] = useState<{
