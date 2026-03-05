@@ -583,13 +583,15 @@ export function AppSidebar() {
                   {user?.email?.[0]?.toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <button
-                onClick={() => navigate('/settings')}
-                className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
-                title="Inställningar"
-              >
-                <FiSettings className="text-base" />
-              </button>
+              {!isEnterpriseViewer && (
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+                  title="Inställningar"
+                >
+                  <FiSettings className="text-base" />
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center justify-center p-2 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
