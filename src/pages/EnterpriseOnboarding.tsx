@@ -293,7 +293,7 @@ export default function EnterpriseOnboarding() {
     // Save draft to ensure draftId exists for verification
     const draftRes = await saveDraft({
       ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-      progressStep: 1, progressPercent: 40,
+      progressStep: 0, progressPercent: 30,
     } as any);
     if (draftRes.draft) {
       setDraftId(draftRes.draft.id);
