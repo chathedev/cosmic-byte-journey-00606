@@ -501,8 +501,8 @@ export function AppSidebar() {
             )}
 
 
-            {/* Enterprise Contact */}
-            {userPlan?.plan === 'enterprise' && !collapsed && (
+            {/* Enterprise/Team Contact */}
+            {(userPlan?.plan === 'enterprise' || userPlan?.plan === 'team') && !collapsed && (
               <div className="pt-2">
                 <button
                   onClick={() => window.location.href = 'mailto:charlie.wretling@tivly.se'}

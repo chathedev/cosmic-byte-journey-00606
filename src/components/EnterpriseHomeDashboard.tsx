@@ -77,7 +77,7 @@ export const EnterpriseHomeDashboard = ({
   const [checklistExpanded, setChecklistExpanded] = useState(true);
   const [stats, setStats] = useState<any>(null);
 
-  const companyName = enterpriseMembership?.company?.name || "Enterprise";
+  const companyName = enterpriseMembership?.company?.name || (enterpriseMembership?.company?.planType === 'enterprise' ? "Enterprise" : "Team");
   const companyId = enterpriseMembership?.company?.id;
   const preferredName = (user as any)?.preferredName;
   const displayName = preferredName || user?.displayName?.split(" ")[0] || "";
