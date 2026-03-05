@@ -35,9 +35,8 @@ import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@
 /* ─── Constants ─── */
 const PLANS = [
   { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
-  { id: 'enterprise_standard' as const, name: 'Enterprise', priceSek: 4990, seats: 20, activationSek: 0, extraSeatSek: 249 },
 ];
-const STEPS = ['Team', 'Uppgifter', 'Plan', 'Bekräfta', 'Betalning'];
+const STEPS = ['Team', 'Uppgifter', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_enterprise_draft';
 const FORM_KEY = 'tivly_enterprise_form';
 
@@ -216,7 +215,7 @@ export default function EnterpriseOnboarding() {
       return;
     }
     
-    // If both already verified, go straight to next step (Plan)
+    // If both already verified, go straight to next step (Bekräfta)
     if (companyConnState === 'verified' && emailVerifyState === 'verified') {
       setStep(2);
       return;
@@ -362,7 +361,7 @@ export default function EnterpriseOnboarding() {
     if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
-    if (step < 4) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step < 3) triggerDraftSave(form as Partial<OnboardingFormData>, step);
   }, [step]);
 
   useEffect(() => {
@@ -440,7 +439,7 @@ export default function EnterpriseOnboarding() {
       }
       const draftRes = await saveDraft({
         ...form, countryCode: 'SE', draftId: draftIdRef.current, resumeToken: resumeTokenRef.current,
-        progressStep: 3, progressPercent: 80,
+        progressStep: 2, progressPercent: 75,
       } as any);
       const ensuredDraftId = draftRes.draft?.id;
       const ensuredResumeToken = draftRes.draft?.resumeToken || resumeTokenRef.current;
@@ -465,14 +464,14 @@ export default function EnterpriseOnboarding() {
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
-        setStep(4);
+        setStep(3);
         return;
       }
       if (!pkKey) { setSubmitError('Stripe-konfigurationsfel (publishable key saknas). Kontakta support.'); setIsSubmitting(false); return; }
       if (!secret) { setSubmitError('Kunde inte initiera kortregistrering. Försök igen.'); setIsSubmitting(false); return; }
       setStripePublishableKey(pkKey);
       setSetupIntentClientSecret(secret);
-      setStep(4);
+      setStep(3);
     } catch (err: any) {
       const status = err?.status;
       const code = err?.code || err?.error;
@@ -538,7 +537,7 @@ export default function EnterpriseOnboarding() {
           <div className="text-center space-y-2">
             <h1 className="text-xl font-semibold text-foreground">Trial aktiverad</h1>
             <p className="text-sm text-muted-foreground">
-              Välkommen till Tivly Enterprise. Debitering sker automatiskt efter 7 dagar.
+              Välkommen till Tivly Team. Debitering sker automatiskt efter 7 dagar.
             </p>
           </div>
 
@@ -593,14 +592,14 @@ export default function EnterpriseOnboarding() {
           <div className="flex items-center gap-3">
             <a href="/auth" className="text-sm font-semibold tracking-wide text-foreground hover:text-primary transition-colors">Tivly</a>
             <span className="text-border">|</span>
-            <span className="text-xs text-muted-foreground font-medium">Enterprise</span>
+            <span className="text-xs text-muted-foreground font-medium">Team</span>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {stripeMode === 'test' && (
               <span className="px-2 py-0.5 border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider">Test</span>
             )}
             {isSaving && <span className="flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />Sparar</span>}
-            {!isSaving && draftId && step < 4 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
+            {!isSaving && draftId && step < 3 && <span className="flex items-center gap-1.5"><Check className="h-3 w-3" />Sparat</span>}
           </div>
         </div>
       </header>
@@ -647,7 +646,7 @@ export default function EnterpriseOnboarding() {
             <Info className="h-4 w-4 text-primary shrink-0" />
             <p className="text-sm text-foreground">
               Du är redan medlem i <span className="font-semibold">{enterpriseMembership.company.name || 'ett företag'}</span>.
-              Du kan fortfarande skapa ett nytt Enterprise-konto här.
+              Du kan fortfarande skapa ett nytt Team-konto här.
             </p>
             <Button variant="ghost" size="sm" className="ml-auto shrink-0 text-xs" onClick={() => navigate('/')}>
               Gå till appen
@@ -680,9 +679,8 @@ export default function EnterpriseOnboarding() {
                 onResend={handleResendVerification}
               />
             )}
-            {step === 2 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} extraSeatSek={selectedPlan.extraSeatSek} />}
-            {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
-            {step === 4 && draftId && resumeToken && (
+            {step === 2 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} extraSeatSek={selectedPlan.extraSeatSek} />}
+            {step === 3 && draftId && resumeToken && (
               <StepCardPayment
                 draftId={draftId}
                 resumeToken={resumeToken}
@@ -723,17 +721,7 @@ export default function EnterpriseOnboarding() {
             )}
             {step === 2 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(1); }} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
-                  <ChevronLeft className="h-4 w-4" /> Tillbaka
-                </Button>
-                <Button size="sm" onClick={() => { hasUserInteractedRef.current = true; setStep(3); }} className="gap-1.5 no-hover-lift rounded-none px-6">
-                  Nästa <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {step === 3 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
+                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="gap-1.5 text-muted-foreground no-hover-lift rounded-none">
                   <ChevronLeft className="h-4 w-4" /> Tillbaka
                 </Button>
                 <Button size="sm" onClick={handleConfirmAndProceedToCard} disabled={!canProceedStep3 || isSubmitting} className="gap-1.5 min-w-[180px] no-hover-lift rounded-none px-6">
@@ -902,71 +890,6 @@ function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number
   );
 }
 
-/* ═══════════════════════════════════════════════════════ */
-/* STEP 1: Plan                                            */
-/* ═══════════════════════════════════════════════════════ */
-function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField, extraSeatSek }: {
-  form: Partial<OnboardingFormData>; selectedPlan: typeof PLANS[0]; extraSeats: number; monthlyTotal: number; updateField: (f: string, v: any) => void; extraSeatSek: number;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">Välj plan</h2>
-        <p className="text-sm text-muted-foreground mt-1">7 dagars kostnadsfri trial. Betalkort krävs.</p>
-      </div>
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        {PLANS.map(plan => {
-          const isSelected = form.planType === plan.id;
-          return (
-            <button
-              key={plan.id}
-              onClick={() => updateField('planType', plan.id)}
-              className={cn(
-                'text-left border p-5 sm:p-6 transition-colors no-hover-lift',
-                isSelected
-                  ? 'border-foreground'
-                  : 'border-border hover:border-muted-foreground',
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-semibold text-foreground">{plan.name}</p>
-                {isSelected && <Check className="h-4 w-4 text-foreground" />}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{plan.seats} användare inkl. · Extra: {fmt(plan.extraSeatSek)} kr/st/mån</p>
-              <p className="mt-3">
-                <span className="text-2xl font-semibold text-foreground">{fmt(plan.priceSek)}</span>
-                <span className="text-sm text-muted-foreground"> SEK/mån</span>
-              </p>
-              {plan.activationSek > 0 && <p className="text-xs text-muted-foreground mt-1.5">Aktivering {fmt(plan.activationSek)} SEK (engång)</p>}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Cost breakdown — visible on mobile, hidden on desktop (sidebar shows it) */}
-      <div className="border border-border divide-y divide-border lg:hidden">
-        <div className="flex justify-between px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Plan {selectedPlan.name}</span>
-          <span className="text-foreground font-medium">{fmt(selectedPlan.priceSek)} SEK/mån</span>
-        </div>
-        {extraSeats > 0 && (
-          <div className="flex justify-between px-4 py-3 text-sm">
-            <span className="text-muted-foreground">{extraSeats} extra × {fmt(extraSeatSek)} SEK</span>
-            <span className="text-foreground font-medium">{fmt(extraSeats * extraSeatSek)} SEK/mån</span>
-          </div>
-        )}
-        <div className="flex justify-between px-4 py-3 text-sm font-semibold">
-          <span className="text-foreground">Totalt/mån</span>
-          <span className="text-foreground">{fmt(monthlyTotal)} SEK</span>
-        </div>
-        <div className="px-4 py-2.5">
-          <p className="text-xs text-muted-foreground">Exkl. moms. Slutpris beräknas server-side.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 2: Details + Inline Email Verification             */

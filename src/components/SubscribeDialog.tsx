@@ -273,7 +273,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     },
     {
       name: 'Pro',
-      price: '149 kr',
+      price: '99 kr',
       period: '/mån',
       features: [
         { text: '30 möten per månad', included: true },
@@ -293,10 +293,11 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       price: 'Från 1 990 kr',
       period: '/mån',
       features: [
-        { text: 'Upp till 5 användare', included: true },
+        { text: 'Upp till 5 användare inkl.', included: true },
         { text: 'Obegränsade möten', included: true },
         { text: 'Delat protokollbibliotek', included: true },
         { text: 'Talaridentifiering', included: true },
+        { text: 'Google Meet & Zoom-integration', included: true },
         { text: 'Adminpanel & workspace', included: true },
         { text: 'Extra användare: 199 kr/st/mån', included: true },
       ],
@@ -306,31 +307,15 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
     },
     {
       name: 'Enterprise',
-      price: 'Från 4 990 kr',
-      period: '/mån',
-      features: [
-        { text: 'Upp till 20 användare', included: true },
-        { text: 'Obegränsade möten', included: true },
-        { text: 'Teams/Zoom/Meet auto-import', included: true },
-        { text: 'Admin-dashboard & roller', included: true },
-        { text: 'EU-hosting & prioriterad support', included: true },
-        { text: 'Extra användare: 249 kr/st/mån', included: true },
-      ],
-      cta: 'Starta onboarding',
-      variant: 'outline' as const,
-      isOnboarding: true,
-    },
-    {
-      name: 'Enterprise Scale',
-      price: 'Custom',
+      price: 'Kontakta oss',
       period: '',
       features: [
+        { text: 'Allt i Team, plus:', included: true },
+        { text: 'Microsoft Teams auto-import', included: true },
         { text: 'SSO (Microsoft / Google)', included: true },
-        { text: 'SLA-avtal', included: true },
-        { text: 'API-access', included: true },
-        { text: 'Anpassade integrationer', included: true },
+        { text: 'Avancerade behörigheter', included: true },
+        { text: 'EU-hosting & SLA', included: true },
         { text: 'Dedikerad onboarding', included: true },
-        { text: 'Offentlig sektor-avtal', included: true },
       ],
       cta: 'Kontakta oss',
       variant: 'outline' as const,
@@ -356,7 +341,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm font-medium text-muted-foreground">Totalt</span>
                 <div className="text-right">
-                  <div className="text-xl sm:text-2xl font-bold text-foreground">149 kr</div>
+                  <div className="text-xl sm:text-2xl font-bold text-foreground">99 kr</div>
                   <div className="text-xs text-muted-foreground">per månad</div>
                 </div>
               </div>
@@ -467,7 +452,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
           )}
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 py-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-3">
           {plans.map((plan) => (
             <Card
               key={plan.name}
