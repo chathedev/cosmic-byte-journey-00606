@@ -35,7 +35,8 @@ export default function OrgSettings() {
   const isViewerRole = role === 'viewer';
   const companyId = enterpriseMembership.company?.id;
   const planTier = enterpriseMembership.company?.planTier;
-  const isEnterprisePlan = planTier === 'enterprise';
+  const planType = enterpriseMembership.company?.planType;
+  const isEnterprisePlan = planTier === 'enterprise' && planType !== 'enterprise_small';
   const defaultIntegrationTab = isEnterprisePlan ? 'teams' : 'zoom';
 
   return (
