@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt, XCircle, Calendar } from "lucide-react";
+import { Loader2, ExternalLink, RefreshCw, Send, Trash2, MoreVertical, Plus, Receipt, XCircle, Calendar, CreditCard, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { addVat } from "@/lib/enterpriseVat";
@@ -55,8 +55,140 @@ interface CompanyBillingSectionProps {
   contactEmail?: string;
 }
 
+function BillingStatusOverview({ company, billingStatus }: { company: any; billingStatus: string | null }) {
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '–';
+    return new Date(dateStr).toLocaleDateString('sv-SE', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+  };
+
+  const status = billingStatus || company?.billingStatus || company?.status;
+  const trial = company?.trial;
+  const pricing = company?.pricing;
+  const softLock = company?.softLock;
+
+  if (!company && !billingStatus) {
+    return (
+      <div className="text-center py-8 text-muted-foreground text-sm">
+        Ingen faktureringsdata tillgänglig
+      </div>
+    );
+  }
+
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'trialing':
+      case 'trial':
+        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20"><Clock className="h-3 w-3 mr-1" /> Provperiod</Badge>;
+      case 'active':
+        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle className="h-3 w-3 mr-1" /> Aktiv</Badge>;
+      case 'past_due':
+        return <Badge className="bg-red-500/10 text-red-600 border-red-500/20"><AlertTriangle className="h-3 w-3 mr-1" /> Förfallen</Badge>;
+      case 'canceled':
+        return <Badge className="bg-muted text-muted-foreground"><XCircle className="h-3 w-3 mr-1" /> Avslutad</Badge>;
+      default:
+        return status ? <Badge variant="outline">{status}</Badge> : null;
+    }
+  };
+
+  return (
+    <div className="space-y-4 py-2">
+      <div className="rounded-lg border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Prenumerationsstatus</span>
+          </div>
+          {getStatusBadge()}
+        </div>
+
+        {pricing && (
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+            <div>
+              <p className="text-[11px] text-muted-foreground">Plan</p>
+              <p className="text-sm font-medium">{pricing.planName || pricing.planType || '–'}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Månadsbelopp</p>
+              <p className="text-sm font-medium">{pricing.monthlyTotalSek?.toLocaleString('sv-SE')} kr/mån</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Medlemmar</p>
+              <p className="text-sm font-medium">{pricing.memberCount || 0} av {pricing.includedUsers || 0} inkl.</p>
+            </div>
+            {(pricing.extraUsers ?? 0) > 0 && (
+              <div>
+                <p className="text-[11px] text-muted-foreground">Extra användare</p>
+                <p className="text-sm font-medium">{pricing.extraUsers} st × {pricing.extraUserUnitSek} kr</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {trial?.enabled && !trial.expired && (
+          <div className="rounded-md bg-blue-500/5 border border-blue-500/10 p-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-blue-600" />
+              <span className="text-xs font-medium text-blue-700">Provperiod aktiv</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {trial.daysRemaining} {trial.daysRemaining === 1 ? 'dag' : 'dagar'} kvar av {trial.daysTotal} dagars trial
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Startade {formatDate(trial.startsAt)} • Slutar {formatDate(trial.endsAt)}
+            </p>
+            {pricing && (
+              <p className="text-xs font-medium text-foreground pt-1">
+                Första debitering: {pricing.monthlyTotalSek?.toLocaleString('sv-SE')} kr den {formatDate(trial.endsAt)}
+              </p>
+            )}
+          </div>
+        )}
+
+        {trial?.expired && (
+          <div className="rounded-md bg-red-500/5 border border-red-500/10 p-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+              <span className="text-xs font-medium text-red-700">Provperioden har gått ut</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Trialen avslutades {formatDate(trial.endsAt)}
+            </p>
+          </div>
+        )}
+
+        {softLock?.active && softLock.banner && (
+          <div className="rounded-md bg-yellow-500/5 border border-yellow-500/10 p-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-yellow-600" />
+              <span className="text-xs font-medium text-yellow-700">{softLock.banner.title || 'Begränsat läge'}</span>
+            </div>
+            {softLock.banner.message && (
+              <p className="text-xs text-muted-foreground">{softLock.banner.message}</p>
+            )}
+          </div>
+        )}
+
+        {company?.stripeCustomerId && (
+          <div className="pt-2 border-t">
+            <p className="text-[11px] text-muted-foreground">Stripe-kund</p>
+            <p className="text-xs font-mono text-muted-foreground">{company.stripeCustomerId}</p>
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-center text-muted-foreground">
+        Ingen manuell faktureringshistorik ännu
+      </p>
+    </div>
+  );
+}
+
 export function CompanyBillingSection({ companyId, companyName, contactEmail }: CompanyBillingSectionProps) {
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
+  const [billingCompany, setBillingCompany] = useState<any>(null);
+  const [billingStatus, setBillingStatus] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recurringInterval, setRecurringInterval] = useState<'monthly' | 'yearly'>('monthly');
@@ -137,6 +269,8 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
     try {
       const data = await apiClient.getEnterpriseCompanyBillingHistory(companyId);
       setBillingHistory(data.billingHistory || []);
+      setBillingCompany(data.company || null);
+      setBillingStatus(data.billingStatus || data.company?.billingStatus || null);
     } catch (error: any) {
       console.error('Failed to load billing history:', error);
       if (showLoader && error.message && !error.message.includes('404') && !error.message.includes('not found')) {
@@ -510,9 +644,7 @@ export function CompanyBillingSection({ companyId, companyName, contactEmail }: 
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : billingHistory.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Ingen faktureringshistorik
-              </div>
+              <BillingStatusOverview company={billingCompany} billingStatus={billingStatus} />
             ) : (
               <div className="overflow-x-auto -mx-4 px-4">
                 <Table>
