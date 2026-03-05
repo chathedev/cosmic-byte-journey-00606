@@ -39,7 +39,16 @@ const IntegrationTeams = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const { enterpriseMembership } = useSubscription();
   const di = useDigitalImport();
+
+  // Gate: Teams integration is enterprise-only
+  const planTier = enterpriseMembership?.company?.planTier;
+  useEffect(() => {
+    if (planTier && planTier !== 'enterprise') {
+      navigate('/integrations', { replace: true });
+    }
+  }, [planTier, navigate]);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [autoImportLoading, setAutoImportLoading] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(false);
