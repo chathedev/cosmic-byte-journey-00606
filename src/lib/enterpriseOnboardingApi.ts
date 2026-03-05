@@ -268,7 +268,7 @@ export async function saveDraft(
     delete payload.resumeToken;
   }
 
-  return apiFetch('/enterprise/onboarding/draft', {
+  return apiFetch('/team/onboarding/draft', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
