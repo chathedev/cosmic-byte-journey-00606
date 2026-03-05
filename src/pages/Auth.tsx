@@ -298,10 +298,10 @@ export default function Auth() {
               {onboardingEnabled && (
                 <div className="pt-4">
                   <a
-                    href="/enterprise/onboarding"
+                    href="/team/onboarding"
                     className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                   >
-                    Enterprise för team <ArrowRight className="h-3.5 w-3.5" />
+                    Tivly för team <ArrowRight className="h-3.5 w-3.5" />
                   </a>
                 </div>
               )}
