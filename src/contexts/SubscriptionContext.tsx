@@ -255,11 +255,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         normalizedPlan
       });
       // For unlimited and enterprise plans, set no limits
-      const isUnlimited = normalizedPlan === 'unlimited' || normalizedPlan === 'enterprise';
+      const isUnlimited = normalizedPlan === 'unlimited' || normalizedPlan === 'team' || normalizedPlan === 'enterprise';
 
       // Default limits per plan
-      const defaultMeetingLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 10, plus: 30, unlimited: 0, enterprise: 0 };
-      const defaultProtocolsLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 1, plus: 5, unlimited: 999999, enterprise: 999999 };
+      const defaultMeetingLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 30, team: 0, plus: 30, unlimited: 0, enterprise: 0 };
+      const defaultProtocolsLimits: Record<UserPlan['plan'], number> = { free: 1, pro: 1, team: 999999, plus: 5, unlimited: 999999, enterprise: 999999 };
 
       // Determine limits: trust backend plan; gifts can raise numeric limits but don't change plan
       const used = backendMeetingCount;
