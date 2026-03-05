@@ -36,7 +36,7 @@ import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@
 const PLANS = [
   { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
 ];
-const STEPS = ['Team', 'Uppgifter', 'Bekräfta', 'Betalning'];
+const STEPS = ['Uppgifter', 'Bekräfta', 'Betalning'];
 const DRAFT_KEY = 'tivly_team_draft';
 const FORM_KEY = 'tivly_team_form';
 
