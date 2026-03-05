@@ -1420,7 +1420,7 @@ function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePubl
           <div className="text-xs text-muted-foreground space-y-1">
             <div className="flex justify-between"><span>Aktiveringsavgift</span><span>{fmt(showActivation)} kr</span></div>
             <div className="flex justify-between"><span>Plan ({includedSeats} anv. inkl.)</span><span>{fmt(planBaseSek)} kr</span></div>
-            {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} kr</span><span>{fmt(extraSeats * EXTRA_SEAT_PRICE)} kr</span></div>}
+            {extraSeats > 0 && <div className="flex justify-between"><span>{extraSeats} extra × {fmt(extraSeatSek)} kr</span><span>{fmt(extraSeats * extraSeatSek)} kr</span></div>}
           </div>
         </div>
         <div className="flex items-center justify-between px-4 py-3">
