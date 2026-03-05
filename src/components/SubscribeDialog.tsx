@@ -332,7 +332,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       variant: 'outline' as const,
       isOnboarding: userPlan?.plan !== 'team',
       isCurrent: userPlan?.plan === 'team',
-      isOnboarding: true,
+      
     },
     {
       name: 'Enterprise',
