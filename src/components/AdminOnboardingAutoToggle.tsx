@@ -71,7 +71,7 @@ export function AdminOnboardingAutoToggle() {
           <CardTitle className="text-sm font-medium">Self-Serve Onboarding</CardTitle>
         </div>
         <CardDescription className="text-xs">
-          Styr om den publika enterprise-onboarding-sidan (/enterprise/onboarding) ska vara tillgänglig
+          Styr om den publika Team-onboarding-sidan (/team/onboarding) ska vara tillgänglig
         </CardDescription>
       </CardHeader>
       <CardContent>

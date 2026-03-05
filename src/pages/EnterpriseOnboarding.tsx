@@ -37,8 +37,8 @@ const PLANS = [
   { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
 ];
 const STEPS = ['Team', 'Uppgifter', 'Bekräfta', 'Betalning'];
-const DRAFT_KEY = 'tivly_enterprise_draft';
-const FORM_KEY = 'tivly_enterprise_form';
+const DRAFT_KEY = 'tivly_team_draft';
+const FORM_KEY = 'tivly_team_form';
 
 function saveStorageJSON(key: string, value: unknown) {
   const s = JSON.stringify(value);
@@ -517,7 +517,7 @@ export default function EnterpriseOnboarding() {
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40" />
           <h1 className="text-lg font-semibold text-foreground">Onboarding ej tillgänglig</h1>
           <p className="text-sm text-muted-foreground">
-            Self-serve enterprise-onboarding är för tillfället inaktiverad. Kontakta oss för att komma igång.
+            Self-serve Team-onboarding är för tillfället inaktiverad. Kontakta oss för att komma igång.
           </p>
         </div>
       </div>

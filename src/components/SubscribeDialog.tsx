@@ -499,7 +499,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                     className="w-full"
                     onClick={() => {
                       onOpenChange(false);
-                      window.location.href = '/enterprise/onboarding';
+                      window.location.href = '/team/onboarding';
                     }}
                   >
                     {plan.cta}

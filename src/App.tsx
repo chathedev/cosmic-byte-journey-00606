@@ -235,7 +235,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
-  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/enterprise/onboarding' || location.pathname === '/enterprise/onboarding/verify-email';
+  const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/team/onboarding' || location.pathname === '/team/onboarding/verify-email';
   const isRecordingPage = location.pathname === '/recording';
   const isNative = isNativeApp();
 
@@ -268,7 +268,7 @@ const WelcomeGate = ({ children }: { children: React.ReactNode }) => {
 
   // Skip welcome screen for auth-related and public routes
   const isAuthRoute = location.pathname === '/auth' || location.pathname === '/magic-login';
-  const isPublicRoute = location.pathname === '/enterprise/onboarding' || location.pathname === '/enterprise/onboarding/verify-email' || location.pathname === '/free-trial';
+  const isPublicRoute = location.pathname === '/team/onboarding' || location.pathname === '/team/onboarding/verify-email' || location.pathname === '/free-trial';
   
   if (!hasSeenWelcome && !isAuthRoute && !isPublicRoute) {
     return <IOSWelcomeScreen onComplete={handleWelcomeComplete} />;
@@ -345,8 +345,11 @@ const AppContent = () => {
                 
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/free-trial" element={<FreeTrial />} />
-                <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
-                <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
+                <Route path="/team/onboarding" element={<EnterpriseOnboarding />} />
+                <Route path="/team/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
+                {/* Legacy redirects */}
+                <Route path="/enterprise/onboarding" element={<Navigate to="/team/onboarding" replace />} />
+                <Route path="/enterprise/onboarding/verify-email" element={<Navigate to="/team/onboarding/verify-email" replace />} />
                 <Route path="/generate-protocol" element={<ViewerGuard><GenerateProtocol /></ViewerGuard>} />
                 <Route path="/recording" element={<ProtectedRoute><ViewerGuard><Recording /></ViewerGuard></ProtectedRoute>} />
                 <Route path="/protocol" element={<ProtectedRoute><ViewerGuard><Protocol /></ViewerGuard></ProtectedRoute>} />
@@ -467,7 +470,7 @@ const AdminBypassGate = ({ children }: { children: React.ReactNode }) => {
 // Renders fully public pages (no auth required) before any auth providers
 const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
-  const publicPaths = ['/enterprise/onboarding', '/enterprise/onboarding/verify-email', '/free-trial'];
+  const publicPaths = ['/team/onboarding', '/team/onboarding/verify-email', '/free-trial'];
   const isPublic = publicPaths.includes(location.pathname);
 
   if (!isPublic) return <>{children}</>;
@@ -483,8 +486,8 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
           }
         >
           <Routes>
-            <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
-            <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
+            <Route path="/team/onboarding" element={<EnterpriseOnboarding />} />
+            <Route path="/team/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
             <Route path="/free-trial" element={<FreeTrial />} />
           </Routes>
         </Suspense>
