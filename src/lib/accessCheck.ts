@@ -44,12 +44,22 @@ export const hasPlusAccess = (user: User | null, userPlan: UserPlan | null): boo
 /**
  * Check if library should be locked
  */
-export const isLibraryLocked = (user: User | null, userPlan: UserPlan | null): boolean => {
+export const isLibraryLocked = (user: User | null, userPlan: UserPlan | null, isViewer?: boolean): boolean => {
   if (!user || !userPlan) return true;
+  
+  // Viewers get read-only access to library (not locked, but write-restricted elsewhere)
+  if (isViewer) return false;
   
   // Never lock when unlimited access present
   if (hasUnlimitedAccess(user, userPlan)) return false;
   
   // Lock only for free users
   return userPlan.plan === 'free';
+};
+
+/**
+ * Check if user is an enterprise viewer (read-only)
+ */
+export const isEnterpriseViewer = (enterpriseRole?: string): boolean => {
+  return enterpriseRole === 'viewer';
 };
