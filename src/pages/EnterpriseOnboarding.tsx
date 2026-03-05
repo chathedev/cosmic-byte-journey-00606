@@ -950,8 +950,8 @@ function StepPlan({ form, selectedPlan, extraSeats, monthlyTotal, updateField, e
         </div>
         {extraSeats > 0 && (
           <div className="flex justify-between px-4 py-3 text-sm">
-            <span className="text-muted-foreground">{extraSeats} extra × {fmt(EXTRA_SEAT_PRICE)} SEK</span>
-            <span className="text-foreground font-medium">{fmt(extraSeats * EXTRA_SEAT_PRICE)} SEK/mån</span>
+            <span className="text-muted-foreground">{extraSeats} extra × {fmt(extraSeatSek)} SEK</span>
+            <span className="text-foreground font-medium">{fmt(extraSeats * extraSeatSek)} SEK/mån</span>
           </div>
         )}
         <div className="flex justify-between px-4 py-3 text-sm font-semibold">
