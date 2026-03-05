@@ -404,9 +404,8 @@ export default function EnterpriseOnboarding() {
     }
   }, [user]);
 
-  const selectedPlan = PLANS.find(p => p.id === form.planType) || PLANS[0];
-  const seats = form.expectedSeats || 5;
-  // Seats from step 0 is only a recommendation — no extra seats in onboarding
+  const selectedPlan = PLANS[0];
+  const seats = 5; // Fixed at 5 during trial
   const extraSeats = 0;
   const monthlyTotal = selectedPlan.priceSek;
 
