@@ -455,18 +455,20 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm sm:max-w-4xl">
+      <DialogContent className="max-w-sm sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Välj din plan</DialogTitle>
           {userPlan && (
             <DialogDescription className="text-xs">
-              Aktiv plan: <span className="font-medium capitalize text-foreground">{userPlan.plan === 'free' ? 'Free' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan}</span>
+              Aktiv plan: <span className="font-medium capitalize text-foreground">
+                {userPlan.plan === 'free' ? 'Gratis' : userPlan.plan === 'pro' ? 'Pro' : userPlan.plan === 'team' ? 'Team' : userPlan.plan === 'enterprise' ? 'Enterprise' : userPlan.plan}
+              </span>
             </DialogDescription>
           )}
         </DialogHeader>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 py-3">
-          {plans.map((plan, index) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 py-3">
+          {plans.map((plan) => (
             <Card
               key={plan.name}
               className={cn(
@@ -479,58 +481,56 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
                   Mest populär
                 </div>
               )}
-              <CardHeader className={cn("p-3 sm:p-4 space-y-1", 'highlight' in plan && plan.highlight && "pt-7 sm:pt-8")}>
-                <CardTitle className="text-base sm:text-lg font-bold">{plan.name}</CardTitle>
+              <CardHeader className={cn("p-3 space-y-1", 'highlight' in plan && plan.highlight && "pt-7")}>
+                <CardTitle className="text-sm font-bold">{plan.name}</CardTitle>
                 <div>
-                  <span className="text-xl sm:text-2xl font-bold text-foreground">{plan.price}</span>
-                  {plan.period && <span className="text-xs text-muted-foreground">{plan.period}</span>}
+                  <span className="text-lg font-bold text-foreground">{plan.price}</span>
+                  {plan.period && <span className="text-[10px] text-muted-foreground">{plan.period}</span>}
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col p-3 sm:p-4 pt-0">
-                <ul className="space-y-1.5 mb-3 flex-1 text-xs">
-                  {plan.features.slice(0, 6).map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className={cn(
-                        "mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold",
-                        feature.included ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                      )}>
-                        {feature.included ? '✓' : '−'}
-                      </span>
-                      <span className={cn(
-                        feature.included ? "text-foreground" : "text-muted-foreground"
-                      )}>
-                        {feature.text}
-                      </span>
+              <CardContent className="flex-1 flex flex-col p-3 pt-0">
+                <ul className="space-y-1 mb-3 flex-1 text-[11px]">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <Check className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                      <span className="text-foreground">{feature.text}</span>
                     </li>
                   ))}
-                  {plan.features.length > 6 && (
-                    <li className="text-[10px] text-muted-foreground pl-6">
-                      +{plan.features.length - 6} fler
-                    </li>
-                  )}
                 </ul>
                 {'planId' in plan ? (
                   <Button
-                    onClick={() => handleSubscribe(plan.planId)}
+                    onClick={() => handleSubscribe((plan as any).planId)}
                     disabled={isLoading}
-                    variant={plan.variant}
+                    variant={(plan as any).variant}
                     className={cn("w-full", 'highlight' in plan && plan.highlight && "shadow-sm")}
                     size="sm"
                   >
                     {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : plan.cta}
                   </Button>
-                ) : plan.name === 'Enterprise' ? (
+                ) : 'isOnboarding' in plan ? (
                   <Button
-                    variant={plan.variant}
+                    variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => window.open('mailto:kontakt@tivly.se?subject=Enterprise-förfrågan', '_blank')}
+                    onClick={() => {
+                      onOpenChange(false);
+                      window.location.href = '/enterprise/onboarding';
+                    }}
+                  >
+                    {plan.cta}
+                  </Button>
+                ) : 'isContact' in plan ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open('mailto:enterprise@tivly.se?subject=Enterprise Scale-förfrågan', '_blank')}
                   >
                     {plan.cta}
                   </Button>
                 ) : (
-                  <Button variant={plan.variant} size="sm" className="w-full" disabled>
-                    {plan.cta}
+                  <Button variant="outline" size="sm" className="w-full" disabled={'isCurrent' in plan && (plan as any).isCurrent}>
+                    {'isCurrent' in plan && (plan as any).isCurrent ? 'Nuvarande plan' : plan.cta}
                   </Button>
                 )}
               </CardContent>
