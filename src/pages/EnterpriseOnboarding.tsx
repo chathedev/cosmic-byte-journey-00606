@@ -286,7 +286,7 @@ export default function EnterpriseOnboarding() {
   const proceedToEmailVerification = async () => {
     // If email already verified, go to next step
     if (emailVerifyState === 'verified') {
-      setStep(2);
+      setStep(1);
       return;
     }
 
