@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText, Monitor } from "lucide-react";
+import { Mic, Loader2, Upload, ClipboardPaste, Sparkles, Shield, FileText, Monitor, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranscriptPreview } from "./TranscriptPreview";
 import { useSubscription } from "@/contexts/SubscriptionContext";
