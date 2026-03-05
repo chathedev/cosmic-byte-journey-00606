@@ -349,9 +349,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Anpassade integrationer', included: true },
         { text: 'Dedikerad onboarding', included: true },
       ],
-      cta: 'Kontakta oss',
+      cta: userPlan?.plan === 'enterprise' ? 'Nuvarande plan' : 'Kontakta oss',
       variant: 'outline' as const,
-      isContact: true,
+      isContact: userPlan?.plan !== 'enterprise',
+      isCurrent: userPlan?.plan === 'enterprise',
     },
   ];
 
