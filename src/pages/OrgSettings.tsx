@@ -30,8 +30,9 @@ export default function OrgSettings() {
   }
 
   const role = enterpriseMembership.membership?.role;
-  const roleName = role === 'owner' ? 'Ägare' : role === 'admin' ? 'Admin' : 'Medlem';
+  const roleName = role === 'owner' ? 'Ägare' : role === 'admin' ? 'Admin' : role === 'viewer' ? 'Läsare' : 'Medlem';
   const isAdminOrOwner = role === 'owner' || role === 'admin';
+  const isViewerRole = role === 'viewer';
   const companyId = enterpriseMembership.company?.id;
 
   return (

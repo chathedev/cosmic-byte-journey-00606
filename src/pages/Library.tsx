@@ -75,7 +75,7 @@ const TranscriptionCompleteMessage = ({ meetingId, status }: { meetingId: string
 
 const Library = () => {
   const { user } = useAuth();
-  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership, isAdmin } = useSubscription();
+  const { userPlan, isLoading: planLoading, canGenerateProtocol, incrementProtocolCount, refreshPlan, canCreateMeeting, enterpriseMembership, isAdmin, isViewer } = useSubscription();
   const [meetings, setMeetings] = useState<MeetingSession[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("Alla");
@@ -632,6 +632,11 @@ const Library = () => {
     // Use canCreateMeeting from context instead of canGenerateProtocol
   };
   const handleDeleteMeeting = async (id: string) => {
+    // Viewers cannot delete
+    if (isViewer) {
+      toast({ title: 'Läsbehörighet', description: 'Du kan inte ta bort möten.', variant: 'destructive' });
+      return;
+    }
     // Demo accounts can't delete - just silently ignore
     if (isDemoAccount) {
       return;

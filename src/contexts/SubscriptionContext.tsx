@@ -124,6 +124,7 @@ interface SubscriptionContextType {
   paymentDomain: PaymentDomain;
   enterpriseMembership: EnterpriseMembership | null;
   isAdmin: boolean;
+  isViewer: boolean;
   refreshPlan: () => Promise<void>;
   refreshEnterpriseMembership: () => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
@@ -527,8 +528,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  // Viewer detection: enterprise member with viewer role = read-only
+  const isViewer = useMemo(() => {
+    if (!enterpriseMembership?.isMember) return false;
+    const role = enterpriseMembership.membership?.role;
+    return role === 'viewer';
+  }, [enterpriseMembership]);
+
   const canCreateMeeting = async () => {
     if (!user) return { allowed: false, reason: 'Du måste vara inloggad' };
+    
+    // Viewers cannot create meetings
+    if (isViewer) return { allowed: false, reason: 'Du har läsbehörighet och kan inte skapa möten' };
     
     // Admins always allowed
     if (isAdmin) return { allowed: true };
@@ -551,6 +562,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   const canGenerateProtocol = async (meetingId: string, protocolCount: number = 0) => {
     if (!user) return { allowed: false, reason: 'Du måste vara inloggad' };
+    
+    // Viewers cannot generate protocols
+    if (isViewer) return { allowed: false, reason: 'Du har läsbehörighet och kan inte generera protokoll' };
     
     // Admins always allowed
     if (isAdmin) return { allowed: true };
@@ -661,7 +675,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, [loadEnterpriseMembership, loadPlan]);
 
   return (
-    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, switchCompany, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
+    <SubscriptionContext.Provider value={{ userPlan, isLoading, requiresPayment, paymentDomain, enterpriseMembership, isAdmin, isViewer, refreshPlan, refreshEnterpriseMembership: loadEnterpriseMembership, switchCompany, canCreateMeeting, canGenerateProtocol, incrementMeetingCount, incrementProtocolCount }}>
       {children}
     </SubscriptionContext.Provider>
   );
