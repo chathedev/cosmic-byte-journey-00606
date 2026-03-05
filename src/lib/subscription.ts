@@ -30,7 +30,8 @@ const normalizePlan = (raw: any, meetingCount: number = 0): UserPlan => {
 
   const defaults: Record<string, { meetingsLimit: number | null; protocolsLimit: number }> = {
     free: { meetingsLimit: 1, protocolsLimit: 1 },
-    pro: { meetingsLimit: 10, protocolsLimit: 1 }, // 10 meetings per month
+    pro: { meetingsLimit: 30, protocolsLimit: 1 }, // 30 meetings per month
+    team: { meetingsLimit: null, protocolsLimit: 999999 }, // Team unlimited
     plus: { meetingsLimit: null, protocolsLimit: 1 }, // Truly unlimited
     enterprise: { meetingsLimit: null, protocolsLimit: 999999 }, // Enterprise unlimited
   };
