@@ -294,6 +294,7 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       cta: 'Nuvarande plan',
       variant: 'outline' as const,
       isCurrent: userPlan?.plan === 'free',
+      disabled: true,
     },
     {
       name: 'Pro',
