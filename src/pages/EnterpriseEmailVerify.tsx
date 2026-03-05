@@ -22,7 +22,7 @@ export default function EnterpriseEmailVerify() {
     }
 
     // Use POST /verify-email/complete as per new backend contract
-    fetch(`${API_BASE_URL}/enterprise/onboarding/verify-email/complete`, {
+    fetch(`${API_BASE_URL}/team/onboarding/verify-email/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ draftId, token }),
