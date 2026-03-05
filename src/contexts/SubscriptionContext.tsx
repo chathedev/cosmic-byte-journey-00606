@@ -239,9 +239,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         ? 'unlimited'
         : (enterpriseDetected
             ? 'enterprise'
-            : ((validPlans as readonly string[]).includes(planStr)
-                ? (planStr as UserPlan['plan'])
-                : (aliasMap[planStr] ?? 'free')));
+            : (teamDetected
+                ? 'team'
+                : ((validPlans as readonly string[]).includes(planStr)
+                    ? (planStr as UserPlan['plan'])
+                    : (aliasMap[planStr] ?? 'free'))));
       
       console.log(`[SubscriptionContext] 📋 Plan normalization:`, {
         platform,
