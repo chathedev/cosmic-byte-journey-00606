@@ -361,7 +361,7 @@ export default function EnterpriseOnboarding() {
     if (initialMountRef.current) return;
     hasUserInteractedRef.current = true;
     saveFormLocal(form, step);
-    if (step < 3) triggerDraftSave(form as Partial<OnboardingFormData>, step);
+    if (step < 2) triggerDraftSave(form as Partial<OnboardingFormData>, step);
   }, [step]);
 
   useEffect(() => {
