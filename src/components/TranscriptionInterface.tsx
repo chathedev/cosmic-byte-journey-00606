@@ -12,6 +12,7 @@ import { DigitalImportView } from "./DigitalImportView";
 import { ZoomImportView } from "./ZoomImportView";
 import { GoogleMeetImportView } from "./GoogleMeetImportView";
 import { ParticipantsInputDialog } from "./ParticipantsInputDialog";
+import { EnterpriseHomeDashboard } from "./EnterpriseHomeDashboard";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
 import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
