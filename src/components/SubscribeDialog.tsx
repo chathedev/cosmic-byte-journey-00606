@@ -198,11 +198,35 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
       cardElementRef.current = paymentElement;
     } catch (error: any) {
       console.error('Subscription error:', error);
-      toast({
-        title: 'Fel',
-        description: error.message || 'Kunde inte starta betalning',
-        variant: 'destructive',
-      });
+      
+      // Handle specific backend error codes
+      const errorCode = error?.code || error?.error;
+      if (errorCode === 'enterprise_onboarding_required') {
+        toast({
+          title: 'Team-onboarding krävs',
+          description: 'Team-planen kräver onboarding. Du omdirigeras.',
+        });
+        onOpenChange(false);
+        window.location.href = '/team/onboarding';
+        return;
+      } else if (errorCode === 'contact_sales') {
+        toast({
+          title: 'Kontakta oss',
+          description: 'Enterprise kräver manuell kontakt. Mejla enterprise@tivly.se',
+        });
+      } else if (errorCode === 'invalid_plan' || errorCode === 'missing_price') {
+        toast({
+          title: 'Ogiltig plan',
+          description: 'Den valda planen kunde inte behandlas. Försök igen.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Fel',
+          description: error.message || 'Kunde inte starta betalning',
+          variant: 'destructive',
+        });
+      }
       setSelectedPlan(null);
     } finally {
       setIsLoading(false);
