@@ -159,10 +159,13 @@ export const EnterpriseHomeDashboard = ({
               <p className="text-xs text-muted-foreground">Teammedlemmar</p>
               <p className="text-lg font-semibold text-foreground">{stats.memberCount ?? 0}</p>
             </div>
-            <div className="rounded-lg border border-border bg-card p-3">
+            <button
+              onClick={() => navigate("/library")}
+              className="rounded-lg border border-border bg-card p-3 text-left hover:border-primary/40 hover:shadow-sm transition-all"
+            >
               <p className="text-xs text-muted-foreground">Totala möten</p>
               <p className="text-lg font-semibold text-foreground">{stats.totalMeetingCount ?? 0}</p>
-            </div>
+            </button>
             <div className="rounded-lg border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">Snitt/medlem</p>
               <p className="text-lg font-semibold text-foreground">
