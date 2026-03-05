@@ -1329,9 +1329,9 @@ function StepConfirm({ form, selectedPlan, monthlyTotal, extraSeats, updateField
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 4: Card Payment                                    */
 /* ═══════════════════════════════════════════════════════ */
-function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, firstChargeEstimate, onCardConfirmed }: {
+function StepCardPayment({ draftId, resumeToken, initialClientSecret, stripePublishableKey, email, monthlyTotal, planBaseSek, activationFeeSek, includedSeats, expectedSeats, extraSeats, extraSeatSek, firstChargeEstimate, onCardConfirmed }: {
   draftId: string; resumeToken: string; initialClientSecret: string | null; stripePublishableKey: string | null;
-  email: string; monthlyTotal: number; planBaseSek: number; activationFeeSek: number; includedSeats: number; expectedSeats: number; extraSeats: number;
+  email: string; monthlyTotal: number; planBaseSek: number; activationFeeSek: number; includedSeats: number; expectedSeats: number; extraSeats: number; extraSeatSek: number;
   firstChargeEstimate: any; onCardConfirmed: () => Promise<void>;
 }) {
   const [loading, setLoading] = useState(!initialClientSecret);
