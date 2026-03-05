@@ -70,7 +70,7 @@ export default function OrgSettings() {
             {isAdminOrOwner && (
               <TabsTrigger value="invite" className="rounded-lg gap-1.5 text-xs sm:text-sm px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 <Settings2 className="w-3.5 h-3.5" />
-                <span>Bjud in</span>
+                <span>Medlemmar</span>
               </TabsTrigger>
             )}
             {isAdminOrOwner && companyId && (
