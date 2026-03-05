@@ -818,66 +818,6 @@ function CostSidebar({ selectedPlan, seats, extraSeats, monthlyTotal, step, form
   );
 }
 
-/* ═══════════════════════════════════════════════════════ */
-/* STEP 0: Team Size                                       */
-/* ═══════════════════════════════════════════════════════ */
-function StepTeamSize({ seats, onChange }: { seats: number; onChange: (v: number) => void }) {
-  const presets = [5, 10, 15, 25, 50];
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">Hur stort är ert team?</h2>
-        <p className="text-sm text-muted-foreground mt-1">Vi rekommenderar en plan baserat på ert behov.</p>
-      </div>
-
-      <div className="border border-border p-6 sm:p-8">
-        <div className="flex items-center justify-center gap-6 sm:gap-8">
-          <button
-            onClick={() => onChange(Math.max(1, seats - 1))}
-            className="h-10 w-10 sm:h-12 sm:w-12 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <div className="text-center min-w-[90px]">
-            <span className="text-5xl sm:text-6xl font-semibold text-foreground tabular-nums block">{seats}</span>
-            <p className="text-xs text-muted-foreground mt-2">användare</p>
-          </div>
-          <button
-            onClick={() => onChange(Math.min(500, seats + 1))}
-            className="h-10 w-10 sm:h-12 sm:w-12 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground transition-colors no-hover-lift"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        {presets.map(n => (
-          <button
-            key={n}
-            onClick={() => onChange(n)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors no-hover-lift border',
-              seats === n
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground',
-            )}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-
-      <div className="border border-border p-4 flex items-start gap-3">
-        <Users className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        <p className="text-sm text-muted-foreground">
-          Vi matchar en plan baserat på ert teamstorlek. Prisdetaljer visas i ett senare steg.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 
 /* ═══════════════════════════════════════════════════════ */
 /* STEP 2: Details + Inline Email Verification             */
