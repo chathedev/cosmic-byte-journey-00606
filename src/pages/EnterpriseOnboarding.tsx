@@ -146,7 +146,7 @@ export default function EnterpriseOnboarding() {
     function restoreFromLocal() {
       const parsed = readStorageJSON<{ form?: Partial<OnboardingFormData>; step?: number; touched?: boolean }>(FORM_KEY);
       if (!parsed?.form) return;
-      const restoredStep = Math.min(parsed.step ?? 0, 2);
+      const restoredStep = Math.min(parsed.step ?? 0, 1);
       if (hasRestorableProgress(parsed.form, restoredStep)) {
         hasUserInteractedRef.current = true;
         setForm(prev => ({ ...prev, ...parsed.form }));
