@@ -592,7 +592,7 @@ export default function EnterpriseOnboarding() {
           <div className="flex items-center gap-3">
             <a href="/auth" className="text-sm font-semibold tracking-wide text-foreground hover:text-primary transition-colors">Tivly</a>
             <span className="text-border">|</span>
-            <span className="text-xs text-muted-foreground font-medium">Enterprise</span>
+            <span className="text-xs text-muted-foreground font-medium">Team</span>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {stripeMode === 'test' && (
