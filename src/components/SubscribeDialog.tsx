@@ -328,8 +328,10 @@ export function SubscribeDialog({ open, onOpenChange }: SubscribeDialogProps) {
         { text: 'Adminpanel & workspace', included: true },
         { text: 'Extra användare: 199 kr/st/mån', included: true },
       ],
-      cta: 'Starta onboarding',
+      cta: userPlan?.plan === 'team' ? 'Nuvarande plan' : 'Starta onboarding',
       variant: 'outline' as const,
+      isOnboarding: userPlan?.plan !== 'team',
+      isCurrent: userPlan?.plan === 'team',
       isOnboarding: true,
     },
     {
