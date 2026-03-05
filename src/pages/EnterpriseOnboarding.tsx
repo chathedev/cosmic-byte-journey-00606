@@ -37,8 +37,8 @@ const PLANS = [
   { id: 'enterprise_small' as const, name: 'Team', priceSek: 1990, seats: 5, activationSek: 0, extraSeatSek: 199 },
 ];
 const STEPS = ['Team', 'Uppgifter', 'Bekräfta', 'Betalning'];
-const DRAFT_KEY = 'tivly_enterprise_draft';
-const FORM_KEY = 'tivly_enterprise_form';
+const DRAFT_KEY = 'tivly_team_draft';
+const FORM_KEY = 'tivly_team_form';
 
 function saveStorageJSON(key: string, value: unknown) {
   const s = JSON.stringify(value);

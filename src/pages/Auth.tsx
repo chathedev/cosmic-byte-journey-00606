@@ -397,10 +397,10 @@ export default function Auth() {
                     {onboardingEnabled && (
                       <div className="lg:hidden text-center pt-2">
                         <a
-                          href="/enterprise/onboarding"
+                          href="/team/onboarding"
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
-                          Enterprise för team →
+                          Tivly för team →
                         </a>
                       </div>
                     )}

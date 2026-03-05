@@ -486,8 +486,8 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
           }
         >
           <Routes>
-            <Route path="/enterprise/onboarding" element={<EnterpriseOnboarding />} />
-            <Route path="/enterprise/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
+            <Route path="/team/onboarding" element={<EnterpriseOnboarding />} />
+            <Route path="/team/onboarding/verify-email" element={<EnterpriseEmailVerify />} />
             <Route path="/free-trial" element={<FreeTrial />} />
           </Routes>
         </Suspense>
