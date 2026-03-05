@@ -540,11 +540,23 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               Skapa protokoll
             </h1>
             <p className="text-sm text-muted-foreground">
-              Spela in, ladda upp eller klistra in text
+              {isViewer ? 'Du har läsbehörighet i organisationen' : 'Spela in, ladda upp eller klistra in text'}
             </p>
           </div>
 
-          {/* Action buttons - clean and simple */}
+          {/* Viewer read-only notice */}
+          {isViewer && (
+            <div className="border border-border rounded-lg p-4 bg-muted/30 text-center space-y-1">
+              <Eye className="w-5 h-5 mx-auto text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Läsläge</p>
+              <p className="text-xs text-muted-foreground">
+                Du kan se delade protokoll men inte skapa nya möten eller redigera innehåll.
+              </p>
+            </div>
+          )}
+
+          {/* Action buttons - hidden for viewers */}
+          {!isViewer && (
           <div className="space-y-3">
             <Button 
               onClick={handleRecordClick}
@@ -580,6 +592,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               Klistra in text
             </Button>
           </div>
+          )}
 
 
           {/* Minimal trust indicators */}
