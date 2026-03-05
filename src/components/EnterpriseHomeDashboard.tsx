@@ -306,10 +306,7 @@ export const EnterpriseHomeDashboard = ({
                   {stats?.memberCount ?? 0}
                 </span>
               </button>
-              <button
-                onClick={() => navigate("/library")}
-                className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
-              >
+              <div className="flex items-center gap-3 px-5 py-3.5">
                 <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm text-foreground">Dina möten</span>
@@ -318,7 +315,7 @@ export const EnterpriseHomeDashboard = ({
                 <span className="text-sm font-semibold text-foreground tabular-nums">
                   {userPlan?.meetingsUsed ?? 0}
                 </span>
-              </button>
+              </div>
               {stats && (
                 <div className="flex items-center gap-3 px-5 py-3.5">
                   <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
