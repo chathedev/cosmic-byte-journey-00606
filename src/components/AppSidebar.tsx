@@ -179,24 +179,35 @@ export function AppSidebar() {
   const isEnterpriseOwner = enterpriseMembership?.isMember && 
     enterpriseMembership.membership?.role === 'owner';
 
-  const navItems = [
-    { Icon: FiHome, title: "Hem", path: "/", locked: false },
-    { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
-    
-    { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
-    { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
-    { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
-  ];
+  // Viewer = read-only investor-style access
+  const isEnterpriseViewer = enterpriseMembership?.isMember && 
+    enterpriseMembership.membership?.role === 'viewer';
+
+  const navItems = isEnterpriseViewer
+    ? [
+        { Icon: FiHome, title: "Hem", path: "/", locked: false },
+      ]
+    : [
+        { Icon: FiHome, title: "Hem", path: "/", locked: false },
+        { Icon: FiBookOpen, title: "Bibliotek", path: "/library", locked: libraryLocked },
+        { Icon: FiCalendar, title: "Agendor", path: "/agendas", locked: agendasLocked },
+        { Icon: FiMessageSquare, title: "Feedback", path: "/feedback", locked: false },
+        { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
+      ];
 
   const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
     (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
 
-  const orgSubItems = [
-    ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
-    { Icon: Users, title: "Team", path: "/org/settings" },
-    { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
-    { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
-  ];
+  const orgSubItems = isEnterpriseViewer
+    ? [
+        { Icon: Users, title: "Team", path: "/org/settings" },
+      ]
+    : [
+        ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
+        { Icon: Users, title: "Team", path: "/org/settings" },
+        { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
+        { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
+      ];
 
   const adminItems = [
     { Icon: FiUsers, title: "Användare", path: "/admin/users" },
