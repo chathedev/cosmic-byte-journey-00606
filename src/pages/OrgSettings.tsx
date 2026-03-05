@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Users, Link2, Settings2 } from "lucide-react";
+import { ArrowLeft, Building2, Users, Link2, Settings2, Lock } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { MemberRoleManager } from "@/components/MemberRoleManager";
