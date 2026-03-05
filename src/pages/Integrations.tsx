@@ -1,21 +1,67 @@
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, CheckCircle2, Puzzle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDigitalImport } from "@/hooks/useDigitalImport";
 import { useZoomImport } from "@/hooks/useZoomImport";
 import { useGoogleMeetImport } from "@/hooks/useGoogleMeetImport";
 import { useSlackIntegration } from "@/hooks/useSlackIntegration";
+import { ConnectionSuccessOverlay } from "@/components/ConnectionSuccessOverlay";
 import teamsLogo from "@/assets/teams-logo.png";
 import zoomLogo from "@/assets/zoom-logo.png";
 import googleMeetLogo from "@/assets/google-meet-logo.png";
 import slackLogo from "@/assets/slack-logo.png";
 
+const INTEGRATION_MAP: Record<string, { route: string; name: string; logo: string; description: string }> = {
+  microsoft: { route: '/integrations/teams', name: 'Microsoft Teams', logo: '', description: 'Microsoft-kontot har kopplats. Du kan nu importera Teams-möten.' },
+  zoom: { route: '/integrations/zoom', name: 'Zoom', logo: '', description: 'Zoom-kontot har kopplats. Du kan nu importera inspelningar med transkript.' },
+  google_meet: { route: '/integrations/google-meet', name: 'Google Meet', logo: '', description: 'Google-kontot har kopplats. Du kan nu importera möten med transkript.' },
+  slack: { route: '/integrations/slack', name: 'Slack', logo: '', description: 'Du kan nu dela protokoll till Slack-kanaler.' },
+};
+
 const Integrations = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const digitalImport = useDigitalImport();
   const zoomImport = useZoomImport();
   const googleMeetImport = useGoogleMeetImport();
   const slackIntegration = useSlackIntegration();
+  const hasHandledCallback = useRef(false);
+
+  const [successOverlay, setSuccessOverlay] = useState<{
+    show: boolean;
+    serviceName: string;
+    description: string;
+    logo: string;
+  } | null>(null);
+
+  // Detect OAuth success callback and show overlay on this page
+  useEffect(() => {
+    if (hasHandledCallback.current) return;
+    const integration = searchParams.get('integration');
+    const status = searchParams.get('status');
+
+    if (status === 'success' && integration) {
+      hasHandledCallback.current = true;
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('integration');
+      url.searchParams.delete('status');
+      window.history.replaceState({}, '', url.toString());
+
+      // Resolve logo
+      const logoMap: Record<string, string> = { microsoft: teamsLogo, zoom: zoomLogo, google_meet: googleMeetLogo, slack: slackLogo };
+      const info = INTEGRATION_MAP[integration];
+      if (info) {
+        setSuccessOverlay({
+          show: true,
+          serviceName: info.name,
+          description: info.description,
+          logo: logoMap[integration] || '',
+        });
+      }
+    }
+  }, [searchParams]);
 
   const isTeamsEnabled = digitalImport.importStatus?.enabled === true;
   const isTeamsConfigured = digitalImport.importStatus?.configured === true;
@@ -206,6 +252,17 @@ const Integrations = () => {
           </div>
         </div>
       </div>
+
+      {/* Success overlay - shown on this page after OAuth callback redirect */}
+      {successOverlay && (
+        <ConnectionSuccessOverlay
+          show={successOverlay.show}
+          onClose={() => setSuccessOverlay(null)}
+          serviceName={successOverlay.serviceName}
+          description={successOverlay.description}
+          logo={successOverlay.logo}
+        />
+      )}
     </div>
   );
 };
