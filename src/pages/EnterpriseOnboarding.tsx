@@ -463,7 +463,7 @@ export default function EnterpriseOnboarding() {
       if (billing?.readyForTrialStart || billing?.paymentMethodSaved) {
         setSetupIntentClientSecret(null);
         setStripePublishableKey(pkKey);
-        setStep(3);
+        setStep(2);
         return;
       }
       if (!pkKey) { setSubmitError('Stripe-konfigurationsfel (publishable key saknas). Kontakta support.'); setIsSubmitting(false); return; }
