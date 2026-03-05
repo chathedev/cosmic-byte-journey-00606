@@ -695,6 +695,7 @@ export default function EnterpriseOnboarding() {
                 includedSeats={selectedPlan.seats}
                 expectedSeats={seats}
                 extraSeats={extraSeats}
+                extraSeatSek={selectedPlan.extraSeatSek}
                 firstChargeEstimate={firstChargeEstimate}
                 onCardConfirmed={handleCardConfirmedStartTrial}
               />
