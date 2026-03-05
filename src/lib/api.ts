@@ -2809,6 +2809,39 @@ class ApiClient {
     }
     return response.json();
   }
+  // ==================== ENTERPRISE CHECKLIST API ====================
+
+  async getEnterpriseChecklist(): Promise<any> {
+    const response = await this.fetchWithAuth('/enterprise/checklist');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to fetch checklist');
+    }
+    return response.json();
+  }
+
+  async updateEnterpriseChecklistStep(stepId: string, completed: boolean = true, note?: string): Promise<any> {
+    const response = await this.fetchWithAuth(`/enterprise/checklist/steps/${stepId}`, {
+      method: 'POST',
+      body: JSON.stringify({ completed, ...(note ? { note } : {}) }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to update checklist step');
+    }
+    return response.json();
+  }
+
+  async resetEnterpriseChecklist(): Promise<any> {
+    const response = await this.fetchWithAuth('/enterprise/checklist/reset', {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to reset checklist');
+    }
+    return response.json();
+  }
 }
 
 export const apiClient = new ApiClient();
