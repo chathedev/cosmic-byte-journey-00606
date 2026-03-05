@@ -43,6 +43,7 @@ export interface EnterpriseMembership {
     slug: string;
     status: string;
     planTier: string;
+    planType?: string;
     speakerIdentificationEnabled?: boolean;
     trial?: {
       enabled: boolean;
