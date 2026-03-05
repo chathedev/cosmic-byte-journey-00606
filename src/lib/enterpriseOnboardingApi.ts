@@ -358,5 +358,5 @@ export async function checkOnboardingEmailVerification(draftId: string): Promise
     attemptsRemaining?: number;
   };
 }> {
-  return apiFetch(`/enterprise/onboarding/verify-email/status?draftId=${encodeURIComponent(draftId)}`);
+  return apiFetch(`/team/onboarding/verify-email/status?draftId=${encodeURIComponent(draftId)}`);
 }
