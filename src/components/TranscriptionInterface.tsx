@@ -49,7 +49,7 @@ interface TranscriptionInterfaceProps {
 export const TranscriptionInterface = ({ isFreeTrialMode = false }: TranscriptionInterfaceProps) => {
   const [currentView, setCurrentView] = useState<View>("welcome");
   const [transcript, setTranscript] = useState("");
-  const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan, enterpriseMembership, isAdmin } = useSubscription();
+  const { canCreateMeeting, userPlan, incrementMeetingCount, refreshPlan, enterpriseMembership, isAdmin, isViewer } = useSubscription();
   const { user } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState('');
