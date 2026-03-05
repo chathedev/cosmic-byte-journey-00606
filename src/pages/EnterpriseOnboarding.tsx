@@ -680,7 +680,7 @@ export default function EnterpriseOnboarding() {
                 onResend={handleResendVerification}
               />
             )}
-            {step === 2 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} />}
+            {step === 2 && <StepPlan form={form} selectedPlan={selectedPlan} extraSeats={extraSeats} monthlyTotal={monthlyTotal} updateField={updateField} extraSeatSek={selectedPlan.extraSeatSek} />}
             {step === 3 && <StepConfirm form={form} selectedPlan={selectedPlan} monthlyTotal={monthlyTotal} extraSeats={extraSeats} updateField={updateField} submitError={submitError} />}
             {step === 4 && draftId && resumeToken && (
               <StepCardPayment
