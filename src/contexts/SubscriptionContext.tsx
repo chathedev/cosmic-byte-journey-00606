@@ -458,6 +458,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             slug: u.enterprise?.companySlug || u.company?.slug || '',
             status: 'active',
             planTier: 'enterprise',
+            planType: u.enterprise?.planType || u.company?.planType,
             speakerIdentificationEnabled: sisEnabled,
           },
           membership: {
