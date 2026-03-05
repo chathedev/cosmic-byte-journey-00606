@@ -714,10 +714,7 @@ export default function AdminEnterpriseBilling() {
               ) : billingHistory.length === 0 ? (
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Receipt className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                      <p>Ingen faktureringshistorik</p>
-                    </div>
+                    <AdminBillingStatusOverview company={billingCompany} billingStatus={billingStatusValue} />
                   </CardContent>
                 </Card>
               ) : (
