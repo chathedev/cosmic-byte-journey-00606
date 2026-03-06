@@ -1413,6 +1413,57 @@ const MeetingDetail = () => {
     setShowAgendaDialog(true);
   };
 
+  // Parse structured sections from raw protocol text
+  const parseProtocolText = (text: string) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    let title = '';
+    let summary = '';
+    let mainPoints: string[] = [];
+    let decisions: string[] = [];
+    let actionItems: { title: string; priority: string }[] = [];
+    
+    let currentSection = '';
+    const sectionBuffer: string[] = [];
+    
+    const flushSection = () => {
+      const content = sectionBuffer.join('\n').trim();
+      if (currentSection.match(/sammanfattning/i)) {
+        summary = content;
+      } else if (currentSection.match(/huvudpunkt/i)) {
+        mainPoints = sectionBuffer.filter(l => l.startsWith('-') || l.startsWith('•') || /^\d+\./.test(l))
+          .map(l => l.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*/, ''));
+      } else if (currentSection.match(/beslut/i)) {
+        decisions = sectionBuffer.filter(l => l.startsWith('-') || l.startsWith('•'))
+          .map(l => l.replace(/^[-•]\s*/, ''));
+      } else if (currentSection.match(/åtgärd/i)) {
+        actionItems = sectionBuffer.filter(l => l.startsWith('-') || l.startsWith('•'))
+          .map(l => ({ title: l.replace(/^[-•]\s*/, ''), priority: 'medium' as const }));
+      }
+      sectionBuffer.length = 0;
+    };
+    
+    for (const line of lines) {
+      if (line.startsWith('#')) {
+        flushSection();
+        const heading = line.replace(/^#+\s*/, '');
+        if (!title && !currentSection) {
+          title = heading;
+        }
+        currentSection = heading;
+      } else {
+        sectionBuffer.push(line);
+      }
+    }
+    flushSection();
+    
+    // If no structured headings found, use full text as summary
+    if (!summary && !mainPoints.length && !decisions.length) {
+      summary = text.trim();
+    }
+    
+    return { title, summary, mainPoints, decisions, actionItems };
+  };
+
   // Handle edit protocol (load draft data from backend)
   const handleEditProtocol = async () => {
     if (!id) return;
@@ -1429,8 +1480,42 @@ const MeetingDetail = () => {
           actionItems: d.actionItems || [],
           nextMeetingSuggestions: d.nextMeetingSuggestions || [],
         });
+        setIsEditingProtocol(true);
+      } else if (draftResponse?.protocol?.blob) {
+        // No draft — parse DOCX blob with mammoth as fallback
+        try {
+          const base64Data = draftResponse.protocol.blob.replace(/^data:.*?;base64,/, '');
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const mammoth = await import('mammoth');
+          const result = await mammoth.default.extractRawText({ arrayBuffer: bytes.buffer });
+          const rawText = result.value || '';
+          
+          // Try to parse structured sections from raw text
+          const parsed = parseProtocolText(rawText);
+          setProtocolDraftData({
+            title: parsed.title || meeting?.title || 'Protokoll',
+            summary: parsed.summary,
+            mainPoints: parsed.mainPoints,
+            decisions: parsed.decisions,
+            actionItems: parsed.actionItems,
+          });
+          setIsEditingProtocol(true);
+        } catch (parseErr) {
+          console.error('Failed to parse DOCX:', parseErr);
+          setProtocolDraftData({
+            title: meeting?.title || 'Protokoll',
+            summary: '',
+            mainPoints: [],
+            decisions: [],
+            actionItems: [],
+          });
+          setIsEditingProtocol(true);
+        }
       } else {
-        // No draft yet — try to parse from protocol DOCX via mammoth (fallback)
         setProtocolDraftData({
           title: meeting?.title || 'Protokoll',
           summary: '',
@@ -1438,11 +1523,10 @@ const MeetingDetail = () => {
           decisions: [],
           actionItems: [],
         });
+        setIsEditingProtocol(true);
       }
-      setIsEditingProtocol(true);
     } catch (error) {
       console.error('Failed to load protocol draft:', error);
-      // Still allow editing with empty data
       setProtocolDraftData({
         title: meeting?.title || 'Protokoll',
         summary: '',

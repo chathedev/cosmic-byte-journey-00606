@@ -790,6 +790,40 @@ export const AutoProtocolGenerator = ({
                 documentBlob: base64,
               });
               console.log('✅ Protocol auto-saved to meeting successfully');
+              
+              // Also save the structured draft data for plain-text editing
+              try {
+                const fullText = [
+                  `# ${title}`,
+                  '',
+                  '## Sammanfattning',
+                  generatedProtocol?.summary || '',
+                  '',
+                  '## Huvudpunkter',
+                  ...(generatedProtocol?.mainPoints || []).map((p: string) => `- ${p}`),
+                  '',
+                  '## Beslut',
+                  ...(generatedProtocol?.decisions || []).map((d: string) => `- ${d}`),
+                  '',
+                  '## Åtgärdspunkter',
+                  ...(generatedProtocol?.actionItems || []).map((a: any) => 
+                    `- ${a.title}${a.owner ? ` (${a.owner})` : ''}${a.deadline ? ` – ${a.deadline}` : ''}`
+                  ),
+                ].join('\n');
+                
+                await backendApi.saveProtocolDraft(meetingId, {
+                  fullText,
+                  title,
+                  summary: generatedProtocol?.summary || '',
+                  mainPoints: generatedProtocol?.mainPoints || [],
+                  decisions: generatedProtocol?.decisions || [],
+                  actionItems: generatedProtocol?.actionItems || [],
+                });
+                console.log('✅ Protocol draft also saved for editing');
+              } catch (draftError) {
+                console.warn('⚠️ Draft save failed (non-blocking):', draftError);
+              }
+              
               resolve();
             } catch (error) {
               console.error('❌ Failed to auto-save protocol:', error);
