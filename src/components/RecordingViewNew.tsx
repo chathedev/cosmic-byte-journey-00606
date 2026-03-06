@@ -40,11 +40,11 @@ const hasAsrAccess = (plan: string | undefined, isAdmin: boolean): boolean => {
   return plan.toLowerCase() === 'enterprise';
 };
 
-// Check if user has library access (Pro, Enterprise, or Admin)
+// Check if user has library access (Pro, Team, Enterprise, Unlimited, or Admin)
 const hasLibraryAccess = (plan: string | undefined, isAdmin: boolean): boolean => {
   if (isAdmin) return true;
   if (!plan) return false;
-  return ['pro', 'enterprise'].includes(plan.toLowerCase());
+  return ['pro', 'team', 'unlimited', 'enterprise'].includes(plan.toLowerCase());
 };
 
 export const RecordingViewNew = ({ onBack, continuedMeeting, isFreeTrialMode = false, selectedLanguage: initialLanguage = 'sv-SE' }: RecordingViewNewProps) => {

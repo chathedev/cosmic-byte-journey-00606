@@ -111,9 +111,11 @@ export const DigitalMeetingDialog = ({
     };
   }, [isSubmitting, isLargeFile]);
 
-  // Check if user has upload access (Pro, Enterprise, or Admin)
+  // Check if user has upload access (Pro, Team, Enterprise, Unlimited, or Admin)
   const hasUploadAccess = userPlan && (
     userPlan.plan === 'pro' || 
+    userPlan.plan === 'team' ||
+    userPlan.plan === 'unlimited' ||
     userPlan.plan === 'enterprise' || 
     isAdmin
   );
