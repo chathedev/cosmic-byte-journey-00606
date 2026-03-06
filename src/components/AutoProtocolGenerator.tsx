@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee, Edit3 } from "lucide-react";
-import { ProtocolEditor } from "@/components/ProtocolEditor";
+import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee } from "lucide-react";
 import { SlackShareButton } from "@/components/SlackShareButton";
 import { Document, Paragraph, HeadingLevel, AlignmentType, Packer, TextRun, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
@@ -116,7 +115,7 @@ export const AutoProtocolGenerator = ({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [hasDownloaded, setHasDownloaded] = useState(false);
   const [hasShared, setHasShared] = useState(false);
-  const [showProtocolEditor, setShowProtocolEditor] = useState(false);
+  
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1184,20 +1183,6 @@ export const AutoProtocolGenerator = ({
               </section>
             )}
 
-            {/* Edit button */}
-            {!(isFreeTrialMode || !meetingId) && (
-              <div className="pt-4 border-t border-border/40">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowProtocolEditor(true)}
-                  className="gap-1.5"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Redigera protokoll
-                </Button>
-              </div>
-            )}
 
             {/* Footer — only for non-enterprise */}
             {!isEnterprise && (
@@ -1217,16 +1202,6 @@ export const AutoProtocolGenerator = ({
             )}
           </div>
 
-          {/* Protocol Editor Dialog */}
-          <ProtocolEditor
-            meetingId={meetingId || ''}
-            protocol={generatedProtocol}
-            open={showProtocolEditor}
-            onOpenChange={setShowProtocolEditor}
-            onProtocolUpdate={(updated) => setGeneratedProtocol(updated)}
-            readOnly={isFreeTrialMode || !meetingId}
-            isEnterprise={isEnterprise}
-          />
         </Card>
       </div>
 

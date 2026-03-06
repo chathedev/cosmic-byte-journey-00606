@@ -2649,11 +2649,6 @@ const MeetingDetail = () => {
                             <Button onClick={handleViewProtocol} size="sm" variant="default" className="gap-1.5 h-9 text-xs no-hover-lift">
                               <Eye className="w-3.5 h-3.5" /> Visa
                             </Button>
-                            {!isReadOnly && (
-                              <Button onClick={handleEditProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift" disabled={loadingProtocolDraft}>
-                                {loadingProtocolDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />} Redigera
-                              </Button>
-                            )}
                             <Button onClick={handleDownloadProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift">
                               <Download className="w-3.5 h-3.5" /> Ladda ner
                             </Button>
@@ -2712,18 +2707,6 @@ const MeetingDetail = () => {
                   </section>
                 )}
 
-                {/* Protocol Editor Dialog */}
-                {protocolDraftData && (
-                  <ProtocolEditor
-                    meetingId={id || ''}
-                    protocol={protocolDraftData}
-                    open={isEditingProtocol}
-                    onOpenChange={setIsEditingProtocol}
-                    onProtocolUpdate={(updated) => setProtocolDraftData(updated)}
-                    readOnly={isReadOnly}
-                    isEnterprise={isEnterprise}
-                  />
-                )}
 
                 {!isEditing && (
                   <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
