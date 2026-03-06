@@ -128,46 +128,7 @@ export const EnterpriseHomeDashboard = ({
     loadStats();
   }, [loadChecklist, loadStats]);
 
-  const handleToggleStep = async (step: ChecklistStep) => {
-    if (togglingStep) return;
-    const newCompleted = !step.completed;
-    setTogglingStep(step.id);
-
-    // Optimistic update
-    setChecklist(prev => {
-      if (!prev) return prev;
-      const updatedSteps = prev.steps.map(s =>
-        s.id === step.id ? { ...s, completed: newCompleted, completedAt: newCompleted ? new Date().toISOString() : undefined } : s
-      );
-      const completedCount = updatedSteps.filter(s => s.completed).length;
-      return {
-        ...prev,
-        steps: updatedSteps,
-        completedSteps: completedCount,
-        progressPercent: Math.round((completedCount / prev.totalSteps) * 100),
-        completed: completedCount === prev.totalSteps,
-      };
-    });
-
-    try {
-      await apiClient.updateChecklistStep(step.id, newCompleted, undefined, planType);
-      // Reload to get fresh server state
-      const data = await apiClient.getChecklist(planType);
-      if (data?.checklist) {
-        setChecklist(data.checklist);
-        if (data.checklist.completed && !checklist?.completed) {
-          toast({ title: "🎉 Onboarding klar!", description: "Teamet är redo att arbeta fullt i Tivly." });
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to toggle step:", e);
-      toast({ title: "Kunde inte uppdatera", description: "Försök igen om en stund.", variant: "destructive" });
-      // Revert
-      loadChecklist();
-    } finally {
-      setTogglingStep(null);
-    }
-  };
+  
 
   const importActions = [
     { key: "microsoftConnected", label: "Teams", logo: teamsLogo, onImport: onOpenTeamsImport },
