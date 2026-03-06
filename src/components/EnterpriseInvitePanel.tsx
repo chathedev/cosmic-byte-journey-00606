@@ -65,10 +65,14 @@ export function EnterpriseInvitePanel() {
   if (!company || !canViewMembers) return null;
 
   const memberLimit = (company as any).memberLimit;
+  const planType = (company as any).planType || (company as any).plan;
+  const isTeamPlan = planType === 'team';
   const memberCount = members.length || (company as any).memberCount || 0;
-  const hasLimit = typeof memberLimit === 'number' && memberLimit > 0;
-  const atLimit = hasLimit && memberCount >= memberLimit;
-  const isTrial = !!(company as any).trial?.enabled && !(company as any).trial?.expired && !(company as any).trial?.manuallyDisabled;
+  const trialObj = (company as any).trial;
+  const isTrial = !!(trialObj?.enabled && !trialObj?.expired && !trialObj?.manuallyDisabled);
+  const effectiveCap = isTeamPlan ? (isTrial ? 5 : 35) : (typeof memberLimit === 'number' && memberLimit > 0 ? memberLimit : undefined);
+  const hasLimit = effectiveCap !== undefined;
+  const atLimit = hasLimit && memberCount >= effectiveCap;
 
   const handleInvite = async () => {
     if (!email.trim()) return;
