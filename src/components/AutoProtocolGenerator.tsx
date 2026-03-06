@@ -116,6 +116,7 @@ export const AutoProtocolGenerator = ({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [hasDownloaded, setHasDownloaded] = useState(false);
   const [hasShared, setHasShared] = useState(false);
+  const [showProtocolEditor, setShowProtocolEditor] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
