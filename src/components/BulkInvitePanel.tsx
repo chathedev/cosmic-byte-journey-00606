@@ -51,9 +51,13 @@ interface BulkInvitePanelProps {
   maxMembers?: number;
   currentMembers?: number;
   isTrialActive?: boolean;
+  planType?: 'team' | 'enterprise' | string;
 }
 
-export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMembers, isTrialActive }: BulkInvitePanelProps) {
+const TEAM_TRIAL_CAP = 5;
+const TEAM_ABSOLUTE_CAP = 35;
+
+export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMembers, isTrialActive, planType }: BulkInvitePanelProps) {
   const { toast } = useToast();
   const [emailText, setEmailText] = useState('');
   const [role, setRole] = useState('member');
@@ -63,9 +67,20 @@ export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMember
   const [results, setResults] = useState<BulkInviteResponse | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const parsedCount = emailText.trim()
-    ? emailText.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.length > 0).length
-    : 0;
+  const parsedEmails = emailText.trim()
+    ? emailText.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.length > 0)
+    : [];
+  const parsedCount = parsedEmails.length;
+
+  // Calculate effective cap
+  const isTeamPlan = planType === 'team';
+  const effectiveCap = isTeamPlan
+    ? (isTrialActive ? TEAM_TRIAL_CAP : TEAM_ABSOLUTE_CAP)
+    : maxMembers;
+  const currentCount = currentMembers ?? 0;
+  const remainingSlots = effectiveCap ? Math.max(0, effectiveCap - currentCount) : undefined;
+  const wouldExceed = remainingSlots !== undefined && parsedCount > remainingSlots;
+  const atLimit = remainingSlots !== undefined && remainingSlots <= 0;
 
   const handleSubmit = async () => {
     if (!emailText.trim()) return;
