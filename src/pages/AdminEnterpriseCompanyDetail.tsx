@@ -1446,6 +1446,32 @@ export default function AdminEnterpriseCompanyDetail() {
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Invite Dialog */}
+      <Dialog open={showBulkInvite} onOpenChange={setShowBulkInvite}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Massbjud in medlemmar</DialogTitle>
+            <DialogDescription>Bjud in flera medlemmar till {company.name} samtidigt</DialogDescription>
+          </DialogHeader>
+          <BulkInvitePanel
+            onSubmit={async (data) => {
+              return apiClient.adminBulkInviteMembers(companyId!, {
+                emails: data.emails,
+                role: data.role,
+                sendInvite: data.sendInvite,
+                resendInvite: data.resendInvite,
+              });
+            }}
+            onSuccess={() => {
+              loadCompany();
+            }}
+            maxMembers={company.memberLimit || undefined}
+            currentMembers={company.members.length}
+            isTrialActive={!!(company.trial?.enabled && !company.trial?.expired && !company.trial?.manuallyDisabled)}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Member Dialog */}
       <Dialog open={showEditMember} onOpenChange={setShowEditMember}>
         <DialogContent>
