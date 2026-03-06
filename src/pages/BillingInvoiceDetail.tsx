@@ -271,7 +271,7 @@ export default function BillingInvoiceDetail() {
                       {formatAmountSEK(invoice.amountSek)} kr
                     </CardTitle>
                     <p className="text-muted-foreground text-sm mt-1">
-                      {invoice.companyName || 'Enterprise'}
+                      {invoice.companyName || planLabel}
                     </p>
                   </div>
                   {statusInfo && (
