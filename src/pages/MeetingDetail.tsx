@@ -1413,6 +1413,57 @@ const MeetingDetail = () => {
     setShowAgendaDialog(true);
   };
 
+  // Parse structured sections from raw protocol text
+  const parseProtocolText = (text: string) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    let title = '';
+    let summary = '';
+    let mainPoints: string[] = [];
+    let decisions: string[] = [];
+    let actionItems: { title: string; priority: 'medium' as const }[] = [];
+    
+    let currentSection = '';
+    const sectionBuffer: string[] = [];
+    
+    const flushSection = () => {
+      const content = sectionBuffer.join('\n').trim();
+      if (currentSection.match(/sammanfattning/i)) {
+        summary = content;
+      } else if (currentSection.match(/huvudpunkt/i)) {
+        mainPoints = sectionBuffer.filter(l => l.startsWith('-') || l.startsWith('•') || /^\d+\./.test(l))
+          .map(l => l.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*/, ''));
+      } else if (currentSection.match(/beslut/i)) {
+        decisions = sectionBuffer.filter(l => l.startsWith('-') || l.startsWith('•'))
+          .map(l => l.replace(/^[-•]\s*/, ''));
+      } else if (currentSection.match(/åtgärd/i)) {
+        actionItems = sectionBuffer.filter(l => l.startsWith('-') || l.startsWith('•'))
+          .map(l => ({ title: l.replace(/^[-•]\s*/, ''), priority: 'medium' as const }));
+      }
+      sectionBuffer.length = 0;
+    };
+    
+    for (const line of lines) {
+      if (line.startsWith('#')) {
+        flushSection();
+        const heading = line.replace(/^#+\s*/, '');
+        if (!title && !currentSection) {
+          title = heading;
+        }
+        currentSection = heading;
+      } else {
+        sectionBuffer.push(line);
+      }
+    }
+    flushSection();
+    
+    // If no structured headings found, use full text as summary
+    if (!summary && !mainPoints.length && !decisions.length) {
+      summary = text.trim();
+    }
+    
+    return { title, summary, mainPoints, decisions, actionItems };
+  };
+
   // Handle edit protocol (load draft data from backend)
   const handleEditProtocol = async () => {
     if (!id) return;
