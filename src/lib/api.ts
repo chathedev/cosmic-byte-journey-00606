@@ -1229,6 +1229,21 @@ class ApiClient {
     return response.json();
   }
 
+  async updateCompanyAccessMode(companyId: string, dataAccessMode: 'shared' | 'individual'): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/companies/${companyId}/access-mode`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ dataAccessMode }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update access mode' }));
+      throw new Error(error.error || 'Failed to update access mode');
+    }
+    return response.json();
+  }
+
   async deleteEnterpriseCompany(companyId: string): Promise<any> {
     const response = await this.fetchWithAuth(
       `/admin/enterprise/companies/${companyId}`,
