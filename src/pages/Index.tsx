@@ -78,7 +78,7 @@ const Index = () => {
     <div className="relative min-h-screen">
       {/* Subtle gradient background */}
       <div
-        className="fixed inset-0 pointer-events-none z-0 opacity-[0.12]"
+        className="fixed inset-0 pointer-events-none z-0 opacity-[0.35]"
         style={{
           backgroundImage: `url(${homeBg})`,
           backgroundSize: 'cover',
