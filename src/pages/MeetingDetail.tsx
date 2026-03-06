@@ -2712,7 +2712,19 @@ const MeetingDetail = () => {
                   </section>
                 )}
 
-                {/* Meeting info bar */}
+                {/* Protocol Editor Dialog */}
+                {protocolDraftData && (
+                  <ProtocolEditor
+                    meetingId={id || ''}
+                    protocol={protocolDraftData}
+                    open={isEditingProtocol}
+                    onOpenChange={setIsEditingProtocol}
+                    onProtocolUpdate={(updated) => setProtocolDraftData(updated)}
+                    readOnly={isReadOnly}
+                    isEnterprise={isEnterprise}
+                  />
+                )}
+
                 {!isEditing && (
                   <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
                     {meeting.source && (
