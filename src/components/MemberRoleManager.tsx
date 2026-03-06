@@ -357,61 +357,86 @@ export function MemberRoleManager() {
         </div>
       )}
 
-      {/* Invite form */}
+      {/* Invite form with tabs */}
       {showInviteForm && !atLimit && canManage && (
-        <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder="kollega@företag.se"
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              onFocus={scrollOnFocus}
-              className="h-9 text-sm"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
-            <Input
-              id="invite-name"
-              placeholder="Förnamn Efternamn"
-              value={inviteName}
-              onChange={e => setInviteName(e.target.value)}
-              onFocus={scrollOnFocus}
-              className="h-9 text-sm"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Roll</Label>
-            <div className="flex gap-1.5">
-              {(['viewer', 'member', 'admin', ...(viewerIsOwner ? ['owner'] : [])] as string[]).map(r => (
-                <button
-                  key={r}
-                  onClick={() => setInviteRole(r)}
-                  className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border transition-colors ${
-                    inviteRole === r
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {ROLE_CONFIG[r]?.label || r}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Button
-            onClick={handleInvite}
-            disabled={!inviteEmail.trim() || isInviting}
-            className="w-full h-9 text-xs"
-            size="sm"
-          >
-            {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
-            Skicka inbjudan
-          </Button>
+        <div className="border border-border rounded-lg p-4 bg-muted/30">
+          <Tabs defaultValue="single" className="w-full">
+            <TabsList className="w-full h-8 mb-3">
+              <TabsTrigger value="single" className="text-xs flex-1">En person</TabsTrigger>
+              <TabsTrigger value="bulk" className="text-xs flex-1">Flera samtidigt</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="single" className="space-y-3 mt-0">
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="kollega@företag.se"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                  onFocus={scrollOnFocus}
+                  className="h-9 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
+                <Input
+                  id="invite-name"
+                  placeholder="Förnamn Efternamn"
+                  value={inviteName}
+                  onChange={e => setInviteName(e.target.value)}
+                  onFocus={scrollOnFocus}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Roll</Label>
+                <div className="flex gap-1.5">
+                  {(['viewer', 'member', 'admin', ...(viewerIsOwner ? ['owner'] : [])] as string[]).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setInviteRole(r)}
+                      className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border transition-colors ${
+                        inviteRole === r
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {ROLE_CONFIG[r]?.label || r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button
+                onClick={handleInvite}
+                disabled={!inviteEmail.trim() || isInviting}
+                className="w-full h-9 text-xs"
+                size="sm"
+              >
+                {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
+                Skicka inbjudan
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-0">
+              <BulkInvitePanel
+                onSubmit={(data) => apiClient.bulkInviteEnterpriseMembers(companyId!, {
+                  emails: data.emails,
+                  role: data.role,
+                  sendInvite: data.sendInvite,
+                  resendInvite: data.resendInvite,
+                })}
+                onSuccess={loadMembers}
+                maxMembers={effectiveCap}
+                currentMembers={activeMembers.length}
+                isTrialActive={isTrial}
+                planType={planType}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       )}
 
