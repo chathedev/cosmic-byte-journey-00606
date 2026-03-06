@@ -244,9 +244,10 @@ export function EnterpriseInvitePanel() {
               <BulkInvitePanel
                 onSubmit={handleBulkInvite}
                 onSuccess={loadMembers}
-                maxMembers={hasLimit ? memberLimit : undefined}
+                maxMembers={effectiveCap}
                 currentMembers={memberCount}
                 isTrialActive={isTrial}
+                planType={planType}
               />
             </TabsContent>
           </Tabs>
