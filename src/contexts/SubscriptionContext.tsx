@@ -432,11 +432,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           sisSample = { status: 'disabled' };
         }
         
-        // Normalize planType from internal (enterprise_small/enterprise_standard) to commercial (team/enterprise)
-        const rawPlanType = membership.company?.planType;
-        const normalizedPlanType = rawPlanType === 'enterprise_small' ? 'team'
-          : rawPlanType === 'enterprise_standard' ? 'enterprise'
-          : rawPlanType; // pass through if already 'team'/'enterprise' or unknown
+        // Normalize to commercial plan for UI: team|enterprise
+        const normalizedPlanType = getCommercialPlan(
+          (membership as any)?.company?.planType,
+          (membership as any)?.company?.plan,
+          (membership as any)?.membership?.plan,
+          (membership as any)?.company?.planTier,
+        );
 
         setEnterpriseMembership({
           ...membership,
