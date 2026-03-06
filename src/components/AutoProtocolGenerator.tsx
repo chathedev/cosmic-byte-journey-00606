@@ -1203,16 +1203,6 @@ export const AutoProtocolGenerator = ({
             )}
           </div>
 
-          {/* Protocol Editor Dialog */}
-          <ProtocolEditor
-            meetingId={meetingId || ''}
-            protocol={generatedProtocol}
-            open={showProtocolEditor}
-            onOpenChange={setShowProtocolEditor}
-            onProtocolUpdate={(updated) => setGeneratedProtocol(updated)}
-            readOnly={isFreeTrialMode || !meetingId}
-            isEnterprise={isEnterprise}
-          />
         </Card>
       </div>
 
