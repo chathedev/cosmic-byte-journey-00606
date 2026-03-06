@@ -79,7 +79,7 @@ export function EnterpriseInvitePanel() {
     if (atLimit) {
       toast({
         title: 'Platsgräns nådd',
-        description: `Företaget har nått sin gräns på ${memberLimit} medlemmar.`,
+        description: `Företaget har nått sin gräns på ${effectiveCap} medlemmar.`,
         variant: 'destructive',
       });
       return;
