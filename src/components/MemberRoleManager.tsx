@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { BulkInvitePanel } from '@/components/BulkInvitePanel';
 import { useToast } from '@/hooks/use-toast';
 import { useScrollToInputHandler } from '@/hooks/useScrollToInput';
 import { apiClient } from '@/lib/api';
