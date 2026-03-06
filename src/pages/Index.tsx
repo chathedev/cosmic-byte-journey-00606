@@ -1,4 +1,5 @@
 import { TranscriptionInterface } from "@/components/TranscriptionInterface";
+import homeBg from "@/assets/home-bg.png";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
 import { EnterpriseWelcomeWizard } from "@/components/EnterpriseWelcomeWizard";
@@ -74,8 +75,20 @@ const Index = () => {
   }
 
   return (
-    <>
-      <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
+    <div className="relative min-h-screen">
+      {/* Subtle gradient background */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0 opacity-[0.12]"
+        style={{
+          backgroundImage: `url(${homeBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      <div className="relative z-10">
+        <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
+      </div>
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
 
       {/* Non-enterprise name prompt only */}
@@ -96,7 +109,7 @@ const Index = () => {
           onSelect={handleOrgSelect}
         />
       )}
-    </>
+    </div>
   );
 };
 
