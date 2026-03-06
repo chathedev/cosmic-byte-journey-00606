@@ -572,7 +572,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col">
+    <div className="min-h-[100dvh] flex flex-col">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
         <div className="max-w-md w-full space-y-8">
