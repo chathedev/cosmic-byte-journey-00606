@@ -73,6 +73,7 @@ export default function EnterpriseBilling() {
 
   const companyId = enterpriseMembership?.company?.id;
   const canManage = billing?.viewer?.canManageBilling || subscription?.viewer?.canManageBilling || false;
+  const planLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   const fetchData = useCallback(async () => {
     if (!companyId) return;
