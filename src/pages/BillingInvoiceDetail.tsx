@@ -192,7 +192,7 @@ export default function BillingInvoiceDetail() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Ingen åtkomst</h2>
             <p className="text-muted-foreground text-sm">
-              Denna sida är endast för enterprise-kunder.
+              Denna sida är endast för team- och enterprise-kunder.
             </p>
           </CardContent>
         </Card>
