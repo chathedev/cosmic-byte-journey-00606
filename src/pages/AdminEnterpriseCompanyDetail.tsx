@@ -121,6 +121,7 @@ export default function AdminEnterpriseCompanyDetail() {
   const [editingMember, setEditingMember] = useState<CompanyMember | null>(null);
   const [deletingMember, setDeletingMember] = useState<CompanyMember | null>(null);
   const [deletingCompany, setDeletingCompany] = useState(false);
+  const [showBulkInvite, setShowBulkInvite] = useState(false);
 
   // Trial
   const [showTrialDialog, setShowTrialDialog] = useState(false);
