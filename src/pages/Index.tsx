@@ -74,20 +74,8 @@ const Index = () => {
   }
 
   return (
-    <div className="relative min-h-screen">
-      {/* Subtle gradient background */}
-      <div
-        className="fixed inset-0 pointer-events-none z-0"
-        style={{
-          backgroundImage: `url(${homeBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
-      <div className="relative z-10">
-        <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
-      </div>
+    <div className="min-h-screen bg-background">
+      <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
 
       {/* Non-enterprise name prompt only */}
