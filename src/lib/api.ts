@@ -2870,10 +2870,12 @@ class ApiClient {
     }
     return response.json();
   }
-  // ==================== ENTERPRISE CHECKLIST API ====================
+  // ==================== CHECKLIST API (Team + Enterprise) ====================
 
-  async getEnterpriseChecklist(): Promise<any> {
-    const response = await this.fetchWithAuth('/enterprise/checklist');
+  /** Fetch checklist – uses /team/checklist for team-plan, /enterprise/checklist for enterprise */
+  async getChecklist(planType?: string): Promise<any> {
+    const base = planType === 'team' || planType === 'enterprise_small' ? '/team/checklist' : '/enterprise/checklist';
+    const response = await this.fetchWithAuth(base);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Failed to fetch checklist');
@@ -2881,8 +2883,15 @@ class ApiClient {
     return response.json();
   }
 
-  async updateEnterpriseChecklistStep(stepId: string, completed: boolean = true, note?: string): Promise<any> {
-    const response = await this.fetchWithAuth(`/enterprise/checklist/steps/${stepId}`, {
+  /** Legacy alias */
+  async getEnterpriseChecklist(): Promise<any> {
+    return this.getChecklist();
+  }
+
+  /** Update a checklist step – uses /team/ or /enterprise/ based on plan */
+  async updateChecklistStep(stepId: string, completed: boolean = true, note?: string, planType?: string): Promise<any> {
+    const base = planType === 'team' || planType === 'enterprise_small' ? '/team/checklist' : '/enterprise/checklist';
+    const response = await this.fetchWithAuth(`${base}/steps/${stepId}`, {
       method: 'POST',
       body: JSON.stringify({ completed, ...(note ? { note } : {}) }),
     });
@@ -2893,13 +2902,36 @@ class ApiClient {
     return response.json();
   }
 
-  async resetEnterpriseChecklist(): Promise<any> {
-    const response = await this.fetchWithAuth('/enterprise/checklist/reset', {
+  /** Legacy alias */
+  async updateEnterpriseChecklistStep(stepId: string, completed: boolean = true, note?: string): Promise<any> {
+    return this.updateChecklistStep(stepId, completed, note);
+  }
+
+  /** Reset checklist – uses /team/ or /enterprise/ based on plan */
+  async resetChecklist(planType?: string): Promise<any> {
+    const base = planType === 'team' || planType === 'enterprise_small' ? '/team/checklist' : '/enterprise/checklist';
+    const response = await this.fetchWithAuth(`${base}/reset`, {
       method: 'POST',
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Failed to reset checklist');
+    }
+    return response.json();
+  }
+
+  /** Legacy alias */
+  async resetEnterpriseChecklist(): Promise<any> {
+    return this.resetChecklist();
+  }
+
+  /** Org-level checklist overview (for owner/admin) */
+  async getOrgChecklist(companyId: string, planType?: string): Promise<any> {
+    const base = planType === 'team' || planType === 'enterprise_small' ? '/team' : '/enterprise';
+    const response = await this.fetchWithAuth(`${base}/companies/${companyId}/checklist`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to fetch org checklist');
     }
     return response.json();
   }
