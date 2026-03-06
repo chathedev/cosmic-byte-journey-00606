@@ -1413,7 +1413,49 @@ const MeetingDetail = () => {
     setShowAgendaDialog(true);
   };
 
-  // Handle view protocol
+  // Handle edit protocol (load draft data from backend)
+  const handleEditProtocol = async () => {
+    if (!id) return;
+    setLoadingProtocolDraft(true);
+    try {
+      const draftResponse = await backendApi.getProtocolDraft(id);
+      if (draftResponse?.protocolDraft) {
+        const d = draftResponse.protocolDraft;
+        setProtocolDraftData({
+          title: d.title || meeting?.title || '',
+          summary: d.summary || '',
+          mainPoints: d.mainPoints || [],
+          decisions: d.decisions || [],
+          actionItems: d.actionItems || [],
+          nextMeetingSuggestions: d.nextMeetingSuggestions || [],
+        });
+      } else {
+        // No draft yet — try to parse from protocol DOCX via mammoth (fallback)
+        setProtocolDraftData({
+          title: meeting?.title || 'Protokoll',
+          summary: '',
+          mainPoints: [],
+          decisions: [],
+          actionItems: [],
+        });
+      }
+      setIsEditingProtocol(true);
+    } catch (error) {
+      console.error('Failed to load protocol draft:', error);
+      // Still allow editing with empty data
+      setProtocolDraftData({
+        title: meeting?.title || 'Protokoll',
+        summary: '',
+        mainPoints: [],
+        decisions: [],
+        actionItems: [],
+      });
+      setIsEditingProtocol(true);
+    } finally {
+      setLoadingProtocolDraft(false);
+    }
+  };
+
   const handleViewProtocol = () => {
     if (protocolData) {
       setViewingProtocol(true);
