@@ -203,6 +203,7 @@ export default function BillingInvoiceDetail() {
   const statusInfo = invoice ? getStatusInfo(invoice.status) : null;
   const isPaid = invoice?.status.toLowerCase() === 'paid';
   const canPay = invoice && ['open', 'draft'].includes(invoice.status.toLowerCase()) && invoice.paymentIntentClientSecret;
+  const planLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   // Calculate VAT breakdown (amounts are in öre, VAT-inclusive)
   const totalKronor = oreToKronor(invoice?.amountSek);
