@@ -92,7 +92,7 @@ export function AppSidebar() {
   const meetingsUsed = !planLoading && userPlan ? (userPlan.meetingsUsed ?? 0) : 0;
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
   const meetingsLeft = meetingsLimit !== null ? Math.max(0, Number(meetingsLimit) - Number(meetingsUsed)) : null;
-
+  const orgPlanLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   useEffect(() => {
     if (user) {
