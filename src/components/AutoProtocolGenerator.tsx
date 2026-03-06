@@ -1184,20 +1184,6 @@ export const AutoProtocolGenerator = ({
               </section>
             )}
 
-            {/* Edit button */}
-            {!(isFreeTrialMode || !meetingId) && (
-              <div className="pt-4 border-t border-border/40">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowProtocolEditor(true)}
-                  className="gap-1.5"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Redigera protokoll
-                </Button>
-              </div>
-            )}
 
             {/* Footer — only for non-enterprise */}
             {!isEnterprise && (
