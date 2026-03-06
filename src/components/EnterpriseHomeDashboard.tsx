@@ -139,7 +139,7 @@ export const EnterpriseHomeDashboard = ({
   const slackConnected = integrations?.slackConnected;
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="min-h-[100dvh]">
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
         {/* Header row */}
