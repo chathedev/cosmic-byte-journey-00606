@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users } from 'lucide-react';
+import { Users, Globe } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api';
@@ -25,6 +25,8 @@ export function TeamSelector({ value, onChange, className, compact }: TeamSelect
 
   const companyId = enterpriseMembership?.company?.id;
   const isMember = enterpriseMembership?.isMember;
+  const activeMembership = enterpriseMembership?.memberships?.find(m => m.companyId === companyId);
+  const isSharedMode = (activeMembership?.dataAccessMode || 'shared') === 'shared';
 
   useEffect(() => {
     if (!companyId || !isMember) return;
@@ -32,7 +34,6 @@ export function TeamSelector({ value, onChange, className, compact }: TeamSelect
     setIsLoading(true);
     apiClient.getEnterpriseTeams(companyId)
       .then(data => {
-        // Only show active teams user is a member of
         const myTeams = (data.teams || [])
           .filter(t => t.status === 'active' && t.isMember)
           .map(t => ({ id: t.id, name: t.name, isMember: t.isMember }));
@@ -47,6 +48,12 @@ export function TeamSelector({ value, onChange, className, compact }: TeamSelect
   // Don't show if not enterprise member or no teams available
   if (!isMember || teams.length === 0) return null;
 
+  const noneLabel = isSharedMode ? 'Organisationsmöte (delat)' : 'Individuellt möte (privat)';
+  const noneLabelCompact = isSharedMode ? 'Organisationsmöte' : 'Individuellt möte';
+  const noneHelpText = isSharedMode
+    ? 'Alla aktiva medlemmar kan se detta möte'
+    : 'Bara du kan se detta möte';
+
   if (compact) {
     return (
       <div className={className}>
@@ -56,13 +63,13 @@ export function TeamSelector({ value, onChange, className, compact }: TeamSelect
         >
           <SelectTrigger className="h-8 text-xs">
             <div className="flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-muted-foreground" />
-              <SelectValue placeholder="Individuellt möte" />
+              {isSharedMode ? <Globe className="w-3.5 h-3.5 text-muted-foreground" /> : <Users className="w-3.5 h-3.5 text-muted-foreground" />}
+              <SelectValue placeholder={noneLabelCompact} />
             </div>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">
-              <span className="text-xs">Individuellt möte</span>
+              <span className="text-xs">{noneLabelCompact}</span>
             </SelectItem>
             {teams.map(team => (
               <SelectItem key={team.id} value={team.id}>
@@ -79,18 +86,21 @@ export function TeamSelector({ value, onChange, className, compact }: TeamSelect
     <div className={`space-y-1.5 ${className || ''}`}>
       <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
         <Users className="w-3.5 h-3.5" />
-        Teamdelning
+        {isSharedMode ? 'Synlighet' : 'Teamdelning'}
       </label>
       <Select
         value={value || '__none__'}
         onValueChange={(v) => onChange(v === '__none__' ? null : v)}
       >
         <SelectTrigger className="h-9">
-          <SelectValue placeholder="Välj team eller individuellt" />
+          <SelectValue placeholder={noneLabel} />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__">
-            Individuellt möte (privat)
+            <span className="flex items-center gap-2">
+              {isSharedMode && <Globe className="w-3.5 h-3.5 text-muted-foreground" />}
+              {noneLabel}
+            </span>
           </SelectItem>
           {teams.map(team => (
             <SelectItem key={team.id} value={team.id}>
@@ -103,7 +113,7 @@ export function TeamSelector({ value, onChange, className, compact }: TeamSelect
         </SelectContent>
       </Select>
       <p className="text-[10px] text-muted-foreground">
-        {value ? 'Teammedlemmar kan se detta möte' : 'Bara du kan se detta möte'}
+        {value ? 'Teammedlemmar kan se detta möte' : noneHelpText}
       </p>
     </div>
   );
