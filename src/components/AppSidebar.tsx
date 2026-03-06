@@ -215,7 +215,7 @@ export function AppSidebar() {
     { Icon: FiMail, title: "E-postkampanjer", path: "/admin/email-campaigns" },
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
-    { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
+    { Icon: FiSettings, title: "Organisationer", path: "/admin/enterprise" },
     { Icon: DollarSign, title: "AI Kostnader", path: "/admin/ai-costs" },
     { Icon: Mic, title: "Röstprofiler", path: "/admin/speaker-profiles" },
     { Icon: FiZap, title: "Integrationer (Admin)", path: "/admin/integrations" },
