@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee } from "lucide-react";
+import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee, Edit3 } from "lucide-react";
 import { ProtocolEditor } from "@/components/ProtocolEditor";
 import { SlackShareButton } from "@/components/SlackShareButton";
 import { Document, Paragraph, HeadingLevel, AlignmentType, Packer, TextRun, BorderStyle } from "docx";
@@ -116,6 +116,7 @@ export const AutoProtocolGenerator = ({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [hasDownloaded, setHasDownloaded] = useState(false);
   const [hasShared, setHasShared] = useState(false);
+  const [showProtocolEditor, setShowProtocolEditor] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1122,10 +1123,106 @@ export const AutoProtocolGenerator = ({
             </div>
           </div>
 
-          {/* Editable Protocol Content */}
+          {/* Protocol Content — read-only view with edit button */}
+          <div className="space-y-8">
+            {/* Summary */}
+            <section>
+              <h2 className="text-xl font-semibold mb-3">Sammanfattning</h2>
+              <p className="text-muted-foreground leading-relaxed">{generatedProtocol.summary}</p>
+            </section>
+
+            {/* Main Points */}
+            {Array.isArray(generatedProtocol.mainPoints) && generatedProtocol.mainPoints.length > 0 && (
+              <section>
+                <h2 className="text-xl font-semibold mb-3">Huvudpunkter</h2>
+                <ul className="space-y-2">
+                  {generatedProtocol.mainPoints.map((point, index) => (
+                    <li key={index} className="flex gap-3">
+                      <span className="text-primary font-medium">{index + 1}.</span>
+                      <span className="text-muted-foreground">{String(point)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Decisions */}
+            {Array.isArray(generatedProtocol.decisions) && generatedProtocol.decisions.length > 0 && (
+              <section>
+                <h2 className="text-xl font-semibold mb-3">Beslut</h2>
+                <ul className="space-y-2">
+                  {generatedProtocol.decisions.map((decision, index) => (
+                    <li key={index} className="flex gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{String(decision)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Action Items */}
+            {Array.isArray(generatedProtocol.actionItems) && generatedProtocol.actionItems.length > 0 && (
+              <section>
+                <h2 className="text-xl font-semibold mb-3">Åtgärdspunkter</h2>
+                <div className="space-y-4">
+                  {generatedProtocol.actionItems.map((item, index) => (
+                    <div key={index} className="pl-4 border-l-2 border-primary/20">
+                      <div className="flex items-start justify-between gap-4 mb-1">
+                        <h3 className="font-medium">{item.title}</h3>
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
+                      )}
+                      <div className="flex gap-4 text-xs text-muted-foreground">
+                        {item.owner && <span>Ansvarig: {item.owner}</span>}
+                        {item.deadline && item.deadline.trim() !== '' && <span>Deadline: {item.deadline}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Edit button */}
+            {!(isFreeTrialMode || !meetingId) && (
+              <div className="pt-4 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowProtocolEditor(true)}
+                  className="gap-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Redigera protokoll
+                </Button>
+              </div>
+            )}
+
+            {/* Footer — only for non-enterprise */}
+            {!isEnterprise && (
+              <div className="mt-12 pt-6 border-t border-border/40">
+                <p className="text-center text-xs text-muted-foreground/50">
+                  dokumenterat av{' '}
+                  <a
+                    href="https://tivly.se"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors"
+                  >
+                    tivly.se
+                  </a>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Protocol Editor Dialog */}
           <ProtocolEditor
             meetingId={meetingId || ''}
             protocol={generatedProtocol}
+            open={showProtocolEditor}
+            onOpenChange={setShowProtocolEditor}
             onProtocolUpdate={(updated) => setGeneratedProtocol(updated)}
             readOnly={isFreeTrialMode || !meetingId}
             isEnterprise={isEnterprise}
