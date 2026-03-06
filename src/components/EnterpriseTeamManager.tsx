@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Trash2, Edit2, Check, X, UserPlus, UserMinus, ChevronDown, ChevronUp, Archive, RotateCcw } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, Check, X, UserPlus, UserMinus, ChevronDown, Archive, RotateCcw } from 'lucide-react';
 import { useScrollToInputHandler } from '@/hooks/useScrollToInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -34,25 +33,20 @@ export function EnterpriseTeamManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
 
-  // Create team state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamDescription, setNewTeamDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  // Edit team state
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  // Expanded teams (for member management)
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
-  // Add member state
   const [addingMemberTeamId, setAddingMemberTeamId] = useState<string | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
 
-  // Delete confirm
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null);
 
   const companyId = enterpriseMembership?.company?.id;
@@ -172,30 +166,44 @@ export function EnterpriseTeamManager() {
 
   if (!enterpriseMembership?.isMember) return null;
 
+  const activeTeams = teams.filter(t => t.status === 'active');
+  const archivedTeams = teams.filter(t => t.status === 'archived');
+  const displayTeams = showArchived ? teams : activeTeams;
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">Team</h2>
-          <Badge variant="secondary" className="text-xs">{teams.filter(t => t.status === 'active').length}</Badge>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold leading-tight">Team</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {activeTeams.length} aktiv{activeTeams.length !== 1 ? 'a' : 't'}
+              {archivedTeams.length > 0 && !showArchived && (
+                <span> · {archivedTeams.length} arkiverad{archivedTeams.length !== 1 ? 'e' : ''}</span>
+              )}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {canManageTeams && (
+        <div className="flex items-center gap-2 shrink-0">
+          {canManageTeams && archivedTeams.length > 0 && (
             <Button
               size="sm"
-              variant={showArchived ? 'secondary' : 'ghost'}
+              variant={showArchived ? 'secondary' : 'outline'}
               onClick={() => setShowArchived(!showArchived)}
-              className="text-xs"
+              className="text-xs h-8 gap-1.5"
             >
-              <Archive className="w-3.5 h-3.5 mr-1" />
-              Arkiverade
+              <Archive className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Arkiverade</span>
             </Button>
           )}
           {canManageTeams && (
-            <Button size="sm" onClick={() => setShowCreateForm(true)}>
-              <Plus className="w-4 h-4 mr-1" />
-              Nytt team
+            <Button size="sm" onClick={() => setShowCreateForm(true)} className="h-8 gap-1.5">
+              <Plus className="w-4 h-4" />
+              <span>Nytt team</span>
             </Button>
           )}
         </div>
@@ -205,175 +213,229 @@ export function EnterpriseTeamManager() {
       <AnimatePresence>
         {showCreateForm && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
           >
-            <Card className="border-primary/20">
-              <CardContent className="pt-4 space-y-3">
-                <Input
-                  placeholder="Teamnamn"
-                  value={newTeamName}
-                  onChange={e => setNewTeamName(e.target.value)}
-                  autoFocus
-                  onFocus={scrollOnFocus}
-                />
-                <Input
-                  placeholder="Beskrivning (valfritt)"
-                  value={newTeamDescription}
-                  onChange={e => setNewTeamDescription(e.target.value)}
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button size="sm" variant="ghost" onClick={() => setShowCreateForm(false)}>Avbryt</Button>
-                  <Button size="sm" onClick={handleCreateTeam} disabled={!newTeamName.trim() || isCreating}>
-                    {isCreating ? 'Skapar...' : 'Skapa'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3">
+              <p className="text-sm font-medium">Skapa nytt team</p>
+              <Input
+                placeholder="Teamnamn"
+                value={newTeamName}
+                onChange={e => setNewTeamName(e.target.value)}
+                autoFocus
+                onFocus={scrollOnFocus}
+              />
+              <Input
+                placeholder="Beskrivning (valfritt)"
+                value={newTeamDescription}
+                onChange={e => setNewTeamDescription(e.target.value)}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="ghost" onClick={() => setShowCreateForm(false)}>Avbryt</Button>
+                <Button size="sm" onClick={handleCreateTeam} disabled={!newTeamName.trim() || isCreating}>
+                  {isCreating ? 'Skapar...' : 'Skapa team'}
+                </Button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Loading */}
       {isLoading && (
-        <div className="flex justify-center py-8">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="flex justify-center py-12">
+          <div className="w-7 h-7 border-[3px] border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && displayTeams.length === 0 && (
+        <div className="text-center py-12 rounded-xl border border-dashed border-border">
+          <Users className="w-10 h-10 mx-auto text-muted-foreground/20 mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">
+            {showArchived ? 'Inga arkiverade team' : 'Inga team ännu'}
+          </p>
+          {canManageTeams && !showArchived && (
+            <p className="text-xs text-muted-foreground/70 mt-1">Skapa ett team för att dela möten inom gruppen</p>
+          )}
         </div>
       )}
 
       {/* Teams List */}
-      {!isLoading && teams.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Inga team ännu</p>
-          {canManageTeams && <p className="text-xs mt-1">Skapa ett team för att dela möten inom gruppen</p>}
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {teams.map(team => {
+      <div className="space-y-2">
+        {displayTeams.map(team => {
           const isExpanded = expandedTeams.has(team.id);
           const isEditing = editingTeamId === team.id;
           const isArchived = team.status === 'archived';
 
           return (
-            <motion.div key={team.id} layout>
-              <Card className={`transition-colors ${isArchived ? 'opacity-60' : ''} ${team.isMember ? 'border-primary/20' : ''}`}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {isEditing ? (
-                        <div className="flex gap-2 flex-1">
-                          <Input
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            className="h-8 text-sm"
-                            autoFocus
-                            onFocus={scrollOnFocus}
-                          />
-                          <Button size="sm" variant="ghost" onClick={() => handleUpdateTeam(team.id)}>
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingTeamId(null)}>
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <CardTitle className="text-sm font-medium truncate">{team.name}</CardTitle>
-                          {isArchived && <Badge variant="outline" className="text-[10px]">Arkiverad</Badge>}
-                          {team.isMember && <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">Mitt team</Badge>}
-                        </>
-                      )}
+            <motion.div key={team.id} layout transition={{ duration: 0.15 }}>
+              <div className={`rounded-xl border bg-card transition-colors ${isArchived ? 'opacity-50' : ''} ${team.isMember ? 'border-primary/15' : 'border-border'}`}>
+                {/* Team Row */}
+                <div className="px-4 py-3">
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        className="h-9 text-sm"
+                        placeholder="Teamnamn"
+                        autoFocus
+                        onFocus={scrollOnFocus}
+                      />
+                      <Input
+                        value={editDescription}
+                        onChange={e => setEditDescription(e.target.value)}
+                        className="h-9 text-sm"
+                        placeholder="Beskrivning (valfritt)"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingTeamId(null)}>
+                          Avbryt
+                        </Button>
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleUpdateTeam(team.id)}>
+                          Spara
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => toggleExpanded(team.id)} className="p-1 rounded hover:bg-accent">
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      {/* Team Info */}
+                      <button
+                        onClick={() => toggleExpanded(team.id)}
+                        className="flex-1 min-w-0 flex items-center gap-3 text-left group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium truncate">{team.name}</span>
+                            {team.isMember && (
+                              <Badge className="text-[10px] h-5 bg-primary/10 text-primary border-primary/20 font-normal">
+                                Mitt team
+                              </Badge>
+                            )}
+                            {isArchived && (
+                              <Badge variant="outline" className="text-[10px] h-5 font-normal">
+                                Arkiverad
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {team.memberCount} {team.memberCount === 1 ? 'medlem' : 'medlemmar'}
+                            {team.description && <span className="hidden sm:inline"> · {team.description}</span>}
+                          </p>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
                       </button>
-                      {canManageTeams && !isEditing && (
-                        <>
-                          <button onClick={() => { setEditingTeamId(team.id); setEditName(team.name); setEditDescription(team.description || ''); }} className="p-1 rounded hover:bg-accent">
+
+                      {/* Actions */}
+                      {canManageTeams && (
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            onClick={() => { setEditingTeamId(team.id); setEditName(team.name); setEditDescription(team.description || ''); }}
+                            className="p-1.5 rounded-md hover:bg-muted/40 transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+                            title="Redigera"
+                          >
                             <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
                           </button>
-                          <button onClick={() => handleArchiveTeam(team)} className="p-1 rounded hover:bg-accent">
-                            {isArchived ? <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" /> : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
+                          <button
+                            onClick={() => handleArchiveTeam(team)}
+                            className="p-1.5 rounded-md hover:bg-muted/40 transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+                            title={isArchived ? 'Återställ' : 'Arkivera'}
+                          >
+                            {isArchived
+                              ? <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                              : <Archive className="w-3.5 h-3.5 text-muted-foreground" />
+                            }
                           </button>
-                          <button onClick={() => setDeletingTeam(team)} className="p-1 rounded hover:bg-destructive/10">
-                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          <button
+                            onClick={() => setDeletingTeam(team)}
+                            className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+                            title="Ta bort"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-destructive/70" />
                           </button>
-                        </>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  {team.description && !isEditing && (
-                    <p className="text-xs text-muted-foreground mt-1">{team.description}</p>
                   )}
-                  <div className="text-xs text-muted-foreground">
-                    {team.memberCount} {team.memberCount === 1 ? 'medlem' : 'medlemmar'}
-                  </div>
-                </CardHeader>
+                </div>
 
                 {/* Expanded: Members */}
                 <AnimatePresence>
-                  {isExpanded && (
+                  {isExpanded && !isEditing && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
                     >
-                      <CardContent className="pt-0 pb-3">
-                        <div className="space-y-1.5 mt-2">
-                          {team.members.map(email => (
-                            <div key={email} className="flex items-center justify-between py-1 px-2 rounded bg-muted/50 text-xs">
-                              <span className="truncate">{email}</span>
-                              {canManageTeams && (
-                                <button onClick={() => handleRemoveMember(team.id, email)} className="p-0.5 rounded hover:bg-destructive/10 shrink-0 ml-2">
-                                  <UserMinus className="w-3.5 h-3.5 text-destructive" />
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                      <div className="border-t border-border px-4 py-3">
+                        {team.members.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-1">Inga medlemmar i detta team</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {team.members.map(email => (
+                              <div key={email} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-muted/30 text-xs group/member">
+                                <span className="truncate text-foreground/80">{email}</span>
+                                {canManageTeams && (
+                                  <button
+                                    onClick={() => handleRemoveMember(team.id, email)}
+                                    className="p-1 rounded hover:bg-destructive/10 shrink-0 ml-2 opacity-0 group-hover/member:opacity-100 transition-opacity"
+                                    title="Ta bort medlem"
+                                  >
+                                    <UserMinus className="w-3.5 h-3.5 text-destructive/70" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         {/* Add member */}
                         {canManageTeams && (
-                          <div className="mt-3">
+                          <div className="mt-2.5">
                             {addingMemberTeamId === team.id ? (
-                              <div className="flex gap-2">
+                              <div className="flex gap-2 items-center">
                                 <Input
                                   placeholder="e-post@företag.se"
                                   value={newMemberEmail}
                                   onChange={e => setNewMemberEmail(e.target.value)}
-                                  className="h-8 text-xs"
+                                  className="h-8 text-xs flex-1"
                                   autoFocus
                                   onFocus={scrollOnFocus}
                                   list={`members-${team.id}`}
+                                  onKeyDown={e => e.key === 'Enter' && handleAddMember(team.id)}
                                 />
                                 <datalist id={`members-${team.id}`}>
                                   {availableMembers
                                     .filter(m => !team.members.includes(m))
                                     .map(m => <option key={m} value={m} />)}
                                 </datalist>
-                                <Button size="sm" variant="ghost" className="h-8" onClick={() => handleAddMember(team.id)}>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleAddMember(team.id)}>
                                   <Check className="w-4 h-4" />
                                 </Button>
-                                <Button size="sm" variant="ghost" className="h-8" onClick={() => { setAddingMemberTeamId(null); setNewMemberEmail(''); }}>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setAddingMemberTeamId(null); setNewMemberEmail(''); }}>
                                   <X className="w-4 h-4" />
                                 </Button>
                               </div>
                             ) : (
-                              <Button size="sm" variant="ghost" className="text-xs w-full" onClick={() => setAddingMemberTeamId(team.id)}>
-                                <UserPlus className="w-3.5 h-3.5 mr-1" /> Lägg till medlem
-                              </Button>
+                              <button
+                                onClick={() => setAddingMemberTeamId(team.id)}
+                                className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors py-1"
+                              >
+                                <UserPlus className="w-3.5 h-3.5" />
+                                Lägg till medlem
+                              </button>
                             )}
                           </div>
                         )}
-                      </CardContent>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </Card>
+              </div>
             </motion.div>
           );
         })}
