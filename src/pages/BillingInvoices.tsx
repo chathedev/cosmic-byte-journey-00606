@@ -159,7 +159,7 @@ export default function BillingInvoices() {
             )}
           </div>
           <Badge variant="outline" className="bg-primary/10 border-primary/20 text-primary">
-            Enterprise
+            {planLabel}
           </Badge>
         </div>
 
