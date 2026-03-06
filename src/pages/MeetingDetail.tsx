@@ -21,6 +21,7 @@ import { subscribeToUpload, getUploadStatus, resolveBackendMeetingId, hasBackend
 import { sendTranscriptionCompleteEmail } from "@/lib/emailNotification";
 import { AgendaSelectionDialog } from "@/components/AgendaSelectionDialog";
 import { AutoProtocolGenerator } from "@/components/AutoProtocolGenerator";
+import { ProtocolEditor } from "@/components/ProtocolEditor";
 import { MeetingRecorder } from "@/components/MeetingRecorder";
 import type { MeetingMode } from "@/components/MeetingModeDialog";
 import { IntegratedTranscriptPlayer } from "@/components/IntegratedTranscriptPlayer";
