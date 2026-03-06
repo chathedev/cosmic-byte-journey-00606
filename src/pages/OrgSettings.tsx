@@ -22,9 +22,9 @@ export default function OrgSettings() {
   const navigate = useNavigate();
   const { enterpriseMembership, refreshEnterpriseMembership } = useSubscription();
 
-  const currentAccessMode = enterpriseMembership?.company?.dataAccessMode || 
-    enterpriseMembership?.memberships?.find(m => m.companyId === enterpriseMembership?.company?.id)?.dataAccessMode || 
-    'shared';
+  const activeCompanyId = enterpriseMembership?.company?.id;
+  const activeMembership = enterpriseMembership?.memberships?.find(m => m.companyId === activeCompanyId);
+  const currentAccessMode = activeMembership?.dataAccessMode || 'shared';
 
   const [accessMode, setAccessMode] = useState<'shared' | 'individual'>(
     currentAccessMode === 'individual' ? 'individual' : 'shared'
