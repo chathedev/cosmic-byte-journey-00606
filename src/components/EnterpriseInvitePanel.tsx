@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/api';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { BulkInvitePanel } from '@/components/BulkInvitePanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface MemberInfo {
   email: string;
@@ -66,6 +68,7 @@ export function EnterpriseInvitePanel() {
   const memberCount = members.length || (company as any).memberCount || 0;
   const hasLimit = typeof memberLimit === 'number' && memberLimit > 0;
   const atLimit = hasLimit && memberCount >= memberLimit;
+  const isTrial = !!(company as any).trial?.enabled && !(company as any).trial?.expired && !(company as any).trial?.manuallyDisabled;
 
   const handleInvite = async () => {
     if (!email.trim()) return;
@@ -105,6 +108,15 @@ export function EnterpriseInvitePanel() {
     } finally {
       setIsInviting(false);
     }
+  };
+
+  const handleBulkInvite = async (data: { emails: string; role: string; sendInvite: boolean; resendInvite: boolean }) => {
+    return apiClient.bulkInviteEnterpriseMembers(company.id, {
+      emails: data.emails,
+      role: data.role,
+      sendInvite: data.sendInvite,
+      resendInvite: data.resendInvite,
+    });
   };
 
   const getRoleBadge = (memberRole?: string) => {
@@ -158,56 +170,75 @@ export function EnterpriseInvitePanel() {
         </div>
       )}
 
-      {/* Invite form */}
+      {/* Invite form - now with tabs for single/bulk */}
       {showInviteForm && !atLimit && (
-        <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder="kollega@företag.se"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              onFocus={scrollOnFocus}
-              className="h-9 text-sm"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
-            <Input
-              id="invite-name"
-              placeholder="Förnamn Efternamn"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              onFocus={scrollOnFocus}
-              className="h-9 text-sm"
-            />
-          </div>
-          <Button
-            onClick={handleInvite}
-            disabled={!email.trim() || isInviting}
-            className="w-full h-9 text-xs"
-            size="sm"
-          >
-            {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
-            Skicka inbjudan
-          </Button>
+        <div className="border border-border rounded-lg p-4 bg-muted/30">
+          <Tabs defaultValue="single" className="w-full">
+            <TabsList className="w-full h-8 mb-3">
+              <TabsTrigger value="single" className="text-xs flex-1">En person</TabsTrigger>
+              <TabsTrigger value="bulk" className="text-xs flex-1">Flera samtidigt</TabsTrigger>
+            </TabsList>
 
-          {recentInvites.length > 0 && (
-            <div className="pt-2 border-t border-border/50 space-y-1">
-              <p className="text-[10px] text-muted-foreground font-medium">Nyligen inbjudna</p>
-              {recentInvites.map((invite, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Check className="w-3 h-3 text-green-500" />
-                  <span className="truncate">{invite}</span>
+            <TabsContent value="single" className="space-y-3 mt-0">
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="kollega@företag.se"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                  onFocus={scrollOnFocus}
+                  className="h-9 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
+                <Input
+                  id="invite-name"
+                  placeholder="Förnamn Efternamn"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                  onFocus={scrollOnFocus}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <Button
+                onClick={handleInvite}
+                disabled={!email.trim() || isInviting}
+                className="w-full h-9 text-xs"
+                size="sm"
+              >
+                {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
+                Skicka inbjudan
+              </Button>
+
+              {recentInvites.length > 0 && (
+                <div className="pt-2 border-t border-border/50 space-y-1">
+                  <p className="text-[10px] text-muted-foreground font-medium">Nyligen inbjudna</p>
+                  {recentInvites.map((invite, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Check className="w-3 h-3 text-green-500" />
+                      <span className="truncate">{invite}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-0">
+              <BulkInvitePanel
+                onSubmit={handleBulkInvite}
+                onSuccess={loadMembers}
+                maxMembers={hasLimit ? memberLimit : undefined}
+                currentMembers={memberCount}
+                isTrialActive={isTrial}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       )}
 

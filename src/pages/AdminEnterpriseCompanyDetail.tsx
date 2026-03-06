@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
 import { CompanyBillingSection } from '@/components/CompanyBillingSection';
+import { BulkInvitePanel } from '@/components/BulkInvitePanel';
 import { getCommercialPlan, getCommercialPlanLabel } from '@/lib/commercialPlan';
 
 interface SISSample {
@@ -121,6 +122,7 @@ export default function AdminEnterpriseCompanyDetail() {
   const [editingMember, setEditingMember] = useState<CompanyMember | null>(null);
   const [deletingMember, setDeletingMember] = useState<CompanyMember | null>(null);
   const [deletingCompany, setDeletingCompany] = useState(false);
+  const [showBulkInvite, setShowBulkInvite] = useState(false);
 
   // Trial
   const [showTrialDialog, setShowTrialDialog] = useState(false);
@@ -1031,10 +1033,16 @@ export default function AdminEnterpriseCompanyDetail() {
                     <CardTitle>Medlemmar</CardTitle>
                     <CardDescription>{company.members.length} totalt, {activeMembers} aktiva</CardDescription>
                   </div>
-                  <Button onClick={() => setShowAddMember(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Lägg till
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowBulkInvite(true)}>
+                      <Users className="h-4 w-4 mr-2" />
+                      Massbjud in
+                    </Button>
+                    <Button onClick={() => setShowAddMember(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Lägg till
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1435,6 +1443,32 @@ export default function AdminEnterpriseCompanyDetail() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Invite Dialog */}
+      <Dialog open={showBulkInvite} onOpenChange={setShowBulkInvite}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Massbjud in medlemmar</DialogTitle>
+            <DialogDescription>Bjud in flera medlemmar till {company.name} samtidigt</DialogDescription>
+          </DialogHeader>
+          <BulkInvitePanel
+            onSubmit={async (data) => {
+              return apiClient.adminBulkInviteMembers(companyId!, {
+                emails: data.emails,
+                role: data.role,
+                sendInvite: data.sendInvite,
+                resendInvite: data.resendInvite,
+              });
+            }}
+            onSuccess={() => {
+              loadCompany();
+            }}
+            maxMembers={company.memberLimit || undefined}
+            currentMembers={company.members.length}
+            isTrialActive={!!(company.trial?.enabled && !company.trial?.expired && !company.trial?.manuallyDisabled)}
+          />
         </DialogContent>
       </Dialog>
 
