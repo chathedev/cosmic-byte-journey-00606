@@ -57,6 +57,7 @@ export default function BillingInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const planLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   // Check if any invoice is open/unpaid to enable auto-polling
   const hasOpenInvoice = invoices.some(inv => 
