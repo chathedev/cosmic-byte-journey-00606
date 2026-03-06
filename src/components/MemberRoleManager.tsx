@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { BulkInvitePanel } from '@/components/BulkInvitePanel';
 import { useToast } from '@/hooks/use-toast';
 import { useScrollToInputHandler } from '@/hooks/useScrollToInput';
 import { apiClient } from '@/lib/api';
@@ -156,6 +158,14 @@ export function MemberRoleManager() {
         description: 'Under trial-perioden kan teamet ha max 5 aktiva medlemmar. Fler kan läggas till efter trialen.',
         variant: 'destructive',
       });
+    } else if (error.status === 409 && error.code === 'team_member_limit_reached') {
+      toast({
+        title: 'Platsgräns nådd',
+        description: error.details?.limit
+          ? `Max ${error.details.limit} aktiva medlemmar i Team-planen.`
+          : 'Team-planen stödjer max 35 aktiva medlemmar.',
+        variant: 'destructive',
+      });
     } else if (error.status === 403) {
       toast({
         title: 'Åtkomst nekad',
@@ -284,8 +294,15 @@ export function MemberRoleManager() {
   };
 
   const memberLimit = (company as any)?.memberLimit;
-  const hasLimit = typeof memberLimit === 'number' && memberLimit > 0;
-  const atLimit = hasLimit && activeMembers.length >= memberLimit;
+  const planType = (company as any)?.planType || (company as any)?.plan;
+  const isTeamPlan = planType === 'team';
+  const trialObj = (company as any)?.trial;
+  const isTrial = !!(trialObj?.enabled && !trialObj?.expired && !trialObj?.manuallyDisabled);
+  const TEAM_TRIAL_CAP = 5;
+  const TEAM_ABSOLUTE_CAP = 35;
+  const effectiveCap = isTeamPlan ? (isTrial ? TEAM_TRIAL_CAP : TEAM_ABSOLUTE_CAP) : (typeof memberLimit === 'number' && memberLimit > 0 ? memberLimit : undefined);
+  const hasLimit = effectiveCap !== undefined;
+  const atLimit = hasLimit && activeMembers.length >= effectiveCap;
 
   const RoleBadge = ({ role }: { role: string }) => {
     const config = ROLE_CONFIG[role];
@@ -307,7 +324,8 @@ export function MemberRoleManager() {
           <Users className="w-4 h-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">Medlemmar</h3>
           <span className="text-xs text-muted-foreground">
-            {activeMembers.length}{hasLimit ? ` av ${memberLimit}` : ''}
+            {activeMembers.length}{hasLimit ? ` av ${effectiveCap}` : ''}
+            {isTeamPlan && !isTrial && hasLimit && <span className="text-muted-foreground/60"> (max 35)</span>}
           </span>
         </div>
         {canManage && !atLimit && (
@@ -329,73 +347,104 @@ export function MemberRoleManager() {
         <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
           <div
             className={`h-full transition-all rounded-full ${atLimit ? 'bg-destructive' : 'bg-primary'}`}
-            style={{ width: `${Math.min((activeMembers.length / memberLimit) * 100, 100)}%` }}
+            style={{ width: `${Math.min((activeMembers.length / effectiveCap!) * 100, 100)}%` }}
           />
         </div>
       )}
 
       {atLimit && canManage && (
         <div className="border border-destructive/20 bg-destructive/5 p-3 rounded-lg">
-          <p className="text-xs font-medium text-destructive">Alla {memberLimit} platser är fyllda</p>
-          <p className="text-[10px] text-destructive/70 mt-0.5">Kontakta support för att utöka.</p>
+          <p className="text-xs font-medium text-destructive">Alla {effectiveCap} platser är fyllda</p>
+          <p className="text-[10px] text-destructive/70 mt-0.5">
+            {isTeamPlan && isTrial
+              ? 'Aktivera planen för att lägga till upp till 35 medlemmar.'
+              : isTeamPlan
+                ? 'Team-planen stödjer max 35 aktiva medlemmar.'
+                : 'Kontakta support för att utöka.'}
+          </p>
         </div>
       )}
 
-      {/* Invite form */}
+      {/* Invite form with tabs */}
       {showInviteForm && !atLimit && canManage && (
-        <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder="kollega@företag.se"
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              onFocus={scrollOnFocus}
-              className="h-9 text-sm"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
-            <Input
-              id="invite-name"
-              placeholder="Förnamn Efternamn"
-              value={inviteName}
-              onChange={e => setInviteName(e.target.value)}
-              onFocus={scrollOnFocus}
-              className="h-9 text-sm"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Roll</Label>
-            <div className="flex gap-1.5">
-              {(['viewer', 'member', 'admin', ...(viewerIsOwner ? ['owner'] : [])] as string[]).map(r => (
-                <button
-                  key={r}
-                  onClick={() => setInviteRole(r)}
-                  className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border transition-colors ${
-                    inviteRole === r
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {ROLE_CONFIG[r]?.label || r}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Button
-            onClick={handleInvite}
-            disabled={!inviteEmail.trim() || isInviting}
-            className="w-full h-9 text-xs"
-            size="sm"
-          >
-            {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
-            Skicka inbjudan
-          </Button>
+        <div className="border border-border rounded-lg p-4 bg-muted/30">
+          <Tabs defaultValue="single" className="w-full">
+            <TabsList className="w-full h-8 mb-3">
+              <TabsTrigger value="single" className="text-xs flex-1">En person</TabsTrigger>
+              <TabsTrigger value="bulk" className="text-xs flex-1">Flera samtidigt</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="single" className="space-y-3 mt-0">
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-email" className="text-xs text-muted-foreground">E-postadress</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="kollega@företag.se"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                  onFocus={scrollOnFocus}
+                  className="h-9 text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="invite-name" className="text-xs text-muted-foreground">Namn (valfritt)</Label>
+                <Input
+                  id="invite-name"
+                  placeholder="Förnamn Efternamn"
+                  value={inviteName}
+                  onChange={e => setInviteName(e.target.value)}
+                  onFocus={scrollOnFocus}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Roll</Label>
+                <div className="flex gap-1.5">
+                  {(['viewer', 'member', 'admin', ...(viewerIsOwner ? ['owner'] : [])] as string[]).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setInviteRole(r)}
+                      className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border transition-colors ${
+                        inviteRole === r
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {ROLE_CONFIG[r]?.label || r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button
+                onClick={handleInvite}
+                disabled={!inviteEmail.trim() || isInviting}
+                className="w-full h-9 text-xs"
+                size="sm"
+              >
+                {isInviting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
+                Skicka inbjudan
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-0">
+              <BulkInvitePanel
+                onSubmit={(data) => apiClient.bulkInviteEnterpriseMembers(companyId!, {
+                  emails: data.emails,
+                  role: data.role,
+                  sendInvite: data.sendInvite,
+                  resendInvite: data.resendInvite,
+                })}
+                onSuccess={loadMembers}
+                maxMembers={effectiveCap}
+                currentMembers={activeMembers.length}
+                isTrialActive={isTrial}
+                planType={planType}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       )}
 
