@@ -1420,7 +1420,7 @@ const MeetingDetail = () => {
     let summary = '';
     let mainPoints: string[] = [];
     let decisions: string[] = [];
-    let actionItems: { title: string; priority: 'medium' as const }[] = [];
+    let actionItems: { title: string; priority: string }[] = [];
     
     let currentSection = '';
     const sectionBuffer: string[] = [];
