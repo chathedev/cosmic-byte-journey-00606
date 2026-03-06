@@ -78,6 +78,7 @@ export const MeetingModeDialog = ({
   digitalLocked = false,
   digitalComingSoon = false,
   showStartConfirmation = false,
+  teamsLocked = false,
 }: MeetingModeDialogProps) => {
   const [hoveredOption, setHoveredOption] = useState<MeetingMode | null>(null);
   const [hoveredProvider, setHoveredProvider] = useState<DigitalProvider | null>(null);
