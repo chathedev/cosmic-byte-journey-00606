@@ -129,8 +129,8 @@ export function AppSidebar() {
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
       else if (path === "/admin/admins") setSelected("Admins");
       else if (path === "/admin/backend") setSelected("Backend");
-      else if (path.startsWith("/admin/enterprise/billing")) setSelected("Enterprise Billing");
-      else if (path.startsWith("/admin/enterprise")) setSelected("Enterprise");
+      else if (path.startsWith("/admin/enterprise/billing")) setSelected("Org-fakturering");
+      else if (path.startsWith("/admin/enterprise")) setSelected("Organisationer");
       else if (path === "/admin/ai-costs") setSelected("AI Kostnader");
       else if (path === "/admin/speaker-profiles") setSelected("Röstprofiler");
       else if (path.startsWith("/admin/integrations")) setSelected("Integrationer (Admin)");
