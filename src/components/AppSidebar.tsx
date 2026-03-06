@@ -146,7 +146,7 @@ export function AppSidebar() {
     if (locked) {
       toast({
         title: "Låst funktion",
-        description: "Denna funktion kräver Standard- eller Enterprise-plan.",
+        description: "Denna funktion kräver Pro-, Team- eller Enterprise-plan.",
       });
       setShowSubscribe(true);
       return;
