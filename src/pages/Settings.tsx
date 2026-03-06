@@ -107,6 +107,7 @@ const Settings = () => {
 
   const isEnterpriseAdminOrOwner = enterpriseMembership?.isMember && 
     (enterpriseMembership.membership?.role === 'admin' || enterpriseMembership.membership?.role === 'owner');
+  const orgPlanLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
   
   const loadEnterpriseBilling = useCallback(async () => {
     if (!enterpriseMembership?.company?.id || !isEnterpriseAdminOrOwner) return;
