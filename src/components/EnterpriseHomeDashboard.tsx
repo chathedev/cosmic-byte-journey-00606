@@ -83,7 +83,7 @@ export const EnterpriseHomeDashboard = ({
   const displayName = preferredName || user?.displayName?.split(" ")[0] || "";
 
   const integrations = checklist?.integrations;
-  const isTeamPlan = enterpriseMembership?.company?.planType === 'team';
+  
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 5) return "God natt";
