@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Users, Lock, ChevronRight } from "lucide-react";
+import { Users, Globe, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { apiClient } from "@/lib/api";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -25,6 +25,8 @@ export function TeamSelectDialog({ open, onOpenChange, onSelect }: TeamSelectDia
   const [isLoading, setIsLoading] = useState(false);
 
   const companyId = enterpriseMembership?.company?.id;
+  const activeMembership = enterpriseMembership?.memberships?.find(m => m.companyId === companyId);
+  const isSharedMode = (activeMembership?.dataAccessMode || 'shared') === 'shared';
 
   useEffect(() => {
     if (!open || !companyId) return;
@@ -52,10 +54,12 @@ export function TeamSelectDialog({ open, onOpenChange, onSelect }: TeamSelectDia
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Dela möte
+            {isSharedMode ? 'Mötessynlighet' : 'Dela möte'}
           </DialogTitle>
           <DialogDescription>
-            Välj om mötet ska delas med ett team eller vara privat.
+            {isSharedMode
+              ? 'Välj om mötet ska kopplas till ett team eller vara synligt för hela organisationen.'
+              : 'Välj om mötet ska delas med ett team eller vara privat.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -65,7 +69,7 @@ export function TeamSelectDialog({ open, onOpenChange, onSelect }: TeamSelectDia
           </div>
         ) : (
           <div className="space-y-2 mt-2">
-            {/* Individual option */}
+            {/* Non-team option */}
             <motion.button
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -73,12 +77,20 @@ export function TeamSelectDialog({ open, onOpenChange, onSelect }: TeamSelectDia
               onClick={() => handleSelect(null)}
               className="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary/40 hover:bg-accent/50 transition-all text-left"
             >
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Lock className="h-5 w-5 text-muted-foreground" />
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isSharedMode ? 'bg-primary/10' : 'bg-muted'}`}>
+                {isSharedMode
+                  ? <Globe className="h-5 w-5 text-primary" />
+                  : <Users className="h-5 w-5 text-muted-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-foreground">Individuellt möte</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Bara du kan se detta möte</div>
+                <div className="text-sm font-semibold text-foreground">
+                  {isSharedMode ? 'Organisationsmöte' : 'Individuellt möte'}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {isSharedMode
+                    ? 'Synligt för alla aktiva medlemmar i organisationen'
+                    : 'Bara du kan se detta möte'}
+                </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </motion.button>
