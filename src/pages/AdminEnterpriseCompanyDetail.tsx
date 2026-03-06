@@ -66,8 +66,9 @@ interface Company {
   slug: string;
   status: string;
   planTier: string;
+  planType?: string;
+  plan?: string;
   contactEmail?: string;
-  domains?: string[];
   notes?: string;
   metadata?: any;
   memberLimit?: number | null;
