@@ -69,8 +69,8 @@ export default function OrgSettings() {
   const isViewerRole = role === 'viewer';
   const companyId = enterpriseMembership.company?.id;
   const commercialPlan = enterpriseMembership.company?.planType;
-  const isEnterprisePlan = commercialPlan === 'enterprise';
-  const defaultIntegrationTab = isEnterprisePlan ? 'teams' : 'zoom';
+  const isTeamsAvailable = commercialPlan === 'enterprise' || commercialPlan === 'team';
+  const defaultIntegrationTab = isTeamsAvailable ? 'teams' : 'zoom';
 
   return (
     <div className="min-h-screen bg-background">
