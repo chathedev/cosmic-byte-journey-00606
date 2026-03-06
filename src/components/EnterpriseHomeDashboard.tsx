@@ -139,38 +139,38 @@ export const EnterpriseHomeDashboard = ({
   const slackConnected = integrations?.slackConnected;
 
   return (
-    <div className="min-h-[100dvh]">
-      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+    <div className="min-h-[100dvh] bg-background">
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
 
-        {/* Header row */}
-        <div className="mb-8 sm:mb-10">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">
+        {/* Header */}
+        <div className="mb-10 sm:mb-12">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em] mb-2">
             {companyName}
           </p>
-          <h1 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
             {displayName ? `${getGreeting()}, ${displayName}` : getGreeting()}
           </h1>
         </div>
 
-        {/* Two-column layout on desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-10">
 
           {/* Left column — primary actions (3/5) */}
           <div className="lg:col-span-3 space-y-6">
 
-            {/* Record CTA */}
-            <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+            {/* Record CTA card */}
+            <div className="rounded-2xl border border-border bg-card p-6 sm:p-7">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-foreground mb-1">Nytt möte</h2>
-                  <p className="text-xs text-muted-foreground">
+                  <h2 className="text-base font-semibold text-foreground mb-1">Nytt möte</h2>
+                  <p className="text-sm text-muted-foreground">
                     Spela in live, ladda upp en fil eller klistra in text
                   </p>
                 </div>
                 <Button
                   onClick={onRecord}
                   disabled={isStartingRecording}
-                  className="h-10 px-5 gap-2 text-sm shrink-0"
+                  className="h-11 px-6 gap-2 text-sm shrink-0 rounded-xl shadow-sm"
                 >
                   {isStartingRecording ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -181,23 +181,23 @@ export const EnterpriseHomeDashboard = ({
                 </Button>
               </div>
 
-              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+              <div className="flex gap-3 mt-5 pt-5 border-t border-border/60">
                 <Button
                   onClick={onUpload}
                   variant="outline"
                   size="sm"
-                  className="flex-1 h-9 text-xs gap-1.5"
+                  className="flex-1 h-10 text-sm gap-2 rounded-xl"
                 >
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload className="w-4 h-4" />
                   Ladda upp
                 </Button>
                 <Button
                   onClick={onTextPaste}
                   variant="outline"
                   size="sm"
-                  className="flex-1 h-9 text-xs gap-1.5"
+                  className="flex-1 h-10 text-sm gap-2 rounded-xl"
                 >
-                  <ClipboardPaste className="w-3.5 h-3.5" />
+                  <ClipboardPaste className="w-4 h-4" />
                   Klistra in
                 </Button>
               </div>
@@ -205,17 +205,17 @@ export const EnterpriseHomeDashboard = ({
 
             {/* Checklist */}
             {checklist && checklist.enabled && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="rounded-2xl border border-border bg-card overflow-hidden">
                 <button
                   onClick={() => setChecklistExpanded(!checklistExpanded)}
-                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/20 transition-colors"
+                  className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                       checklist.completed ? "bg-primary/10" : "bg-muted"
                     }`}>
                       {checklist.completed ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
                       ) : (
                         <span className="text-xs font-bold text-foreground">
                           {checklist.completedSteps}
@@ -223,7 +223,7 @@ export const EnterpriseHomeDashboard = ({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-sm font-semibold text-foreground">
                         {checklist.completed ? "Onboarding klar" : "Kom igång"}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
@@ -232,7 +232,7 @@ export const EnterpriseHomeDashboard = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <Progress value={checklist.progressPercent} className="w-16 h-1" />
+                    <Progress value={checklist.progressPercent} className="w-20 h-1.5" />
                     {checklistExpanded ? (
                       <ChevronUp className="w-4 h-4 text-muted-foreground" />
                     ) : (
@@ -242,42 +242,41 @@ export const EnterpriseHomeDashboard = ({
                 </button>
 
                 {checklistExpanded && (
-                  <div className="px-5 pb-4 space-y-0.5">
+                  <div className="px-6 pb-5 space-y-1">
                     {/* Completion banner */}
                     {checklist.completed && (
-                      <div className="flex items-center gap-2.5 rounded-md px-2.5 py-3 bg-primary/5 mb-2">
+                      <div className="flex items-center gap-3 rounded-xl px-4 py-3 bg-primary/5 mb-3">
                         <PartyPopper className="w-4 h-4 text-primary shrink-0" />
-                        <p className="text-[13px] text-foreground">
+                        <p className="text-sm text-foreground">
                           Checklistan är klar. Teamet är redo att arbeta fullt i Tivly.
                         </p>
                       </div>
                     )}
 
-                    {/* Next step hint from backend */}
+                    {/* Next step hint */}
                     {!checklist.completed && checklist.messages?.[0] && (
-                      <div className="flex items-center gap-2.5 rounded-md px-2.5 py-2.5 bg-muted/40 mb-2">
+                      <div className="flex items-center gap-3 rounded-xl px-4 py-3 bg-muted/40 mb-3">
                         <ArrowRight className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <p className="text-[12px] text-muted-foreground">{checklist.messages[0]}</p>
+                        <p className="text-xs text-muted-foreground">{checklist.messages[0]}</p>
                       </div>
                     )}
 
                     {checklist.steps.map((step) => (
                       <div
                         key={step.id}
-                        className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
-                          step.completed ? "opacity-60" : ""
+                        className={`flex items-start gap-3 rounded-xl px-4 py-2.5 transition-colors ${
+                          step.completed ? "opacity-50" : ""
                         }`}
                       >
-                        {/* Auto-tracked indicator (read-only) */}
                         <div className="mt-0.5 shrink-0">
                           {step.completed ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                            <CheckCircle2 className="w-4 h-4 text-primary" />
                           ) : (
-                            <Circle className="w-3.5 h-3.5 text-border" />
+                            <Circle className="w-4 h-4 text-border" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-[13px] leading-snug ${
+                          <p className={`text-sm leading-snug ${
                             step.completed
                               ? "line-through text-muted-foreground"
                               : "text-foreground"
@@ -285,7 +284,7 @@ export const EnterpriseHomeDashboard = ({
                             {step.title}
                           </p>
                           {!step.completed && step.description && (
-                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                               {step.description}
                             </p>
                           )}
@@ -293,12 +292,11 @@ export const EnterpriseHomeDashboard = ({
                         {!step.completed && step.cta && (
                           <button
                             onClick={() => {
-                              // Remap invalid routes from backend
                               let path = step.cta!.path;
                               if (path === "/meetings" || path === "/meetings/") path = "/library";
                               navigate(path);
                             }}
-                            className="shrink-0 text-[11px] text-primary hover:underline flex items-center gap-0.5 mt-0.5"
+                            className="shrink-0 text-xs text-primary hover:underline flex items-center gap-0.5 mt-0.5 font-medium"
                           >
                             {step.cta.label}
                             <ArrowRight className="w-3 h-3" />
@@ -312,7 +310,7 @@ export const EnterpriseHomeDashboard = ({
             )}
 
             {checklistLoading && (
-              <div className="rounded-lg border border-border bg-card p-8 flex items-center justify-center">
+              <div className="rounded-2xl border border-border bg-card p-10 flex items-center justify-center">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               </div>
             )}
@@ -322,35 +320,41 @@ export const EnterpriseHomeDashboard = ({
           <div className="lg:col-span-2 space-y-6">
 
             {/* Stats */}
-            <div className="rounded-lg border border-border bg-card divide-y divide-border">
+            <div className="rounded-2xl border border-border bg-card divide-y divide-border/60">
               <button
                 onClick={() => navigate("/org/settings")}
-                className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+                className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-muted/20 transition-colors rounded-t-2xl"
               >
-                <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                </div>
                 <span className="text-sm text-foreground flex-1">Teammedlemmar</span>
-                <span className="text-sm font-semibold text-foreground tabular-nums">
+                <span className="text-lg font-semibold text-foreground tabular-nums">
                   {stats?.memberCount ?? 0}
                 </span>
               </button>
-              <div className="flex items-center gap-3 px-5 py-3.5">
-                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-3 px-5 py-4">
+                <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4 text-muted-foreground" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <span className="text-sm text-foreground">Dina möten</span>
                   <p className="text-[10px] text-muted-foreground leading-tight">Historiskt antal</p>
                 </div>
-                <span className="text-sm font-semibold text-foreground tabular-nums">
+                <span className="text-lg font-semibold text-foreground tabular-nums">
                   {userPlan?.meetingsUsed ?? 0}
                 </span>
               </div>
               {stats && (
-                <div className="flex items-center gap-3 px-5 py-3.5">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex items-center gap-3 px-5 py-4 rounded-b-2xl">
+                  <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm text-foreground">Org. möten</span>
                     <p className="text-[10px] text-muted-foreground leading-tight">Aktiva i organisationen</p>
                   </div>
-                  <span className="text-sm font-semibold text-foreground tabular-nums">
+                  <span className="text-lg font-semibold text-foreground tabular-nums">
                     {stats.totalMeetingCount ?? 0}
                   </span>
                 </div>
@@ -358,47 +362,49 @@ export const EnterpriseHomeDashboard = ({
             </div>
 
             {/* Integrations */}
-            <div className="rounded-lg border border-border bg-card">
-              <div className="px-5 py-3 border-b border-border">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-border/60">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.12em]">
                   Integrationer
                 </p>
               </div>
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/60">
                 {importActions.map((int) => {
                   const connected = integrations?.[int.key as keyof typeof integrations];
                   return (
                     <button
                       key={int.key}
                       onClick={connected ? int.onImport : () => navigate("/integrations")}
-                      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors"
+                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/20 transition-colors"
                     >
                       <img src={int.logo} alt={int.label} className="w-5 h-5 object-contain shrink-0" />
                       <span className="text-sm text-foreground flex-1 text-left">{int.label}</span>
                       {connected ? (
-                        <span className="text-[11px] text-primary font-medium">Importera →</span>
+                        <span className="text-xs text-primary font-medium">Importera →</span>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">Koppla</span>
+                        <span className="text-xs text-muted-foreground">Koppla</span>
                       )}
                     </button>
                   );
                 })}
                 {slackConnected && (
-                  <div className="flex items-center gap-3 px-5 py-3">
+                  <div className="flex items-center gap-3 px-5 py-3.5">
                     <img src={slackLogo} alt="Slack" className="w-5 h-5 object-contain shrink-0" />
                     <span className="text-sm text-foreground flex-1">Slack</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    <span className="w-2 h-2 rounded-full bg-primary" />
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Quick library link */}
+            {/* Library link */}
             <button
               onClick={() => navigate("/library")}
-              className="w-full rounded-lg border border-border bg-card px-5 py-3.5 flex items-center gap-3 hover:bg-muted/20 transition-colors"
+              className="w-full rounded-2xl border border-border bg-card px-5 py-4 flex items-center gap-3 hover:bg-muted/20 transition-colors"
             >
-              <Library className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                <Library className="w-4 h-4 text-muted-foreground" />
+              </div>
               <span className="text-sm text-foreground flex-1 text-left">Bibliotek</span>
               <ArrowRight className="w-4 h-4 text-muted-foreground" />
             </button>
