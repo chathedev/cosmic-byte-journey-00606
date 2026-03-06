@@ -1468,6 +1468,7 @@ export default function AdminEnterpriseCompanyDetail() {
             maxMembers={company.memberLimit || undefined}
             currentMembers={company.members.length}
             isTrialActive={!!(company.trial?.enabled && !company.trial?.expired && !company.trial?.manuallyDisabled)}
+            planType={getCommercialPlan(company.planTier || company.planType || company.plan)}
           />
         </DialogContent>
       </Dialog>

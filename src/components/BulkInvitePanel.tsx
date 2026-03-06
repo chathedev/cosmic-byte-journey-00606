@@ -51,9 +51,13 @@ interface BulkInvitePanelProps {
   maxMembers?: number;
   currentMembers?: number;
   isTrialActive?: boolean;
+  planType?: 'team' | 'enterprise' | string;
 }
 
-export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMembers, isTrialActive }: BulkInvitePanelProps) {
+const TEAM_TRIAL_CAP = 5;
+const TEAM_ABSOLUTE_CAP = 35;
+
+export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMembers, isTrialActive, planType }: BulkInvitePanelProps) {
   const { toast } = useToast();
   const [emailText, setEmailText] = useState('');
   const [role, setRole] = useState('member');
@@ -63,9 +67,20 @@ export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMember
   const [results, setResults] = useState<BulkInviteResponse | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const parsedCount = emailText.trim()
-    ? emailText.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.length > 0).length
-    : 0;
+  const parsedEmails = emailText.trim()
+    ? emailText.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.length > 0)
+    : [];
+  const parsedCount = parsedEmails.length;
+
+  // Calculate effective cap
+  const isTeamPlan = planType === 'team';
+  const effectiveCap = isTeamPlan
+    ? (isTrialActive ? TEAM_TRIAL_CAP : TEAM_ABSOLUTE_CAP)
+    : maxMembers;
+  const currentCount = currentMembers ?? 0;
+  const remainingSlots = effectiveCap ? Math.max(0, effectiveCap - currentCount) : undefined;
+  const wouldExceed = remainingSlots !== undefined && parsedCount > remainingSlots;
+  const atLimit = remainingSlots !== undefined && remainingSlots <= 0;
 
   const handleSubmit = async () => {
     if (!emailText.trim()) return;
@@ -143,13 +158,58 @@ export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMember
 
   return (
     <div className="space-y-4">
-      {/* Capacity warning */}
-      {isTrialActive && (
+      {/* Capacity info */}
+      {effectiveCap && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">
+              {currentCount} av {effectiveCap} platser använda
+              {isTeamPlan && !isTrialActive && (
+                <span className="text-muted-foreground/60"> (5 ingår + max 30 extra)</span>
+              )}
+            </span>
+            {remainingSlots !== undefined && remainingSlots > 0 && (
+              <span className="font-medium text-foreground">{remainingSlots} kvar</span>
+            )}
+          </div>
+          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all rounded-full ${atLimit ? 'bg-destructive' : wouldExceed ? 'bg-amber-500' : 'bg-primary'}`}
+              style={{ width: `${Math.min((currentCount / effectiveCap) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Trial warning */}
+      {isTrialActive && isTeamPlan && (
         <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
           <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-xs text-amber-700 dark:text-amber-300">
-            Under trial-perioden kan max 5 medlemmar vara aktiva. Aktivera planen för att bjuda in fler.
-          </p>
+          <div>
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              Trial: max {TEAM_TRIAL_CAP} medlemmar
+            </p>
+            <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70 mt-0.5">
+              Aktivera planen för att lägga till upp till {TEAM_ABSOLUTE_CAP} medlemmar (199 kr/extra användare/mån).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* At limit */}
+      {atLimit && (
+        <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/20 bg-destructive/5">
+          <XCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-destructive">Alla {effectiveCap} platser är fyllda</p>
+            <p className="text-[11px] text-destructive/70 mt-0.5">
+              {isTeamPlan && !isTrialActive
+                ? 'Team-planen stödjer max 35 aktiva medlemmar.'
+                : isTrialActive
+                  ? 'Aktivera planen för att lägga till fler.'
+                  : 'Kontakta support för att utöka.'}
+            </p>
+          </div>
         </div>
       )}
 
@@ -164,18 +224,17 @@ export function BulkInvitePanel({ onSubmit, onSuccess, maxMembers, currentMember
           value={emailText}
           onChange={e => setEmailText(e.target.value)}
           className="min-h-[100px] text-sm font-mono resize-y"
-          disabled={isSubmitting}
+          disabled={isSubmitting || atLimit}
         />
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">
-            {parsedCount > 0 ? `${parsedCount} adress${parsedCount === 1 ? '' : 'er'} hittade` : 'Inga adresser'}
+          <span className={`text-[11px] ${wouldExceed ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'}`}>
+            {parsedCount > 0
+              ? wouldExceed
+                ? `${parsedCount} adresser – överskrider med ${parsedCount - (remainingSlots ?? 0)}`
+                : `${parsedCount} adress${parsedCount === 1 ? '' : 'er'} hittade`
+              : 'Inga adresser'}
             {parsedCount > 200 && ' (max 200 per omgång)'}
           </span>
-          {maxMembers && currentMembers !== undefined && (
-            <span className="text-[11px] text-muted-foreground">
-              {currentMembers} / {maxMembers} platser
-            </span>
-          )}
         </div>
       </div>
 

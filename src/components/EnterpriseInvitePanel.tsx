@@ -65,17 +65,21 @@ export function EnterpriseInvitePanel() {
   if (!company || !canViewMembers) return null;
 
   const memberLimit = (company as any).memberLimit;
+  const planType = (company as any).planType || (company as any).plan;
+  const isTeamPlan = planType === 'team';
   const memberCount = members.length || (company as any).memberCount || 0;
-  const hasLimit = typeof memberLimit === 'number' && memberLimit > 0;
-  const atLimit = hasLimit && memberCount >= memberLimit;
-  const isTrial = !!(company as any).trial?.enabled && !(company as any).trial?.expired && !(company as any).trial?.manuallyDisabled;
+  const trialObj = (company as any).trial;
+  const isTrial = !!(trialObj?.enabled && !trialObj?.expired && !trialObj?.manuallyDisabled);
+  const effectiveCap = isTeamPlan ? (isTrial ? 5 : 35) : (typeof memberLimit === 'number' && memberLimit > 0 ? memberLimit : undefined);
+  const hasLimit = effectiveCap !== undefined;
+  const atLimit = hasLimit && memberCount >= effectiveCap;
 
   const handleInvite = async () => {
     if (!email.trim()) return;
     if (atLimit) {
       toast({
         title: 'Platsgräns nådd',
-        description: `Företaget har nått sin gräns på ${memberLimit} medlemmar.`,
+        description: `Företaget har nått sin gräns på ${effectiveCap} medlemmar.`,
         variant: 'destructive',
       });
       return;
@@ -134,7 +138,8 @@ export function EnterpriseInvitePanel() {
           <h3 className="text-sm font-semibold text-foreground">Medlemmar</h3>
           {hasLimit && (
             <span className="text-xs text-muted-foreground">
-              {memberCount} av {memberLimit}
+              {memberCount} av {effectiveCap}
+              {isTeamPlan && !isTrial && <span className="text-muted-foreground/60"> (max 35)</span>}
             </span>
           )}
         </div>
@@ -157,7 +162,7 @@ export function EnterpriseInvitePanel() {
         <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
           <div
             className={`h-full transition-all rounded-full ${atLimit ? 'bg-destructive' : 'bg-primary'}`}
-            style={{ width: `${Math.min((memberCount / memberLimit) * 100, 100)}%` }}
+            style={{ width: `${Math.min((memberCount / effectiveCap!) * 100, 100)}%` }}
           />
         </div>
       )}
@@ -165,8 +170,14 @@ export function EnterpriseInvitePanel() {
       {/* Limit reached */}
       {atLimit && canInvite && (
         <div className="border border-destructive/20 bg-destructive/5 p-3 rounded-lg">
-          <p className="text-xs font-medium text-destructive">Alla {memberLimit} platser är fyllda</p>
-          <p className="text-[10px] text-destructive/70 mt-0.5">Kontakta support för att utöka.</p>
+          <p className="text-xs font-medium text-destructive">Alla {effectiveCap} platser är fyllda</p>
+          <p className="text-[10px] text-destructive/70 mt-0.5">
+            {isTeamPlan && isTrial
+              ? 'Aktivera planen för att lägga till upp till 35 medlemmar.'
+              : isTeamPlan
+                ? 'Team-planen stödjer max 35 aktiva medlemmar.'
+                : 'Kontakta support för att utöka.'}
+          </p>
         </div>
       )}
 
@@ -233,9 +244,10 @@ export function EnterpriseInvitePanel() {
               <BulkInvitePanel
                 onSubmit={handleBulkInvite}
                 onSuccess={loadMembers}
-                maxMembers={hasLimit ? memberLimit : undefined}
+                maxMembers={effectiveCap}
                 currentMembers={memberCount}
                 isTrialActive={isTrial}
+                planType={planType}
               />
             </TabsContent>
           </Tabs>
