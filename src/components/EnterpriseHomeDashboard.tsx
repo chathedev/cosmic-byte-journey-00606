@@ -83,7 +83,7 @@ export const EnterpriseHomeDashboard = ({
   const displayName = preferredName || user?.displayName?.split(" ")[0] || "";
 
   const integrations = checklist?.integrations;
-  const isTeamPlan = enterpriseMembership?.company?.planType === 'team';
+  
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 5) return "God natt";
@@ -125,9 +125,9 @@ export const EnterpriseHomeDashboard = ({
   }, [loadChecklist, loadStats]);
 
   const importActions = [
-    { key: "microsoftConnected", label: "Teams", logo: teamsLogo, onImport: onOpenTeamsImport, enterpriseOnly: true },
-    { key: "zoomConnected", label: "Zoom", logo: zoomLogo, onImport: onOpenZoomImport, enterpriseOnly: false },
-    { key: "googleMeetConnected", label: "Meet", logo: googleMeetLogo, onImport: onOpenGoogleMeetImport, enterpriseOnly: false },
+    { key: "microsoftConnected", label: "Teams", logo: teamsLogo, onImport: onOpenTeamsImport },
+    { key: "zoomConnected", label: "Zoom", logo: zoomLogo, onImport: onOpenZoomImport },
+    { key: "googleMeetConnected", label: "Meet", logo: googleMeetLogo, onImport: onOpenGoogleMeetImport },
   ];
 
   const slackConnected = integrations?.slackConnected;
