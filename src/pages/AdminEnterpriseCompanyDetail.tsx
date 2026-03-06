@@ -94,6 +94,7 @@ interface Company {
     speakerIdentificationEnabled?: boolean;
     specialPerkEnabled?: boolean;
   };
+  domains?: string[];
   billingCustomerId?: string;
   billingHistory?: BillingRecord[];
   billingStatus?: string;
