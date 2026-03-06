@@ -107,6 +107,9 @@ const Library = () => {
   const location = useLocation();
   const { toast } = useToast();
   const isEnterprise = enterpriseMembership?.isMember === true;
+  const activeCompanyId = enterpriseMembership?.company?.id;
+  const activeMembership = enterpriseMembership?.memberships?.find(m => m.companyId === activeCompanyId);
+  const isSharedMode = (activeMembership?.dataAccessMode || 'shared') === 'shared';
   const hasSpecialPerk = enterpriseMembership?.company?.preferences?.specialPerkEnabled === true;
   const hasUnlimitedProtocols = isAdmin || hasSpecialPerk;
   const maxProtocolsPerMeeting = hasUnlimitedProtocols ? Infinity : (isEnterprise ? 3 : 2);
