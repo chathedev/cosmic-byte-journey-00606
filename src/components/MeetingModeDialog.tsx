@@ -19,7 +19,6 @@ interface MeetingModeDialogProps {
   digitalLocked?: boolean;
   digitalComingSoon?: boolean;
   showStartConfirmation?: boolean;
-  teamsLocked?: boolean;
 }
 
 const OPTIONS: { mode: MeetingMode; icon: typeof Users; title: string; desc: string; hint: string; hintIcon: typeof Mic }[] = [
