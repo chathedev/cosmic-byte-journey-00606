@@ -330,7 +330,7 @@ const Settings = () => {
           <Separator />
 
           {/* Enterprise Section */}
-          {userPlan?.plan === 'enterprise' && enterpriseMembership?.isMember && (
+          {enterpriseMembership?.isMember && (
             <>
               <section>
                 <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Företag</h2>
