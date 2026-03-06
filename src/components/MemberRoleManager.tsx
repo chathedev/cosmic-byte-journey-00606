@@ -158,6 +158,14 @@ export function MemberRoleManager() {
         description: 'Under trial-perioden kan teamet ha max 5 aktiva medlemmar. Fler kan läggas till efter trialen.',
         variant: 'destructive',
       });
+    } else if (error.status === 409 && error.code === 'team_member_limit_reached') {
+      toast({
+        title: 'Platsgräns nådd',
+        description: error.details?.limit
+          ? `Max ${error.details.limit} aktiva medlemmar i Team-planen.`
+          : 'Team-planen stödjer max 35 aktiva medlemmar.',
+        variant: 'destructive',
+      });
     } else if (error.status === 403) {
       toast({
         title: 'Åtkomst nekad',
