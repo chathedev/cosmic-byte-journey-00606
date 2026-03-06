@@ -210,7 +210,7 @@ export function UserDetailDialog({ user, open, onOpenChange, onOpenStripeDashboa
   const totalMeetings = displayData.meetingUsage?.totalMeetingCount ?? displayData.totalMeetingCount ?? usedMeetings;
   
   // Check if user has unlimited access (enterprise, unlimited plan, or null limit)
-  const isUnlimitedPlan = displayData.plan === 'enterprise' || displayData.plan === 'unlimited' || effectiveLimit === null;
+  const isUnlimitedPlan = displayData.plan === 'enterprise' || displayData.plan === 'unlimited' || displayData.plan === 'team' || effectiveLimit === null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

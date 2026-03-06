@@ -486,7 +486,15 @@ export const AdminSupportPanel = ({ open, onOpenChange }: AdminSupportPanelProps
                             <p className="text-xs text-muted-foreground">I papperskorgen</p>
                           </div>
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
-                            <p className="text-2xl font-bold">{userData.user.meetingUsage?.meetingLimit ?? userData.user.meetingLimit ?? '-'}</p>
+                            <p className="text-2xl font-bold">
+                              {(() => {
+                                const p = userData.user.plan;
+                                const planStr = typeof p === 'string' ? p : (p?.plan || '');
+                                return ['team', 'enterprise', 'unlimited'].includes(planStr)
+                                  ? '∞'
+                                  : (userData.user.meetingUsage?.meetingLimit ?? userData.user.meetingLimit ?? '-');
+                              })()}
+                            </p>
                             <p className="text-xs text-muted-foreground">Mötesgräns</p>
                           </div>
                           <div className="text-center p-3 bg-muted/50 rounded-lg">
