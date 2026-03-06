@@ -1134,17 +1134,19 @@ const Library = () => {
                     <Users className="w-3 h-3" />
                     Team
                   </button>
-                  <button
-                    onClick={() => setAccessScopeFilter('individual')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-                      accessScopeFilter === 'individual'
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Lock className="w-3 h-3" />
-                    Privata
-                  </button>
+                  {!isSharedMode && (
+                    <button
+                      onClick={() => setAccessScopeFilter('individual')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                        accessScopeFilter === 'individual'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Lock className="w-3 h-3" />
+                      Privata
+                    </button>
+                  )}
                 </div>
                 <div className="w-px h-6 bg-border" />
               </>
