@@ -2548,7 +2548,31 @@ const MeetingDetail = () => {
                 {!isEditing && (
                 <section className="rounded-lg border border-border bg-card overflow-hidden">
                     <div className="p-3 sm:p-5">
-                      {protocolData ? (
+                      {isEditingProtocol && protocolDraftData ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Edit3 className="w-4 h-4 text-primary" />
+                              <h2 className="text-sm font-semibold text-foreground">Redigera protokoll</h2>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsEditingProtocol(false)}
+                              className="gap-1.5 h-8 text-xs text-muted-foreground no-hover-lift"
+                            >
+                              Stäng
+                            </Button>
+                          </div>
+                          <ProtocolEditor
+                            meetingId={id || ''}
+                            protocol={protocolDraftData}
+                            onProtocolUpdate={(updated) => setProtocolDraftData(updated)}
+                            readOnly={isReadOnly}
+                            isEnterprise={isEnterprise}
+                          />
+                        </div>
+                      ) : protocolData ? (
                         <div className="space-y-4">
                           <div className="flex items-start gap-3">
                             <div className="mt-0.5 w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -2565,6 +2589,11 @@ const MeetingDetail = () => {
                             <Button onClick={handleViewProtocol} size="sm" variant="default" className="gap-1.5 h-9 text-xs no-hover-lift">
                               <Eye className="w-3.5 h-3.5" /> Visa
                             </Button>
+                            {!isReadOnly && (
+                              <Button onClick={handleEditProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift" disabled={loadingProtocolDraft}>
+                                {loadingProtocolDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />} Redigera
+                              </Button>
+                            )}
                             <Button onClick={handleDownloadProtocol} size="sm" variant="outline" className="gap-1.5 h-9 text-xs no-hover-lift">
                               <Download className="w-3.5 h-3.5" /> Ladda ner
                             </Button>
