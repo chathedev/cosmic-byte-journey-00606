@@ -233,7 +233,7 @@ export default function OrgSettings() {
                   </TabsTrigger>
                 </TabsList>
 
-                {isEnterprisePlan && (
+                {isTeamsAvailable && (
                   <TabsContent value="teams" className="mt-4">
                     <OrgTeamsInsights companyId={companyId} />
                   </TabsContent>
