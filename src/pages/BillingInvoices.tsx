@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, ExternalLink, CheckCircle, Clock, AlertCircle, XCircle, ArrowLeft } from "lucide-react";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 interface Invoice {
   id: string;
@@ -56,6 +57,7 @@ export default function BillingInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const planLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   // Check if any invoice is open/unpaid to enable auto-polling
   const hasOpenInvoice = invoices.some(inv => 
@@ -125,7 +127,7 @@ export default function BillingInvoices() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Ingen åtkomst</h2>
             <p className="text-muted-foreground text-sm">
-              Denna sida är endast för enterprise-kunder. Kontakta support om du tror att detta är ett fel.
+              Denna sida är endast för team- och enterprise-kunder. Kontakta support om du tror att detta är ett fel.
             </p>
           </CardContent>
         </Card>
@@ -157,14 +159,14 @@ export default function BillingInvoices() {
             )}
           </div>
           <Badge variant="outline" className="bg-primary/10 border-primary/20 text-primary">
-            Enterprise
+            {planLabel}
           </Badge>
         </div>
 
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-foreground">Dina fakturor</h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Hantera och betala dina enterprise-fakturor
+            Hantera och betala dina organisationsfakturor
           </p>
         </div>
 

@@ -7,6 +7,7 @@ import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, ArrowRight, Mail } from 
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
+import { getCommercialPlan } from '@/lib/commercialPlan';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoAppAccessScreen from '@/components/NoAppAccessScreen';
 import tivlyLogo from '@/assets/tivly-logo.png';
@@ -47,9 +48,9 @@ function hasAppAccess(userData: any): boolean {
     if (userData.roles.includes('admin') || userData.roles.includes('owner')) return true;
   }
   const planType = typeof userData.plan === 'string' ? userData.plan : userData.plan?.plan;
-  if (planType?.toLowerCase() === 'enterprise') return true;
+  const commercialPlan = getCommercialPlan(planType, userData.company?.planType, userData.company?.plan, userData.company?.planTier);
+  if (commercialPlan === 'team' || commercialPlan === 'enterprise') return true;
   if (userData.enterprise?.active || userData.enterprise?.companyName) return true;
-  if (userData.company?.planTier === 'enterprise') return true;
   return false;
 }
 

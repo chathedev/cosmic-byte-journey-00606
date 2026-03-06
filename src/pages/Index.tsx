@@ -7,6 +7,7 @@ import { ViewerDashboard } from "@/components/ViewerDashboard";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 const Index = () => {
   const { userPlan, isLoading, enterpriseMembership, switchCompany, isViewer } = useSubscription();
@@ -59,7 +60,7 @@ const Index = () => {
     return (
       <EnterpriseWelcomeWizard
         open
-        companyName={enterpriseMembership?.company?.name || "Enterprise"}
+        companyName={enterpriseMembership?.company?.name || getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier)}
         onComplete={() => {
           // Wizard auto-closes once refreshUser updates name in auth state.
         }}

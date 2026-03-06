@@ -692,7 +692,7 @@ export default function AdminEnterprise() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Företag</CardTitle>
-                <CardDescription>Alla enterprise-företag i systemet</CardDescription>
+                <CardDescription>Alla Team- och Enterprise-företag i systemet</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 {sisTimestamp && (
@@ -1202,7 +1202,7 @@ export default function AdminEnterprise() {
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>Alla företagets medlemmar ({deletingCompany?.members?.length || 0} st)</li>
                 <li>All företagsdata och inställningar</li>
-                <li>Medlemmarnas tillgång till enterprise-funktioner</li>
+                <li>Medlemmarnas tillgång till organisationsfunktioner</li>
               </ul>
               <p className="text-sm text-muted-foreground mt-2">
                 Denna åtgärd kan inte ångras.

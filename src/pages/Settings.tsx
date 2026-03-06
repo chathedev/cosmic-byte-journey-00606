@@ -15,6 +15,7 @@ import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { SupportCodeDialog } from "@/components/SupportCodeDialog";
 import { Separator } from "@/components/ui/separator";
 import { isWebBrowser } from "@/utils/environment";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 import appStoreBadge from "@/assets/app-store-badge-black.svg";
 const formatSwedishDate = (dateString: string | undefined) => {
@@ -106,6 +107,7 @@ const Settings = () => {
 
   const isEnterpriseAdminOrOwner = enterpriseMembership?.isMember && 
     (enterpriseMembership.membership?.role === 'admin' || enterpriseMembership.membership?.role === 'owner');
+  const orgPlanLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
   
   const loadEnterpriseBilling = useCallback(async () => {
     if (!enterpriseMembership?.company?.id || !isEnterpriseAdminOrOwner) return;
@@ -262,9 +264,9 @@ const Settings = () => {
       case 'pro':
       case 'standard': return 'Tivly Pro';
       case 'plus': return 'Tivly Plus';
+      case 'team': return 'Team';
       case 'unlimited': return 'Unlimited';
       case 'enterprise': return 'Enterprise';
-      default: return 'Gratis';
     }
   };
 
@@ -328,7 +330,7 @@ const Settings = () => {
           <Separator />
 
           {/* Enterprise Section */}
-          {userPlan?.plan === 'enterprise' && enterpriseMembership?.isMember && (
+          {enterpriseMembership?.isMember && (
             <>
               <section>
                 <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Företag</h2>
@@ -338,9 +340,9 @@ const Settings = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold">{enterpriseMembership?.company?.name || (enterpriseMembership?.company?.planType === 'enterprise' ? 'Enterprise' : 'Team')}</h3>
+                      <h3 className="font-semibold">{enterpriseMembership?.company?.name || orgPlanLabel}</h3>
                       <Badge variant="secondary" className="bg-primary/20 text-primary text-xs">
-                        {enterpriseMembership?.company?.planType === 'enterprise' ? 'Enterprise' : 'Team'}
+                        {orgPlanLabel}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5">
@@ -446,7 +448,7 @@ const Settings = () => {
           )}
 
           {/* Plan Section - For non-enterprise users */}
-          {userPlan?.plan !== 'enterprise' && userPlan?.plan !== 'unlimited' && (
+          {!enterpriseMembership?.isMember && userPlan?.plan !== 'unlimited' && (
             <>
               <section>
                 <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Prenumeration</h2>

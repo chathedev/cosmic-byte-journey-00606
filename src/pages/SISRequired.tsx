@@ -9,6 +9,7 @@ import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getCommercialPlanLabel } from '@/lib/commercialPlan';
 
 const MIN_RECORDING_TIME = 20; // 20 seconds minimum for ~220-260 words
 const MAX_RECORDING_TIME = 90; // 90 seconds maximum
@@ -77,7 +78,7 @@ export default function SISRequired() {
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const companyName = enterpriseMembership?.company?.name || 'Enterprise';
+  const companyName = enterpriseMembership?.company?.name || getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   // ~220-260 words for optimal voice sample quality
   const sampleText = `Hej, jag heter ${speakerName || '[ditt namn]'} och arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen och gå igenom vad vi åstadkommit sedan förra mötet.

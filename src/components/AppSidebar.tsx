@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { isMobileDevice } from "@/utils/mobileDetection";
 import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import tivlyLogo from "@/assets/tivly-logo.png";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 export function AppSidebar() {
   const [isMobile] = useState(() => isMobileDevice());
@@ -91,7 +92,7 @@ export function AppSidebar() {
   const meetingsUsed = !planLoading && userPlan ? (userPlan.meetingsUsed ?? 0) : 0;
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
   const meetingsLeft = meetingsLimit !== null ? Math.max(0, Number(meetingsLimit) - Number(meetingsUsed)) : null;
-
+  const orgPlanLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   useEffect(() => {
     if (user) {
@@ -128,8 +129,8 @@ export function AppSidebar() {
       else if (path === "/admin/email-campaigns") setSelected("E-postkampanjer");
       else if (path === "/admin/admins") setSelected("Admins");
       else if (path === "/admin/backend") setSelected("Backend");
-      else if (path.startsWith("/admin/enterprise/billing")) setSelected("Enterprise Billing");
-      else if (path.startsWith("/admin/enterprise")) setSelected("Enterprise");
+      else if (path.startsWith("/admin/enterprise/billing")) setSelected("Org-fakturering");
+      else if (path.startsWith("/admin/enterprise")) setSelected("Organisationer");
       else if (path === "/admin/ai-costs") setSelected("AI Kostnader");
       else if (path === "/admin/speaker-profiles") setSelected("Röstprofiler");
       else if (path.startsWith("/admin/integrations")) setSelected("Integrationer (Admin)");
@@ -145,7 +146,7 @@ export function AppSidebar() {
     if (locked) {
       toast({
         title: "Låst funktion",
-        description: "Denna funktion kräver Standard- eller Enterprise-plan.",
+        description: "Denna funktion kräver Pro-, Team- eller Enterprise-plan.",
       });
       setShowSubscribe(true);
       return;
@@ -214,7 +215,7 @@ export function AppSidebar() {
     { Icon: FiMail, title: "E-postkampanjer", path: "/admin/email-campaigns" },
     { Icon: FiUserCheck, title: "Admins", path: "/admin/admins" },
     { Icon: FiDatabase, title: "Backend", path: "/admin/backend" },
-    { Icon: FiSettings, title: "Enterprise", path: "/admin/enterprise" },
+    { Icon: FiSettings, title: "Organisationer", path: "/admin/enterprise" },
     { Icon: DollarSign, title: "AI Kostnader", path: "/admin/ai-costs" },
     { Icon: Mic, title: "Röstprofiler", path: "/admin/speaker-profiles" },
     { Icon: FiZap, title: "Integrationer (Admin)", path: "/admin/integrations" },
@@ -339,7 +340,7 @@ export function AppSidebar() {
                       {enterpriseMembership?.isMember ? (
                         <span className="flex items-center gap-1">
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 border-primary/20 text-primary">
-                            {enterpriseMembership.company?.planType === 'enterprise' ? 'Enterprise' : 'Team'}
+                            {orgPlanLabel}
                           </Badge>
                           {enterpriseMembership.membership?.role && (
                             <span className="text-muted-foreground/70">

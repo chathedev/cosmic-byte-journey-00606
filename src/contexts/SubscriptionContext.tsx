@@ -4,6 +4,7 @@ import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
 import { setDebugAdminStatus } from '@/lib/debugLogger';
+import { getCommercialPlan } from '@/lib/commercialPlan';
 
 // Payment routing is PURELY domain-based:
 // - io.tivly.se = Apple IAP via RevenueCat
@@ -219,13 +220,24 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       
       // Detect team/enterprise membership from user payload hints
       const u: any = user;
+      const inferredCompanyPlan = getCommercialPlan(
+        u?.company?.planType,
+        u?.company?.plan,
+        u?.company?.planTier,
+        u?.plan?.planType,
+        u?.plan?.plan,
+        u?.planTier,
+      );
+
       const teamDetected = (
+        inferredCompanyPlan === 'team' ||
         planStr === 'team' ||
         u?.planTier === 'team' ||
         (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
         (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'))
       );
       const enterpriseDetected = (
+        inferredCompanyPlan === 'enterprise' ||
         planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
@@ -238,10 +250,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
       const normalizedPlan: UserPlan['plan'] = admin
         ? 'unlimited'
-        : (enterpriseDetected
-            ? 'enterprise'
-            : (teamDetected
-                ? 'team'
+        : (teamDetected
+            ? 'team'
+            : (enterpriseDetected
+                ? 'enterprise'
                 : ((validPlans as readonly string[]).includes(planStr)
                     ? (planStr as UserPlan['plan'])
                     : (aliasMap[planStr] ?? 'free'))));
@@ -420,11 +432,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           sisSample = { status: 'disabled' };
         }
         
-        // Normalize planType from internal (enterprise_small/enterprise_standard) to commercial (team/enterprise)
-        const rawPlanType = membership.company?.planType;
-        const normalizedPlanType = rawPlanType === 'enterprise_small' ? 'team'
-          : rawPlanType === 'enterprise_standard' ? 'enterprise'
-          : rawPlanType; // pass through if already 'team'/'enterprise' or unknown
+        // Normalize to commercial plan for UI: team|enterprise
+        const normalizedPlanType = getCommercialPlan(
+          (membership as any)?.company?.planType,
+          (membership as any)?.company?.plan,
+          (membership as any)?.membership?.plan,
+          (membership as any)?.company?.planTier,
+        );
 
         setEnterpriseMembership({
           ...membership,
@@ -433,7 +447,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           memberships: membership.memberships,
           company: {
             ...membership.company,
-            planType: normalizedPlanType,
+            planType: normalizedPlanType === 'unknown' ? membership.company?.planType : normalizedPlanType,
             speakerIdentificationEnabled: sisEnabled,
           },
           sisSample,

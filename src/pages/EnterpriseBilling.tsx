@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 const formatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return '–';
@@ -72,6 +73,7 @@ export default function EnterpriseBilling() {
 
   const companyId = enterpriseMembership?.company?.id;
   const canManage = billing?.viewer?.canManageBilling || subscription?.viewer?.canManageBilling || false;
+  const planLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   const fetchData = useCallback(async () => {
     if (!companyId) return;
@@ -180,7 +182,7 @@ export default function EnterpriseBilling() {
               )}
             </div>
             <Badge variant="outline" className="bg-primary/10 border-primary/20 text-primary">
-              {enterpriseMembership?.company?.planType === 'enterprise' ? 'Enterprise' : 'Team'}
+              {planLabel}
             </Badge>
           </div>
         </div>

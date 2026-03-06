@@ -19,6 +19,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { InvoicePaymentDialog } from "@/components/InvoicePaymentDialog";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 interface InvoiceDetail {
   id: string;
@@ -191,7 +192,7 @@ export default function BillingInvoiceDetail() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Ingen åtkomst</h2>
             <p className="text-muted-foreground text-sm">
-              Denna sida är endast för enterprise-kunder.
+              Denna sida är endast för team- och enterprise-kunder.
             </p>
           </CardContent>
         </Card>
@@ -202,6 +203,7 @@ export default function BillingInvoiceDetail() {
   const statusInfo = invoice ? getStatusInfo(invoice.status) : null;
   const isPaid = invoice?.status.toLowerCase() === 'paid';
   const canPay = invoice && ['open', 'draft'].includes(invoice.status.toLowerCase()) && invoice.paymentIntentClientSecret;
+  const planLabel = getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   // Calculate VAT breakdown (amounts are in öre, VAT-inclusive)
   const totalKronor = oreToKronor(invoice?.amountSek);
@@ -269,7 +271,7 @@ export default function BillingInvoiceDetail() {
                       {formatAmountSEK(invoice.amountSek)} kr
                     </CardTitle>
                     <p className="text-muted-foreground text-sm mt-1">
-                      {invoice.companyName || 'Enterprise'}
+                      {invoice.companyName || planLabel}
                     </p>
                   </div>
                   {statusInfo && (
@@ -391,7 +393,7 @@ export default function BillingInvoiceDetail() {
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Tivly Enterprise-villkor
+                Tivly Team & Enterprise-villkor
               </a>
             </p>
           </div>

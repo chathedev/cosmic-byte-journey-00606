@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from '@/components/UserDetailDialog';
 import { CompanyBillingSection } from '@/components/CompanyBillingSection';
+import { getCommercialPlan, getCommercialPlanLabel } from '@/lib/commercialPlan';
 
 interface SISSample {
   status: 'ready' | 'processing' | 'error' | 'missing' | null;
@@ -65,8 +66,9 @@ interface Company {
   slug: string;
   status: string;
   planTier: string;
+  planType?: string;
+  plan?: string;
   contactEmail?: string;
-  domains?: string[];
   notes?: string;
   metadata?: any;
   memberLimit?: number | null;
@@ -778,7 +780,7 @@ export default function AdminEnterpriseCompanyDetail() {
               </div>
               <p className="text-muted-foreground mt-1 flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
-                {company.planTier}
+                {getCommercialPlanLabel(company.planType, (company as any).plan, company.planTier)}
                 {company.contactEmail && (
                   <>
                     <span className="mx-1">•</span>
@@ -1056,7 +1058,7 @@ export default function AdminEnterpriseCompanyDetail() {
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => setSelectedMemberDetail({
                             email: member.email,
-                            plan: 'enterprise',
+                            plan: getCommercialPlan(company.planType, (company as any).plan, company.planTier) === 'team' ? 'team' : 'enterprise',
                             meetingCount: memberStats?.meetingCount ?? 0
                           })}
                         >
