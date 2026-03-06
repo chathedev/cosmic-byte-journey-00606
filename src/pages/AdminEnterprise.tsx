@@ -692,7 +692,7 @@ export default function AdminEnterprise() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Företag</CardTitle>
-                <CardDescription>Alla enterprise-företag i systemet</CardDescription>
+                <CardDescription>Alla Team- och Enterprise-företag i systemet</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 {sisTimestamp && (

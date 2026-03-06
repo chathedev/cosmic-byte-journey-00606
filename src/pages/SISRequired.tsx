@@ -9,6 +9,7 @@ import { apiClient } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getCommercialPlanLabel } from '@/lib/commercialPlan';
 
 const MIN_RECORDING_TIME = 20; // 20 seconds minimum for ~220-260 words
 const MAX_RECORDING_TIME = 90; // 90 seconds maximum
