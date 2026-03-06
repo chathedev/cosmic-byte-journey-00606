@@ -1218,6 +1218,50 @@ class ApiClient {
     return response.json();
   }
 
+  // Admin bulk invite members
+  async adminBulkInviteMembers(companyId: string, data: {
+    emails: string | string[];
+    role?: string;
+    sendInvite?: boolean;
+    resendInvite?: boolean;
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/admin/enterprise/companies/${companyId}/members/bulk-invite`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: any = new Error(errorData.message || errorData.error || 'Failed to bulk invite');
+      error.code = errorData.code || errorData.error;
+      error.status = response.status;
+      error.details = errorData.details;
+      throw error;
+    }
+    return response.json();
+  }
+
+  // Enterprise (non-admin) bulk invite members
+  async bulkInviteEnterpriseMembers(companyId: string, data: {
+    emails: string | string[];
+    role?: string;
+    sendInvite?: boolean;
+    resendInvite?: boolean;
+  }): Promise<any> {
+    const response = await this.fetchWithAuth(
+      `/enterprise/companies/${companyId}/members/bulk-invite`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: any = new Error(errorData.message || errorData.error || 'Failed to bulk invite');
+      error.code = errorData.code || errorData.error;
+      error.status = response.status;
+      error.details = errorData.details;
+      throw error;
+    }
+    return response.json();
+  }
+
   async deleteEnterpriseCompanyMember(companyId: string, memberEmail: string): Promise<any> {
     const response = await this.fetchWithAuth(
       `/admin/enterprise/companies/${companyId}/members/${encodeURIComponent(memberEmail)}`,
