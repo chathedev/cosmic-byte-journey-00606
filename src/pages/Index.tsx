@@ -1,4 +1,5 @@
 import { TranscriptionInterface } from "@/components/TranscriptionInterface";
+import homeBg from "@/assets/home-bg.png";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { WelcomeNameDialog } from "@/components/WelcomeNameDialog";
 import { EnterpriseWelcomeWizard } from "@/components/EnterpriseWelcomeWizard";
