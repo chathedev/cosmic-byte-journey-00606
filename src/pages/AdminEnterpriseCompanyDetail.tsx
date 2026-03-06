@@ -780,7 +780,7 @@ export default function AdminEnterpriseCompanyDetail() {
               </div>
               <p className="text-muted-foreground mt-1 flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
-                {company.planTier}
+                {getCommercialPlanLabel(company.planType, (company as any).plan, company.planTier)}
                 {company.contactEmail && (
                   <>
                     <span className="mx-1">•</span>
