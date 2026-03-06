@@ -286,8 +286,15 @@ export function MemberRoleManager() {
   };
 
   const memberLimit = (company as any)?.memberLimit;
-  const hasLimit = typeof memberLimit === 'number' && memberLimit > 0;
-  const atLimit = hasLimit && activeMembers.length >= memberLimit;
+  const planType = (company as any)?.planType || (company as any)?.plan;
+  const isTeamPlan = planType === 'team';
+  const trialObj = (company as any)?.trial;
+  const isTrial = !!(trialObj?.enabled && !trialObj?.expired && !trialObj?.manuallyDisabled);
+  const TEAM_TRIAL_CAP = 5;
+  const TEAM_ABSOLUTE_CAP = 35;
+  const effectiveCap = isTeamPlan ? (isTrial ? TEAM_TRIAL_CAP : TEAM_ABSOLUTE_CAP) : (typeof memberLimit === 'number' && memberLimit > 0 ? memberLimit : undefined);
+  const hasLimit = effectiveCap !== undefined;
+  const atLimit = hasLimit && activeMembers.length >= effectiveCap;
 
   const RoleBadge = ({ role }: { role: string }) => {
     const config = ROLE_CONFIG[role];
