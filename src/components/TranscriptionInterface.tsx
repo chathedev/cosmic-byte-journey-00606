@@ -572,29 +572,29 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8">
-        <div className="max-w-md w-full space-y-8">
+        <div className="max-w-lg w-full space-y-10">
           
-          {/* Hero - simplified */}
-          <div className="text-center space-y-3">
+          {/* Hero */}
+          <div className="text-center space-y-2">
             {displayName && (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-sm tracking-wide">
                 {getGreeting()}, <span className="text-foreground font-medium">{displayName}</span>
               </p>
             )}
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
-              Skapa protokoll
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
+              Nytt protokoll
             </h1>
-            <p className="text-sm text-muted-foreground">
-              {isViewer ? 'Du har läsbehörighet i organisationen' : 'Spela in, ladda upp eller klistra in text'}
+            <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+              {isViewer ? 'Du har läsbehörighet i organisationen' : 'Spela in live, ladda upp en fil eller klistra in text'}
             </p>
           </div>
 
           {/* Viewer read-only notice */}
           {isViewer && (
-            <div className="border border-border rounded-lg p-4 bg-muted/30 text-center space-y-1">
+            <div className="border border-border rounded-2xl p-5 bg-card text-center space-y-2">
               <Eye className="w-5 h-5 mx-auto text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">Läsläge</p>
               <p className="text-xs text-muted-foreground">
@@ -610,7 +610,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               onClick={handleRecordClick}
               size="lg"
               disabled={isStartingRecording}
-              className="w-full h-14 text-base gap-3 rounded-none"
+              className="w-full h-14 text-base gap-3 rounded-2xl shadow-sm"
             >
               {isStartingRecording ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -620,39 +620,42 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
               {isStartingRecording ? 'Startar...' : 'Spela in möte'}
             </Button>
 
-            <Button 
-              onClick={handleUploadClick}
-              variant="outline"
-              size="lg"
-              className="w-full h-14 text-base gap-3 rounded-none"
-            >
-              <Upload className="w-5 h-5" />
-              Ladda upp fil
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                onClick={handleUploadClick}
+                variant="outline"
+                size="lg"
+                className="h-12 text-sm gap-2.5 rounded-2xl"
+              >
+                <Upload className="w-4 h-4" />
+                Ladda upp
+              </Button>
 
-            <Button 
-              onClick={() => setShowTextPasteDialog(true)}
-              variant="outline"
-              size="lg"
-              className="w-full h-14 text-base gap-3 rounded-none"
-            >
-              <ClipboardPaste className="w-5 h-5" />
-              Klistra in text
-            </Button>
+              <Button 
+                onClick={() => setShowTextPasteDialog(true)}
+                variant="outline"
+                size="lg"
+                className="h-12 text-sm gap-2.5 rounded-2xl"
+              >
+                <ClipboardPaste className="w-4 h-4" />
+                Klistra in
+              </Button>
+            </div>
           </div>
           )}
 
-
-          {/* Minimal trust indicators */}
-          <div className="flex items-center justify-center gap-4 pt-4 text-xs text-muted-foreground">
+          {/* Trust indicators */}
+          <div className="flex items-center justify-center gap-6 pt-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
               <span>GDPR</span>
             </div>
+            <span className="w-px h-3 bg-border" />
             <div className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
               <span>AI-driven</span>
             </div>
+            <span className="w-px h-3 bg-border" />
             <div className="flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" />
               <span>SV / EN</span>
