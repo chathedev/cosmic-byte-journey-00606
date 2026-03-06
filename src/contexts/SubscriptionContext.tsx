@@ -4,6 +4,7 @@ import { subscriptionService, UserPlan } from '@/lib/subscription';
 import { meetingStorage } from '@/utils/meetingStorage';
 import { apiClient } from '@/lib/api';
 import { setDebugAdminStatus } from '@/lib/debugLogger';
+import { getCommercialPlan } from '@/lib/commercialPlan';
 
 // Payment routing is PURELY domain-based:
 // - io.tivly.se = Apple IAP via RevenueCat

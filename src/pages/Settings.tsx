@@ -15,6 +15,7 @@ import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { SupportCodeDialog } from "@/components/SupportCodeDialog";
 import { Separator } from "@/components/ui/separator";
 import { isWebBrowser } from "@/utils/environment";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 import appStoreBadge from "@/assets/app-store-badge-black.svg";
 const formatSwedishDate = (dateString: string | undefined) => {

@@ -7,6 +7,7 @@ import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, ArrowRight, Mail } from 
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
+import { getCommercialPlan } from '@/lib/commercialPlan';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoAppAccessScreen from '@/components/NoAppAccessScreen';
 import tivlyLogo from '@/assets/tivly-logo.png';

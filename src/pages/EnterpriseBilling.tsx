@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 const formatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return '–';

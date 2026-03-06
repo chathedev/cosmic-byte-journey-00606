@@ -7,6 +7,7 @@ import { ViewerDashboard } from "@/components/ViewerDashboard";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 const Index = () => {
   const { userPlan, isLoading, enterpriseMembership, switchCompany, isViewer } = useSubscription();

@@ -19,6 +19,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { InvoicePaymentDialog } from "@/components/InvoicePaymentDialog";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 interface InvoiceDetail {
   id: string;

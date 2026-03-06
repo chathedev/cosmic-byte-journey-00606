@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { getCommercialPlan } from './commercialPlan';
 
 const BACKEND_URL = 'https://api.tivly.se';
 

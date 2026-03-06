@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, ExternalLink, CheckCircle, Clock, AlertCircle, XCircle, ArrowLeft } from "lucide-react";
+import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 interface Invoice {
   id: string;
