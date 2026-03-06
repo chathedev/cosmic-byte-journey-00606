@@ -264,9 +264,9 @@ const Settings = () => {
       case 'pro':
       case 'standard': return 'Tivly Pro';
       case 'plus': return 'Tivly Plus';
+      case 'team': return 'Team';
       case 'unlimited': return 'Unlimited';
       case 'enterprise': return 'Enterprise';
-      default: return 'Gratis';
     }
   };
 
