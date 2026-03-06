@@ -1088,103 +1088,14 @@ export const AutoProtocolGenerator = ({
             </div>
           </div>
 
-          {/* Content sections */}
-          <div className="space-y-8">
-            {/* Summary */}
-            <div>
-              <h2 className="text-xl font-semibold mb-3">Sammanfattning</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                {generatedProtocol.summary}
-              </p>
-            </div>
-
-            {/* Main Points */}
-            <div>
-              <h2 className="text-xl font-semibold mb-3">Huvudpunkter</h2>
-              <ul className="space-y-2">
-                {Array.isArray(generatedProtocol.mainPoints) && generatedProtocol.mainPoints.map((point, index) => (
-                  <li key={index} className="flex gap-3">
-                    <span className="text-primary font-medium">{index + 1}.</span>
-                    <span className="text-muted-foreground">{String(point)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Decisions */}
-            {Array.isArray(generatedProtocol.decisions) && generatedProtocol.decisions.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold mb-3">Beslut</h2>
-                <ul className="space-y-2">
-                  {generatedProtocol.decisions.map((decision, index) => (
-                    <li key={index} className="flex gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground">{String(decision)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Action Items */}
-            {Array.isArray(generatedProtocol.actionItems) && generatedProtocol.actionItems.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold mb-3">Åtgärdspunkter</h2>
-                <div className="space-y-4">
-                  {generatedProtocol.actionItems.map((item, index) => (
-                    <div key={index} className="pl-4 border-l-2 border-primary/20">
-                      <div className="flex items-start justify-between gap-4 mb-1">
-                        <h3 className="font-medium">{item.title}</h3>
-                        <span className={`text-xs font-medium ${getPriorityColor(item.priority)}`}>
-                          {getPriorityLabel(item.priority)}
-                        </span>
-                      </div>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
-                      )}
-                      <div className="flex gap-4 text-xs text-muted-foreground">
-                        {item.owner && <span>Ansvarig: {item.owner}</span>}
-                        {item.deadline && item.deadline.trim() !== '' && <span>Deadline: {item.deadline}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Next Meeting Suggestions */}
-            {Array.isArray(generatedProtocol.nextMeetingSuggestions) && generatedProtocol.nextMeetingSuggestions.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold mb-3">Nästa möte - Förslag</h2>
-                <ul className="space-y-2">
-                  {generatedProtocol.nextMeetingSuggestions.map((suggestion, index) => (
-                    <li key={index} className="flex gap-3">
-                      <span className="text-primary font-medium">•</span>
-                      <span className="text-muted-foreground">{String(suggestion)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-          </div>
-
-          {/* Footer — only for non-enterprise */}
-          {!isEnterprise && (
-            <div className="mt-12 pt-6 border-t border-border/40">
-              <p className="text-center text-xs text-muted-foreground/50">
-                dokumenterat av{' '}
-                <a 
-                  href="https://tivly.se" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors"
-                >
-                  tivly.se
-                </a>
-              </p>
-            </div>
-          )}
+          {/* Editable Protocol Content */}
+          <ProtocolEditor
+            meetingId={meetingId || ''}
+            protocol={generatedProtocol}
+            onProtocolUpdate={(updated) => setGeneratedProtocol(updated)}
+            readOnly={isFreeTrialMode || !meetingId}
+            isEnterprise={isEnterprise}
+          />
         </Card>
       </div>
 
