@@ -220,13 +220,24 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       
       // Detect team/enterprise membership from user payload hints
       const u: any = user;
+      const inferredCompanyPlan = getCommercialPlan(
+        u?.company?.planType,
+        u?.company?.plan,
+        u?.company?.planTier,
+        u?.plan?.planType,
+        u?.plan?.plan,
+        u?.planTier,
+      );
+
       const teamDetected = (
+        inferredCompanyPlan === 'team' ||
         planStr === 'team' ||
         u?.planTier === 'team' ||
         (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
         (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'))
       );
       const enterpriseDetected = (
+        inferredCompanyPlan === 'enterprise' ||
         planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
@@ -239,10 +250,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
       const normalizedPlan: UserPlan['plan'] = admin
         ? 'unlimited'
-        : (enterpriseDetected
-            ? 'enterprise'
-            : (teamDetected
-                ? 'team'
+        : (teamDetected
+            ? 'team'
+            : (enterpriseDetected
+                ? 'enterprise'
                 : ((validPlans as readonly string[]).includes(planStr)
                     ? (planStr as UserPlan['plan'])
                     : (aliasMap[planStr] ?? 'free'))));
