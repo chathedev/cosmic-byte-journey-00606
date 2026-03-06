@@ -154,6 +154,16 @@ const MeetingDetail = () => {
   const [showDeleteProtocolConfirm, setShowDeleteProtocolConfirm] = useState(false);
   const [showReplaceProtocolConfirm, setShowReplaceProtocolConfirm] = useState(false);
   const [showSpeakerNameConfirm, setShowSpeakerNameConfirm] = useState(false);
+  const [isEditingProtocol, setIsEditingProtocol] = useState(false);
+  const [protocolDraftData, setProtocolDraftData] = useState<{
+    title: string;
+    summary: string;
+    mainPoints: string[];
+    decisions: string[];
+    actionItems: any[];
+    nextMeetingSuggestions?: string[];
+  } | null>(null);
+  const [loadingProtocolDraft, setLoadingProtocolDraft] = useState(false);
 
   // Audio backup failsafe state - server-side copy of original recording
   const [audioBackup, setAudioBackup] = useState<AudioBackup | null>(null);
