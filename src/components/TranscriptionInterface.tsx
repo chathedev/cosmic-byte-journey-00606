@@ -560,6 +560,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
           showDigitalOption={true}
           digitalComingSoon={false}
           digitalLocked={false}
+          teamsLocked={enterpriseMembership?.company?.planType === 'team'}
         />
         <ParticipantsInputDialog
           open={showParticipantsDialog}
@@ -700,6 +701,7 @@ export const TranscriptionInterface = ({ isFreeTrialMode = false }: Transcriptio
         showDigitalOption={isEnterprise || isAdmin}
         digitalComingSoon={false}
         digitalLocked={false}
+        teamsLocked={enterpriseMembership?.company?.planType === 'team'}
       />
 
       <ParticipantsInputDialog
