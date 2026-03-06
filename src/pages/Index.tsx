@@ -88,6 +88,7 @@ const Index = () => {
       />
       <div className="relative z-10">
         <TranscriptionInterface isFreeTrialMode={userPlan?.plan === "free"} />
+      </div>
       <SubscribeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} />
 
       {/* Non-enterprise name prompt only */}
@@ -108,7 +109,7 @@ const Index = () => {
           onSelect={handleOrgSelect}
         />
       )}
-    </>
+    </div>
   );
 };
 
