@@ -122,7 +122,7 @@ export function AppSidebar() {
     else if (path === "/org/settings" || path.startsWith("/org/settings/")) setSelected("Team");
     else if (path === "/org/billing" || path.startsWith("/org/billing/")) setSelected("Fakturering");
     else if (path.startsWith("/billing/invoices")) setSelected("Fakturor");
-    else if (path.startsWith("/meetings/")) setSelected("Hem");
+    else if (path.startsWith("/meetings/") || path.startsWith("/generate-protocol")) setSelected("Bibliotek");
     else if (path === "/chat" || path.startsWith("/chat/")) setSelected("Hem");
     else if (path.startsWith("/admin")) {
       if (path === "/admin/users") setSelected("Användare");

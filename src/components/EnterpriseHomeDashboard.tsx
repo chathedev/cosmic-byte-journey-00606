@@ -265,24 +265,17 @@ export const EnterpriseHomeDashboard = ({
                       <div
                         key={step.id}
                         className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
-                          step.completed ? "opacity-60" : "hover:bg-muted/20"
+                          step.completed ? "opacity-60" : ""
                         }`}
                       >
-                        {/* Clickable toggle */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggleStep(step); }}
-                          disabled={togglingStep === step.id}
-                          className="mt-0.5 shrink-0 focus:outline-none disabled:opacity-50"
-                          aria-label={step.completed ? `Markera "${step.title}" som ej klar` : `Markera "${step.title}" som klar`}
-                        >
-                          {togglingStep === step.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                          ) : step.completed ? (
+                        {/* Auto-tracked indicator (read-only) */}
+                        <div className="mt-0.5 shrink-0">
+                          {step.completed ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                           ) : (
-                            <Circle className="w-3.5 h-3.5 text-border hover:text-primary/50 transition-colors" />
+                            <Circle className="w-3.5 h-3.5 text-border" />
                           )}
-                        </button>
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-[13px] leading-snug ${
                             step.completed
