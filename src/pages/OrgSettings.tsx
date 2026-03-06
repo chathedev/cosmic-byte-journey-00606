@@ -69,8 +69,8 @@ export default function OrgSettings() {
   const isViewerRole = role === 'viewer';
   const companyId = enterpriseMembership.company?.id;
   const commercialPlan = enterpriseMembership.company?.planType;
-  const isEnterprisePlan = commercialPlan === 'enterprise';
-  const defaultIntegrationTab = isEnterprisePlan ? 'teams' : 'zoom';
+  const isTeamsAvailable = commercialPlan === 'enterprise' || commercialPlan === 'team';
+  const defaultIntegrationTab = isTeamsAvailable ? 'teams' : 'zoom';
 
   return (
     <div className="min-h-screen bg-background">
@@ -201,7 +201,7 @@ export default function OrgSettings() {
               {/* Sub-tabs for each integration */}
               <Tabs defaultValue={defaultIntegrationTab} className="w-full">
                 <TabsList className="w-full justify-start bg-transparent border-b border-border rounded-none p-0 h-auto gap-0">
-                  {isEnterprisePlan && (
+                  {isTeamsAvailable && (
                     <TabsTrigger
                       value="teams"
                       className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 gap-2 text-xs sm:text-sm"
@@ -233,7 +233,7 @@ export default function OrgSettings() {
                   </TabsTrigger>
                 </TabsList>
 
-                {isEnterprisePlan && (
+                {isTeamsAvailable && (
                   <TabsContent value="teams" className="mt-4">
                     <OrgTeamsInsights companyId={companyId} />
                   </TabsContent>

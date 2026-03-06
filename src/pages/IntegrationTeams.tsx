@@ -42,10 +42,10 @@ const IntegrationTeams = () => {
   const { enterpriseMembership } = useSubscription();
   const di = useDigitalImport();
 
-  // Gate: Teams integration is enterprise-only (not Team plan)
+  // Gate: Teams integration requires Team or Enterprise plan
   const commercialPlan = enterpriseMembership?.company?.planType;
   useEffect(() => {
-    if (commercialPlan && commercialPlan !== 'enterprise') {
+    if (commercialPlan && commercialPlan !== 'enterprise' && commercialPlan !== 'team') {
       navigate('/integrations', { replace: true });
     }
   }, [commercialPlan, navigate]);
