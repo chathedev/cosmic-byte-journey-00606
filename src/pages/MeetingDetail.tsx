@@ -1429,8 +1429,42 @@ const MeetingDetail = () => {
           actionItems: d.actionItems || [],
           nextMeetingSuggestions: d.nextMeetingSuggestions || [],
         });
+        setIsEditingProtocol(true);
+      } else if (draftResponse?.protocol?.blob) {
+        // No draft — parse DOCX blob with mammoth as fallback
+        try {
+          const base64Data = draftResponse.protocol.blob.replace(/^data:.*?;base64,/, '');
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const mammoth = await import('mammoth');
+          const result = await mammoth.default.extractRawText({ arrayBuffer: bytes.buffer });
+          const rawText = result.value || '';
+          
+          // Try to parse structured sections from raw text
+          const parsed = parseProtocolText(rawText);
+          setProtocolDraftData({
+            title: parsed.title || meeting?.title || 'Protokoll',
+            summary: parsed.summary,
+            mainPoints: parsed.mainPoints,
+            decisions: parsed.decisions,
+            actionItems: parsed.actionItems,
+          });
+          setIsEditingProtocol(true);
+        } catch (parseErr) {
+          console.error('Failed to parse DOCX:', parseErr);
+          setProtocolDraftData({
+            title: meeting?.title || 'Protokoll',
+            summary: '',
+            mainPoints: [],
+            decisions: [],
+            actionItems: [],
+          });
+          setIsEditingProtocol(true);
+        }
       } else {
-        // No draft yet — try to parse from protocol DOCX via mammoth (fallback)
         setProtocolDraftData({
           title: meeting?.title || 'Protokoll',
           summary: '',
@@ -1438,11 +1472,10 @@ const MeetingDetail = () => {
           decisions: [],
           actionItems: [],
         });
+        setIsEditingProtocol(true);
       }
-      setIsEditingProtocol(true);
     } catch (error) {
       console.error('Failed to load protocol draft:', error);
-      // Still allow editing with empty data
       setProtocolDraftData({
         title: meeting?.title || 'Protokoll',
         summary: '',
