@@ -77,7 +77,7 @@ export const EnterpriseHomeDashboard = ({
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
   const [checklistLoading, setChecklistLoading] = useState(true);
   const [checklistExpanded, setChecklistExpanded] = useState(true);
-  const [togglingStep, setTogglingStep] = useState<string | null>(null);
+  
   const [stats, setStats] = useState<any>(null);
 
   const companyName = enterpriseMembership?.company?.name || (enterpriseMembership?.company?.planType === 'enterprise' ? "Enterprise" : "Team");
