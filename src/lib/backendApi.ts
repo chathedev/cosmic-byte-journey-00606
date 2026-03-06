@@ -431,6 +431,43 @@ export const backendApi = {
     return response.json();
   },
 
+  async getProtocolDraft(meetingId: string): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol/draft`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      const error = await response.json().catch(() => ({ error: 'Failed to get protocol draft' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async saveProtocolDraft(meetingId: string, data: {
+    fullText?: string;
+    summary?: string;
+    mainPoints?: string[];
+    decisions?: string[];
+    title?: string;
+    actionItems?: any[];
+  }): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol/draft`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to save protocol draft' }));
+      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
   async deleteProtocol(meetingId: string): Promise<any> {
     const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
       method: 'DELETE',

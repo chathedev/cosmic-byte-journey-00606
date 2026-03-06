@@ -12,22 +12,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-// Email functionality removed - requires backend setup
 import { Mail, X, Plus } from "lucide-react";
 
 interface EmailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  documentBlob: Blob;
-  fileName: string;
+  documentBlob?: Blob | null;
+  fileName?: string;
+  protocolText?: string;
 }
 
-export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: EmailDialogProps) => {
+export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName, protocolText }: EmailDialogProps) => {
   const [recipients, setRecipients] = useState<string[]>([""]);
   const [subject, setSubject] = useState("Mötesprotokoll");
   const [message, setMessage] = useState("Hej,\n\nBifogat finner du mötesprotokoll från vårt möte.\n\nMed vänliga hälsningar");
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
+
+  const hasAttachment = !!documentBlob;
+  const hasTextContent = !!protocolText?.trim();
 
   const addRecipient = () => {
     setRecipients([...recipients, ""]);
@@ -75,19 +78,33 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
         throw new Error('Not authenticated');
       }
 
-      // Convert Blob to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          const base64data = reader.result as string;
-          const base64 = base64data.split(',')[1]; // Remove data:xxx;base64, prefix
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(documentBlob);
-      });
+      const payload: Record<string, any> = {
+        recipients: validRecipients,
+        subject: subject.trim(),
+        message: message.trim(),
+      };
 
-      const base64Document = await base64Promise;
+      // Attachment flow: convert Blob to base64
+      if (hasAttachment && documentBlob) {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => {
+            const base64data = reader.result as string;
+            const base64 = base64data.split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(documentBlob);
+        });
+
+        payload.documentBlob = await base64Promise;
+        if (fileName) payload.fileName = fileName;
+      }
+
+      // Text flow: include plain-text protocol content
+      if (hasTextContent) {
+        payload.protocolText = protocolText;
+      }
 
       const response = await fetch('https://api.tivly.se/send-protocol-email', {
         method: 'POST',
@@ -96,13 +113,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          recipients: validRecipients,
-          subject: subject.trim(),
-          message: message.trim(),
-          documentBlob: base64Document,
-          fileName: fileName,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -144,7 +155,9 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
             Skicka protokoll via e-post
           </DialogTitle>
           <DialogDescription>
-            Skicka mötesprotokoll som bilaga till en eller flera mottagare
+            {hasAttachment
+              ? "Skicka mötesprotokoll som bilaga till en eller flera mottagare"
+              : "Skicka mötesprotokoll som text till en eller flera mottagare"}
           </DialogDescription>
         </DialogHeader>
 
@@ -205,7 +218,11 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
           </div>
 
           <div className="text-sm text-muted-foreground">
-            Bilaga: {fileName}
+            {hasAttachment && fileName
+              ? `Bilaga: ${fileName}`
+              : hasTextContent
+                ? "Protokolltext bifogas i e-postmeddelandet"
+                : "Inget protokollinnehåll att bifoga"}
           </div>
         </div>
 
@@ -213,7 +230,7 @@ export const EmailDialog = ({ open, onOpenChange, documentBlob, fileName }: Emai
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Avbryt
           </Button>
-          <Button onClick={handleSend} disabled={sending}>
+          <Button onClick={handleSend} disabled={sending || (!hasAttachment && !hasTextContent)}>
             {sending ? "Skickar..." : "Skicka e-post"}
           </Button>
         </DialogFooter>
