@@ -481,18 +481,6 @@ export const backendApi = {
 
     return response.json();
   },
-    const response = await fetch(`${BACKEND_URL}/meetings/${meetingId}/protocol`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to delete protocol' }));
-      throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  },
 
   // Speaker Names Management - Lyra Voice Learning Integration
   // Per docs: PUT /meetings/:meetingId/speaker-names with { speakerNames: { label: name } }
