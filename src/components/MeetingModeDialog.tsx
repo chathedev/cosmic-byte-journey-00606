@@ -143,59 +143,40 @@ export const MeetingModeDialog = ({
             </div>
 
             <div className="px-3 sm:px-4 pb-4 sm:pb-6 space-y-2 sm:space-y-3">
-              {DIGITAL_PROVIDERS.map((prov) => {
-                const isProviderLocked = prov.id === 'teams' && teamsLocked;
-                return (
-                  <button
-                    key={prov.id}
-                    onClick={() => !isProviderLocked && handleProviderSelect(prov.id)}
-                    onMouseEnter={() => setHoveredProvider(prov.id)}
-                    onMouseLeave={() => setHoveredProvider(null)}
-                    disabled={isProviderLocked}
-                    className={cn(
-                      "w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all duration-200",
-                      "flex items-center gap-3 sm:gap-4 group",
-                      isProviderLocked
-                        ? "border-border/50 bg-muted/30 opacity-60 cursor-not-allowed"
-                        : hoveredProvider === prov.id
-                          ? "border-primary bg-primary/5 shadow-md"
-                          : "border-border hover:border-primary/50 bg-card"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors overflow-hidden relative",
-                      isProviderLocked
-                        ? "bg-muted"
-                        : hoveredProvider === prov.id
-                          ? "bg-primary/10"
-                          : "bg-muted"
-                    )}>
-                      <img src={prov.logo} alt={prov.title} className={`object-contain ${prov.id === 'zoom' ? 'w-9 h-9 sm:w-10 sm:h-10' : 'w-7 h-7 sm:w-8 sm:h-8'}`} />
-                      {isProviderLocked && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center">
-                          <Lock className="w-3 h-3 text-destructive-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-sm sm:text-base text-foreground">{prov.title}</span>
-                      {isProviderLocked ? (
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Kräver Enterprise-plan</p>
-                      ) : (
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{prov.desc}</p>
-                      )}
-                    </div>
-                    {!isProviderLocked && (
-                      <ArrowRight className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-all",
-                        hoveredProvider === prov.id
-                          ? "text-primary translate-x-0.5"
-                          : "text-muted-foreground/50"
-                      )} />
-                    )}
-                  </button>
-                );
-              })}
+              {DIGITAL_PROVIDERS.map((prov) => (
+                <button
+                  key={prov.id}
+                  onClick={() => handleProviderSelect(prov.id)}
+                  onMouseEnter={() => setHoveredProvider(prov.id)}
+                  onMouseLeave={() => setHoveredProvider(null)}
+                  className={cn(
+                    "w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all duration-200",
+                    "flex items-center gap-3 sm:gap-4 group",
+                    hoveredProvider === prov.id
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : "border-border hover:border-primary/50 bg-card"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors overflow-hidden",
+                    hoveredProvider === prov.id
+                      ? "bg-primary/10"
+                      : "bg-muted"
+                  )}>
+                    <img src={prov.logo} alt={prov.title} className={`object-contain ${prov.id === 'zoom' ? 'w-9 h-9 sm:w-10 sm:h-10' : 'w-7 h-7 sm:w-8 sm:h-8'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-sm sm:text-base text-foreground">{prov.title}</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{prov.desc}</p>
+                  </div>
+                  <ArrowRight className={cn(
+                    "w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-all",
+                    hoveredProvider === prov.id
+                      ? "text-primary translate-x-0.5"
+                      : "text-muted-foreground/50"
+                  )} />
+                </button>
+              ))}
             </div>
           </>
         ) : showStartConfirmation && pendingMode && selectedOption ? (
