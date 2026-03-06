@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Download, Save, ArrowLeft, FileText, CheckCircle2, Loader2, Share2, Coffee } from "lucide-react";
+import { ProtocolEditor } from "@/components/ProtocolEditor";
 import { SlackShareButton } from "@/components/SlackShareButton";
 import { Document, Paragraph, HeadingLevel, AlignmentType, Packer, TextRun, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
