@@ -60,7 +60,7 @@ const Index = () => {
     return (
       <EnterpriseWelcomeWizard
         open
-        companyName={enterpriseMembership?.company?.name || "Enterprise"}
+        companyName={enterpriseMembership?.company?.name || getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier)}
         onComplete={() => {
           // Wizard auto-closes once refreshUser updates name in auth state.
         }}

@@ -182,7 +182,7 @@ export default function EnterpriseBilling() {
               )}
             </div>
             <Badge variant="outline" className="bg-primary/10 border-primary/20 text-primary">
-              {enterpriseMembership?.company?.planType === 'enterprise' ? 'Enterprise' : 'Team'}
+              {planLabel}
             </Badge>
           </div>
         </div>

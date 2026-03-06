@@ -1202,7 +1202,7 @@ export default function AdminEnterprise() {
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>Alla företagets medlemmar ({deletingCompany?.members?.length || 0} st)</li>
                 <li>All företagsdata och inställningar</li>
-                <li>Medlemmarnas tillgång till enterprise-funktioner</li>
+                <li>Medlemmarnas tillgång till organisationsfunktioner</li>
               </ul>
               <p className="text-sm text-muted-foreground mt-2">
                 Denna åtgärd kan inte ångras.

@@ -448,7 +448,7 @@ const Settings = () => {
           )}
 
           {/* Plan Section - For non-enterprise users */}
-          {userPlan?.plan !== 'enterprise' && userPlan?.plan !== 'unlimited' && (
+          {!enterpriseMembership?.isMember && userPlan?.plan !== 'unlimited' && (
             <>
               <section>
                 <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Prenumeration</h2>

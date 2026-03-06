@@ -601,7 +601,7 @@ export default function AdminEnterpriseBilling() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-semibold">Enterprise Fakturering</h1>
+          <h1 className="text-2xl font-semibold">Team & Enterprise-fakturering</h1>
           <p className="text-sm text-muted-foreground mt-1">Hantera fakturor och prenumerationer</p>
         </div>
 

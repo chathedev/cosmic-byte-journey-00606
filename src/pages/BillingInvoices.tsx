@@ -166,7 +166,7 @@ export default function BillingInvoices() {
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-foreground">Dina fakturor</h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Hantera och betala dina enterprise-fakturor
+            Hantera och betala dina organisationsfakturor
           </p>
         </div>
 

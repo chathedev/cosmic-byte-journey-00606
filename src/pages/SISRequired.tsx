@@ -78,7 +78,7 @@ export default function SISRequired() {
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const companyName = enterpriseMembership?.company?.name || 'Enterprise';
+  const companyName = enterpriseMembership?.company?.name || getCommercialPlanLabel(enterpriseMembership?.company?.planType, (enterpriseMembership as any)?.company?.plan, enterpriseMembership?.company?.planTier);
 
   // ~220-260 words for optimal voice sample quality
   const sampleText = `Hej, jag heter ${speakerName || '[ditt namn]'} och arbetar på ${companyName}. Idag ska vi diskutera de viktigaste punkterna på dagordningen och gå igenom vad vi åstadkommit sedan förra mötet.

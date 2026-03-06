@@ -393,7 +393,7 @@ export default function BillingInvoiceDetail() {
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Tivly Enterprise-villkor
+                Tivly Team & Enterprise-villkor
               </a>
             </p>
           </div>

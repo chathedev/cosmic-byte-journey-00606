@@ -447,7 +447,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           memberships: membership.memberships,
           company: {
             ...membership.company,
-            planType: normalizedPlanType,
+            planType: normalizedPlanType === 'unknown' ? membership.company?.planType : normalizedPlanType,
             speakerIdentificationEnabled: sisEnabled,
           },
           sisSample,

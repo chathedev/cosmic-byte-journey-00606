@@ -121,10 +121,21 @@ export const subscriptionService = {
 
       // Detect enterprise/team membership hints from backend user payload
       const u: any = user;
-      const teamDetected = planStr === 'team' || u?.planTier === 'team' ||
+      const inferredCompanyPlan = getCommercialPlan(
+        u?.company?.planType,
+        u?.company?.plan,
+        u?.company?.planTier,
+        u?.plan?.planType,
+        u?.plan?.plan,
+        u?.planTier,
+      );
+
+      const teamDetected = inferredCompanyPlan === 'team' || planStr === 'team' || u?.planTier === 'team' ||
         (u?.company?.planTier === 'team' && (u?.company?.status ?? 'active') === 'active') ||
         (Array.isArray(u?.companies) && u.companies.some((c: any) => c?.planTier === 'team' && (c?.status ?? 'active') === 'active'));
+
       const enterpriseDetected = (
+        inferredCompanyPlan === 'enterprise' ||
         planStr === 'enterprise' || planStr === 'enterprise_scale' ||
         u?.planTier === 'enterprise' ||
         u?.enterprise?.active === true ||
@@ -136,10 +147,10 @@ export const subscriptionService = {
       );
 
       const validPlans = ['free','pro','team','plus','unlimited','enterprise'] as const;
-      const normalizedPlan: UserPlan['plan'] = enterpriseDetected
-        ? 'enterprise'
-        : (teamDetected
-            ? 'team'
+      const normalizedPlan: UserPlan['plan'] = teamDetected
+        ? 'team'
+        : (enterpriseDetected
+            ? 'enterprise'
             : ((validPlans.includes(planStr as any) ? (planStr as any) : (aliasMap[planStr] ?? 'free')) as UserPlan['plan']));
 
       // Use cumulative count from /me only

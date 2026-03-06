@@ -1058,7 +1058,7 @@ export default function AdminEnterpriseCompanyDetail() {
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => setSelectedMemberDetail({
                             email: member.email,
-                            plan: 'enterprise',
+                            plan: getCommercialPlan(company.planType, (company as any).plan, company.planTier) === 'team' ? 'team' : 'enterprise',
                             meetingCount: memberStats?.meetingCount ?? 0
                           })}
                         >
