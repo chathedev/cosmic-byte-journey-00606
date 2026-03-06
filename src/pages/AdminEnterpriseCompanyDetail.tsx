@@ -178,7 +178,7 @@ export default function AdminEnterpriseCompanyDetail() {
         if (sisCompany) {
           companyWithSIS = {
             ...companyWithSIS,
-            members: companyWithSIS.members.map(member => {
+            members: (companyWithSIS.members || []).map((member: any) => {
               const sisMember = sisCompany.members.find(m => m.email.toLowerCase() === member.email.toLowerCase());
               if (sisMember) {
                 return {
