@@ -77,7 +77,7 @@ export const EnterpriseHomeDashboard = ({
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
   const [checklistLoading, setChecklistLoading] = useState(true);
   const [checklistExpanded, setChecklistExpanded] = useState(true);
-  const [togglingStep, setTogglingStep] = useState<string | null>(null);
+  
   const [stats, setStats] = useState<any>(null);
 
   const companyName = enterpriseMembership?.company?.name || (enterpriseMembership?.company?.planType === 'enterprise' ? "Enterprise" : "Team");
@@ -128,46 +128,7 @@ export const EnterpriseHomeDashboard = ({
     loadStats();
   }, [loadChecklist, loadStats]);
 
-  const handleToggleStep = async (step: ChecklistStep) => {
-    if (togglingStep) return;
-    const newCompleted = !step.completed;
-    setTogglingStep(step.id);
-
-    // Optimistic update
-    setChecklist(prev => {
-      if (!prev) return prev;
-      const updatedSteps = prev.steps.map(s =>
-        s.id === step.id ? { ...s, completed: newCompleted, completedAt: newCompleted ? new Date().toISOString() : undefined } : s
-      );
-      const completedCount = updatedSteps.filter(s => s.completed).length;
-      return {
-        ...prev,
-        steps: updatedSteps,
-        completedSteps: completedCount,
-        progressPercent: Math.round((completedCount / prev.totalSteps) * 100),
-        completed: completedCount === prev.totalSteps,
-      };
-    });
-
-    try {
-      await apiClient.updateChecklistStep(step.id, newCompleted, undefined, planType);
-      // Reload to get fresh server state
-      const data = await apiClient.getChecklist(planType);
-      if (data?.checklist) {
-        setChecklist(data.checklist);
-        if (data.checklist.completed && !checklist?.completed) {
-          toast({ title: "🎉 Onboarding klar!", description: "Teamet är redo att arbeta fullt i Tivly." });
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to toggle step:", e);
-      toast({ title: "Kunde inte uppdatera", description: "Försök igen om en stund.", variant: "destructive" });
-      // Revert
-      loadChecklist();
-    } finally {
-      setTogglingStep(null);
-    }
-  };
+  
 
   const importActions = [
     { key: "microsoftConnected", label: "Teams", logo: teamsLogo, onImport: onOpenTeamsImport },
@@ -304,24 +265,17 @@ export const EnterpriseHomeDashboard = ({
                       <div
                         key={step.id}
                         className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
-                          step.completed ? "opacity-60" : "hover:bg-muted/20"
+                          step.completed ? "opacity-60" : ""
                         }`}
                       >
-                        {/* Clickable toggle */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggleStep(step); }}
-                          disabled={togglingStep === step.id}
-                          className="mt-0.5 shrink-0 focus:outline-none disabled:opacity-50"
-                          aria-label={step.completed ? `Markera "${step.title}" som ej klar` : `Markera "${step.title}" som klar`}
-                        >
-                          {togglingStep === step.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                          ) : step.completed ? (
+                        {/* Auto-tracked indicator (read-only) */}
+                        <div className="mt-0.5 shrink-0">
+                          {step.completed ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                           ) : (
-                            <Circle className="w-3.5 h-3.5 text-border hover:text-primary/50 transition-colors" />
+                            <Circle className="w-3.5 h-3.5 text-border" />
                           )}
-                        </button>
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-[13px] leading-snug ${
                             step.completed
