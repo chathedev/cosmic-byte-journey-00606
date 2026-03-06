@@ -1031,10 +1031,16 @@ export default function AdminEnterpriseCompanyDetail() {
                     <CardTitle>Medlemmar</CardTitle>
                     <CardDescription>{company.members.length} totalt, {activeMembers} aktiva</CardDescription>
                   </div>
-                  <Button onClick={() => setShowAddMember(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Lägg till
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowBulkInvite(true)}>
+                      <Users className="h-4 w-4 mr-2" />
+                      Massbjud in
+                    </Button>
+                    <Button onClick={() => setShowAddMember(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Lägg till
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
