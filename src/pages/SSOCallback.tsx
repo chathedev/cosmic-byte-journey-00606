@@ -169,10 +169,17 @@ export default function SSOCallback() {
           apiClient.applyAuthToken(typedResult.token);
           setSuccess(true);
           await refreshUser();
-          // Always navigate to root on custom domains; use redirectTarget on generic domain
-          const target = typedResult.redirectTarget || '/';
-          console.log('[SSOCallback] Redirecting to:', target);
-          setTimeout(() => navigate(target, { replace: true }), 600);
+
+          const redirect = resolvePostLoginRedirect(typedResult.redirectTarget);
+          console.log('[SSOCallback] Redirect decision:', redirect);
+
+          setTimeout(() => {
+            if (redirect.kind === 'location') {
+              window.location.href = redirect.url;
+              return;
+            }
+            navigate(redirect.path, { replace: true });
+          }, 600);
           return;
         }
 
