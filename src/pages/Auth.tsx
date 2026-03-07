@@ -353,11 +353,26 @@ export default function Auth() {
     );
   }
 
-  // Show loading while bootstrapping workspace on custom domains
+  // Show branded fullscreen loader while bootstrapping workspace on custom domains
   if (isCustomDomain && workspaceLoading) {
+    // Try to show cached branding logo immediately
+    let cachedLogo: string | null = null;
+    try {
+      const raw = localStorage.getItem('tivly_enterprise_branding');
+      if (raw) {
+        const c = JSON.parse(raw);
+        if (c?.logoUrl) cachedLogo = c.logoUrl;
+      }
+    } catch {}
+
     return (
-      <div className="min-h-[100svh] bg-background flex items-center justify-center">
-        <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
+      <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center gap-6">
+        {cachedLogo ? (
+          <img src={cachedLogo} alt="" className="h-12 w-auto object-contain animate-pulse" />
+        ) : (
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        )}
+        <p className="text-sm text-muted-foreground">Laddar arbetsyta…</p>
       </div>
     );
   }
