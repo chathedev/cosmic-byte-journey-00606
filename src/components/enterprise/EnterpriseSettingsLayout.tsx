@@ -60,7 +60,19 @@ export function EnterpriseSettingsLayout({ title, description, icon, children }:
           </div>
         )}
 
-        {children(ctx)}
+        {ctx.loading || !ctx.data ? (
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
+                <div className="h-5 w-48 bg-muted rounded" />
+                <div className="h-4 w-full bg-muted/60 rounded" />
+                <div className="h-4 w-3/4 bg-muted/40 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          children(ctx)
+        )}
       </div>
     </div>
   );
