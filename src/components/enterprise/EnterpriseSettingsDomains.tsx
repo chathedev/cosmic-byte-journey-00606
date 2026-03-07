@@ -523,10 +523,13 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       await apiFetch(`/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(hostname)}`, {
         method: 'PATCH', body: JSON.stringify({ primary: true, loginEnabled: true }),
       });
+      // Optimistic update
+      setDefaultLogin(hostname);
       toast({ title: 'Primär inloggningsvärd uppdaterad' });
-      await refreshDomains();
+      refreshDomains();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      await refreshDomains();
     } finally { setSaving(false); }
   };
 
