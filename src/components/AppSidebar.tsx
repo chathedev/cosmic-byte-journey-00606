@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { isMobileDevice } from "@/utils/mobileDetection";
 import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import tivlyLogo from "@/assets/tivly-logo.png";
+import { useEnterpriseBranding } from "@/contexts/EnterpriseBrandingContext";
 import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 export function AppSidebar() {
