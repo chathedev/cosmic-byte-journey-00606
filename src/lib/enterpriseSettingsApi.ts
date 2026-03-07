@@ -149,6 +149,15 @@ export interface SettingsLock {
   reason: string;
 }
 
+export interface ProviderReadiness {
+  enabled: boolean;
+  configured: boolean;
+  ready: boolean;
+  lastTestedAt: string | null;
+  lastTestResult: string | null;
+  lastError: string | null;
+}
+
 export interface EnterpriseSettingsResponse {
   company: { id: string; name: string; planType: string };
   settings: {
@@ -158,6 +167,11 @@ export interface EnterpriseSettingsResponse {
     meetingContentControls: Partial<MeetingContentSettings>;
     integrations: Partial<IntegrationSettings>;
     customRoles: CustomRole[];
+  };
+  settingsSummary?: {
+    providerReadiness?: Record<string, ProviderReadiness>;
+    enabledProviders?: string[];
+    [key: string]: any;
   };
   locks: Record<string, SettingsLock>;
   viewer: {
