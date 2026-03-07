@@ -33,6 +33,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 export interface WorkspaceBranding {
   workspaceDisplayName?: string;
+  legalEntityName?: string;
   logoUrl?: string;
   wordmarkUrl?: string;
   faviconUrl?: string;
@@ -48,22 +49,59 @@ export interface WorkspaceBranding {
 
 export interface PublicWorkspaceInfo {
   companyId: string;
+  companyName: string;
   hostname: string;
   verified: boolean;
   loginEnabled: boolean;
   ssoEnabled: boolean;
   ssoOnlyLogin: boolean;
   allowedProviders: string[];
+  enabledProviders: string[];
   primaryProvider: string | null;
   branding: WorkspaceBranding;
 }
 
 /**
- * Bootstrap workspace from custom domain
- * Only call on non-app.tivly.se hosts
+ * Bootstrap workspace from custom domain.
+ * Maps the nested API response into a flat PublicWorkspaceInfo.
  */
-export function getPublicWorkspace(host: string): Promise<PublicWorkspaceInfo> {
-  return apiFetch(`/public/enterprise/workspace?host=${encodeURIComponent(host)}`);
+export async function getPublicWorkspace(host: string): Promise<PublicWorkspaceInfo> {
+  const raw = await apiFetch(`/public/enterprise/workspace?host=${encodeURIComponent(host)}`);
+
+  // The API returns a nested structure — normalize to our flat type
+  const identity = raw.identityAccess || {};
+  const branding = raw.branding || {};
+  const workspace = raw.workspace || {};
+  const company = raw.company || {};
+  const primaryDomain = workspace.customDomains?.find((d: any) => d.primary) || workspace.customDomains?.[0];
+
+  return {
+    companyId: company.id || raw.companyId || '',
+    companyName: company.name || branding.workspaceDisplayName || '',
+    hostname: raw.hostname || host,
+    verified: primaryDomain?.status === 'verified',
+    loginEnabled: primaryDomain?.loginEnabled ?? true,
+    ssoEnabled: identity.ssoEnabled ?? false,
+    ssoOnlyLogin: identity.ssoOnlyLogin ?? false,
+    allowedProviders: identity.allowedProviders || [],
+    enabledProviders: identity.enabledProviders || [],
+    primaryProvider: identity.primaryProvider || null,
+    branding: {
+      workspaceDisplayName: branding.workspaceDisplayName,
+      legalEntityName: branding.legalEntityName,
+      logoUrl: branding.logoUrl,
+      wordmarkUrl: branding.wordmarkUrl,
+      faviconUrl: branding.faviconUrl,
+      primaryColor: branding.primaryColor,
+      accentColor: branding.accentColor,
+      loginTitle: branding.loginTitle,
+      loginSubtitle: branding.loginSubtitle,
+      supportEmail: branding.supportEmail,
+      supportUrl: branding.supportUrl,
+      privacyUrl: branding.privacyUrl,
+      termsUrl: branding.termsUrl,
+    },
+  };
 }
 
 /**
