@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Users, Link2, Settings2, Globe, UserRound, Shield, ChevronRight } from "lucide-react";
+import { ArrowLeft, Building2, Users, Link2, Settings2, Globe, UserRound } from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { EnterpriseTeamManager } from "@/components/EnterpriseTeamManager";
 import { MemberRoleManager } from "@/components/MemberRoleManager";
