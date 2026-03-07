@@ -514,11 +514,13 @@ const App = () => {
               <PublicPagesShell>
                 <AuthProvider>
                   <SubscriptionProvider>
+                    <EnterpriseBrandingProvider>
                     <SupportProvider>
                       <AdminBypassGate>
                         <AppContent />
                       </AdminBypassGate>
                     </SupportProvider>
+                    </EnterpriseBrandingProvider>
                   </SubscriptionProvider>
                 </AuthProvider>
               </PublicPagesShell>
