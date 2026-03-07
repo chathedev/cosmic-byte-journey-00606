@@ -10,7 +10,7 @@ export default function EnterpriseSettingsAuditPage() {
       icon={<FileText className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
-        <AuditContent companyId={ctx.companyId!} />
+        <AuditContent companyId={ctx.companyId ?? ''} />
       )}
     </EnterpriseSettingsLayout>
   );
