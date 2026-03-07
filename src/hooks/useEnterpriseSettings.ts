@@ -52,20 +52,20 @@ export function useEnterpriseSettings() {
     }
   };
 
-  const handleTestSSO = async (provider: string) => {
+  const handleTestSSO = async (provider: string, config?: Record<string, any>) => {
     if (!companyId) return;
     try {
-      const result = await testSSO(companyId, provider);
+      const result = await testSSO(companyId, provider, config);
       toast({ title: result.ready ? `${provider} är redo` : `${provider} saknar konfiguration` });
     } catch (err: any) {
       toast({ title: 'SSO-test misslyckades', description: err.message, variant: 'destructive' });
     }
   };
 
-  const handleConnectSSO = async (provider: string) => {
+  const handleConnectSSO = async (provider: string, config?: Record<string, any>) => {
     if (!companyId) return;
     try {
-      const result = await connectSSO(companyId, provider);
+      const result = await connectSSO(companyId, provider, config);
       if (result.authorizationUrl) window.location.href = result.authorizationUrl;
     } catch (err: any) {
       toast({ title: 'Anslutning misslyckades', description: err.message, variant: 'destructive' });
