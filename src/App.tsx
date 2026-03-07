@@ -56,6 +56,7 @@ import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
 import Settings from "./pages/Settings";
 import OrgSettings from "./pages/OrgSettings";
+import EnterpriseSettings from "./pages/EnterpriseSettings";
 import NotFound from "./pages/NotFound";
 import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
