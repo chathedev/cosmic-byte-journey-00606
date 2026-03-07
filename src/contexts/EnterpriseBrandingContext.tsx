@@ -183,6 +183,52 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
     if (isEnterprise) applyTitle(workspaceName);
   }, [isEnterprise, workspaceName]);
 
+  // Show fullscreen loader until branding is resolved
+  if (!brandingReady) {
+    return (
+      <EnterpriseBrandingContext.Provider value={{
+        logoUrl: isEnterprise ? logoUrl : tivlyLogo,
+        wordmarkUrl: isEnterprise ? wordmarkUrl : null,
+        faviconUrl: isEnterprise ? faviconUrl : null,
+        workspaceName: isEnterprise ? workspaceName : null,
+        isEnterprise,
+        brandingReady,
+        refreshBranding: fetchBranding,
+      }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'hsl(var(--background, 0 0% 100%))',
+          }}
+        >
+          {hasCachedBranding && cached.logoUrl ? (
+            <img
+              src={cached.logoUrl}
+              alt=""
+              style={{ width: 48, height: 48, objectFit: 'contain', opacity: 0.9 }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                border: '4px solid hsl(var(--primary, 221.2 83.2% 53.3%))',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+          )}
+        </div>
+      </EnterpriseBrandingContext.Provider>
+    );
+  }
+
   return (
     <EnterpriseBrandingContext.Provider value={{
       logoUrl: isEnterprise ? logoUrl : tivlyLogo,
