@@ -68,6 +68,7 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
 
   return (
     <div className="space-y-6">
+      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
       {/* Service Integrations */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
