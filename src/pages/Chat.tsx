@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles, FileText, AlertTriangle } from "lucide-react";
+import { MessageCircle, Send, Loader2, Lock, TrendingUp, ExternalLink, Sparkles, FileText, AlertTriangle, CheckCircle2, ArrowRight, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SubscribeDialog } from "@/components/SubscribeDialog";
 import { hasPlusAccess } from "@/lib/accessCheck";
@@ -329,7 +329,7 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
       );
       return [
         ...updated,
-        { role: "assistant" as const, content: `Perfekt! Jag tittar nu på **${meetingTitle}**. Vad vill du veta om det mötet? 📋` }
+        { role: "assistant" as const, content: `Perfekt! Jag tittar nu på **${meetingTitle}**. Vad vill du veta om det mötet?` }
       ];
     });
   };
@@ -475,21 +475,25 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
                 </p>
                 <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
                   {[
-                    { text: "Sammanfatta senaste mötet", icon: "📋" },
-                    { text: "Vilka beslut togs?", icon: "✅" },
-                    { text: "Föreslå nästa steg", icon: "💡" },
-                    { text: "Vad borde vi prata om i nästa möte?", icon: "📌" }
-                  ].map(({ text, icon }) => (
-                    <Button 
-                      key={text} 
-                      variant="outline" 
-                      onClick={() => setInput(text)}
-                      className="h-auto py-3 px-4 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all group"
-                    >
-                      <span className="mr-2 group-hover:scale-110 transition-transform">{icon}</span>
-                      {text}
-                    </Button>
-                  ))}
+                    { text: "Sammanfatta senaste mötet", icon: "fileText" },
+                    { text: "Vilka beslut togs?", icon: "checkCircle" },
+                    { text: "Föreslå nästa steg", icon: "arrowRight" },
+                    { text: "Vad borde vi prata om i nästa möte?", icon: "messageSquare" }
+                  ].map(({ text, icon }) => {
+                    const IconMap: Record<string, any> = { fileText: FileText, checkCircle: CheckCircle2, arrowRight: ArrowRight, messageSquare: MessageSquare };
+                    const Icon = IconMap[icon];
+                    return (
+                      <Button 
+                        key={text} 
+                        variant="outline" 
+                        onClick={() => setInput(text)}
+                        className="h-auto py-3 px-4 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all group"
+                      >
+                        <Icon className="w-4 h-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+                        {text}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -568,8 +572,7 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
                       )}
                     </div>
                   </div>
-                ))}
-                
+                  ))}
                 {/* Thinking indicator */}
                 {isThinking && (
                   <div className="flex gap-3 justify-start animate-fade-in">

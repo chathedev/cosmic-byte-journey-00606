@@ -10,11 +10,11 @@ import { Separator } from '@/components/ui/separator';
 import type { IdentityAccessSettings, EnterpriseProvider, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 const PROVIDERS = [
-  { key: 'microsoft', label: 'Microsoft', icon: '🏢' },
-  { key: 'google', label: 'Google', icon: '🔍' },
-  { key: 'okta', label: 'Okta', icon: '🔐' },
-  { key: 'oidc', label: 'OIDC', icon: '🔗' },
-  { key: 'saml', label: 'SAML', icon: '📜' },
+  { key: 'microsoft', label: 'Microsoft' },
+  { key: 'google', label: 'Google' },
+  { key: 'okta', label: 'Okta' },
+  { key: 'oidc', label: 'OIDC' },
+  { key: 'saml', label: 'SAML' },
 ];
 
 const FALLBACK_POLICIES = [
@@ -157,7 +157,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Välj provider" /></SelectTrigger>
                 <SelectContent>
                   {PROVIDERS.map(p => (
-                    <SelectItem key={p.key} value={p.key}>{p.icon} {p.label}</SelectItem>
+                    <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -188,7 +188,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-foreground">Providers</h4>
           <div className="grid gap-3">
-            {PROVIDERS.map(({ key, label, icon }) => {
+            {PROVIDERS.map(({ key, label }) => {
               const provider = providers[key] as EnterpriseProvider | undefined;
               const readiness = providerReadiness?.[key];
               const isEnabled = provider?.enabled ?? false;
@@ -198,7 +198,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                 <div key={key} className="rounded-lg border border-border p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{icon}</span>
+                      <Key className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm font-medium">{label}</span>
                       {isEnabled && isReady && (
                         <Badge variant="outline" className="text-[10px] border-green-300 text-green-700 dark:border-green-800 dark:text-green-400">

@@ -12,10 +12,10 @@ interface Props {
 }
 
 const INTEGRATIONS = [
-  { key: 'microsoftTeams', label: 'Microsoft Teams', icon: '🏢' },
-  { key: 'googleMeet', label: 'Google Meet', icon: '📹' },
-  { key: 'zoom', label: 'Zoom', icon: '🔵' },
-  { key: 'slack', label: 'Slack', icon: '💬' },
+  { key: 'microsoftTeams', label: 'Microsoft Teams' },
+  { key: 'googleMeet', label: 'Google Meet' },
+  { key: 'zoom', label: 'Zoom' },
+  { key: 'slack', label: 'Slack' },
 ];
 
 export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpdate }: Props) {
@@ -33,12 +33,14 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
           </div>
         </div>
 
-        {INTEGRATIONS.map(({ key, label, icon }) => {
+        {INTEGRATIONS.map(({ key, label }) => {
           const integration = (settings as any)?.[key] || {};
           return (
             <div key={key} className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{icon}</span>
+                <div className="w-5 h-5 rounded bg-muted flex items-center justify-center">
+                  <Link2 className="w-3 h-3 text-muted-foreground" />
+                </div>
                 <div>
                   <p className="text-sm">{label}</p>
                   {integration.allowedRoles?.length > 0 && (
