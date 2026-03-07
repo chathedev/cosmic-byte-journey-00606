@@ -201,8 +201,6 @@ export function AppSidebar() {
         { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
       ];
 
-  const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
-    (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
 
   const orgSubItems = isEnterpriseViewer
     ? [
