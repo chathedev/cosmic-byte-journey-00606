@@ -23,7 +23,7 @@ function isLockedOn(field: string, boundaries?: CustomizationBoundaries): boolea
 }
 
 // ─── Security Toggles Card ───
-function SecurityTogglesCard({ settings, locks, canEdit, onUpdate }: Props) {
+function SecurityTogglesCard({ settings, locks, canEdit, onUpdate, customizationBoundaries }: Props) {
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
   const [auditLogsEnabled, setAuditLogsEnabled] = useState(settings.auditLogsEnabled ?? false);
