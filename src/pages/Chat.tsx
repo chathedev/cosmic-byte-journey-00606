@@ -571,8 +571,7 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
                       )}
                     </div>
                   </div>
-                ))}
-                
+                  })}
                 {/* Thinking indicator */}
                 {isThinking && (
                   <div className="flex gap-3 justify-start animate-fade-in">
