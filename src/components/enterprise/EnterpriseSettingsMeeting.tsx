@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Video, FileText, Mic, Sparkles, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Video, FileText, Mic, Sparkles, CheckCircle2, Save } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { MeetingContentSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
@@ -15,29 +16,96 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
   const [saving, setSaving] = useState(false);
   const isLocked = (path: string) => !!locks[`meetingContentControls.${path}`]?.locked;
 
-  const handleToggle = async (field: string, value: boolean) => {
-    if (!canEdit || isLocked(field)) return;
+  // Local state
+  const [recordingAllowed, setRecordingAllowed] = useState(settings.recordingAllowed ?? true);
+  const [transcriptionAllowed, setTranscriptionAllowed] = useState(settings.transcriptionAllowed ?? true);
+  const [aiSummaryAllowed, setAiSummaryAllowed] = useState(settings.aiSummaryAllowed ?? true);
+  const [speakerIdentificationAllowed, setSpeakerIdentificationAllowed] = useState(settings.speakerIdentificationAllowed ?? false);
+  const [protocolTemplatesEnabled, setProtocolTemplatesEnabled] = useState(settings.protocolTemplatesEnabled ?? true);
+  const [approvalWorkflowEnabled, setApprovalWorkflowEnabled] = useState(settings.approvalWorkflowEnabled ?? false);
+  const [requiredProtocolFields, setRequiredProtocolFields] = useState<string[]>(settings.requiredProtocolFields || []);
+  const [allowOrgSharedMeetings, setAllowOrgSharedMeetings] = useState(settings.sharingPolicy?.allowOrgSharedMeetings ?? true);
+  const [allowTeamScopedMeetings, setAllowTeamScopedMeetings] = useState(settings.sharingPolicy?.allowTeamScopedMeetings ?? true);
+  const [allowExternalShareLinks, setAllowExternalShareLinks] = useState(settings.sharingPolicy?.allowExternalShareLinks ?? true);
+
+  useEffect(() => {
+    setRecordingAllowed(settings.recordingAllowed ?? true);
+    setTranscriptionAllowed(settings.transcriptionAllowed ?? true);
+    setAiSummaryAllowed(settings.aiSummaryAllowed ?? true);
+    setSpeakerIdentificationAllowed(settings.speakerIdentificationAllowed ?? false);
+    setProtocolTemplatesEnabled(settings.protocolTemplatesEnabled ?? true);
+    setApprovalWorkflowEnabled(settings.approvalWorkflowEnabled ?? false);
+    setRequiredProtocolFields(settings.requiredProtocolFields || []);
+    setAllowOrgSharedMeetings(settings.sharingPolicy?.allowOrgSharedMeetings ?? true);
+    setAllowTeamScopedMeetings(settings.sharingPolicy?.allowTeamScopedMeetings ?? true);
+    setAllowExternalShareLinks(settings.sharingPolicy?.allowExternalShareLinks ?? true);
+  }, [settings]);
+
+  const isDirty = useMemo(() => {
+    return (
+      recordingAllowed !== (settings.recordingAllowed ?? true) ||
+      transcriptionAllowed !== (settings.transcriptionAllowed ?? true) ||
+      aiSummaryAllowed !== (settings.aiSummaryAllowed ?? true) ||
+      speakerIdentificationAllowed !== (settings.speakerIdentificationAllowed ?? false) ||
+      protocolTemplatesEnabled !== (settings.protocolTemplatesEnabled ?? true) ||
+      approvalWorkflowEnabled !== (settings.approvalWorkflowEnabled ?? false) ||
+      JSON.stringify(requiredProtocolFields) !== JSON.stringify(settings.requiredProtocolFields || []) ||
+      allowOrgSharedMeetings !== (settings.sharingPolicy?.allowOrgSharedMeetings ?? true) ||
+      allowTeamScopedMeetings !== (settings.sharingPolicy?.allowTeamScopedMeetings ?? true) ||
+      allowExternalShareLinks !== (settings.sharingPolicy?.allowExternalShareLinks ?? true)
+    );
+  }, [recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, settings]);
+
+  const handleSave = async () => {
+    if (!canEdit || !isDirty) return;
     setSaving(true);
-    try { await onUpdate({ meetingContentControls: { [field]: value } }); }
-    finally { setSaving(false); }
+    try {
+      await onUpdate({
+        meetingContentControls: {
+          recordingAllowed,
+          transcriptionAllowed,
+          aiSummaryAllowed,
+          speakerIdentificationAllowed,
+          protocolTemplatesEnabled,
+          approvalWorkflowEnabled,
+          requiredProtocolFields,
+          sharingPolicy: {
+            allowOrgSharedMeetings,
+            allowTeamScopedMeetings,
+            allowExternalShareLinks,
+          },
+        },
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const toggleItems: Array<{ field: string; label: string; desc: string; icon: typeof Video }> = [
-    { field: 'recordingAllowed', label: 'Inspelning', desc: 'Tillåt inspelning av möten', icon: Video },
-    { field: 'transcriptionAllowed', label: 'Transkribering', desc: 'Tillåt automatisk transkribering', icon: Mic },
-    { field: 'aiSummaryAllowed', label: 'AI-sammanfattning', desc: 'Tillåt AI-genererade sammanfattningar', icon: Sparkles },
-    { field: 'speakerIdentificationAllowed', label: 'Talaridentifiering', desc: 'Tillåt identifiering av talare', icon: Mic },
-    { field: 'protocolTemplatesEnabled', label: 'Protokollmallar', desc: 'Aktivera mallbibliotek för protokoll', icon: FileText },
-    { field: 'approvalWorkflowEnabled', label: 'Godkännandeflöde', desc: 'Kräv godkännande innan protokoll publiceras', icon: CheckCircle2 },
+  const toggleField = (field: string, value: boolean, setter: (v: boolean) => void) => {
+    setter(value);
+  };
+
+  const toggleItems: Array<{ field: string; label: string; desc: string; icon: typeof Video; value: boolean; setter: (v: boolean) => void }> = [
+    { field: 'recordingAllowed', label: 'Inspelning', desc: 'Tillåt inspelning av möten', icon: Video, value: recordingAllowed, setter: setRecordingAllowed },
+    { field: 'transcriptionAllowed', label: 'Transkribering', desc: 'Tillåt automatisk transkribering', icon: Mic, value: transcriptionAllowed, setter: setTranscriptionAllowed },
+    { field: 'aiSummaryAllowed', label: 'AI-sammanfattning', desc: 'Tillåt AI-genererade sammanfattningar', icon: Sparkles, value: aiSummaryAllowed, setter: setAiSummaryAllowed },
+    { field: 'speakerIdentificationAllowed', label: 'Talaridentifiering', desc: 'Tillåt identifiering av talare', icon: Mic, value: speakerIdentificationAllowed, setter: setSpeakerIdentificationAllowed },
+    { field: 'protocolTemplatesEnabled', label: 'Protokollmallar', desc: 'Aktivera mallbibliotek för protokoll', icon: FileText, value: protocolTemplatesEnabled, setter: setProtocolTemplatesEnabled },
+    { field: 'approvalWorkflowEnabled', label: 'Godkännandeflöde', desc: 'Kräv godkännande innan protokoll publiceras', icon: CheckCircle2, value: approvalWorkflowEnabled, setter: setApprovalWorkflowEnabled },
   ];
 
-  const sharingItems: Array<{ field: string; label: string; desc: string }> = [
-    { field: 'allowOrgSharedMeetings', label: 'Organisationsdelade möten', desc: 'Tillåt delning av möten inom organisationen' },
-    { field: 'allowTeamScopedMeetings', label: 'Team-möten', desc: 'Tillåt team-specifika möten' },
-    { field: 'allowExternalShareLinks', label: 'Externa delningslänkar', desc: 'Tillåt delning utanför organisationen' },
+  const sharingItems: Array<{ field: string; label: string; desc: string; value: boolean; setter: (v: boolean) => void }> = [
+    { field: 'allowOrgSharedMeetings', label: 'Organisationsdelade möten', desc: 'Tillåt delning av möten inom organisationen', value: allowOrgSharedMeetings, setter: setAllowOrgSharedMeetings },
+    { field: 'allowTeamScopedMeetings', label: 'Team-möten', desc: 'Tillåt team-specifika möten', value: allowTeamScopedMeetings, setter: setAllowTeamScopedMeetings },
+    { field: 'allowExternalShareLinks', label: 'Externa delningslänkar', desc: 'Tillåt delning utanför organisationen', value: allowExternalShareLinks, setter: setAllowExternalShareLinks },
   ];
 
-  const requiredFields = settings.requiredProtocolFields || [];
+  const toggleRequiredField = (field: string) => {
+    if (!canEdit) return;
+    setRequiredProtocolFields(prev =>
+      prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -50,7 +118,7 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
           </div>
         </div>
 
-        {toggleItems.map(({ field, label, desc, icon: Icon }) => (
+        {toggleItems.map(({ field, label, desc, icon: Icon, value, setter }) => (
           <div key={field} className="flex items-center justify-between py-1">
             <div className="flex items-center gap-2">
               <Icon className="w-4 h-4 text-muted-foreground" />
@@ -60,8 +128,8 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
               </div>
             </div>
             <Switch
-              checked={(settings as any)[field] ?? true}
-              onCheckedChange={v => handleToggle(field, v)}
+              checked={value}
+              onCheckedChange={setter}
               disabled={!canEdit || isLocked(field) || saving}
             />
           </div>
@@ -75,17 +143,9 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
           {['summary', 'decisions', 'action_items', 'mainPoints'].map(field => (
             <Badge
               key={field}
-              variant={requiredFields.includes(field) ? 'default' : 'outline'}
+              variant={requiredProtocolFields.includes(field) ? 'default' : 'outline'}
               className="text-xs cursor-pointer"
-              onClick={async () => {
-                if (!canEdit) return;
-                const newFields = requiredFields.includes(field)
-                  ? requiredFields.filter(f => f !== field)
-                  : [...requiredFields, field];
-                setSaving(true);
-                try { await onUpdate({ meetingContentControls: { requiredProtocolFields: newFields } }); }
-                finally { setSaving(false); }
-              }}
+              onClick={() => toggleRequiredField(field)}
             >
               {field === 'summary' ? 'Sammanfattning' : field === 'decisions' ? 'Beslut' : field === 'action_items' ? 'Åtgärder' : 'Huvudpunkter'}
             </Badge>
@@ -96,25 +156,30 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
       {/* Sharing Policy */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h4 className="text-sm font-medium">Delningspolicy</h4>
-        {sharingItems.map(({ field, label, desc }) => (
+        {sharingItems.map(({ field, label, desc, value, setter }) => (
           <div key={field} className="flex items-center justify-between py-1">
             <div>
               <p className="text-sm">{label}</p>
               <p className="text-xs text-muted-foreground">{desc}</p>
             </div>
             <Switch
-              checked={(settings.sharingPolicy as any)?.[field] ?? true}
-              onCheckedChange={async v => {
-                if (!canEdit) return;
-                setSaving(true);
-                try { await onUpdate({ meetingContentControls: { sharingPolicy: { [field]: v } } }); }
-                finally { setSaving(false); }
-              }}
+              checked={value}
+              onCheckedChange={setter}
               disabled={!canEdit || saving}
             />
           </div>
         ))}
       </div>
+
+      {/* Save button */}
+      {canEdit && isDirty && (
+        <div className="sticky bottom-4 flex justify-end z-10">
+          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
+            <Save className="w-4 h-4" />
+            {saving ? 'Sparar…' : 'Spara ändringar'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

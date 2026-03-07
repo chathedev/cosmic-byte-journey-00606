@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Link2, Webhook, Code } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Link2, Code, Save } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { IntegrationSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
@@ -20,6 +21,49 @@ const INTEGRATIONS = [
 
 export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpdate }: Props) {
   const [saving, setSaving] = useState(false);
+
+  // Local state
+  const [integrationStates, setIntegrationStates] = useState<Record<string, boolean>>({});
+  const [apiAccessEnabled, setApiAccessEnabled] = useState(settings.apiAccessEnabled ?? false);
+  const [webhooksEnabled, setWebhooksEnabled] = useState(settings.webhooksEnabled ?? false);
+  const [customIntegrationsEnabled, setCustomIntegrationsEnabled] = useState(settings.customIntegrationsEnabled ?? false);
+
+  useEffect(() => {
+    const states: Record<string, boolean> = {};
+    INTEGRATIONS.forEach(({ key }) => {
+      states[key] = (settings as any)?.[key]?.enabled ?? false;
+    });
+    setIntegrationStates(states);
+    setApiAccessEnabled(settings.apiAccessEnabled ?? false);
+    setWebhooksEnabled(settings.webhooksEnabled ?? false);
+    setCustomIntegrationsEnabled(settings.customIntegrationsEnabled ?? false);
+  }, [settings]);
+
+  const isDirty = useMemo(() => {
+    const integrationsChanged = INTEGRATIONS.some(({ key }) => {
+      return integrationStates[key] !== ((settings as any)?.[key]?.enabled ?? false);
+    });
+    return (
+      integrationsChanged ||
+      apiAccessEnabled !== (settings.apiAccessEnabled ?? false) ||
+      webhooksEnabled !== (settings.webhooksEnabled ?? false) ||
+      customIntegrationsEnabled !== (settings.customIntegrationsEnabled ?? false)
+    );
+  }, [integrationStates, apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled, settings]);
+
+  const handleSave = async () => {
+    if (!canEdit || !isDirty) return;
+    setSaving(true);
+    try {
+      const patch: Record<string, any> = { apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled };
+      INTEGRATIONS.forEach(({ key }) => {
+        patch[key] = { enabled: integrationStates[key] };
+      });
+      await onUpdate({ integrations: patch });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -53,13 +97,8 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
                 </div>
               </div>
               <Switch
-                checked={integration.enabled ?? false}
-                onCheckedChange={async v => {
-                  if (!canEdit) return;
-                  setSaving(true);
-                  try { await onUpdate({ integrations: { [key]: { enabled: v } } }); }
-                  finally { setSaving(false); }
-                }}
+                checked={integrationStates[key] ?? false}
+                onCheckedChange={v => setIntegrationStates(prev => ({ ...prev, [key]: v }))}
                 disabled={!canEdit || saving}
               />
             </div>
@@ -79,13 +118,8 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
             <p className="text-xs text-muted-foreground">Tillåt programmatisk åtkomst via API</p>
           </div>
           <Switch
-            checked={settings.apiAccessEnabled ?? false}
-            onCheckedChange={async v => {
-              if (!canEdit) return;
-              setSaving(true);
-              try { await onUpdate({ integrations: { apiAccessEnabled: v } }); }
-              finally { setSaving(false); }
-            }}
+            checked={apiAccessEnabled}
+            onCheckedChange={setApiAccessEnabled}
             disabled={!canEdit || saving}
           />
         </div>
@@ -95,13 +129,8 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
             <p className="text-xs text-muted-foreground">Aktivera webhooks för realtidsnotifieringar</p>
           </div>
           <Switch
-            checked={settings.webhooksEnabled ?? false}
-            onCheckedChange={async v => {
-              if (!canEdit) return;
-              setSaving(true);
-              try { await onUpdate({ integrations: { webhooksEnabled: v } }); }
-              finally { setSaving(false); }
-            }}
+            checked={webhooksEnabled}
+            onCheckedChange={setWebhooksEnabled}
             disabled={!canEdit || saving}
           />
         </div>
@@ -111,17 +140,22 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
             <p className="text-xs text-muted-foreground">Tillåt tredjepartsintegrationer</p>
           </div>
           <Switch
-            checked={settings.customIntegrationsEnabled ?? false}
-            onCheckedChange={async v => {
-              if (!canEdit) return;
-              setSaving(true);
-              try { await onUpdate({ integrations: { customIntegrationsEnabled: v } }); }
-              finally { setSaving(false); }
-            }}
+            checked={customIntegrationsEnabled}
+            onCheckedChange={setCustomIntegrationsEnabled}
             disabled={!canEdit || saving}
           />
         </div>
       </div>
+
+      {/* Save button */}
+      {canEdit && isDirty && (
+        <div className="sticky bottom-4 flex justify-end z-10">
+          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
+            <Save className="w-4 h-4" />
+            {saving ? 'Sparar…' : 'Spara ändringar'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
