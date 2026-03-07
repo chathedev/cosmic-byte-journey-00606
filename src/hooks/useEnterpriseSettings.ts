@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
+import { translateError } from '@/lib/errorTranslation';
 import {
   getEnterpriseSettings, updateEnterpriseSettings, testSSO, connectSSO,
   disableSSOProvider, removeSSOProvider, resetSSOProvider,
