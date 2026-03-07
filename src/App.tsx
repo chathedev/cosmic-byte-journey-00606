@@ -250,7 +250,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isRecordingPage = location.pathname === '/recording';
   const isNative = isNativeApp();
 
-  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage) {
+  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage || isSSOCallback) {
     return <>{children}</>;
   }
 
