@@ -249,19 +249,20 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
 
       {/* Role Editor Dialog */}
       <Dialog open={!!editRole} onOpenChange={open => !open && setEditRole(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-lg p-0 gap-0 max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="px-5 pt-5 pb-3 shrink-0 border-b border-border">
             <DialogTitle>{isNew ? 'Skapa roll' : 'Redigera roll'}</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 min-h-0 pr-4">
-            <div className="space-y-4 py-2">
+
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="px-5 py-4 space-y-5">
               <div className="space-y-1.5">
                 <Label className="text-xs">Namn</Label>
-                <Input value={editRole?.name || ''} onChange={e => setEditRole(prev => prev ? { ...prev, name: e.target.value } : prev)} className="h-9 text-sm" />
+                <Input value={editRole?.name || ''} onChange={e => setEditRole(prev => prev ? { ...prev, name: e.target.value } : prev)} className="h-9 text-sm" placeholder="T.ex. Mötesansvarig" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Beskrivning</Label>
-                <Textarea value={editRole?.description || ''} onChange={e => setEditRole(prev => prev ? { ...prev, description: e.target.value } : prev)} className="text-sm min-h-[60px]" />
+                <Textarea value={editRole?.description || ''} onChange={e => setEditRole(prev => prev ? { ...prev, description: e.target.value } : prev)} className="text-sm min-h-[60px]" placeholder="Beskriv rollens syfte…" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Baserad på</Label>
@@ -276,10 +277,10 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
               <div className="space-y-3">
                 <Label className="text-xs font-medium">Behörigheter</Label>
                 {Object.entries(PERMISSION_GROUPS).map(([groupKey, group]) => (
-                  <div key={groupKey} className="space-y-1">
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{group.label}</p>
+                  <div key={groupKey} className="rounded-lg border border-border p-3 space-y-1.5">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
                     {group.permissions.map(perm => (
-                      <div key={perm.key} className="flex items-center justify-between py-1">
+                      <div key={perm.key} className="flex items-center justify-between py-0.5">
                         <span className="text-xs">{perm.label}</span>
                         <Switch
                           checked={editRole?.permissions?.[perm.key] ?? false}
@@ -293,7 +294,8 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
               </div>
             </div>
           </ScrollArea>
-          <DialogFooter>
+
+          <DialogFooter className="px-5 py-3 shrink-0 border-t border-border bg-muted/30">
             <Button variant="outline" size="sm" onClick={() => setEditRole(null)}>Avbryt</Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !editRole?.name}>
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
