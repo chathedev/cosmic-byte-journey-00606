@@ -166,6 +166,7 @@ export default function EnterpriseSettingsPage() {
               onUpdate={handleUpdate}
               onTestSSO={handleTestSSO}
               onConnectSSO={handleConnectSSO}
+              providerReadiness={data.settingsSummary?.providerReadiness}
             />
           </TabsContent>
           <TabsContent value="workspace" className="mt-6">
