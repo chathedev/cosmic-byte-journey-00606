@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Video, FileText, Mic, Sparkles, CheckCircle2 } from 'lucide-react';
-import { EnterpriseSaveBar } from './EnterpriseSaveBar';
-import { useAutoSave } from '@/hooks/useAutoSave';
+import { CardSaveFooter } from './CardSaveFooter';
+import { useManualSave } from '@/hooks/useManualSave';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import type { MeetingContentSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
@@ -17,7 +16,6 @@ interface Props {
 export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }: Props) {
   const isLocked = (path: string) => !!locks[`meetingContentControls.${path}`]?.locked;
 
-  // Local state
   const [recordingAllowed, setRecordingAllowed] = useState(settings.recordingAllowed ?? true);
   const [transcriptionAllowed, setTranscriptionAllowed] = useState(settings.transcriptionAllowed ?? true);
   const [aiSummaryAllowed, setAiSummaryAllowed] = useState(settings.aiSummaryAllowed ?? true);
@@ -29,7 +27,7 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
   const [allowTeamScopedMeetings, setAllowTeamScopedMeetings] = useState(settings.sharingPolicy?.allowTeamScopedMeetings ?? true);
   const [allowExternalShareLinks, setAllowExternalShareLinks] = useState(settings.sharingPolicy?.allowExternalShareLinks ?? true);
 
-  useEffect(() => {
+  const syncFromProps = useCallback(() => {
     setRecordingAllowed(settings.recordingAllowed ?? true);
     setTranscriptionAllowed(settings.transcriptionAllowed ?? true);
     setAiSummaryAllowed(settings.aiSummaryAllowed ?? true);
@@ -41,6 +39,8 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
     setAllowTeamScopedMeetings(settings.sharingPolicy?.allowTeamScopedMeetings ?? true);
     setAllowExternalShareLinks(settings.sharingPolicy?.allowExternalShareLinks ?? true);
   }, [settings]);
+
+  useEffect(() => { syncFromProps(); }, [syncFromProps]);
 
   const isDirty = useMemo(() => {
     return (
@@ -57,31 +57,18 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
     );
   }, [recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, settings]);
 
-  const handleSave = useCallback(async () => {
+  const doSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
     await onUpdate({
       meetingContentControls: {
-        recordingAllowed,
-        transcriptionAllowed,
-        aiSummaryAllowed,
-        speakerIdentificationAllowed,
-        protocolTemplatesEnabled,
-        approvalWorkflowEnabled,
-        requiredProtocolFields,
-        sharingPolicy: {
-          allowOrgSharedMeetings,
-          allowTeamScopedMeetings,
-          allowExternalShareLinks,
-        },
+        recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed,
+        protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields,
+        sharingPolicy: { allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks },
       },
     });
   }, [canEdit, isDirty, recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, onUpdate]);
 
-  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
-
-  const toggleField = (field: string, value: boolean, setter: (v: boolean) => void) => {
-    setter(value);
-  };
+  const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: syncFromProps });
 
   const toggleItems: Array<{ field: string; label: string; desc: string; icon: typeof Video; value: boolean; setter: (v: boolean) => void }> = [
     { field: 'recordingAllowed', label: 'Inspelning', desc: 'Tillåt inspelning av möten', icon: Video, value: recordingAllowed, setter: setRecordingAllowed },
@@ -93,21 +80,20 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
   ];
 
   const sharingItems: Array<{ field: string; label: string; desc: string; value: boolean; setter: (v: boolean) => void }> = [
-    { field: 'allowOrgSharedMeetings', label: 'Organisationsdelade möten', desc: 'Tillåt delning av möten inom organisationen', value: allowOrgSharedMeetings, setter: setAllowOrgSharedMeetings },
+    { field: 'allowOrgSharedMeetings', label: 'Organisationsdelade möten', desc: 'Tillåt delning inom organisationen', value: allowOrgSharedMeetings, setter: setAllowOrgSharedMeetings },
     { field: 'allowTeamScopedMeetings', label: 'Team-möten', desc: 'Tillåt team-specifika möten', value: allowTeamScopedMeetings, setter: setAllowTeamScopedMeetings },
     { field: 'allowExternalShareLinks', label: 'Externa delningslänkar', desc: 'Tillåt delning utanför organisationen', value: allowExternalShareLinks, setter: setAllowExternalShareLinks },
   ];
 
   const toggleRequiredField = (field: string) => {
     if (!canEdit) return;
-    setRequiredProtocolFields(prev =>
-      prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
-    );
+    setRequiredProtocolFields(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
   };
+
+  const saveFooter = <CardSaveFooter status={status} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />;
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar status={autoSaveStatus} />
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-primary/10"><Video className="w-5 h-5 text-primary" /></div>
@@ -116,60 +102,40 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
             <p className="text-xs text-muted-foreground mt-0.5">Styr vad som är tillåtet i arbetsytan</p>
           </div>
         </div>
-
         {toggleItems.map(({ field, label, desc, icon: Icon, value, setter }) => (
           <div key={field} className="flex items-center justify-between py-1">
             <div className="flex items-center gap-2">
               <Icon className="w-4 h-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm">{label}</p>
-                <p className="text-xs text-muted-foreground">{desc}</p>
-              </div>
+              <div><p className="text-sm">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
             </div>
-            <Switch
-              checked={value}
-              onCheckedChange={setter}
-              disabled={!canEdit || isLocked(field) || saving}
-            />
+            <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isLocked(field) || isSaving} />
           </div>
         ))}
+        {saveFooter}
       </div>
 
-      {/* Required Fields */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-3">
         <h4 className="text-sm font-medium">Obligatoriska protokollfält</h4>
         <div className="flex flex-wrap gap-2">
           {['summary', 'decisions', 'action_items', 'mainPoints'].map(field => (
-            <Badge
-              key={field}
-              variant={requiredProtocolFields.includes(field) ? 'default' : 'outline'}
-              className="text-xs cursor-pointer"
-              onClick={() => toggleRequiredField(field)}
-            >
+            <Badge key={field} variant={requiredProtocolFields.includes(field) ? 'default' : 'outline'} className="text-xs cursor-pointer" onClick={() => toggleRequiredField(field)}>
               {field === 'summary' ? 'Sammanfattning' : field === 'decisions' ? 'Beslut' : field === 'action_items' ? 'Åtgärder' : 'Huvudpunkter'}
             </Badge>
           ))}
         </div>
+        {saveFooter}
       </div>
 
-      {/* Sharing Policy */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h4 className="text-sm font-medium">Delningspolicy</h4>
         {sharingItems.map(({ field, label, desc, value, setter }) => (
           <div key={field} className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-sm">{label}</p>
-              <p className="text-xs text-muted-foreground">{desc}</p>
-            </div>
-            <Switch
-              checked={value}
-              onCheckedChange={setter}
-              disabled={!canEdit || saving}
-            />
+            <div><p className="text-sm">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
+            <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isSaving} />
           </div>
         ))}
+        {saveFooter}
       </div>
-
     </div>
   );
 }
