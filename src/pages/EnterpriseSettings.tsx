@@ -1,34 +1,77 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Building2, Lock, Palette, Video, Link2, Users, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Building2, Lock, Palette, Video, Link2, Users, FileText, Loader2, ChevronRight, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useEnterpriseSettings } from '@/hooks/useEnterpriseSettings';
-import { EnterpriseSettingsIdentity } from '@/components/enterprise/EnterpriseSettingsIdentity';
-import { EnterpriseSettingsWorkspace } from '@/components/enterprise/EnterpriseSettingsWorkspace';
-import { EnterpriseSettingsDomains } from '@/components/enterprise/EnterpriseSettingsDomains';
-import { EnterpriseSettingsSecurity } from '@/components/enterprise/EnterpriseSettingsSecurity';
-import { EnterpriseSettingsMeeting } from '@/components/enterprise/EnterpriseSettingsMeeting';
-import { EnterpriseSettingsIntegrations } from '@/components/enterprise/EnterpriseSettingsIntegrations';
-import { EnterpriseSettingsRoles } from '@/components/enterprise/EnterpriseSettingsRoles';
-import { EnterpriseSettingsAudit } from '@/components/enterprise/EnterpriseSettingsAudit';
-import { cn } from '@/lib/utils';
 
 const sections = [
-  { key: 'identity', title: 'Identitet & SSO', icon: Shield, color: 'text-blue-600 dark:text-blue-400' },
-  { key: 'workspace', title: 'Arbetsyta & Domäner', icon: Palette, color: 'text-purple-600 dark:text-purple-400' },
-  { key: 'security', title: 'Säkerhet', icon: Lock, color: 'text-amber-600 dark:text-amber-400' },
-  { key: 'meeting', title: 'Möten & Innehåll', icon: Video, color: 'text-green-600 dark:text-green-400' },
-  { key: 'integrations', title: 'Integrationer', icon: Link2, color: 'text-cyan-600 dark:text-cyan-400' },
-  { key: 'roles', title: 'Roller', icon: Users, color: 'text-rose-600 dark:text-rose-400' },
-  { key: 'audit', title: 'Historik', icon: FileText, color: 'text-slate-600 dark:text-slate-400' },
+  {
+    key: 'identity',
+    title: 'Identitet & SSO',
+    description: 'Single sign-on, leverantörer och provisionering',
+    icon: Shield,
+    color: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-50 dark:bg-blue-950/30',
+    path: '/org/enterprise-settings/identity',
+  },
+  {
+    key: 'workspace',
+    title: 'Arbetsyta & Domäner',
+    description: 'Branding, logotyper och anpassade domäner',
+    icon: Palette,
+    color: 'text-purple-600 dark:text-purple-400',
+    bg: 'bg-purple-50 dark:bg-purple-950/30',
+    path: '/org/enterprise-settings/workspace',
+  },
+  {
+    key: 'security',
+    title: 'Säkerhet & Efterlevnad',
+    description: 'Datalagring, IP-begränsningar och exportkontroller',
+    icon: Lock,
+    color: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-950/30',
+    path: '/org/enterprise-settings/security',
+  },
+  {
+    key: 'meeting',
+    title: 'Möten & Innehåll',
+    description: 'Inspelning, transkribering, AI och delningspolicyer',
+    icon: Video,
+    color: 'text-green-600 dark:text-green-400',
+    bg: 'bg-green-50 dark:bg-green-950/30',
+    path: '/org/enterprise-settings/meetings',
+  },
+  {
+    key: 'integrations',
+    title: 'Integrationer',
+    description: 'Teams, Zoom, Google Meet, Slack och API-åtkomst',
+    icon: Link2,
+    color: 'text-cyan-600 dark:text-cyan-400',
+    bg: 'bg-cyan-50 dark:bg-cyan-950/30',
+    path: '/org/enterprise-settings/integrations',
+  },
+  {
+    key: 'roles',
+    title: 'Roller & Behörigheter',
+    description: 'Anpassade roller och behörighetspaket',
+    icon: Users,
+    color: 'text-rose-600 dark:text-rose-400',
+    bg: 'bg-rose-50 dark:bg-rose-950/30',
+    path: '/org/enterprise-settings/roles',
+  },
+  {
+    key: 'audit',
+    title: 'Historik & Audit',
+    description: 'Ändringslogg och säkerhetshändelser',
+    icon: FileText,
+    color: 'text-slate-600 dark:text-slate-400',
+    bg: 'bg-slate-50 dark:bg-slate-950/30',
+    path: '/org/enterprise-settings/audit',
+  },
 ] as const;
-
-type SectionKey = typeof sections[number]['key'];
 
 export default function EnterpriseSettingsPage() {
   const navigate = useNavigate();
   const ctx = useEnterpriseSettings();
-  const [activeTab, setActiveTab] = useState<SectionKey>('identity');
 
   if (!ctx.isEnterprise) {
     return (
@@ -49,147 +92,84 @@ export default function EnterpriseSettingsPage() {
     );
   }
 
-  const renderContent = () => {
-    if (!ctx.data) return null;
-
-    switch (activeTab) {
-      case 'identity':
-        return (
-          <EnterpriseSettingsIdentity
-            settings={ctx.data.settings.identityAccess}
-            locks={ctx.data.locks}
-            canEdit={ctx.canEdit}
-            onUpdate={ctx.handleUpdate}
-            onTestSSO={ctx.handleTestSSO}
-            onConnectSSO={ctx.handleConnectSSO}
-            onDisableProvider={ctx.handleDisableProvider}
-            onRemoveProvider={ctx.handleRemoveProvider}
-            onResetProvider={ctx.handleResetProvider}
-            providerReadiness={ctx.data.settingsSummary?.providerReadiness}
-            hasVerifiedDomain={!!(ctx.data.settings.adminWorkspace as any)?.customDomains?.domains?.some((d: any) => d.status === 'verified')}
-            defaultLoginHostname={(ctx.data.settings.adminWorkspace as any)?.customDomains?.defaultLoginHostname || ctx.data.settingsSummary?.defaultLoginHostname || null}
-          />
-        );
-      case 'workspace':
-        return (
-          <div className="space-y-8">
-            <EnterpriseSettingsWorkspace
-              settings={ctx.data.settings.adminWorkspace}
-              locks={ctx.data.locks}
-              canEdit={ctx.canEdit}
-              onUpdate={ctx.handleUpdate}
-            />
-            {ctx.companyId && (
-              <EnterpriseSettingsDomains
-                companyId={ctx.companyId}
-                customDomains={(ctx.data.settings.adminWorkspace as any)?.customDomains}
-                canEdit={ctx.canEdit}
-                onDomainsChanged={ctx.loadSettings}
-              />
-            )}
-          </div>
-        );
-      case 'security':
-        return (
-          <EnterpriseSettingsSecurity
-            settings={ctx.data.settings.securityCompliance}
-            locks={ctx.data.locks}
-            canEdit={ctx.canEdit}
-            onUpdate={ctx.handleUpdate}
-          />
-        );
-      case 'meeting':
-        return (
-          <EnterpriseSettingsMeeting
-            settings={ctx.data.settings.meetingContentControls}
-            locks={ctx.data.locks}
-            canEdit={ctx.canEdit}
-            onUpdate={ctx.handleUpdate}
-          />
-        );
-      case 'integrations':
-        return (
-          <EnterpriseSettingsIntegrations
-            settings={ctx.data.settings.integrations}
-            locks={ctx.data.locks}
-            canEdit={ctx.canEdit}
-            onUpdate={ctx.handleUpdate}
-          />
-        );
-      case 'roles':
-        return (
-          <EnterpriseSettingsRoles
-            companyId={ctx.companyId!}
-            canEdit={ctx.canEdit}
-            initialRoles={ctx.data.settings.customRoles}
-          />
-        );
-      case 'audit':
-        return <EnterpriseSettingsAudit companyId={ctx.companyId!} />;
-    }
-  };
+  // Quick stats from settings summary
+  const summary = ctx.data.settingsSummary;
+  const ssoEnabled = summary?.ssoEnabled;
+  const lockCount = summary?.lockCount || 0;
+  const customRoleCount = summary?.customRoleCount || 0;
+  const defaultLoginHostname = summary?.defaultLoginHostname;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-5xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-8">
           <button onClick={() => navigate('/org/settings')} className="p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold">Enterprise-inställningar</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold">Enterprise</h1>
             <p className="text-sm text-muted-foreground mt-0.5 truncate">{ctx.data.company?.name}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Badge variant="secondary" className="bg-primary/15 text-primary text-xs gap-1">
               <Building2 className="w-3 h-3" />Enterprise
             </Badge>
-            {ctx.hasLocks && (
-              <Badge variant="outline" className="text-xs gap-1 border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400">
-                <Lock className="w-3 h-3" />Låsta fält
-              </Badge>
-            )}
           </div>
         </div>
 
         {!ctx.canEdit && (
-          <div className="mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-300">
+          <div className="mb-6 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-300">
             Du har läsbehörighet men kan inte ändra enterprise-inställningar.
           </div>
         )}
 
-        {/* Tab navigation + content */}
-        <div className="flex flex-col sm:flex-row gap-6">
-          {/* Sidebar tabs */}
-          <nav className="sm:w-52 shrink-0">
-            <div className="sm:sticky sm:top-6 flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible pb-2 sm:pb-0 -mx-1 px-1">
-              {sections.map((section) => {
-                const Icon = section.icon;
-                const isActive = activeTab === section.key;
-                return (
-                  <button
-                    key={section.key}
-                    onClick={() => setActiveTab(section.key)}
-                    className={cn(
-                      "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all whitespace-nowrap text-sm",
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                    )}
-                  >
-                    <Icon className={cn("w-4 h-4 shrink-0", isActive ? 'text-primary' : section.color)} />
-                    <span className="truncate">{section.title}</span>
-                  </button>
-                );
-              })}
+        {/* Quick status bar */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          {ssoEnabled && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
+              <Shield className="w-3 h-3" />SSO aktivt
             </div>
-          </nav>
+          )}
+          {defaultLoginHostname && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-xs text-foreground">
+              <Globe className="w-3 h-3 text-primary" />
+              <span className="font-mono text-[11px]">{defaultLoginHostname}</span>
+            </div>
+          )}
+          {lockCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-400">
+              <Lock className="w-3 h-3" />{lockCount} låsta fält
+            </div>
+          )}
+          {customRoleCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400">
+              <Users className="w-3 h-3" />{customRoleCount} roller
+            </div>
+          )}
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {renderContent()}
-          </div>
+        {/* Section grid */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {sections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.key}
+                onClick={() => navigate(section.path)}
+                className="group flex items-start gap-3.5 p-4 rounded-xl border border-border bg-card hover:border-primary/20 hover:shadow-sm transition-all text-left"
+              >
+                <div className={`p-2 rounded-lg ${section.bg} shrink-0`}>
+                  <Icon className={`w-4 h-4 ${section.color}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">{section.title}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{section.description}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary/50 mt-0.5 shrink-0 transition-colors" />
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

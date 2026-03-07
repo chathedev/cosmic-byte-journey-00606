@@ -55,6 +55,13 @@ import AdminEnterpriseCompanyDetail from "./pages/AdminEnterpriseCompanyDetail";
 import AdminAICosts from "./pages/AdminAICosts";
 import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
+import EnterpriseSettingsIdentity from "./pages/EnterpriseSettingsIdentity";
+import EnterpriseSettingsWorkspace from "./pages/EnterpriseSettingsWorkspace";
+import EnterpriseSettingsSecurity from "./pages/EnterpriseSettingsSecurity";
+import EnterpriseSettingsMeetings from "./pages/EnterpriseSettingsMeetings";
+import EnterpriseSettingsIntegrations from "./pages/EnterpriseSettingsIntegrations";
+import EnterpriseSettingsRoles from "./pages/EnterpriseSettingsRoles";
+import EnterpriseSettingsAudit from "./pages/EnterpriseSettingsAudit";
 import Settings from "./pages/Settings";
 import OrgSettings from "./pages/OrgSettings";
 import EnterpriseSettings from "./pages/EnterpriseSettings";
@@ -436,6 +443,13 @@ const AppContent = () => {
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/org/enterprise-settings" element={<ProtectedRoute><EnterpriseSettings /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/identity" element={<ProtectedRoute><EnterpriseSettingsIdentity /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/workspace" element={<ProtectedRoute><EnterpriseSettingsWorkspace /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/security" element={<ProtectedRoute><EnterpriseSettingsSecurity /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/meetings" element={<ProtectedRoute><EnterpriseSettingsMeetings /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/integrations" element={<ProtectedRoute><EnterpriseSettingsIntegrations /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/roles" element={<ProtectedRoute><EnterpriseSettingsRoles /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings/audit" element={<ProtectedRoute><EnterpriseSettingsAudit /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
