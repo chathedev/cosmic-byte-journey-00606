@@ -17,6 +17,9 @@ export default function EnterpriseSettingsIdentityPage() {
           onUpdate={ctx.handleUpdate}
           onTestSSO={ctx.handleTestSSO}
           onConnectSSO={ctx.handleConnectSSO}
+          onDisableProvider={ctx.handleDisableProvider}
+          onRemoveProvider={ctx.handleRemoveProvider}
+          onResetProvider={ctx.handleResetProvider}
           providerReadiness={ctx.data!.settingsSummary?.providerReadiness}
           hasVerifiedDomain={!!(ctx.data!.settings.adminWorkspace as any)?.customDomains?.domains?.some((d: any) => d.status === 'verified')}
           defaultLoginHostname={(ctx.data!.settings.adminWorkspace as any)?.customDomains?.defaultLoginHostname || ctx.data!.settingsSummary?.defaultLoginHostname || null}
