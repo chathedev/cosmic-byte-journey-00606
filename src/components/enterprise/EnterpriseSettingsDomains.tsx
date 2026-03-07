@@ -220,18 +220,18 @@ function DomainInlineDetail({
   saving: boolean;
 }) {
   const { toast } = useToast();
-  const isVerified = domain.status === 'verified';
+  const isVerified = isDomainVerified(domain);
   const isFailed = domain.status === 'failed';
   const isPrimary = domain.primary || defaultLogin === domain.hostname;
   const isPolling = verifyingHost === domain.hostname;
   const errorText = getErrorText(domain);
 
   const ob = domain.onboarding;
-  const obStatus = ob?.status || (isVerified ? 'active' : 'pending');
+  const obStatus = isVerified ? 'active' : (ob?.status || 'pending');
   const progress = getOnboardingProgress(obStatus);
   const dnsRecords = resolveDnsRecords(domain, addResponse);
   const provider = resolveProvider(domain, addResponse);
-  const needsDns = !isVerified && domain.kind === 'bring_your_own';
+  const needsDns = !isVerified && domain.kind !== 'tivly_subdomain';
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => toast({ title: 'Kopierad' }));
