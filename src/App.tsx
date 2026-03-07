@@ -388,6 +388,7 @@ const AppContent = () => {
                 <Route path="/integrations/slack" element={<ProtectedRoute><ViewerGuard><IntegrationSlack /></ViewerGuard></ProtectedRoute>} />
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings" element={<ProtectedRoute><EnterpriseSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
