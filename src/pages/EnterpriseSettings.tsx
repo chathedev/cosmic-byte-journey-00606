@@ -25,7 +25,7 @@ export default function EnterpriseSettingsPage() {
   const [loading, setLoading] = useState(true);
 
   const companyId = enterpriseMembership?.company?.id;
-  const planType = enterpriseMembership?.company?.planType || enterpriseMembership?.company?.plan;
+  const planType = enterpriseMembership?.company?.planType || (enterpriseMembership?.company as any)?.plan;
   const isEnterprise = planType === 'enterprise';
 
   const loadSettings = useCallback(async () => {
