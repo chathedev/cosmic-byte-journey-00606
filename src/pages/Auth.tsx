@@ -11,6 +11,8 @@ import { getCommercialPlan } from '@/lib/commercialPlan';
 import { motion, AnimatePresence } from 'framer-motion';
 import NoAppAccessScreen from '@/components/NoAppAccessScreen';
 import tivlyLogo from '@/assets/tivly-logo.png';
+import { isEnterpriseCustomDomain, getPublicWorkspace, type PublicWorkspaceInfo } from '@/lib/enterpriseDomainApi';
+import { EnterpriseSSOLogin } from '@/components/EnterpriseSSOLogin';
 
 declare global {
   interface Window {
@@ -72,12 +74,34 @@ export default function Auth() {
   const [isSignup, setIsSignup] = useState(false);
   const [onboardingEnabled, setOnboardingEnabled] = useState(false);
   const [enterpriseRedirect, setEnterpriseRedirect] = useState<{ hostname: string; origin: string } | null>(null);
+  const [workspace, setWorkspace] = useState<PublicWorkspaceInfo | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const isCustomDomain = isEnterpriseCustomDomain();
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
   }, []);
+
+  // Bootstrap enterprise workspace on custom domains
+  useEffect(() => {
+    if (!isCustomDomain) return;
+    setWorkspaceLoading(true);
+    getPublicWorkspace(window.location.hostname)
+      .then(ws => {
+        setWorkspace(ws);
+        // Apply branding favicon
+        if (ws.branding?.faviconUrl) {
+          const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+          if (link) link.href = ws.branding.faviconUrl;
+        }
+      })
+      .catch(err => {
+        console.warn('[Auth] Failed to bootstrap workspace:', err);
+      })
+      .finally(() => setWorkspaceLoading(false));
+  }, [isCustomDomain]);
 
   useEffect(() => {
     apiClient.getEnterpriseOnboardingAuto()
@@ -331,16 +355,20 @@ export default function Auth() {
           {/* Left panel — branding (desktop only) */}
           <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12 min-h-screen sticky top-0">
             <div className="max-w-sm space-y-8">
-              <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
+              {workspace?.branding?.logoUrl ? (
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" />
+              ) : (
+                <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
+              )}
               <div className="space-y-3">
                 <h2 className="text-2xl font-semibold text-foreground tracking-tight">
-                  Mötesprotokoll på sekunder
+                  {workspace?.branding?.loginTitle || 'Mötesprotokoll på sekunder'}
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.
+                  {workspace?.branding?.loginSubtitle || 'Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.'}
                 </p>
               </div>
-              {onboardingEnabled && (
+              {!isCustomDomain && onboardingEnabled && (
                 <div className="pt-4">
                   <a
                     href="/team/onboarding"
@@ -357,7 +385,11 @@ export default function Auth() {
           <div className="flex-1 relative flex flex-col items-center px-5 sm:px-8 py-10 sm:py-12 min-h-[100svh] md:min-h-[100dvh] lg:min-h-screen justify-start lg:justify-center">
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
-              <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
+              {workspace?.branding?.logoUrl ? (
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-8 w-auto" />
+              ) : (
+                <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
+              )}
             </div>
 
             <div className="w-full max-w-[380px] mx-auto">
@@ -373,49 +405,74 @@ export default function Auth() {
                   >
                     <div className="text-center space-y-1.5">
                       <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-                        {isSignup ? 'Skapa konto' : 'Välkommen tillbaka'}
+                        {workspace?.branding?.workspaceDisplayName
+                          ? `Logga in på ${workspace.branding.workspaceDisplayName}`
+                          : isSignup ? 'Skapa konto' : 'Välkommen tillbaka'}
                       </h1>
                       <p className="text-sm text-muted-foreground">
-                        {isSignup
-                          ? 'Ange din e-post så skapar vi ett konto åt dig.'
-                          : 'Logga in med din e-postadress.'}
+                        {workspace?.ssoOnlyLogin
+                          ? 'Använd din organisations SSO för att logga in.'
+                          : isSignup
+                            ? 'Ange din e-post så skapar vi ett konto åt dig.'
+                            : 'Logga in med din e-postadress.'}
                       </p>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
-                          E-postadress
-                        </Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none z-10" />
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="namn@foretag.se"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            onFocus={(e) => scrollInputIntoView(e.currentTarget)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
-                            disabled={loading}
-                            className="h-11 text-base pl-10 rounded-lg bg-background border-border focus:border-primary touch-manipulation"
-                          />
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={handleRequestCode}
-                        disabled={loading || !email.trim()}
-                        className="w-full h-11 rounded-lg text-sm font-medium"
-                        type="button"
-                      >
-                        {loading ? (
-                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</>
-                        ) : (
-                          <>{isSignup ? 'Skapa konto' : 'Skicka kod'}</>
+                    {/* SSO buttons — only on enterprise custom domains */}
+                    {isCustomDomain && workspace?.ssoEnabled && (
+                      <div className="space-y-4">
+                        <EnterpriseSSOLogin workspace={workspace} />
+                        
+                        {!workspace.ssoOnlyLogin && (
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t border-border" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-background px-3 text-muted-foreground">eller</span>
+                            </div>
+                          </div>
                         )}
-                      </Button>
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Email login — hidden when SSO-only on custom domain */}
+                    {!(isCustomDomain && workspace?.ssoOnlyLogin) && (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
+                            E-postadress
+                          </Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none z-10" />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="namn@foretag.se"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              onFocus={(e) => scrollInputIntoView(e.currentTarget)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
+                              disabled={loading}
+                              className="h-11 text-base pl-10 rounded-lg bg-background border-border focus:border-primary touch-manipulation"
+                            />
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={handleRequestCode}
+                          disabled={loading || !email.trim()}
+                          className="w-full h-11 rounded-lg text-sm font-medium"
+                          type="button"
+                        >
+                          {loading ? (
+                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</>
+                          ) : (
+                            <>{isSignup ? 'Skapa konto' : 'Skicka kod'}</>
+                          )}
+                        </Button>
+                      </div>
+                    )}
 
                     <AnimatePresence>
                       {authError && (
@@ -428,18 +485,21 @@ export default function Auth() {
                       )}
                     </AnimatePresence>
 
-                    <div className="pt-2">
-                      <p className="text-center text-sm text-muted-foreground">
-                        {isSignup ? (
-                          <>Har du redan konto?{' '}<button onClick={() => setIsSignup(false)} className="text-primary font-medium hover:text-primary/80 transition-colors">Logga in</button></>
-                        ) : (
-                          <>Nytt här?{' '}<button onClick={() => setIsSignup(true)} className="text-primary font-medium hover:text-primary/80 transition-colors">Skapa konto</button></>
-                        )}
-                      </p>
-                    </div>
+                    {/* Signup/login toggle — only on generic domain */}
+                    {!isCustomDomain && (
+                      <div className="pt-2">
+                        <p className="text-center text-sm text-muted-foreground">
+                          {isSignup ? (
+                            <>Har du redan konto?{' '}<button onClick={() => setIsSignup(false)} className="text-primary font-medium hover:text-primary/80 transition-colors">Logga in</button></>
+                          ) : (
+                            <>Nytt här?{' '}<button onClick={() => setIsSignup(true)} className="text-primary font-medium hover:text-primary/80 transition-colors">Skapa konto</button></>
+                          )}
+                        </p>
+                      </div>
+                    )}
 
-                    {/* Enterprise link — mobile only */}
-                    {onboardingEnabled && (
+                    {/* Enterprise link — mobile only, generic domain only */}
+                    {!isCustomDomain && onboardingEnabled && (
                       <div className="lg:hidden text-center pt-2">
                         <a
                           href="/team/onboarding"
@@ -546,7 +606,17 @@ export default function Auth() {
 
             {/* Footer inside the form panel */}
             <div className="hidden lg:flex w-full justify-center absolute bottom-6 left-0">
-              <p className="text-[11px] text-muted-foreground/50 text-center">© {new Date().getFullYear()} <a href="https://lyrio.se" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">Lyrio AB</a></p>
+              <p className="text-[11px] text-muted-foreground/50 text-center">
+                {isCustomDomain && workspace?.branding?.supportUrl ? (
+                  <>
+                    <a href={workspace.branding.supportUrl} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+                      Support
+                    </a>
+                    {' · '}
+                  </>
+                ) : null}
+                © {new Date().getFullYear()} <a href="https://lyrio.se" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">Lyrio AB</a>
+              </p>
             </div>
           </div>
         </div>

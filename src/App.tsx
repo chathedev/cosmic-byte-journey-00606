@@ -85,6 +85,7 @@ import AdminSlackInsights from "./pages/AdminSlackInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import IntegrationSlack from "./pages/IntegrationSlack";
 import SharedProtocol from "./pages/SharedProtocol";
+import SSOCallback from "./pages/SSOCallback";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -245,10 +246,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
   const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/team/onboarding' || location.pathname === '/team/onboarding/verify-email';
+  const isSSOCallback = location.pathname === '/auth/sso/callback';
   const isRecordingPage = location.pathname === '/recording';
   const isNative = isNativeApp();
 
-  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage) {
+  if (isAuthPage || isMagicLoginPage || isPublicPage || isRecordingPage || isSSOCallback) {
     return <>{children}</>;
   }
 
@@ -392,6 +394,7 @@ const AppContent = () => {
             >
               <Routes>
                 <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                <Route path="/auth/sso/callback" element={<SSOCallback />} />
                 <Route path="/auth/handoff" element={<AuthHandoff />} />
                 <Route path="/magic-login" element={<MagicLogin />} />
                 
