@@ -119,7 +119,7 @@ function getOnboardingProgress(status?: string): number {
 }
 
 function statusIcon(domain: DomainEntry, size = 'w-3.5 h-3.5') {
-  if (domain.status === 'verified') return <CheckCircle2 className={`${size} text-green-600 dark:text-green-400`} />;
+  if (isDomainVerified(domain)) return <CheckCircle2 className={`${size} text-green-600 dark:text-green-400`} />;
   if (domain.status === 'failed') return <XCircle className={`${size} text-destructive`} />;
   if (domain.status === 'removing') return <Loader2 className={`${size} animate-spin text-muted-foreground`} />;
   const ob = domain.onboarding;
@@ -127,8 +127,12 @@ function statusIcon(domain: DomainEntry, size = 'w-3.5 h-3.5') {
   return <Clock className={`${size} text-amber-500`} />;
 }
 
+function isDomainVerified(domain: DomainEntry): boolean {
+  return domain.status === 'verified' || domain.onboarding?.status === 'active';
+}
+
 function domainStatusLabel(domain: DomainEntry): string {
-  if (domain.status === 'verified') return 'Verifierad';
+  if (isDomainVerified(domain)) return 'Verifierad';
   if (domain.status === 'failed') return 'Misslyckad';
   if (domain.status === 'removing') return 'Tas bort';
   const ob = domain.onboarding;
@@ -216,18 +220,18 @@ function DomainInlineDetail({
   saving: boolean;
 }) {
   const { toast } = useToast();
-  const isVerified = domain.status === 'verified';
+  const isVerified = isDomainVerified(domain);
   const isFailed = domain.status === 'failed';
   const isPrimary = domain.primary || defaultLogin === domain.hostname;
   const isPolling = verifyingHost === domain.hostname;
   const errorText = getErrorText(domain);
 
   const ob = domain.onboarding;
-  const obStatus = ob?.status || (isVerified ? 'active' : 'pending');
+  const obStatus = isVerified ? 'active' : (ob?.status || 'pending');
   const progress = getOnboardingProgress(obStatus);
   const dnsRecords = resolveDnsRecords(domain, addResponse);
   const provider = resolveProvider(domain, addResponse);
-  const needsDns = !isVerified && domain.kind === 'bring_your_own';
+  const needsDns = !isVerified && domain.kind !== 'tivly_subdomain';
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => toast({ title: 'Kopierad' }));
@@ -400,9 +404,9 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Auto-poll for any pending domains
+  // Auto-poll for any pending domains (every 3s)
   useEffect(() => {
-    const hasPending = domains.some(d => d.status !== 'verified' && d.status !== 'removing');
+    const hasPending = domains.some(d => !isDomainVerified(d) && d.status !== 'removing');
     if (!hasPending) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
@@ -411,31 +415,34 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     pollRef.current = setInterval(async () => {
       try {
         const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`);
-        if (res.domains) {
+        const newDomains = res.customDomains?.domains || res.domains || [];
+        const newDefault = res.customDomains?.defaultLoginHostname ?? res.defaultLoginHostname;
+        if (newDomains.length > 0 || res.customDomains) {
           const oldDomains = domains;
-          setDomains(res.domains);
-          if (res.defaultLoginHostname !== undefined) setDefaultLogin(res.defaultLoginHostname);
-          // Check if any domain just became verified
-          for (const d of res.domains as DomainEntry[]) {
+          setDomains(newDomains);
+          if (newDefault !== undefined) setDefaultLogin(newDefault);
+          for (const d of newDomains as DomainEntry[]) {
             const old = oldDomains.find(od => od.hostname === d.hostname);
-            if (d.status === 'verified' && old && old.status !== 'verified') {
+            if (isDomainVerified(d) && old && !isDomainVerified(old)) {
               toast({ title: 'Domän verifierad!', description: `${d.hostname} är nu klar att använda.` });
             }
           }
         }
       } catch { /* silent */ }
-    }, 15000);
+    }, 3000);
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [domains, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasVerifiedDomain = domains.some(d => d.status === 'verified');
+  const hasVerifiedDomain = domains.some(d => isDomainVerified(d));
 
   const refreshDomains = useCallback(async () => {
     try {
       const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`);
-      if (res.domains) setDomains(res.domains);
-      if (res.defaultLoginHostname !== undefined) setDefaultLogin(res.defaultLoginHostname);
-      return res.domains as DomainEntry[];
+      const newDomains = res.customDomains?.domains || res.domains || [];
+      const newDefault = res.customDomains?.defaultLoginHostname ?? res.defaultLoginHostname;
+      if (newDomains.length > 0 || res.customDomains) setDomains(newDomains);
+      if (newDefault !== undefined) setDefaultLogin(newDefault);
+      return newDomains as DomainEntry[];
     } catch { return null; }
   }, [companyId]);
 
@@ -673,7 +680,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                 >
                   {statusIcon(domain)}
                   <span className="text-sm font-mono truncate flex-1 min-w-0">{domain.hostname}</span>
-                  {isPrimary && domain.status === 'verified' && (
+                  {isPrimary && isDomainVerified(domain) && (
                     <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0 shrink-0">Primär</Badge>
                   )}
                   <span className="text-[10px] text-muted-foreground shrink-0">{domainStatusLabel(domain)}</span>
