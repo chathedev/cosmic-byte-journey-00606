@@ -53,19 +53,16 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
     );
   }, [integrationStates, apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled, settings]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      const patch: Record<string, any> = { apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled };
-      INTEGRATIONS.forEach(({ key }) => {
-        patch[key] = { enabled: integrationStates[key] };
-      });
-      await onUpdate({ integrations: patch });
-    } finally {
-      setSaving(false);
-    }
-  };
+    const patch: Record<string, any> = { apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled };
+    INTEGRATIONS.forEach(({ key }) => {
+      patch[key] = { enabled: integrationStates[key] };
+    });
+    await onUpdate({ integrations: patch });
+  }, [canEdit, isDirty, apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled, integrationStates, onUpdate]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   return (
     <div className="space-y-6">
