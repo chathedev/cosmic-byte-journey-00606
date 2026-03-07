@@ -100,6 +100,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           logoUrl: logoUrl || null,
           wordmarkUrl: wordmarkUrl || null,
           faviconUrl: faviconUrl || null,
+          primaryColor: primaryColor || null,
+          accentColor: accentColor || null,
           loginTitle: loginTitle || null,
           loginSubtitle: loginSubtitle || null,
           supportEmail: supportEmail || null,
@@ -111,12 +113,13 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
         invitePolicy: {
           domainRestrictedInvites,
           allowExternalGuests,
+          requireApprovalForExternalGuests,
         },
         teamManagementEnabled,
       },
     });
     await refreshBranding();
-  }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
+  }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, primaryColor, accentColor, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, requireApprovalForExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
 
   const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave, debounceMs: 1200 });
 
