@@ -89,7 +89,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [actionProvider, setActionProvider] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); // for provider actions only
   const [domainInput, setDomainInput] = useState('');
 
   // Local state for all identity settings
