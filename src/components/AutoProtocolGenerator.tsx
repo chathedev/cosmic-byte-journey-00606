@@ -14,6 +14,7 @@ import { ConfirmCloseProtocolDialog } from "@/components/ConfirmCloseProtocolDia
 import { backendApi } from "@/lib/backendApi";
 import { analyzeMeetingAI, generateMeetingTitleAI } from "@/lib/geminiApi";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useEnterpriseBranding } from "@/contexts/EnterpriseBrandingContext";
 import {
   computeSpeakerIndexOffset,
   lookupSpeakerNameMap,
