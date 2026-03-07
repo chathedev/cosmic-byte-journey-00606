@@ -54,6 +54,7 @@ export function AppSidebar() {
   const scrollYRef = useRef(0);
   const { user, logout } = useAuth();
   const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership, switchCompany } = useSubscription();
+  const { logoUrl: brandingLogoUrl } = useEnterpriseBranding();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
