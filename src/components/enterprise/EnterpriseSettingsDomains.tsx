@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Globe, Plus, CheckCircle2, XCircle, Loader2, Trash2, ExternalLink, Shield, AlertTriangle, Copy, RefreshCw, Clock } from 'lucide-react';
+import {
+  Globe, Plus, CheckCircle2, XCircle, Loader2, Trash2, ExternalLink,
+  Shield, AlertTriangle, Copy, RefreshCw, Clock, Zap, ArrowRight, ChevronDown, ChevronUp,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,6 +38,34 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   return res.json();
 }
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface DomainConnectInfo {
+  supported?: boolean;
+  available?: boolean;
+  providerName?: string | null;
+  providerId?: string | null;
+  settingsUrl?: string | null;
+  urlSyncUX?: string | null;
+  urlAPI?: string | null;
+  templateSupported?: boolean;
+  templateUrl?: string | null;
+  connectUrl?: string | null;
+  lastCheckedAt?: string | null;
+  lastError?: string | null;
+}
+
+export interface DomainOnboarding {
+  tenantId?: string;
+  hostname?: string;
+  apexDomain?: string;
+  hostLabel?: string;
+  verificationToken?: string;
+  status?: 'pending' | 'awaiting_dns' | 'verifying' | 'active' | 'failed';
+  setupMethod?: 'domain_connect' | 'manual' | null;
+  domainConnect?: DomainConnectInfo;
+}
+
 export interface DomainEntry {
   hostname: string;
   kind: 'tivly_subdomain' | 'bring_your_own';
@@ -50,6 +82,7 @@ export interface DomainEntry {
   dnsProvider?: string | { key?: string; label?: string; dashboardUrl?: string } | null;
   nameservers?: string[];
   vercel?: any;
+  onboarding?: DomainOnboarding;
 }
 
 export interface CustomDomainsConfig {
@@ -66,6 +99,8 @@ interface Props {
   canEdit: boolean;
   onDomainsChanged?: () => void;
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -92,6 +127,295 @@ function getErrorText(domain: DomainEntry): string | null {
   return null;
 }
 
+const ONBOARDING_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending: { label: 'Väntar', color: 'text-amber-600 dark:text-amber-400' },
+  awaiting_dns: { label: 'Väntar på DNS', color: 'text-amber-600 dark:text-amber-400' },
+  verifying: { label: 'Verifierar', color: 'text-blue-600 dark:text-blue-400' },
+  active: { label: 'Aktiv', color: 'text-green-600 dark:text-green-400' },
+  failed: { label: 'Misslyckad', color: 'text-destructive' },
+};
+
+const ONBOARDING_STEPS = ['pending', 'awaiting_dns', 'verifying', 'active'] as const;
+
+function getOnboardingProgress(status?: string): number {
+  if (!status) return 0;
+  const idx = ONBOARDING_STEPS.indexOf(status as any);
+  if (status === 'active') return 100;
+  if (status === 'failed') return 0;
+  if (idx < 0) return 0;
+  return Math.round(((idx + 1) / ONBOARDING_STEPS.length) * 100);
+}
+
+// ─── Onboarding Status Widget ────────────────────────────────────────────────
+
+function OnboardingStatusWidget({
+  onboarding,
+  hostname,
+  companyId,
+  canEdit,
+  onRefresh,
+}: {
+  onboarding: DomainOnboarding;
+  hostname: string;
+  companyId: string;
+  canEdit: boolean;
+  onRefresh: () => void;
+}) {
+  const { toast } = useToast();
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const status: string = onboarding.status || 'pending';
+  const dc = onboarding.domainConnect;
+  const isDomainConnectAvailable = dc?.available === true;
+  const isAutomatic = onboarding.setupMethod === 'domain_connect';
+  const isActive = status === 'active';
+  const isFailed = status === 'failed';
+  const progress = getOnboardingProgress(status);
+  const statusInfo = ONBOARDING_STATUS_LABELS[status] || ONBOARDING_STATUS_LABELS.pending;
+
+  // Poll onboarding status when in intermediate states
+  useEffect(() => {
+    if (isActive || isFailed) return;
+    pollRef.current = setInterval(() => { onRefresh(); }, 10000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [status, isActive, isFailed, onRefresh]);
+
+  const handleDomainConnect = async () => {
+    setConnectLoading(true);
+    try {
+      const res = await apiFetch(
+        `/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(hostname)}/domain-connect-url`,
+        { method: 'POST' }
+      );
+      if (res.connectUrl) {
+        window.location.href = res.connectUrl;
+      } else {
+        toast({ title: 'Fel', description: 'Ingen anslutnings-URL returnerades.', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Anslutning misslyckades', description: err.message, variant: 'destructive' });
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  if (isActive) return null; // Domain card handles verified state
+
+  return (
+    <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
+      {/* Status header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {status === 'verifying' ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+          ) : isFailed ? (
+            <XCircle className="w-3.5 h-3.5 text-destructive" />
+          ) : (
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
+          )}
+          <span className={`text-xs font-medium ${statusInfo.color}`}>
+            {statusInfo.label}
+          </span>
+          {onboarding.setupMethod && (
+            <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+              {onboarding.setupMethod === 'domain_connect' ? 'Automatisk' : 'Manuell'}
+            </Badge>
+          )}
+        </div>
+        <span className="text-[10px] text-muted-foreground">{progress}%</span>
+      </div>
+
+      {/* Progress bar */}
+      <Progress value={progress} className="h-1.5" />
+
+      {/* Step indicators */}
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        {ONBOARDING_STEPS.map((step, i) => {
+          const stepIdx = ONBOARDING_STEPS.indexOf(status as any);
+          const isCurrentOrPast = stepIdx >= i || status === 'active';
+          const isCurrent = step === status;
+          return (
+            <div key={step} className={`flex items-center gap-1 ${isCurrentOrPast ? 'text-foreground' : ''} ${isCurrent ? 'font-medium' : ''}`}>
+              {isCurrentOrPast && !isCurrent && <CheckCircle2 className="w-2.5 h-2.5 text-green-500" />}
+              {isCurrent && step !== 'active' && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
+              {isCurrent && step === 'active' && <CheckCircle2 className="w-2.5 h-2.5 text-green-500" />}
+              {!isCurrentOrPast && <span className="w-2.5 h-2.5 rounded-full border border-muted-foreground/30 inline-block" />}
+              <span>{ONBOARDING_STATUS_LABELS[step]?.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Domain Connect error */}
+      {dc?.lastError && (
+        <div className="flex items-start gap-2 p-2 rounded-lg border border-destructive/20 bg-destructive/5">
+          <XCircle className="w-3 h-3 text-destructive mt-0.5 shrink-0" />
+          <p className="text-[10px] text-destructive">{dc.lastError}</p>
+        </div>
+      )}
+
+      {/* Failed state message */}
+      {isFailed && (
+        <div className="flex items-start gap-2 p-2 rounded-lg border border-destructive/20 bg-destructive/5">
+          <AlertTriangle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+          <div className="text-[11px] text-destructive space-y-1">
+            <p>Konfigurationen misslyckades. Kontrollera DNS-posterna och försök igen.</p>
+            {onboarding.domainConnect?.lastError && <p>{onboarding.domainConnect.lastError}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Primary action: Domain Connect */}
+      {isDomainConnectAvailable && !isAutomatic && canEdit && status !== 'active' && (
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
+            <Zap className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+            <div className="space-y-1.5 flex-1">
+              <p className="text-xs font-medium text-foreground">Automatisk DNS-konfiguration tillgänglig</p>
+              <p className="text-[11px] text-muted-foreground">
+                {dc?.providerName
+                  ? `Din DNS-leverantör (${dc.providerName}) stödjer automatisk konfiguration via Domain Connect.`
+                  : 'Din DNS-leverantör stödjer automatisk konfiguration via Domain Connect.'}
+              </p>
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs mt-1"
+                onClick={handleDomainConnect}
+                disabled={connectLoading}
+              >
+                {connectLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5" />
+                )}
+                {connectLoading ? 'Ansluter…' : 'Anslut automatiskt'}
+                {!connectLoading && <ArrowRight className="w-3 h-3" />}
+              </Button>
+            </div>
+          </div>
+
+          {/* Toggle to show manual fallback */}
+          <button
+            onClick={() => setShowManual(!showManual)}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showManual ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showManual ? 'Dölj manuell DNS-konfiguration' : 'Visa manuell DNS-konfiguration istället'}
+          </button>
+        </div>
+      )}
+
+      {/* Show manual DNS section when DC unavailable, or toggled on */}
+      {(!isDomainConnectAvailable || showManual || isAutomatic) && status !== 'active' && (
+        <ManualDNSFallback onboarding={onboarding} />
+      )}
+
+      {/* Onboarding metadata */}
+      {(onboarding.apexDomain || onboarding.hostLabel) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-1 border-t border-border">
+          {onboarding.apexDomain && <span>Apex: <span className="font-mono">{onboarding.apexDomain}</span></span>}
+          {onboarding.hostLabel && <span>Host: <span className="font-mono">{onboarding.hostLabel}</span></span>}
+          {dc?.providerName && <span>DNS: {dc.providerName}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Manual DNS Fallback Section ─────────────────────────────────────────────
+
+function ManualDNSFallback({ onboarding }: { onboarding: DomainOnboarding }) {
+  const { toast } = useToast();
+  const dc = onboarding.domainConnect;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: 'Kopierad till urklipp' });
+    });
+  };
+
+  // Build required records from onboarding data
+  const records: Array<{ type: string; name: string; value: string; reason?: string }> = [];
+  if (onboarding.hostname) {
+    records.push({
+      type: 'CNAME',
+      name: onboarding.hostLabel || onboarding.hostname,
+      value: 'cname.vercel-dns.com',
+      reason: 'Pekar domänen till Tivly',
+    });
+  }
+  if (onboarding.verificationToken) {
+    records.push({
+      type: 'TXT',
+      name: `_tivly.${onboarding.apexDomain || onboarding.hostname}`,
+      value: onboarding.verificationToken,
+      reason: 'Verifierar ägarskap',
+    });
+  }
+
+  if (records.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-medium text-muted-foreground">DNS-poster att konfigurera:</p>
+      <div className="rounded-lg border border-border overflow-hidden">
+        <table className="w-full text-[11px]">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground w-16">Typ</th>
+              <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Namn</th>
+              <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Värde</th>
+              <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground w-28">Syfte</th>
+              <th className="w-8"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((rec, i) => (
+              <tr key={i} className="border-t border-border">
+                <td className="px-2.5 py-2 font-mono font-medium">{rec.type}</td>
+                <td className="px-2.5 py-2 font-mono text-muted-foreground truncate max-w-[140px]" title={rec.name}>{rec.name}</td>
+                <td className="px-2.5 py-2 font-mono truncate max-w-[200px]" title={rec.value}>{rec.value}</td>
+                <td className="px-2.5 py-2 text-muted-foreground">{rec.reason || '—'}</td>
+                <td className="px-1 py-2">
+                  <button onClick={() => copyToClipboard(rec.value)} className="p-1 hover:bg-muted rounded transition-colors" title="Kopiera värde">
+                    <Copy className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* DNS provider settings link */}
+      {dc?.settingsUrl && (
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          {dc.providerName && <span>DNS-leverantör: <span className="font-medium text-foreground">{dc.providerName}</span></span>}
+          <a
+            href={dc.settingsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
+          >
+            Öppna DNS-hantering <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        </div>
+      )}
+
+      <div className="flex items-start gap-1.5 p-2.5 rounded-lg bg-muted/30 border border-border">
+        <AlertTriangle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Lägg till ovanstående DNS-poster hos din domänleverantör. DNS-propagering kan ta upp till 72 timmar. Verifiering sker automatiskt i bakgrunden.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
 export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, onDomainsChanged }: Props) {
   const { toast } = useToast();
   const [domains, setDomains] = useState<DomainEntry[]>(customDomains?.domains || []);
@@ -117,7 +441,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
 
   const hasVerifiedDomain = domains.some(d => d.status === 'verified');
 
-  // Silently refresh domains without triggering parent reload
   const refreshDomains = useCallback(async () => {
     try {
       const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`);
@@ -129,7 +452,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     }
   }, [companyId]);
 
-  // Full refresh that also notifies parent (use sparingly)
   const fullRefresh = useCallback(async () => {
     await refreshDomains();
     onDomainsChanged?.();
@@ -155,7 +477,8 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       });
       toast({ title: 'Domän tillagd', description: `${hostname} har lagts till.` });
 
-      if (res.instructions || res.domain?.dnsRecords) {
+      // Store full response for onboarding data
+      if (res.instructions || res.domain?.dnsRecords || res.onboarding) {
         setAddResponse(prev => ({ ...prev, [hostname]: res }));
       }
 
@@ -180,7 +503,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     let attempts = 0;
     pollRef.current = setInterval(async () => {
       attempts++;
-      if (attempts > 12) {
+      if (attempts > 24) {
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
         setVerifyingHost(null);
@@ -189,12 +512,12 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       const updated = await refreshDomains();
       if (updated) {
         const d = updated.find((dom: DomainEntry) => dom.hostname === hostname);
-        if (d?.status === 'verified') {
+        if (d?.status === 'verified' || d?.onboarding?.status === 'active') {
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
           setVerifyingHost(null);
           toast({ title: 'Domän verifierad!', description: `${hostname} är nu verifierad.` });
-          onDomainsChanged?.(); // Notify parent only on verified
+          onDomainsChanged?.();
         }
       }
     }, 5000);
@@ -211,7 +534,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       if (domain?.status === 'verified') {
         toast({ title: 'Domän verifierad!', description: `${hostname} är nu verifierad och redo att användas.` });
         await refreshDomains();
-        onDomainsChanged?.(); // Notify parent on verified
+        onDomainsChanged?.();
       } else if (domain?.status === 'pending') {
         const hint = getErrorText(domain) || 'DNS har inte propagerats ännu.';
         toast({
@@ -220,7 +543,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         });
         await refreshDomains();
         startVerificationPoll(hostname);
-        return; // Don't clear verifyingHost — poll handles it
+        return;
       } else if (domain?.status === 'failed') {
         toast({
           title: 'Verifiering misslyckades',
@@ -232,7 +555,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     } catch (err: any) {
       toast({ title: 'Verifiering misslyckades', description: err.message, variant: 'destructive' });
     } finally {
-      // Only clear if not polling
       if (!pollRef.current) setVerifyingHost(null);
     }
   };
@@ -250,7 +572,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         return next;
       });
       await refreshDomains();
-      onDomainsChanged?.(); // Notify parent on delete
+      onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally {
@@ -306,6 +628,21 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       name: providerName || resp?.instructions?.provider?.name || null,
       dashboardUrl: providerDashboard || resp?.instructions?.provider?.dashboardUrl || null,
     };
+  };
+
+  // Merge onboarding from add response if domain doesn't have it
+  const getOnboarding = (domain: DomainEntry): DomainOnboarding | null => {
+    if (domain.onboarding) return domain.onboarding;
+    const resp = addResponse[domain.hostname];
+    if (resp?.onboarding) return resp.onboarding;
+    return null;
+  };
+
+  // Check if domain has active onboarding (not yet verified via onboarding)
+  const hasActiveOnboarding = (domain: DomainEntry): boolean => {
+    const ob = getOnboarding(domain);
+    if (!ob) return false;
+    return ob.status !== 'active' && domain.status !== 'verified';
   };
 
   return (
@@ -372,6 +709,8 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
               const verifiedAt = formatTime(domain.verifiedAt);
               const isPolling = verifyingHost === domain.hostname;
               const errorText = getErrorText(domain);
+              const onboarding = getOnboarding(domain);
+              const showOnboarding = hasActiveOnboarding(domain);
 
               return (
                 <div key={domain.hostname} className={`rounded-xl border p-4 space-y-3 transition-colors ${
@@ -389,7 +728,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                           <CheckCircle2 className="w-2.5 h-2.5" />Verifierad
                         </Badge>
                       )}
-                      {isPending && (
+                      {isPending && !showOnboarding && (
                         <Badge variant="outline" className="text-[10px] gap-0.5 border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400">
                           <Clock className="w-2.5 h-2.5" />Väntar
                         </Badge>
@@ -418,7 +757,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {!isVerified && canEdit && (
+                      {!isVerified && canEdit && !showOnboarding && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -456,6 +795,17 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                     </div>
                   </div>
 
+                  {/* Onboarding widget — shown for domains with active onboarding */}
+                  {showOnboarding && onboarding && (
+                    <OnboardingStatusWidget
+                      onboarding={onboarding}
+                      hostname={domain.hostname}
+                      companyId={companyId}
+                      canEdit={canEdit}
+                      onRefresh={refreshDomains}
+                    />
+                  )}
+
                   {/* Verification metadata */}
                   {(verifiedAt || lastChecked) && (
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
@@ -464,8 +814,8 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                     </div>
                   )}
 
-                  {/* Error message */}
-                  {errorText && (
+                  {/* Error message (only when no onboarding widget handles it) */}
+                  {errorText && !showOnboarding && (
                     <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
                       <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
                       <div className="text-[11px] text-destructive space-y-1">
@@ -477,8 +827,8 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                     </div>
                   )}
 
-                  {/* DNS Records */}
-                  {!isVerified && dnsRecords.length > 0 && (
+                  {/* Legacy DNS Records (for domains without onboarding data) */}
+                  {!isVerified && !showOnboarding && dnsRecords.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-[11px] font-medium text-muted-foreground">
                         {domain.kind === 'tivly_subdomain' ? 'Verifieringsposter:' : 'DNS-poster att konfigurera:'}
