@@ -157,7 +157,7 @@ export default function EnterpriseSettingsPage() {
             </div>
             {setupChecklist.nextStep && (
               <p className="text-[11px] text-muted-foreground mt-2">
-                Nästa: {setupChecklist.nextStep.replace(/_/g, ' ')}
+                Nästa: {typeof setupChecklist.nextStep === 'string' ? setupChecklist.nextStep.replace(/_/g, ' ') : String(setupChecklist.nextStep)}
               </p>
             )}
           </div>
