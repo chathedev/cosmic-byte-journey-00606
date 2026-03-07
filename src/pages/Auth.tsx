@@ -445,7 +445,7 @@ export default function Auth() {
                     )}
 
                     {/* Email login — hidden when SSO-only on custom domain */}
-                    {!(isCustomDomain && workspace?.ssoOnlyLogin) && (
+                    {!(isCustomDomain && workspace?.ssoOnlyLogin && hasSSO) && (
                       <div className="space-y-3">
                         <div className="space-y-1.5">
                           <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
