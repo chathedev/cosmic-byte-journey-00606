@@ -56,6 +56,7 @@ import AdminSpeakerProfiles from "./pages/AdminSpeakerProfiles";
 import EnterpriseStats from "./pages/EnterpriseStats";
 import Settings from "./pages/Settings";
 import OrgSettings from "./pages/OrgSettings";
+import EnterpriseSettings from "./pages/EnterpriseSettings";
 import NotFound from "./pages/NotFound";
 import BillingInvoices from "./pages/BillingInvoices";
 import BillingInvoiceDetail from "./pages/BillingInvoiceDetail";
@@ -387,6 +388,7 @@ const AppContent = () => {
                 <Route path="/integrations/slack" element={<ProtectedRoute><ViewerGuard><IntegrationSlack /></ViewerGuard></ProtectedRoute>} />
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
+                <Route path="/org/enterprise-settings" element={<ProtectedRoute><EnterpriseSettings /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
