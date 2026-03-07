@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link2, Code, Save } from 'lucide-react';
+import { Link2, Code } from 'lucide-react';
+import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,7 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
 
   return (
     <div className="space-y-6">
+      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
       {/* Service Integrations */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
@@ -147,15 +149,6 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
         </div>
       </div>
 
-      {/* Save button */}
-      {canEdit && isDirty && (
-        <div className="sticky bottom-4 flex justify-end z-10">
-          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
-            <Save className="w-4 h-4" />
-            {saving ? 'Sparar…' : 'Spara ändringar'}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

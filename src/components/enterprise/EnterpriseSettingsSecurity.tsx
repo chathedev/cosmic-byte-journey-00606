@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Shield, Database, Globe, Lock, AlertTriangle, Save } from 'lucide-react';
+import { Shield, Database, Globe, Lock, AlertTriangle } from 'lucide-react';
+import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,6 +107,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
 
   return (
     <div className="space-y-6">
+      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-primary/10"><Shield className="w-5 h-5 text-primary" /></div>
@@ -218,15 +220,6 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
         )}
       </div>
 
-      {/* Save button */}
-      {canEdit && isDirty && (
-        <div className="sticky bottom-4 flex justify-end z-10">
-          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
-            <Save className="w-4 h-4" />
-            {saving ? 'Sparar…' : 'Spara ändringar'}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
