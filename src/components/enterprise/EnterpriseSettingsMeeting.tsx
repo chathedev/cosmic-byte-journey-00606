@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Video, FileText, Mic, Sparkles, CheckCircle2, Save } from 'lucide-react';
+import { Video, FileText, Mic, Sparkles, CheckCircle2 } from 'lucide-react';
+import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
