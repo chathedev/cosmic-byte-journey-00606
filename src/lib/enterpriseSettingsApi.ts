@@ -424,8 +424,19 @@ export function getEnterpriseSettings(companyId: string): Promise<EnterpriseSett
   return apiFetch(`/enterprise/companies/${companyId}/settings`);
 }
 
+export function getEnterpriseSectionSettings(companyId: string, sectionSlug: string): Promise<any> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/${sectionSlug}`);
+}
+
 export function updateEnterpriseSettings(companyId: string, settings: Record<string, any>): Promise<EnterpriseSettingsResponse> {
   return apiFetch(`/enterprise/companies/${companyId}/settings`, {
+    method: 'PATCH',
+    body: JSON.stringify(settings),
+  });
+}
+
+export function updateEnterpriseSectionSettings(companyId: string, sectionSlug: string, settings: Record<string, any>): Promise<any> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/${sectionSlug}`, {
     method: 'PATCH',
     body: JSON.stringify(settings),
   });
