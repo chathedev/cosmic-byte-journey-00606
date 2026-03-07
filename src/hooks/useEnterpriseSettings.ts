@@ -6,7 +6,7 @@ import {
   getEnterpriseSettings, updateEnterpriseSettings, testSSO, connectSSO,
   disableSSOProvider, removeSSOProvider, resetSSOProvider, applyGovernancePreset,
   type EnterpriseSettingsResponse, type SetupChecklist, type SettingsCatalog,
-  type CustomizationBoundaries, type GovernanceProfile,
+  type SettingsSummary, type CustomizationBoundaries, type GovernanceProfile,
 } from '@/lib/enterpriseSettingsApi';
 
 export function useEnterpriseSettings() {
