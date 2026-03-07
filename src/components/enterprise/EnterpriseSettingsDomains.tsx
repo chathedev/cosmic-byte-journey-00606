@@ -455,18 +455,29 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`, {
         method: 'POST', body: JSON.stringify({ hostname }),
       });
-      toast({ title: 'Domän tillagd', description: `${hostname} har lagts till.` });
+      // Optimistic: add to UI immediately from response
+      const newDomain: DomainEntry = res.domain || {
+        hostname, kind: addMode === 'tivly' ? 'tivly_subdomain' : 'bring_your_own',
+        status: 'pending', onboarding: res.onboarding || { status: 'pending' },
+      };
+      setDomains(prev => {
+        if (prev.some(d => d.hostname === hostname)) return prev;
+        return [...prev, newDomain];
+      });
       if (res.instructions || res.domain?.dnsRecords || res.onboarding) {
         setAddResponse(prev => ({ ...prev, [hostname]: res }));
       }
-      await refreshDomains();
+      toast({ title: 'Domän tillagd', description: `${hostname} har lagts till.` });
       setExpandedDomain(hostname);
       setShowAddForm(false);
       setAddMode(null);
       setHostnameInput('');
+      // Background sync
+      refreshDomains();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setAdding(false); }
+  };
   };
 
   const handleVerify = async (hostname: string) => {
