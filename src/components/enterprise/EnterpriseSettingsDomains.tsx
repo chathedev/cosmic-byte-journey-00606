@@ -495,7 +495,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       setAddResponse(prev => { const next = { ...prev }; delete next[hostname]; return next; });
       if (expandedDomain === hostname) setExpandedDomain(null);
       await refreshDomains();
-      onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setDeletingHost(null); }
