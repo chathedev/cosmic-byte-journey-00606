@@ -508,7 +508,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       });
       toast({ title: 'Primär inloggningsvärd uppdaterad' });
       await refreshDomains();
-      onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setSaving(false); }
