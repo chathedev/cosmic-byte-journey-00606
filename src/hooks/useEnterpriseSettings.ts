@@ -4,6 +4,7 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   getEnterpriseSettings, updateEnterpriseSettings, testSSO, connectSSO,
+  disableSSOProvider, removeSSOProvider, resetSSOProvider,
   type EnterpriseSettingsResponse,
 } from '@/lib/enterpriseSettingsApi';
 
