@@ -239,7 +239,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const isAuthPage = location.pathname === '/auth';
   const isMagicLoginPage = location.pathname === '/magic-login';
   const isPublicPage = location.pathname === '/free-trial' || location.pathname === '/team/onboarding' || location.pathname === '/team/onboarding/verify-email';
-  const isSSOCallback = location.pathname === '/auth/sso/callback';
+  const isSSOCallback = location.pathname.startsWith('/auth/sso/callback');
   const isRecordingPage = location.pathname === '/recording';
   const isNative = isNativeApp();
 
@@ -387,7 +387,7 @@ const AppContent = () => {
             >
               <Routes>
                 <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
-                <Route path="/auth/sso/callback" element={<SSOCallback />} />
+                <Route path="/auth/sso/callback/*" element={<SSOCallback />} />
                 <Route path="/auth/handoff" element={<AuthHandoff />} />
                 <Route path="/magic-login" element={<MagicLogin />} />
                 

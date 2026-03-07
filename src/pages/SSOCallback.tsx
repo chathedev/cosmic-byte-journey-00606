@@ -80,6 +80,45 @@ function readSessionToken(searchParams: URLSearchParams): string | null {
   return null;
 }
 
+type RedirectDecision = { kind: 'navigate'; path: string } | { kind: 'location'; url: string };
+
+function resolvePostLoginRedirect(rawTarget: unknown): RedirectDecision {
+  const fallback: RedirectDecision = { kind: 'navigate', path: '/' };
+
+  if (typeof rawTarget !== 'string') return fallback;
+  const target = rawTarget.trim();
+  if (!target) return fallback;
+
+  if (target.includes('/auth/sso/callback')) return fallback;
+
+  if (/^https?:\/\//i.test(target)) {
+    try {
+      const url = new URL(target);
+      const isAllowedHost =
+        url.hostname === window.location.hostname ||
+        url.hostname.endsWith('tivly.se') ||
+        url.hostname.endsWith('.lovableproject.com');
+
+      if (!isAllowedHost || url.pathname.startsWith('/auth/sso/callback')) {
+        return fallback;
+      }
+
+      if (url.origin === window.location.origin) {
+        return { kind: 'navigate', path: `${url.pathname}${url.search}${url.hash}` || '/' };
+      }
+
+      return { kind: 'location', url: url.toString() };
+    } catch {
+      return fallback;
+    }
+  }
+
+  const normalizedPath = target.startsWith('/') ? target : `/${target}`;
+  if (normalizedPath.startsWith('/auth/sso/callback')) return fallback;
+
+  return { kind: 'navigate', path: normalizedPath };
+}
+
 export default function SSOCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -106,6 +145,13 @@ export default function SSOCallback() {
     }
 
     if (!sessionToken) {
+      if (apiClient.isAuthenticated()) {
+        console.warn('[SSOCallback] Missing session token, but auth token exists. Redirecting home.');
+        setSuccess(true);
+        setTimeout(() => navigate('/', { replace: true }), 250);
+        return;
+      }
+
       console.error('[SSOCallback] No session token found in URL');
       setError('Ingen SSO-session hittades. Försök logga in igen.');
       return;
@@ -123,10 +169,17 @@ export default function SSOCallback() {
           apiClient.applyAuthToken(typedResult.token);
           setSuccess(true);
           await refreshUser();
-          // Always navigate to root on custom domains; use redirectTarget on generic domain
-          const target = typedResult.redirectTarget || '/';
-          console.log('[SSOCallback] Redirecting to:', target);
-          setTimeout(() => navigate(target, { replace: true }), 600);
+
+          const redirect = resolvePostLoginRedirect(typedResult.redirectTarget);
+          console.log('[SSOCallback] Redirect decision:', redirect);
+
+          setTimeout(() => {
+            if (redirect.kind === 'location') {
+              window.location.href = redirect.url;
+              return;
+            }
+            navigate(redirect.path, { replace: true });
+          }, 600);
           return;
         }
 

@@ -38,16 +38,34 @@ if ('serviceWorker' in navigator) {
 
 const rootElement = document.getElementById("root")!;
 
-// Fix doubled SSO callback URLs (e.g. /auth/sso/callback/https://host/auth/sso/callback?token=...)
-const ssoCallbackPath = '/auth/sso/callback';
-if (window.location.pathname.includes(ssoCallbackPath) && window.location.pathname !== ssoCallbackPath) {
-  const fullUrl = window.location.href;
-  const lastQ = fullUrl.lastIndexOf('?');
-  const queryPart = lastQ !== -1 ? fullUrl.slice(lastQ) : '';
-  const hashPart = window.location.hash || '';
-  console.log('[main] Fixing doubled SSO callback URL:', window.location.pathname);
-  window.history.replaceState({}, document.title, ssoCallbackPath + queryPart + hashPart);
+const SSO_CALLBACK_PATH = '/auth/sso/callback';
+
+function normalizeDoubledSSOCallbackUrl(): void {
+  const { pathname, search, hash } = window.location;
+  if (!pathname.startsWith(SSO_CALLBACK_PATH)) return;
+
+  const decodedPath = (() => {
+    try {
+      return decodeURIComponent(pathname);
+    } catch {
+      return pathname;
+    }
+  })();
+
+  const hasTrailingSlashOnly = pathname === `${SSO_CALLBACK_PATH}/`;
+  const hasExtraSegments = pathname !== SSO_CALLBACK_PATH && !hasTrailingSlashOnly;
+  const looksEmbeddedUrl =
+    decodedPath.includes(`${SSO_CALLBACK_PATH}/http://`) ||
+    decodedPath.includes(`${SSO_CALLBACK_PATH}/https://`) ||
+    decodedPath.includes(`${SSO_CALLBACK_PATH}/${window.location.origin}`);
+
+  if (!hasTrailingSlashOnly && !hasExtraSegments && !looksEmbeddedUrl) return;
+
+  console.warn('[main] Normalizing malformed SSO callback URL:', pathname);
+  window.history.replaceState({}, document.title, `${SSO_CALLBACK_PATH}${search}${hash}`);
 }
+
+normalizeDoubledSSOCallbackUrl();
 
 // Migrate legacy hash URLs (/#/feedback → /feedback)
 if (window.location.hash.startsWith("#/")) {
