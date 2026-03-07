@@ -39,11 +39,31 @@ export function useEnterpriseSettings() {
 
   const handleUpdate = async (patch: Record<string, any>) => {
     if (!companyId) return;
+    // Optimistic: merge patch into local data immediately
+    const previousData = data;
+    if (data) {
+      setData({
+        ...data,
+        settings: {
+          ...data.settings,
+          ...Object.fromEntries(
+            Object.entries(patch).map(([key, value]) => [
+              key,
+              typeof value === 'object' && value !== null && !Array.isArray(value)
+                ? { ...(data.settings as any)[key], ...value }
+                : value,
+            ])
+          ),
+        },
+      });
+    }
     try {
       const res = await updateEnterpriseSettings(companyId, patch);
       setData(res);
       toast({ title: 'Inställningar sparade' });
     } catch (err: any) {
+      // Revert on error
+      setData(previousData);
       if (err.status === 423) {
         toast({ title: 'Låst inställning', description: 'Denna inställning är låst av en administratör.', variant: 'destructive' });
       } else {
