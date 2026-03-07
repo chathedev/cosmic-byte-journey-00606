@@ -29,8 +29,8 @@ interface Props {
   locks: Record<string, SettingsLock>;
   canEdit: boolean;
   onUpdate: (patch: Record<string, any>) => Promise<void>;
-  onTestSSO?: (provider: string) => Promise<void>;
-  onConnectSSO?: (provider: string) => Promise<void>;
+  onTestSSO?: (provider: string, config?: Record<string, any>) => Promise<void>;
+  onConnectSSO?: (provider: string, config?: Record<string, any>) => Promise<void>;
   onDisableProvider?: (provider: string) => Promise<void>;
   onRemoveProvider?: (provider: string) => Promise<void>;
   onResetProvider?: (provider: string) => Promise<void>;
