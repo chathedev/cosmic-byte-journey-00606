@@ -15,7 +15,6 @@ interface Props {
 }
 
 export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
   const isLocked = (path: string) => !!locks[`meetingContentControls.${path}`]?.locked;
 
   // Local state
