@@ -23,23 +23,58 @@ function readParam(searchParams: URLSearchParams, key: string): string | null {
   return value && value.trim() ? value.trim() : null;
 }
 
+/**
+ * Extract all query/hash params from the full raw URL.
+ * Handles edge cases where the URL path is doubled (e.g. /auth/sso/callback/https://host/auth/sso/callback?token=...).
+ */
+function getAllSearchParams(): URLSearchParams {
+  const fullUrl = window.location.href;
+  const params = new URLSearchParams();
+
+  // 1. Normal query string
+  const qIdx = fullUrl.indexOf('?');
+  if (qIdx !== -1) {
+    const hashIdx = fullUrl.indexOf('#', qIdx);
+    const qString = hashIdx !== -1 ? fullUrl.slice(qIdx + 1, hashIdx) : fullUrl.slice(qIdx + 1);
+    new URLSearchParams(qString).forEach((v, k) => { if (!params.has(k)) params.set(k, v); });
+  }
+
+  // 2. Hash fragment params
+  const hIdx = fullUrl.indexOf('#');
+  if (hIdx !== -1) {
+    let raw = fullUrl.slice(hIdx + 1);
+    if (raw.startsWith('?')) raw = raw.slice(1);
+    // Could also contain a nested ? from doubled URLs
+    const nestedQ = raw.indexOf('?');
+    if (nestedQ !== -1) {
+      new URLSearchParams(raw.slice(nestedQ + 1)).forEach((v, k) => { if (!params.has(k)) params.set(k, v); });
+    }
+    new URLSearchParams(raw.split('?')[0]).forEach((v, k) => { if (!params.has(k)) params.set(k, v); });
+  }
+
+  // 3. Handle doubled-path URLs: look for a second '?' in the full path portion
+  const pathPortion = qIdx !== -1 ? fullUrl.slice(0, qIdx) : (hIdx !== -1 ? fullUrl.slice(0, hIdx) : fullUrl);
+  // Check if path contains an embedded URL with its own query string (doubled callback)
+  const embeddedMatch = pathPortion.match(/\/auth\/sso\/callback.*\/auth\/sso\/callback/);
+  if (embeddedMatch) {
+    console.warn('[SSOCallback] Detected doubled callback URL, extracting params from full URL');
+  }
+
+  return params;
+}
+
 function readSessionToken(searchParams: URLSearchParams): string | null {
+  // Try react-router params first
   for (const key of SSO_TOKEN_KEYS) {
     const fromRouter = readParam(searchParams, key);
     if (fromRouter) return fromRouter;
   }
 
-  const rawParams = new URLSearchParams(window.location.search);
+  // Try raw window params (handles doubled URLs etc.)
+  const rawParams = getAllSearchParams();
   for (const key of SSO_TOKEN_KEYS) {
     const fromRaw = readParam(rawParams, key);
     if (fromRaw) return fromRaw;
-  }
-
-  const rawHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
-  const hashParams = new URLSearchParams(rawHash.startsWith('?') ? rawHash.slice(1) : rawHash);
-  for (const key of SSO_TOKEN_KEYS) {
-    const fromHash = readParam(hashParams, key);
-    if (fromHash) return fromHash;
   }
 
   return null;
