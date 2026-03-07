@@ -275,9 +275,13 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
 
   const getDnsProvider = (domain: DomainEntry): { name: string | null; dashboardUrl: string | null } => {
     const resp = addResponse[domain.hostname];
+    const dp = domain.dnsProvider;
+    // dnsProvider can be a string or an object {key, label, dashboardUrl}
+    const providerName = typeof dp === 'object' && dp ? (dp.label || dp.key || null) : (dp || null);
+    const providerDashboard = typeof dp === 'object' && dp ? (dp.dashboardUrl || null) : null;
     return {
-      name: domain.dnsProvider || resp?.instructions?.provider?.name || null,
-      dashboardUrl: resp?.instructions?.provider?.dashboardUrl || null,
+      name: providerName || resp?.instructions?.provider?.name || null,
+      dashboardUrl: providerDashboard || resp?.instructions?.provider?.dashboardUrl || null,
     };
   };
 
