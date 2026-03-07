@@ -199,7 +199,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             <Switch
               checked={settings.ssoEnabled ?? false}
               onCheckedChange={(v) => handleToggle('ssoEnabled', v)}
-              disabled={!canEdit || isLocked('ssoEnabled') || saving || (!hasVerifiedDomain && v => v)}
+              disabled={!canEdit || isLocked('ssoEnabled') || saving || !hasVerifiedDomain}
             />
           </div>
         </div>
