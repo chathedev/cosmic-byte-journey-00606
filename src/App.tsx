@@ -436,13 +436,6 @@ const AppContent = () => {
                 <Route path="/integrations/teams/admin-verified" element={<AdminConsentVerified />} />
                 <Route path="/org/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
                 <Route path="/org/enterprise-settings" element={<ProtectedRoute><EnterpriseSettings /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/identity" element={<ProtectedRoute><EnterpriseSettingsIdentityPage /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/workspace" element={<ProtectedRoute><EnterpriseSettingsWorkspacePage /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/security" element={<ProtectedRoute><EnterpriseSettingsSecurityPage /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/meetings" element={<ProtectedRoute><EnterpriseSettingsMeetingsPage /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/integrations" element={<ProtectedRoute><EnterpriseSettingsIntegrationsPage /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/roles" element={<ProtectedRoute><EnterpriseSettingsRolesPage /></ProtectedRoute>} />
-                <Route path="/org/enterprise-settings/audit" element={<ProtectedRoute><EnterpriseSettingsAuditPage /></ProtectedRoute>} />
                 <Route path="/subscribe/success" element={<ProtectedRoute><SubscribeSuccess /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
