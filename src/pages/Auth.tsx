@@ -78,11 +78,11 @@ export default function Auth() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const isCustomDomain = isEnterpriseCustomDomain();
 
-  // Determine if SSO providers are available (don't rely solely on ssoEnabled flag)
+  // Determine if SSO providers are available
   const hasSSO = !!(
     workspace &&
     (workspace.ssoEnabled ||
-      (workspace.allowedProviders?.some(p => p && p !== 'email')) ||
+      workspace.enabledProviders?.length > 0 ||
       (workspace.primaryProvider && workspace.primaryProvider !== 'email'))
   );
 
