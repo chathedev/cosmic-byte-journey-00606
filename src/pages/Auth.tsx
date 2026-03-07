@@ -78,6 +78,14 @@ export default function Auth() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const isCustomDomain = isEnterpriseCustomDomain();
 
+  // Determine if SSO providers are available (don't rely solely on ssoEnabled flag)
+  const hasSSO = !!(
+    workspace &&
+    (workspace.ssoEnabled ||
+      (workspace.allowedProviders?.some(p => p && p !== 'email')) ||
+      (workspace.primaryProvider && workspace.primaryProvider !== 'email'))
+  );
+
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -356,7 +364,9 @@ export default function Auth() {
           <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12 min-h-screen sticky top-0">
             <div className="max-w-sm space-y-8">
               {workspace?.branding?.logoUrl ? (
-                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" />
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" onError={(e) => { (e.target as HTMLImageElement).src = tivlyLogo; }} />
+              ) : workspace?.branding?.workspaceDisplayName ? (
+                <h2 className="text-xl font-bold text-foreground">{workspace.branding.workspaceDisplayName}</h2>
               ) : (
                 <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
               )}
@@ -386,7 +396,9 @@ export default function Auth() {
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
               {workspace?.branding?.logoUrl ? (
-                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-8 w-auto" />
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-8 w-auto" onError={(e) => { (e.target as HTMLImageElement).src = tivlyLogo; }} />
+              ) : workspace?.branding?.workspaceDisplayName ? (
+                <span className="text-lg font-bold text-foreground">{workspace.branding.workspaceDisplayName}</span>
               ) : (
                 <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
               )}
@@ -419,7 +431,7 @@ export default function Auth() {
                     </div>
 
                     {/* SSO buttons — only on enterprise custom domains */}
-                    {isCustomDomain && workspace?.ssoEnabled && (
+                    {isCustomDomain && workspace && hasSSO && (
                       <div className="space-y-4">
                         <EnterpriseSSOLogin workspace={workspace} />
                         
@@ -437,7 +449,7 @@ export default function Auth() {
                     )}
 
                     {/* Email login — hidden when SSO-only on custom domain */}
-                    {!(isCustomDomain && workspace?.ssoOnlyLogin) && (
+                    {!(isCustomDomain && workspace?.ssoOnlyLogin && hasSSO) && (
                       <div className="space-y-3">
                         <div className="space-y-1.5">
                           <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
