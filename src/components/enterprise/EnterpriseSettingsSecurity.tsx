@@ -44,6 +44,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
     setIpAllowlist(settings.ipAllowlist || []);
     setRetentionDays(settings.retentionDays ?? 365);
     setStorageRegion(settings.storageRegion || 'eu');
+    setEuDataResidencyRequired(settings.euDataResidencyRequired ?? false);
   }, [settings]);
 
   const isDirty = useMemo(() => {
