@@ -6,8 +6,8 @@ export default function EnterpriseSettingsIdentityPage() {
   return (
     <EnterpriseSettingsLayout
       title="Identitet & SSO"
-      description="Single sign-on, leverantörer och provisionering"
-      icon={<Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+      description="Leverantörer, provisionering och domänbegränsningar"
+      icon={<Shield className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
         <IdentityContent

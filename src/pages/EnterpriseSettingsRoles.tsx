@@ -7,7 +7,7 @@ export default function EnterpriseSettingsRolesPage() {
     <EnterpriseSettingsLayout
       title="Roller & Behörigheter"
       description="Anpassade roller, behörighetspaket och rollmallar"
-      icon={<Users className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
+      icon={<Users className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
         <RolesContent
