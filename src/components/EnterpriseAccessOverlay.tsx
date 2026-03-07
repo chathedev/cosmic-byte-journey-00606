@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import tivlyLogo from '@/assets/tivly-logo.png';
+import { useEnterpriseBranding } from '@/contexts/EnterpriseBrandingContext';
 
 // Enterprise billing uses the Tivly Enterprise Stripe account
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
