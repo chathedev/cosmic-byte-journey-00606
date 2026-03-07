@@ -30,6 +30,10 @@ interface SharedProtocolData {
   meetingDate?: string;
   sharedAt?: string;
   duration?: string;
+  branding?: {
+    logoUrl?: string;
+    workspaceName?: string;
+  };
 }
 
 const SharedProtocol = () => {
