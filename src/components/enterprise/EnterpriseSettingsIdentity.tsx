@@ -188,7 +188,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-foreground">Providers</h4>
           <div className="grid gap-3">
-            {PROVIDERS.map(({ key, label, icon }) => {
+            {PROVIDERS.map(({ key, label }) => {
               const provider = providers[key] as EnterpriseProvider | undefined;
               const readiness = providerReadiness?.[key];
               const isEnabled = provider?.enabled ?? false;
@@ -198,7 +198,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                 <div key={key} className="rounded-lg border border-border p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{icon}</span>
+                      <Key className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm font-medium">{label}</span>
                       {isEnabled && isReady && (
                         <Badge variant="outline" className="text-[10px] border-green-300 text-green-700 dark:border-green-800 dark:text-green-400">
