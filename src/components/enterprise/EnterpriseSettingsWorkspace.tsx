@@ -292,6 +292,20 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           />
         </div>
 
+        {allowExternalGuests && (
+          <div className="flex items-center justify-between ml-6">
+            <div>
+              <p className="text-sm">Kräv godkännande för externa gäster</p>
+              <p className="text-xs text-muted-foreground">Ägare/admin måste godkänna innan externa gäster får åtkomst</p>
+            </div>
+            <Switch
+              checked={requireApprovalForExternalGuests}
+              onCheckedChange={setRequireApprovalForExternalGuests}
+              disabled={!canEdit || saving}
+            />
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm">Teamhantering</p>

@@ -169,6 +169,17 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
             </SelectContent>
           </Select>
         </div>
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <p className="text-sm">EU-datalagringsgaranti</p>
+            <p className="text-xs text-muted-foreground">Kräv att all data lagras inom EU</p>
+          </div>
+          <Switch
+            checked={euDataResidencyRequired}
+            onCheckedChange={setEuDataResidencyRequired}
+            disabled={!canEdit || isLocked('euDataResidencyRequired') || saving}
+          />
+        </div>
       </div>
 
       {/* IP Allowlist */}
