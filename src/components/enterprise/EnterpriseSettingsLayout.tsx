@@ -2,18 +2,19 @@ import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield, Building2, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useEnterpriseSettings } from '@/hooks/useEnterpriseSettings';
+import { useEnterpriseSectionSettings } from '@/hooks/useEnterpriseSectionSettings';
 
 interface Props {
   title: string;
   description?: string;
   icon: ReactNode;
-  children: (ctx: ReturnType<typeof useEnterpriseSettings>) => ReactNode;
+  sectionSlug: string;
+  children: (ctx: ReturnType<typeof useEnterpriseSectionSettings>) => ReactNode;
 }
 
-export function EnterpriseSettingsLayout({ title, description, icon, children }: Props) {
+export function EnterpriseSettingsLayout({ title, description, icon, sectionSlug, children }: Props) {
   const navigate = useNavigate();
-  const ctx = useEnterpriseSettings();
+  const ctx = useEnterpriseSectionSettings(sectionSlug);
 
   if (!ctx.isEnterprise) {
     return (
