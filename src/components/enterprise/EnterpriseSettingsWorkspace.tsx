@@ -28,6 +28,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
   const [wordmarkUrl, setWordmarkUrl] = useState((branding as any).wordmarkUrl || '');
   const [faviconUrl, setFaviconUrl] = useState((branding as any).faviconUrl || '');
+  const [primaryColor, setPrimaryColor] = useState(branding.primaryColor || '');
+  const [accentColor, setAccentColor] = useState((branding as any).accentColor || '');
   const [loginTitle, setLoginTitle] = useState((branding as any).loginTitle || '');
   const [loginSubtitle, setLoginSubtitle] = useState((branding as any).loginSubtitle || '');
   const [supportEmail, setSupportEmail] = useState((branding as any).supportEmail || '');
@@ -37,6 +39,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const [emailBrandingEnabled, setEmailBrandingEnabled] = useState(branding.emailBrandingEnabled ?? false);
   const [domainRestrictedInvites, setDomainRestrictedInvites] = useState(invitePolicy.domainRestrictedInvites ?? false);
   const [allowExternalGuests, setAllowExternalGuests] = useState(invitePolicy.allowExternalGuests ?? false);
+  const [requireApprovalForExternalGuests, setRequireApprovalForExternalGuests] = useState(invitePolicy.requireApprovalForExternalGuests ?? false);
   const [teamManagementEnabled, setTeamManagementEnabled] = useState(settings.teamManagementEnabled ?? true);
 
   // Sync from props when settings change (e.g. after save)
@@ -46,6 +49,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     setLogoUrl(branding.logoUrl || '');
     setWordmarkUrl((branding as any).wordmarkUrl || '');
     setFaviconUrl((branding as any).faviconUrl || '');
+    setPrimaryColor(branding.primaryColor || '');
+    setAccentColor((branding as any).accentColor || '');
     setLoginTitle((branding as any).loginTitle || '');
     setLoginSubtitle((branding as any).loginSubtitle || '');
     setSupportEmail((branding as any).supportEmail || '');
@@ -55,6 +60,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     setEmailBrandingEnabled(branding.emailBrandingEnabled ?? false);
     setDomainRestrictedInvites(invitePolicy.domainRestrictedInvites ?? false);
     setAllowExternalGuests(invitePolicy.allowExternalGuests ?? false);
+    setRequireApprovalForExternalGuests(invitePolicy.requireApprovalForExternalGuests ?? false);
     setTeamManagementEnabled(settings.teamManagementEnabled ?? true);
   }, [settings]);
 
@@ -66,6 +72,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       logoUrl !== (branding.logoUrl || '') ||
       wordmarkUrl !== ((branding as any).wordmarkUrl || '') ||
       faviconUrl !== ((branding as any).faviconUrl || '') ||
+      primaryColor !== (branding.primaryColor || '') ||
+      accentColor !== ((branding as any).accentColor || '') ||
       loginTitle !== ((branding as any).loginTitle || '') ||
       loginSubtitle !== ((branding as any).loginSubtitle || '') ||
       supportEmail !== ((branding as any).supportEmail || '') ||
@@ -75,9 +83,10 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       emailBrandingEnabled !== (branding.emailBrandingEnabled ?? false) ||
       domainRestrictedInvites !== (invitePolicy.domainRestrictedInvites ?? false) ||
       allowExternalGuests !== (invitePolicy.allowExternalGuests ?? false) ||
+      requireApprovalForExternalGuests !== (invitePolicy.requireApprovalForExternalGuests ?? false) ||
       teamManagementEnabled !== (settings.teamManagementEnabled ?? true)
     );
-  }, [workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, settings]);
+  }, [workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, primaryColor, accentColor, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, requireApprovalForExternalGuests, teamManagementEnabled, settings]);
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
@@ -91,6 +100,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           logoUrl: logoUrl || null,
           wordmarkUrl: wordmarkUrl || null,
           faviconUrl: faviconUrl || null,
+          primaryColor: primaryColor || null,
+          accentColor: accentColor || null,
           loginTitle: loginTitle || null,
           loginSubtitle: loginSubtitle || null,
           supportEmail: supportEmail || null,
@@ -102,12 +113,13 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
         invitePolicy: {
           domainRestrictedInvites,
           allowExternalGuests,
+          requireApprovalForExternalGuests,
         },
         teamManagementEnabled,
       },
     });
     await refreshBranding();
-  }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
+  }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, primaryColor, accentColor, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, requireApprovalForExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
 
   const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave, debounceMs: 1200 });
 
@@ -154,6 +166,41 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           
           {fieldRow('Ordmärke (wordmark) URL', wordmarkUrl, setWordmarkUrl, 'branding.wordmarkUrl', 'https://example.se/wordmark.png')}
           {fieldRow('Favicon URL', faviconUrl, setFaviconUrl, 'branding.faviconUrl', 'https://example.se/favicon.ico')}
+          
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Primärfärg</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={primaryColor}
+                  onChange={e => setPrimaryColor(e.target.value)}
+                  disabled={!canEdit || isLocked('branding.primaryColor') || saving}
+                  className="h-9 text-sm flex-1"
+                  placeholder="#0066FF"
+                />
+                {primaryColor && (
+                  <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: primaryColor }} />
+                )}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Accentfärg</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={accentColor}
+                  onChange={e => setAccentColor(e.target.value)}
+                  disabled={!canEdit || isLocked('branding.accentColor') || saving}
+                  className="h-9 text-sm flex-1"
+                  placeholder="#FF6600"
+                />
+                {accentColor && (
+                  <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: accentColor }} />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -244,6 +291,20 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
             disabled={!canEdit || saving}
           />
         </div>
+
+        {allowExternalGuests && (
+          <div className="flex items-center justify-between ml-6">
+            <div>
+              <p className="text-sm">Kräv godkännande för externa gäster</p>
+              <p className="text-xs text-muted-foreground">Ägare/admin måste godkänna innan externa gäster får åtkomst</p>
+            </div>
+            <Switch
+              checked={requireApprovalForExternalGuests}
+              onCheckedChange={setRequireApprovalForExternalGuests}
+              disabled={!canEdit || saving}
+            />
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <div>

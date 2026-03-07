@@ -47,6 +47,15 @@ export interface WorkspaceBranding {
   termsUrl?: string;
 }
 
+export interface ProviderReadinessInfo {
+  enabled: boolean;
+  configured: boolean;
+  ready: boolean;
+  lastTestedAt: string | null;
+  lastTestResult: string | null;
+  lastError: string | null;
+}
+
 export interface PublicWorkspaceInfo {
   companyId: string;
   companyName: string;
@@ -58,6 +67,7 @@ export interface PublicWorkspaceInfo {
   allowedProviders: string[];
   enabledProviders: string[];
   primaryProvider: string | null;
+  providerReadiness: Record<string, ProviderReadinessInfo>;
   branding: WorkspaceBranding;
 }
 
@@ -75,6 +85,21 @@ export async function getPublicWorkspace(host: string): Promise<PublicWorkspaceI
   const company = raw.company || {};
   const primaryDomain = workspace.customDomains?.find((d: any) => d.primary) || workspace.customDomains?.[0];
 
+  // Build provider readiness from identity or settingsSummary
+  const providerReadiness: Record<string, ProviderReadinessInfo> = {};
+  const readinessSource = identity.providerReadiness || raw.settingsSummary?.providerReadiness || {};
+  for (const [key, val] of Object.entries(readinessSource)) {
+    const r = val as any;
+    providerReadiness[key] = {
+      enabled: r.enabled ?? false,
+      configured: r.configured ?? false,
+      ready: r.ready ?? false,
+      lastTestedAt: r.lastTestedAt || null,
+      lastTestResult: r.lastTestResult || null,
+      lastError: r.lastError || null,
+    };
+  }
+
   return {
     companyId: company.id || raw.companyId || '',
     companyName: company.name || branding.workspaceDisplayName || '',
@@ -86,6 +111,7 @@ export async function getPublicWorkspace(host: string): Promise<PublicWorkspaceI
     allowedProviders: identity.allowedProviders || [],
     enabledProviders: identity.enabledProviders || [],
     primaryProvider: identity.primaryProvider || null,
+    providerReadiness,
     branding: {
       workspaceDisplayName: branding.workspaceDisplayName,
       legalEntityName: branding.legalEntityName,

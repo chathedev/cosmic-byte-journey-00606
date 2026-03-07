@@ -31,6 +31,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
   const [ipAllowlist, setIpAllowlist] = useState<string[]>(settings.ipAllowlist || []);
   const [retentionDays, setRetentionDays] = useState(settings.retentionDays ?? 365);
   const [storageRegion, setStorageRegion] = useState(settings.storageRegion || 'eu');
+  const [euDataResidencyRequired, setEuDataResidencyRequired] = useState(settings.euDataResidencyRequired ?? false);
 
   useEffect(() => {
     setAuditLogsEnabled(settings.auditLogsEnabled ?? false);
@@ -43,6 +44,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
     setIpAllowlist(settings.ipAllowlist || []);
     setRetentionDays(settings.retentionDays ?? 365);
     setStorageRegion(settings.storageRegion || 'eu');
+    setEuDataResidencyRequired(settings.euDataResidencyRequired ?? false);
   }, [settings]);
 
   const isDirty = useMemo(() => {
@@ -56,9 +58,10 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
       ipAllowlistingEnabled !== (settings.ipAllowlistingEnabled ?? false) ||
       JSON.stringify(ipAllowlist) !== JSON.stringify(settings.ipAllowlist || []) ||
       retentionDays !== (settings.retentionDays ?? 365) ||
-      storageRegion !== (settings.storageRegion || 'eu')
+      storageRegion !== (settings.storageRegion || 'eu') ||
+      euDataResidencyRequired !== (settings.euDataResidencyRequired ?? false)
     );
-  }, [auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, settings]);
+  }, [auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, euDataResidencyRequired, settings]);
 
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
@@ -87,9 +90,10 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
         ipAllowlist,
         retentionDays,
         storageRegion,
+        euDataResidencyRequired,
       },
     });
-  }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, onUpdate]);
+  }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, euDataResidencyRequired, onUpdate]);
 
   const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
@@ -164,6 +168,17 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
               <SelectItem value="auto">🌍 Auto</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <p className="text-sm">EU-datalagringsgaranti</p>
+            <p className="text-xs text-muted-foreground">Kräv att all data lagras inom EU</p>
+          </div>
+          <Switch
+            checked={euDataResidencyRequired}
+            onCheckedChange={setEuDataResidencyRequired}
+            disabled={!canEdit || isLocked('euDataResidencyRequired') || saving}
+          />
         </div>
       </div>
 
