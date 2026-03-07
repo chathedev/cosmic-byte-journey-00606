@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw, Save } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,7 +47,6 @@ function LockedBadge({ lock }: { lock?: SettingsLock }) {
 
 function StatusIndicator({ readiness, provider }: { readiness?: ProviderReadiness; provider?: EnterpriseProvider }) {
   if (!readiness && !provider) return null;
-
   const isEnabled = readiness?.enabled ?? provider?.enabled ?? false;
   const isReady = readiness?.ready ?? false;
   const isConfigured = readiness?.configured ?? !!provider?.clientIdConfigured;
@@ -55,45 +54,20 @@ function StatusIndicator({ readiness, provider }: { readiness?: ProviderReadines
   const lastError = readiness?.lastError ?? provider?.lastError;
 
   if (!isEnabled) {
-    return (
-      <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
-        Inaktiverad
-      </Badge>
-    );
+    return <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">Inaktiverad</Badge>;
   }
-
   if (isReady && lastTestResult === 'success') {
-    return (
-      <Badge variant="outline" className="text-[10px] border-green-300 text-green-700 dark:border-green-800 dark:text-green-400 gap-0.5">
-        <CheckCircle2 className="w-2.5 h-2.5" />Redo
-      </Badge>
-    );
+    return <Badge variant="outline" className="text-[10px] border-green-300 text-green-700 dark:border-green-800 dark:text-green-400 gap-0.5"><CheckCircle2 className="w-2.5 h-2.5" />Redo</Badge>;
   }
-
   if (isConfigured && !isReady) {
-    return (
-      <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400 gap-0.5">
-        <AlertTriangle className="w-2.5 h-2.5" />Ej verifierad
-      </Badge>
-    );
+    return <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400 gap-0.5"><AlertTriangle className="w-2.5 h-2.5" />Ej verifierad</Badge>;
   }
-
   if (!isConfigured) {
-    return (
-      <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700 dark:border-orange-800 dark:text-orange-400 gap-0.5">
-        <XCircle className="w-2.5 h-2.5" />Ej konfigurerad
-      </Badge>
-    );
+    return <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700 dark:border-orange-800 dark:text-orange-400 gap-0.5"><XCircle className="w-2.5 h-2.5" />Ej konfigurerad</Badge>;
   }
-
   if (lastError) {
-    return (
-      <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive gap-0.5">
-        <XCircle className="w-2.5 h-2.5" />Fel
-      </Badge>
-    );
+    return <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive gap-0.5"><XCircle className="w-2.5 h-2.5" />Fel</Badge>;
   }
-
   return null;
 }
 
@@ -106,81 +80,114 @@ function formatTestTime(iso: string | null | undefined): string | null {
 }
 
 export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, providerReadiness, hasVerifiedDomain, defaultLoginHostname }: Props) {
-  const [saving, setSaving] = useState(false);
-  const [domainInput, setDomainInput] = useState('');
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [domainInput, setDomainInput] = useState('');
+
+  // Local state for all identity settings
+  const [ssoEnabled, setSsoEnabled] = useState(settings.ssoEnabled ?? false);
+  const [ssoOnlyLogin, setSsoOnlyLogin] = useState(settings.ssoOnlyLogin ?? false);
+  const [primaryProvider, setPrimaryProvider] = useState(settings.primaryProvider || '');
+  const [fallbackPolicy, setFallbackPolicy] = useState(settings.fallbackPolicy || 'sso_only');
+  const [jitProvisioningEnabled, setJitProvisioningEnabled] = useState(settings.jitProvisioningEnabled ?? false);
+  const [groupSyncEnabled, setGroupSyncEnabled] = useState(settings.groupSyncEnabled ?? false);
+  const [scimEnabled, setScimEnabled] = useState(settings.scimEnabled ?? false);
+  const [defaultAnchorRole, setDefaultAnchorRole] = useState(settings.defaultAnchorRole || 'member');
+  const [domainRestrictions, setDomainRestrictions] = useState<string[]>(settings.domainRestrictions || []);
+  const [providerEnabled, setProviderEnabled] = useState<Record<string, boolean>>({});
+
+  // Sync from props
+  useEffect(() => {
+    setSsoEnabled(settings.ssoEnabled ?? false);
+    setSsoOnlyLogin(settings.ssoOnlyLogin ?? false);
+    setPrimaryProvider(settings.primaryProvider || '');
+    setFallbackPolicy(settings.fallbackPolicy || 'sso_only');
+    setJitProvisioningEnabled(settings.jitProvisioningEnabled ?? false);
+    setGroupSyncEnabled(settings.groupSyncEnabled ?? false);
+    setScimEnabled(settings.scimEnabled ?? false);
+    setDefaultAnchorRole(settings.defaultAnchorRole || 'member');
+    setDomainRestrictions(settings.domainRestrictions || []);
+    const pe: Record<string, boolean> = {};
+    const providers = settings.providers || {};
+    PROVIDERS.forEach(p => { pe[p.key] = (providers as any)[p.key]?.enabled ?? false; });
+    setProviderEnabled(pe);
+  }, [settings]);
+
+  const isDirty = useMemo(() => {
+    const providers = settings.providers || {};
+    const providersDirty = PROVIDERS.some(p => providerEnabled[p.key] !== ((providers as any)[p.key]?.enabled ?? false));
+    return (
+      ssoEnabled !== (settings.ssoEnabled ?? false) ||
+      ssoOnlyLogin !== (settings.ssoOnlyLogin ?? false) ||
+      primaryProvider !== (settings.primaryProvider || '') ||
+      fallbackPolicy !== (settings.fallbackPolicy || 'sso_only') ||
+      jitProvisioningEnabled !== (settings.jitProvisioningEnabled ?? false) ||
+      groupSyncEnabled !== (settings.groupSyncEnabled ?? false) ||
+      scimEnabled !== (settings.scimEnabled ?? false) ||
+      defaultAnchorRole !== (settings.defaultAnchorRole || 'member') ||
+      JSON.stringify(domainRestrictions) !== JSON.stringify(settings.domainRestrictions || []) ||
+      providersDirty
+    );
+  }, [ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings]);
 
   const isLocked = (path: string) => !!locks[`identityAccess.${path}`]?.locked;
   const getLock = (path: string) => locks[`identityAccess.${path}`];
 
-  const handleToggle = async (field: string, value: boolean) => {
-    if (!canEdit || isLocked(field)) return;
+  const handleSave = async () => {
+    if (!canEdit || !isDirty) return;
     setSaving(true);
     try {
-      await onUpdate({ identityAccess: { [field]: value } });
+      const providerPatch: Record<string, any> = {};
+      PROVIDERS.forEach(p => {
+        const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
+        if (providerEnabled[p.key] !== orig) {
+          providerPatch[p.key] = { enabled: providerEnabled[p.key] };
+        }
+      });
+      await onUpdate({
+        identityAccess: {
+          ssoEnabled,
+          ssoOnlyLogin,
+          primaryProvider: primaryProvider || undefined,
+          fallbackPolicy,
+          jitProvisioningEnabled,
+          groupSyncEnabled,
+          scimEnabled,
+          defaultAnchorRole,
+          domainRestrictions,
+          ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
+        },
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSelect = async (field: string, value: string) => {
-    if (!canEdit || isLocked(field)) return;
-    setSaving(true);
-    try {
-      await onUpdate({ identityAccess: { [field]: value } });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addDomain = async () => {
+  const addDomain = () => {
     const d = domainInput.trim().toLowerCase();
-    if (!d || isLocked('domainRestrictions')) return;
-    const current = settings.domainRestrictions || [];
-    if (current.includes(d)) return;
-    setSaving(true);
-    try {
-      await onUpdate({ identityAccess: { domainRestrictions: [...current, d] } });
-      setDomainInput('');
-    } finally {
-      setSaving(false);
-    }
+    if (!d || domainRestrictions.includes(d)) return;
+    setDomainRestrictions([...domainRestrictions, d]);
+    setDomainInput('');
   };
 
-  const removeDomain = async (domain: string) => {
-    if (isLocked('domainRestrictions')) return;
-    const current = settings.domainRestrictions || [];
-    setSaving(true);
-    try {
-      await onUpdate({ identityAccess: { domainRestrictions: current.filter(d => d !== domain) } });
-    } finally {
-      setSaving(false);
-    }
+  const removeDomain = (domain: string) => {
+    setDomainRestrictions(domainRestrictions.filter(d => d !== domain));
   };
 
   const handleTestProvider = async (key: string) => {
     if (!onTestSSO) return;
     setTestingProvider(key);
-    try {
-      await onTestSSO(key);
-    } finally {
-      setTestingProvider(null);
-    }
+    try { await onTestSSO(key); } finally { setTestingProvider(null); }
   };
 
   const handleConnectProvider = async (key: string) => {
     if (!onConnectSSO) return;
     setConnectingProvider(key);
-    try {
-      await onConnectSSO(key);
-    } finally {
-      setConnectingProvider(null);
-    }
+    try { await onConnectSSO(key); } finally { setConnectingProvider(null); }
   };
 
   const providers = settings.providers || {};
-  const primaryProvider = settings.primaryProvider;
 
   return (
     <div className="space-y-6">
@@ -197,8 +204,8 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
           <div className="flex items-center gap-2">
             <LockedBadge lock={getLock('ssoEnabled')} />
             <Switch
-              checked={settings.ssoEnabled ?? false}
-              onCheckedChange={(v) => handleToggle('ssoEnabled', v)}
+              checked={ssoEnabled}
+              onCheckedChange={setSsoEnabled}
               disabled={!canEdit || isLocked('ssoEnabled') || saving || !hasVerifiedDomain}
             />
           </div>
@@ -222,7 +229,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
           </div>
         )}
 
-        {settings.ssoEnabled && hasVerifiedDomain && (
+        {ssoEnabled && hasVerifiedDomain && (
           <>
             <Separator />
             {/* SSO Only */}
@@ -234,13 +241,13 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
               <div className="flex items-center gap-2">
                 <LockedBadge lock={getLock('ssoOnlyLogin')} />
                 <Switch
-                  checked={settings.ssoOnlyLogin ?? false}
-                  onCheckedChange={(v) => handleToggle('ssoOnlyLogin', v)}
+                  checked={ssoOnlyLogin}
+                  onCheckedChange={setSsoOnlyLogin}
                   disabled={!canEdit || isLocked('ssoOnlyLogin') || saving}
                 />
               </div>
             </div>
-            {settings.ssoOnlyLogin && (
+            {ssoOnlyLogin && (
               <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -252,11 +259,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             {/* Primary Provider */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Primär provider</Label>
-              <Select
-                value={settings.primaryProvider || ''}
-                onValueChange={(v) => handleSelect('primaryProvider', v)}
-                disabled={!canEdit || isLocked('primaryProvider') || saving}
-              >
+              <Select value={primaryProvider} onValueChange={setPrimaryProvider} disabled={!canEdit || isLocked('primaryProvider') || saving}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Välj provider" /></SelectTrigger>
                 <SelectContent>
                   {PROVIDERS.map(p => (
@@ -269,24 +272,16 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             {/* Fallback policy */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Fallback-policy</Label>
-              <Select
-                value={settings.fallbackPolicy || 'sso_only'}
-                onValueChange={(v) => handleSelect('fallbackPolicy', v)}
-                disabled={!canEdit || isLocked('fallbackPolicy') || saving}
-              >
+              <Select value={fallbackPolicy} onValueChange={setFallbackPolicy} disabled={!canEdit || isLocked('fallbackPolicy') || saving}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FALLBACK_POLICIES.map(p => (
-                    <SelectItem key={p.value} value={p.value}>
-                      <div>
-                        <span>{p.label}</span>
-                      </div>
-                    </SelectItem>
+                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                {FALLBACK_POLICIES.find(p => p.value === (settings.fallbackPolicy || 'sso_only'))?.description}
+                {FALLBACK_POLICIES.find(p => p.value === fallbackPolicy)?.description}
               </p>
             </div>
           </>
@@ -294,40 +289,32 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
       </div>
 
       {/* Provider Cards */}
-      {settings.ssoEnabled && hasVerifiedDomain && (
+      {ssoEnabled && hasVerifiedDomain && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-foreground">Identity Providers</h4>
           <div className="grid gap-3">
-            {PROVIDERS.map(({ key, label, shortLabel, description }) => {
-              const provider = providers[key] as EnterpriseProvider | undefined;
+            {PROVIDERS.map(({ key, label, description }) => {
+              const provider = (providers as any)[key] as EnterpriseProvider | undefined;
               const readiness = providerReadiness?.[key];
-              const isEnabled = provider?.enabled ?? false;
+              const isEnabled = providerEnabled[key] ?? false;
               const isPrimary = primaryProvider === key;
               const lastTestedAt = formatTestTime(readiness?.lastTestedAt ?? provider?.lastTestedAt);
 
               return (
                 <div
                   key={key}
-                  className={`rounded-xl border p-4 space-y-3 transition-colors ${
-                    isEnabled
-                      ? 'border-primary/30 bg-card shadow-sm'
-                      : 'border-border bg-card/50'
-                  }`}
+                  className={`rounded-xl border p-4 space-y-3 transition-colors ${isEnabled ? 'border-primary/30 bg-card shadow-sm' : 'border-border bg-card/50'}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        isEnabled ? 'bg-primary/10' : 'bg-muted/50'
-                      }`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isEnabled ? 'bg-primary/10' : 'bg-muted/50'}`}>
                         <Key className={`w-4 h-4 ${isEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{label}</span>
                           {isPrimary && (
-                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0">
-                              Primär
-                            </Badge>
+                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0">Primär</Badge>
                           )}
                         </div>
                         <p className="text-[11px] text-muted-foreground">{description}</p>
@@ -337,15 +324,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                       <StatusIndicator readiness={readiness} provider={provider} />
                       <Switch
                         checked={isEnabled}
-                        onCheckedChange={async (v) => {
-                          if (!canEdit) return;
-                          setSaving(true);
-                          try {
-                            await onUpdate({ identityAccess: { providers: { [key]: { enabled: v } } } });
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
+                        onCheckedChange={v => setProviderEnabled(prev => ({ ...prev, [key]: v }))}
                         disabled={!canEdit || saving}
                       />
                     </div>
@@ -353,41 +332,30 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
 
                   {isEnabled && (
                     <div className="space-y-3">
-                      {/* Provider-specific config hints */}
                       {provider?.clientIdConfigured && (
                         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <CheckCircle2 className="w-3 h-3 text-green-500" />
-                          Client ID konfigurerad
+                          <CheckCircle2 className="w-3 h-3 text-green-500" />Client ID konfigurerad
                         </div>
                       )}
-
                       {key === 'microsoft' && provider?.tenantMode && (
                         <div className="text-[11px] text-muted-foreground">
                           Tenant-läge: <span className="font-medium text-foreground">{provider.tenantMode}</span>
-                          {provider.enforceOrganizationAccountOnly && (
-                            <span className="ml-2 text-muted-foreground">(Organisationskonton)</span>
-                          )}
+                          {provider.enforceOrganizationAccountOnly && <span className="ml-2 text-muted-foreground">(Organisationskonton)</span>}
                         </div>
                       )}
-
                       {key === 'google' && provider?.hostedDomain && (
                         <div className="text-[11px] text-muted-foreground">
                           Hosted domain: <span className="font-medium text-foreground">{provider.hostedDomain}</span>
                         </div>
                       )}
-
                       {key === 'okta' && provider?.issuer && (
                         <div className="text-[11px] text-muted-foreground truncate">
                           Issuer: <span className="font-medium text-foreground">{provider.issuer}</span>
                         </div>
                       )}
-
                       {lastTestedAt && (
-                        <div className="text-[11px] text-muted-foreground">
-                          Senast testad: {lastTestedAt}
-                        </div>
+                        <div className="text-[11px] text-muted-foreground">Senast testad: {lastTestedAt}</div>
                       )}
-
                       {readiness?.lastError && (
                         <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
                           <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
@@ -395,37 +363,17 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                         </div>
                       )}
 
-                      {/* Actions */}
+                      {/* Actions — these are immediate (test/connect are not buffered) */}
                       <div className="flex gap-2 pt-1">
                         {onTestSSO && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs gap-1.5"
-                            onClick={() => handleTestProvider(key)}
-                            disabled={testingProvider === key || saving}
-                          >
-                            {testingProvider === key ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <RefreshCw className="w-3 h-3" />
-                            )}
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || saving}>
+                            {testingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                             Verifiera anslutning
                           </Button>
                         )}
                         {onConnectSSO && !readiness?.ready && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-7 text-xs gap-1.5"
-                            onClick={() => handleConnectProvider(key)}
-                            disabled={connectingProvider === key || saving}
-                          >
-                            {connectingProvider === key ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <ExternalLink className="w-3 h-3" />
-                            )}
+                          <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleConnectProvider(key)} disabled={connectingProvider === key || saving}>
+                            {connectingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
                             Konfigurera
                           </Button>
                         )}
@@ -450,33 +398,21 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             <p className="text-sm">JIT-provisionering</p>
             <p className="text-xs text-muted-foreground">Skapa konton automatiskt vid första SSO-inloggning</p>
           </div>
-          <Switch
-            checked={settings.jitProvisioningEnabled ?? false}
-            onCheckedChange={(v) => handleToggle('jitProvisioningEnabled', v)}
-            disabled={!canEdit || isLocked('jitProvisioningEnabled') || saving}
-          />
+          <Switch checked={jitProvisioningEnabled} onCheckedChange={setJitProvisioningEnabled} disabled={!canEdit || isLocked('jitProvisioningEnabled') || saving} />
         </div>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm">Gruppsynkronisering</p>
             <p className="text-xs text-muted-foreground">Synka grupper från identity provider</p>
           </div>
-          <Switch
-            checked={settings.groupSyncEnabled ?? false}
-            onCheckedChange={(v) => handleToggle('groupSyncEnabled', v)}
-            disabled={!canEdit || isLocked('groupSyncEnabled') || saving}
-          />
+          <Switch checked={groupSyncEnabled} onCheckedChange={setGroupSyncEnabled} disabled={!canEdit || isLocked('groupSyncEnabled') || saving} />
         </div>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm">SCIM</p>
             <p className="text-xs text-muted-foreground">Automatisk användarhantering via SCIM</p>
           </div>
-          <Switch
-            checked={settings.scimEnabled ?? false}
-            onCheckedChange={(v) => handleToggle('scimEnabled', v)}
-            disabled={!canEdit || isLocked('scimEnabled') || saving}
-          />
+          <Switch checked={scimEnabled} onCheckedChange={setScimEnabled} disabled={!canEdit || isLocked('scimEnabled') || saving} />
         </div>
       </div>
 
@@ -488,7 +424,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         </h4>
         <p className="text-xs text-muted-foreground">Begränsa vilka e-postdomäner som kan logga in via SSO</p>
         <div className="flex flex-wrap gap-2">
-          {(settings.domainRestrictions || []).map(d => (
+          {domainRestrictions.map(d => (
             <Badge key={d} variant="secondary" className="text-xs gap-1">
               {d}
               {canEdit && !isLocked('domainRestrictions') && (
@@ -496,7 +432,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
               )}
             </Badge>
           ))}
-          {(settings.domainRestrictions || []).length === 0 && (
+          {domainRestrictions.length === 0 && (
             <p className="text-[11px] text-muted-foreground italic">Inga domänbegränsningar konfigurerade — alla domäner tillåts</p>
           )}
         </div>
@@ -509,7 +445,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
               placeholder="example.se"
               className="h-8 text-sm flex-1"
             />
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addDomain} disabled={saving || !domainInput.trim()}>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addDomain} disabled={!domainInput.trim()}>
               Lägg till
             </Button>
           </div>
@@ -525,11 +461,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         <p className="text-xs text-muted-foreground">Vilken roll ska nya användare tilldelas vid automatisk provisionering</p>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Standardroll (anchor)</Label>
-          <Select
-            value={settings.defaultAnchorRole || 'member'}
-            onValueChange={(v) => handleSelect('defaultAnchorRole', v)}
-            disabled={!canEdit || saving}
-          >
+          <Select value={defaultAnchorRole} onValueChange={setDefaultAnchorRole} disabled={!canEdit || saving}>
             <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="member">Medlem</SelectItem>
@@ -539,6 +471,16 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
           </Select>
         </div>
       </div>
+
+      {/* Save button */}
+      {canEdit && isDirty && (
+        <div className="sticky bottom-4 flex justify-end z-10">
+          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
+            <Save className="w-4 h-4" />
+            {saving ? 'Sparar…' : 'Spara ändringar'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

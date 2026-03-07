@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Building2, Palette, Users, Lock, Mail, Link2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Building2, Palette, Users, Lock, Mail, Link2, Save } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useEnterpriseBranding } from '@/contexts/EnterpriseBrandingContext';
 import type { AdminWorkspaceSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
@@ -20,6 +21,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const branding = settings.branding || {};
   const invitePolicy = settings.invitePolicy || {};
 
+  // Local state for all fields
   const [workspaceName, setWorkspaceName] = useState(branding.workspaceDisplayName || '');
   const [legalName, setLegalName] = useState((branding as any).legalEntityName || '');
   const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
@@ -31,7 +33,12 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const [supportUrl, setSupportUrl] = useState((branding as any).supportUrl || '');
   const [privacyUrl, setPrivacyUrl] = useState((branding as any).privacyUrl || '');
   const [termsUrl, setTermsUrl] = useState((branding as any).termsUrl || '');
+  const [emailBrandingEnabled, setEmailBrandingEnabled] = useState(branding.emailBrandingEnabled ?? false);
+  const [domainRestrictedInvites, setDomainRestrictedInvites] = useState(invitePolicy.domainRestrictedInvites ?? false);
+  const [allowExternalGuests, setAllowExternalGuests] = useState(invitePolicy.allowExternalGuests ?? false);
+  const [teamManagementEnabled, setTeamManagementEnabled] = useState(settings.teamManagementEnabled ?? true);
 
+  // Sync from props when settings change (e.g. after save)
   useEffect(() => {
     setWorkspaceName(branding.workspaceDisplayName || '');
     setLegalName((branding as any).legalEntityName || '');
@@ -44,25 +51,66 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     setSupportUrl((branding as any).supportUrl || '');
     setPrivacyUrl((branding as any).privacyUrl || '');
     setTermsUrl((branding as any).termsUrl || '');
-  }, [branding]);
+    setEmailBrandingEnabled(branding.emailBrandingEnabled ?? false);
+    setDomainRestrictedInvites(invitePolicy.domainRestrictedInvites ?? false);
+    setAllowExternalGuests(invitePolicy.allowExternalGuests ?? false);
+    setTeamManagementEnabled(settings.teamManagementEnabled ?? true);
+  }, [settings]);
+
+  // Dirty check
+  const isDirty = useMemo(() => {
+    return (
+      workspaceName !== (branding.workspaceDisplayName || '') ||
+      legalName !== ((branding as any).legalEntityName || '') ||
+      logoUrl !== (branding.logoUrl || '') ||
+      wordmarkUrl !== ((branding as any).wordmarkUrl || '') ||
+      faviconUrl !== ((branding as any).faviconUrl || '') ||
+      loginTitle !== ((branding as any).loginTitle || '') ||
+      loginSubtitle !== ((branding as any).loginSubtitle || '') ||
+      supportEmail !== ((branding as any).supportEmail || '') ||
+      supportUrl !== ((branding as any).supportUrl || '') ||
+      privacyUrl !== ((branding as any).privacyUrl || '') ||
+      termsUrl !== ((branding as any).termsUrl || '') ||
+      emailBrandingEnabled !== (branding.emailBrandingEnabled ?? false) ||
+      domainRestrictedInvites !== (invitePolicy.domainRestrictedInvites ?? false) ||
+      allowExternalGuests !== (invitePolicy.allowExternalGuests ?? false) ||
+      teamManagementEnabled !== (settings.teamManagementEnabled ?? true)
+    );
+  }, [workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, settings]);
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
-  const updateField = async (path: string, value: any) => {
-    if (!canEdit) return;
+  const handleSave = async () => {
+    if (!canEdit || !isDirty) return;
     setSaving(true);
     try {
-      const parts = path.split('.');
-      let patch: any = {};
-      let ref = patch;
-      for (let i = 0; i < parts.length - 1; i++) {
-        ref[parts[i]] = {};
-        ref = ref[parts[i]];
-      }
-      ref[parts[parts.length - 1]] = value;
-      await onUpdate({ adminWorkspace: patch });
+      await onUpdate({
+        adminWorkspace: {
+          branding: {
+            workspaceDisplayName: workspaceName || null,
+            legalEntityName: legalName || null,
+            logoUrl: logoUrl || null,
+            wordmarkUrl: wordmarkUrl || null,
+            faviconUrl: faviconUrl || null,
+            loginTitle: loginTitle || null,
+            loginSubtitle: loginSubtitle || null,
+            supportEmail: supportEmail || null,
+            supportUrl: supportUrl || null,
+            privacyUrl: privacyUrl || null,
+            termsUrl: termsUrl || null,
+            emailBrandingEnabled,
+          },
+          invitePolicy: {
+            domainRestrictedInvites,
+            allowExternalGuests,
+          },
+          teamManagementEnabled,
+        },
+      });
       await refreshBranding();
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const fieldRow = (label: string, value: string, setter: (v: string) => void, path: string, placeholder: string) => (
@@ -71,7 +119,6 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       <Input
         value={value}
         onChange={e => setter(e.target.value)}
-        onBlur={() => updateField(path, value || null)}
         disabled={!canEdit || isLocked(path) || saving}
         className="h-9 text-sm"
         placeholder={placeholder}
@@ -158,8 +205,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
             <p className="text-xs text-muted-foreground">Använd organisationens logotyp och färger i inbjudningsmail. Tivlys standardmail (inloggningskoder) påverkas inte.</p>
           </div>
           <Switch
-            checked={branding.emailBrandingEnabled ?? false}
-            onCheckedChange={v => updateField('branding.emailBrandingEnabled', v)}
+            checked={emailBrandingEnabled}
+            onCheckedChange={setEmailBrandingEnabled}
             disabled={!canEdit || saving}
           />
         </div>
@@ -181,8 +228,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
             <p className="text-xs text-muted-foreground">Kräv att inbjudna tillhör godkänd domän</p>
           </div>
           <Switch
-            checked={invitePolicy.domainRestrictedInvites ?? false}
-            onCheckedChange={v => updateField('invitePolicy.domainRestrictedInvites', v)}
+            checked={domainRestrictedInvites}
+            onCheckedChange={setDomainRestrictedInvites}
             disabled={!canEdit || saving}
           />
         </div>
@@ -193,8 +240,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
             <p className="text-xs text-muted-foreground">Låt användare utanför organisationen bjudas in</p>
           </div>
           <Switch
-            checked={invitePolicy.allowExternalGuests ?? false}
-            onCheckedChange={v => updateField('invitePolicy.allowExternalGuests', v)}
+            checked={allowExternalGuests}
+            onCheckedChange={setAllowExternalGuests}
             disabled={!canEdit || saving}
           />
         </div>
@@ -205,12 +252,22 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
             <p className="text-xs text-muted-foreground">Aktivera interna arbetsgrupper</p>
           </div>
           <Switch
-            checked={settings.teamManagementEnabled ?? true}
-            onCheckedChange={v => updateField('teamManagementEnabled', v)}
+            checked={teamManagementEnabled}
+            onCheckedChange={setTeamManagementEnabled}
             disabled={!canEdit || saving}
           />
         </div>
       </div>
+
+      {/* Save button */}
+      {canEdit && isDirty && (
+        <div className="sticky bottom-4 flex justify-end z-10">
+          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
+            <Save className="w-4 h-4" />
+            {saving ? 'Sparar…' : 'Spara ändringar'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

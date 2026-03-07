@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Shield, Database, Globe, Lock, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Shield, Database, Globe, Lock, AlertTriangle, Save } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,42 +19,89 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
   const [saving, setSaving] = useState(false);
   const [ipInput, setIpInput] = useState('');
 
+  // Local toggle state
+  const [auditLogsEnabled, setAuditLogsEnabled] = useState(settings.auditLogsEnabled ?? false);
+  const [loginHistoryEnabled, setLoginHistoryEnabled] = useState(settings.loginHistoryEnabled ?? false);
+  const [autoDeleteEnabled, setAutoDeleteEnabled] = useState(settings.autoDeleteEnabled ?? false);
+  const [restrictExport, setRestrictExport] = useState(settings.restrictExport ?? false);
+  const [restrictDownload, setRestrictDownload] = useState(settings.restrictDownload ?? false);
+  const [restrictExternalSharing, setRestrictExternalSharing] = useState(settings.restrictExternalSharing ?? false);
+  const [ipAllowlistingEnabled, setIpAllowlistingEnabled] = useState(settings.ipAllowlistingEnabled ?? false);
+  const [ipAllowlist, setIpAllowlist] = useState<string[]>(settings.ipAllowlist || []);
+  const [retentionDays, setRetentionDays] = useState(settings.retentionDays ?? 365);
+  const [storageRegion, setStorageRegion] = useState(settings.storageRegion || 'eu');
+
+  useEffect(() => {
+    setAuditLogsEnabled(settings.auditLogsEnabled ?? false);
+    setLoginHistoryEnabled(settings.loginHistoryEnabled ?? false);
+    setAutoDeleteEnabled(settings.autoDeleteEnabled ?? false);
+    setRestrictExport(settings.restrictExport ?? false);
+    setRestrictDownload(settings.restrictDownload ?? false);
+    setRestrictExternalSharing(settings.restrictExternalSharing ?? false);
+    setIpAllowlistingEnabled(settings.ipAllowlistingEnabled ?? false);
+    setIpAllowlist(settings.ipAllowlist || []);
+    setRetentionDays(settings.retentionDays ?? 365);
+    setStorageRegion(settings.storageRegion || 'eu');
+  }, [settings]);
+
+  const isDirty = useMemo(() => {
+    return (
+      auditLogsEnabled !== (settings.auditLogsEnabled ?? false) ||
+      loginHistoryEnabled !== (settings.loginHistoryEnabled ?? false) ||
+      autoDeleteEnabled !== (settings.autoDeleteEnabled ?? false) ||
+      restrictExport !== (settings.restrictExport ?? false) ||
+      restrictDownload !== (settings.restrictDownload ?? false) ||
+      restrictExternalSharing !== (settings.restrictExternalSharing ?? false) ||
+      ipAllowlistingEnabled !== (settings.ipAllowlistingEnabled ?? false) ||
+      JSON.stringify(ipAllowlist) !== JSON.stringify(settings.ipAllowlist || []) ||
+      retentionDays !== (settings.retentionDays ?? 365) ||
+      storageRegion !== (settings.storageRegion || 'eu')
+    );
+  }, [auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, settings]);
+
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
-  const handleToggle = async (field: string, value: boolean) => {
-    if (!canEdit || isLocked(field)) return;
-    setSaving(true);
-    try { await onUpdate({ securityCompliance: { [field]: value } }); }
-    finally { setSaving(false); }
-  };
-
-  const addIp = async () => {
+  const addIp = () => {
     const ip = ipInput.trim();
-    if (!ip || isLocked('ipAllowlist')) return;
-    const current = settings.ipAllowlist || [];
-    if (current.includes(ip)) return;
-    setSaving(true);
-    try {
-      await onUpdate({ securityCompliance: { ipAllowlist: [...current, ip] } });
-      setIpInput('');
-    } finally { setSaving(false); }
+    if (!ip || ipAllowlist.includes(ip)) return;
+    setIpAllowlist([...ipAllowlist, ip]);
+    setIpInput('');
   };
 
-  const removeIp = async (ip: string) => {
-    if (isLocked('ipAllowlist')) return;
-    setSaving(true);
-    try {
-      await onUpdate({ securityCompliance: { ipAllowlist: (settings.ipAllowlist || []).filter(i => i !== ip) } });
-    } finally { setSaving(false); }
+  const removeIp = (ip: string) => {
+    setIpAllowlist(ipAllowlist.filter(i => i !== ip));
   };
 
-  const toggleItems: Array<{ field: string; label: string; desc: string }> = [
-    { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar' },
-    { field: 'loginHistoryEnabled', label: 'Inloggningshistorik', desc: 'Logga alla SSO-inloggningar' },
-    { field: 'autoDeleteEnabled', label: 'Automatisk radering', desc: 'Radera möten efter retentionstiden' },
-    { field: 'restrictExport', label: 'Begränsa export', desc: 'Blockera export av protokoll och transkript' },
-    { field: 'restrictDownload', label: 'Begränsa nedladdning', desc: 'Blockera filnedladdningar' },
-    { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen' },
+  const handleSave = async () => {
+    if (!canEdit || !isDirty) return;
+    setSaving(true);
+    try {
+      await onUpdate({
+        securityCompliance: {
+          auditLogsEnabled,
+          loginHistoryEnabled,
+          autoDeleteEnabled,
+          restrictExport,
+          restrictDownload,
+          restrictExternalSharing,
+          ipAllowlistingEnabled,
+          ipAllowlist,
+          retentionDays,
+          storageRegion,
+        },
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleItems: Array<{ field: string; label: string; desc: string; value: boolean; setter: (v: boolean) => void }> = [
+    { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled },
+    { field: 'loginHistoryEnabled', label: 'Inloggningshistorik', desc: 'Logga alla SSO-inloggningar', value: loginHistoryEnabled, setter: setLoginHistoryEnabled },
+    { field: 'autoDeleteEnabled', label: 'Automatisk radering', desc: 'Radera möten efter retentionstiden', value: autoDeleteEnabled, setter: setAutoDeleteEnabled },
+    { field: 'restrictExport', label: 'Begränsa export', desc: 'Blockera export av protokoll och transkript', value: restrictExport, setter: setRestrictExport },
+    { field: 'restrictDownload', label: 'Begränsa nedladdning', desc: 'Blockera filnedladdningar', value: restrictDownload, setter: setRestrictDownload },
+    { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen', value: restrictExternalSharing, setter: setRestrictExternalSharing },
   ];
 
   return (
@@ -68,15 +115,15 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
           </div>
         </div>
 
-        {toggleItems.map(({ field, label, desc }) => (
+        {toggleItems.map(({ field, label, desc, value, setter }) => (
           <div key={field} className="flex items-center justify-between py-1">
             <div>
               <p className="text-sm">{label}</p>
               <p className="text-xs text-muted-foreground">{desc}</p>
             </div>
             <Switch
-              checked={(settings as any)[field] ?? false}
-              onCheckedChange={v => handleToggle(field, v)}
+              checked={value}
+              onCheckedChange={setter}
               disabled={!canEdit || isLocked(field) || saving}
             />
           </div>
@@ -95,14 +142,10 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
             type="number"
             min={30}
             max={3650}
-            value={settings.retentionDays ?? 365}
-            onChange={async e => {
+            value={retentionDays}
+            onChange={e => {
               const val = parseInt(e.target.value);
-              if (val >= 30 && val <= 3650 && canEdit) {
-                setSaving(true);
-                try { await onUpdate({ securityCompliance: { retentionDays: val } }); }
-                finally { setSaving(false); }
-              }
+              if (!isNaN(val)) setRetentionDays(val);
             }}
             disabled={!canEdit || isLocked('retentionDays') || saving}
             className="h-9 text-sm w-32"
@@ -111,13 +154,8 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Lagringsregion</Label>
           <Select
-            value={settings.storageRegion || 'eu'}
-            onValueChange={async v => {
-              if (!canEdit || isLocked('storageRegion')) return;
-              setSaving(true);
-              try { await onUpdate({ securityCompliance: { storageRegion: v } }); }
-              finally { setSaving(false); }
-            }}
+            value={storageRegion}
+            onValueChange={setStorageRegion}
             disabled={!canEdit || isLocked('storageRegion') || saving}
           >
             <SelectTrigger className="h-9 text-sm w-40"><SelectValue /></SelectTrigger>
@@ -138,13 +176,13 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
             IP-vitlista
           </h4>
           <Switch
-            checked={settings.ipAllowlistingEnabled ?? false}
-            onCheckedChange={v => handleToggle('ipAllowlistingEnabled', v)}
+            checked={ipAllowlistingEnabled}
+            onCheckedChange={setIpAllowlistingEnabled}
             disabled={!canEdit || isLocked('ipAllowlistingEnabled') || saving}
           />
         </div>
 
-        {settings.ipAllowlistingEnabled && (
+        {ipAllowlistingEnabled && (
           <>
             <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
               <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
@@ -153,7 +191,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(settings.ipAllowlist || []).map(ip => (
+              {ipAllowlist.map(ip => (
                 <Badge key={ip} variant="secondary" className="text-xs font-mono gap-1">
                   {ip}
                   {canEdit && !isLocked('ipAllowlist') && (
@@ -171,7 +209,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
                   placeholder="203.0.113.0/24"
                   className="h-8 text-sm flex-1 font-mono"
                 />
-                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addIp} disabled={saving}>
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addIp} disabled={!ipInput.trim()}>
                   Lägg till
                 </Button>
               </div>
@@ -179,6 +217,16 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
           </>
         )}
       </div>
+
+      {/* Save button */}
+      {canEdit && isDirty && (
+        <div className="sticky bottom-4 flex justify-end z-10">
+          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
+            <Save className="w-4 h-4" />
+            {saving ? 'Sparar…' : 'Spara ändringar'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
