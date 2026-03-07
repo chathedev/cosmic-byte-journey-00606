@@ -1,19 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
 import { exchangeSSOSession } from '@/lib/enterpriseDomainApi';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+
+const ERROR_MESSAGES: Record<string, string> = {
+  enterprise_sso_member_not_provisioned: 'Ditt konto har inte provisionerats för den här arbetsytan. Kontakta din organisations ägare eller administratör för att bli inbjuden, eller be dem aktivera Just-in-Time-provisionering.',
+  enterprise_sso_required: 'Din organisation kräver SSO-inloggning.',
+  enterprise_sso_domain_restriction: 'Din e-postdomän är inte godkänd för denna arbetsyta.',
+  enterprise_sso_disabled: 'SSO är inte aktiverat för denna arbetsyta.',
+  enterprise_sso_provider_not_ready: 'SSO-providern är inte korrekt konfigurerad. Kontakta din administratör.',
+  invalid_session: 'SSO-sessionen har gått ut. Försök logga in igen.',
+};
 
 export default function SSOCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const sessionToken = searchParams.get('session_token') || searchParams.get('token');
+    const errorParam = searchParams.get('error');
+
+    // Handle error passed via redirect query param
+    if (errorParam && !sessionToken) {
+      const msg = ERROR_MESSAGES[errorParam] || searchParams.get('error_description') || 'SSO-inloggning misslyckades.';
+      setError(msg);
+      setErrorCode(errorParam);
+      return;
+    }
+
     if (!sessionToken) {
       setError('Ingen SSO-session hittades. Försök logga in igen.');
       return;
@@ -33,7 +53,9 @@ export default function SSOCallback() {
         }
       } catch (err: any) {
         console.error('[SSOCallback] Exchange failed:', err);
-        setError(err.message || 'SSO-inloggning misslyckades. Försök igen.');
+        const code = err.code || '';
+        setErrorCode(code);
+        setError(ERROR_MESSAGES[code] || err.message || 'SSO-inloggning misslyckades. Försök igen.');
       }
     })();
   }, []);
@@ -56,7 +78,11 @@ export default function SSOCallback() {
         {error && (
           <>
             <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-destructive" />
+              {errorCode === 'enterprise_sso_member_not_provisioned' ? (
+                <Shield className="w-6 h-6 text-destructive" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-destructive" />
+              )}
             </div>
             <p className="text-sm text-destructive font-medium">{error}</p>
             <button

@@ -299,10 +299,11 @@ export function testSSO(companyId: string, provider: string): Promise<SSOTestRes
   });
 }
 
-export function connectSSO(companyId: string, provider: string, config?: Record<string, any>): Promise<SSOConnectResult> {
+export function connectSSO(companyId: string, provider: string, config?: Record<string, any>, forcePrompt?: boolean): Promise<SSOConnectResult> {
+  const body = { ...(config || {}), ...(forcePrompt ? { forcePrompt: true } : {}) };
   return apiFetch(`/enterprise/companies/${companyId}/settings/sso/${provider}/connect`, {
     method: 'POST',
-    body: JSON.stringify(config || {}),
+    body: JSON.stringify(body),
   });
 }
 
