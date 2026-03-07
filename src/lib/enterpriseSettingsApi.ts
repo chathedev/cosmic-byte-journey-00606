@@ -306,6 +306,18 @@ export function connectSSO(companyId: string, provider: string, config?: Record<
   });
 }
 
+export function disableSSOProvider(companyId: string, provider: string): Promise<any> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/sso/${provider}/disable`, { method: 'POST' });
+}
+
+export function removeSSOProvider(companyId: string, provider: string): Promise<any> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/sso/${provider}`, { method: 'DELETE' });
+}
+
+export function resetSSOProvider(companyId: string, provider: string): Promise<any> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/sso/${provider}/reset`, { method: 'POST' });
+}
+
 // === SSO Login Flow ===
 
 export function startSSOLogin(companyId: string, provider: string, redirect: string): Promise<{ authorizationUrl: string }> {
