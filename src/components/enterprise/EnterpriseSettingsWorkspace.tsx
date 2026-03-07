@@ -81,38 +81,35 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      await onUpdate({
-        adminWorkspace: {
-          branding: {
-            workspaceDisplayName: workspaceName || null,
-            legalEntityName: legalName || null,
-            logoUrl: logoUrl || null,
-            wordmarkUrl: wordmarkUrl || null,
-            faviconUrl: faviconUrl || null,
-            loginTitle: loginTitle || null,
-            loginSubtitle: loginSubtitle || null,
-            supportEmail: supportEmail || null,
-            supportUrl: supportUrl || null,
-            privacyUrl: privacyUrl || null,
-            termsUrl: termsUrl || null,
-            emailBrandingEnabled,
-          },
-          invitePolicy: {
-            domainRestrictedInvites,
-            allowExternalGuests,
-          },
-          teamManagementEnabled,
+    await onUpdate({
+      adminWorkspace: {
+        branding: {
+          workspaceDisplayName: workspaceName || null,
+          legalEntityName: legalName || null,
+          logoUrl: logoUrl || null,
+          wordmarkUrl: wordmarkUrl || null,
+          faviconUrl: faviconUrl || null,
+          loginTitle: loginTitle || null,
+          loginSubtitle: loginSubtitle || null,
+          supportEmail: supportEmail || null,
+          supportUrl: supportUrl || null,
+          privacyUrl: privacyUrl || null,
+          termsUrl: termsUrl || null,
+          emailBrandingEnabled,
         },
-      });
-      await refreshBranding();
-    } finally {
-      setSaving(false);
-    }
-  };
+        invitePolicy: {
+          domainRestrictedInvites,
+          allowExternalGuests,
+        },
+        teamManagementEnabled,
+      },
+    });
+    await refreshBranding();
+  }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave, debounceMs: 1200 });
 
   const fieldRow = (label: string, value: string, setter: (v: string) => void, path: string, placeholder: string) => (
     <div className="space-y-1.5">
