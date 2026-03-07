@@ -47,7 +47,7 @@ export function EnterpriseSettingsAudit({ companyId, isAdmin }: Props) {
           {audit.length === 0 ? (
             <div className="p-6 text-center text-xs text-muted-foreground">Inga ändringar registrerade</div>
           ) : (
-            <ScrollArea className="max-h-[400px]">
+            <ScrollArea className="h-[520px]">
               <div className="divide-y divide-border">
                 {audit.map(entry => (
                   <div key={entry.id} className="px-4 py-3 text-xs space-y-1">
