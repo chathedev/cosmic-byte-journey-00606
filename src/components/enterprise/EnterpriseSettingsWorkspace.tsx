@@ -15,6 +15,7 @@ interface Props {
 
 export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate }: Props) {
   const [saving, setSaving] = useState(false);
+  const { refreshBranding } = useEnterpriseBranding();
   const branding = settings.branding || {};
   const invitePolicy = settings.invitePolicy || {};
 
