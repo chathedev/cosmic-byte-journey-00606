@@ -483,16 +483,17 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
                     const IconMap: Record<string, any> = { fileText: FileText, checkCircle: CheckCircle2, arrowRight: ArrowRight, messageSquare: MessageSquare };
                     const Icon = IconMap[icon];
                     return (
-                    <Button 
-                      key={text} 
-                      variant="outline" 
-                      onClick={() => setInput(text)}
-                      className="h-auto py-3 px-4 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all group"
-                    >
-                      <Icon className="w-4 h-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
-                      {text}
-                    </Button>
-                  ))}
+                      <Button 
+                        key={text} 
+                        variant="outline" 
+                        onClick={() => setInput(text)}
+                        className="h-auto py-3 px-4 text-sm justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all group"
+                      >
+                        <Icon className="w-4 h-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+                        {text}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
