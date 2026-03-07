@@ -553,7 +553,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
       <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 overflow-hidden flex items-center justify-center">
-            <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-3" />
+            <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-3" />
           </div>
           <div className="flex items-center justify-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
