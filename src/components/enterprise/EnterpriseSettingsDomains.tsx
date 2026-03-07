@@ -44,8 +44,9 @@ export interface DomainEntry {
   verifiedAt?: string | null;
   lastCheckedAt?: string | null;
   lastError?: string | null;
+  lastErrorMessage?: string | null;
   dnsRecords?: Array<{ type: string; name: string; value: string; reason?: string }>;
-  dnsProvider?: string | null;
+  dnsProvider?: string | { key?: string; label?: string; dashboardUrl?: string } | null;
   nameservers?: string[];
   vercel?: any;
 }
@@ -275,9 +276,13 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
 
   const getDnsProvider = (domain: DomainEntry): { name: string | null; dashboardUrl: string | null } => {
     const resp = addResponse[domain.hostname];
+    const dp = domain.dnsProvider;
+    // dnsProvider can be a string or an object {key, label, dashboardUrl}
+    const providerName = typeof dp === 'object' && dp ? (dp.label || dp.key || null) : (dp || null);
+    const providerDashboard = typeof dp === 'object' && dp ? (dp.dashboardUrl || null) : null;
     return {
-      name: domain.dnsProvider || resp?.instructions?.provider?.name || null,
-      dashboardUrl: resp?.instructions?.provider?.dashboardUrl || null,
+      name: providerName || resp?.instructions?.provider?.name || null,
+      dashboardUrl: providerDashboard || resp?.instructions?.provider?.dashboardUrl || null,
     };
   };
 
@@ -430,11 +435,11 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                 )}
 
                 {/* Error message */}
-                {domain.lastError && (
+                {(domain.lastError || domain.lastErrorMessage) && (
                   <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
                     <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
                     <div className="text-[11px] text-destructive space-y-1">
-                      <p>{domain.lastError}</p>
+                      <p>{typeof domain.lastError === 'string' ? domain.lastError : domain.lastErrorMessage || 'Verifiering misslyckades'}</p>
                       {isFailed && domain.kind === 'bring_your_own' && (
                         <p className="text-muted-foreground">Kontrollera att DNS-posterna nedan är korrekt konfigurerade hos din domänleverantör.</p>
                       )}
