@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw, Ban, Trash2, RotateCcw } from 'lucide-react';
-import { EnterpriseSaveBar } from './EnterpriseSaveBar';
+import { CardSaveFooter } from './CardSaveFooter';
+import { useManualSave } from '@/hooks/useManualSave';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
