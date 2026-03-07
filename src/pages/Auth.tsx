@@ -353,6 +353,15 @@ export default function Auth() {
     );
   }
 
+  // Show loading while bootstrapping workspace on custom domains
+  if (isCustomDomain && workspaceLoading) {
+    return (
+      <div className="min-h-[100svh] bg-background flex items-center justify-center">
+        <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-[100svh] md:min-h-[100dvh] bg-background overflow-x-hidden flex flex-col">
       {/* Main area — NO fixed height, allows natural scroll on mobile */}
