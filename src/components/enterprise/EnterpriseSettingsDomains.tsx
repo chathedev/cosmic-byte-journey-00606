@@ -420,7 +420,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
             const old = oldDomains.find(od => od.hostname === d.hostname);
             if (d.status === 'verified' && old && old.status !== 'verified') {
               toast({ title: 'Domän verifierad!', description: `${d.hostname} är nu klar att använda.` });
-              onDomainsChanged?.();
             }
           }
         }
@@ -477,7 +476,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       const d = res.domain;
       if (d?.status === 'verified') {
         toast({ title: 'Domän verifierad!', description: `${hostname} är nu klar.` });
-        onDomainsChanged?.();
       } else if (d?.status === 'pending') {
         toast({ title: 'Inte klar ännu', description: getErrorText(d) || 'DNS har inte propagerats ännu. Tivly kontrollerar automatiskt.' });
       } else if (d?.status === 'failed') {
@@ -497,7 +495,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       setAddResponse(prev => { const next = { ...prev }; delete next[hostname]; return next; });
       if (expandedDomain === hostname) setExpandedDomain(null);
       await refreshDomains();
-      onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setDeletingHost(null); }
@@ -511,7 +508,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       });
       toast({ title: 'Primär inloggningsvärd uppdaterad' });
       await refreshDomains();
-      onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setSaving(false); }
