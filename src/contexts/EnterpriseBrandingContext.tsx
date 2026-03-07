@@ -146,6 +146,12 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
 
   const fetchBranding = useCallback(async () => {
     if (!companyId || !isEnterprise) {
+      // On custom enterprise hosts, keep public/bootstrap branding for unauthenticated users
+      if (isCustomHost) {
+        setBrandingReady(true);
+        return;
+      }
+
       setLogoUrl(tivlyLogo);
       setWordmarkUrl(null);
       setFaviconUrl(null);
