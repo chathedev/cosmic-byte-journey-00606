@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useSubscription } from './SubscriptionContext';
 import { getEnterpriseSettings } from '@/lib/enterpriseSettingsApi';
+import { getPublicWorkspace, isEnterpriseCustomDomain } from '@/lib/enterpriseDomainApi';
 import tivlyLogo from '@/assets/tivly-logo.png';
 
 interface EnterpriseBranding {
