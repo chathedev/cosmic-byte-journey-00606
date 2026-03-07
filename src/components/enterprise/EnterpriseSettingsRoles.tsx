@@ -172,7 +172,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
       setRoles(prev => prev.filter(r => r.id !== roleId));
       toast({ title: 'Roll borttagen' });
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     }
   };
 
