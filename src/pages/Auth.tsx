@@ -396,7 +396,9 @@ export default function Auth() {
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
               {workspace?.branding?.logoUrl ? (
-                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-8 w-auto" />
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-8 w-auto" onError={(e) => { (e.target as HTMLImageElement).src = tivlyLogo; }} />
+              ) : workspace?.branding?.workspaceDisplayName ? (
+                <span className="text-lg font-bold text-foreground">{workspace.branding.workspaceDisplayName}</span>
               ) : (
                 <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
               )}
