@@ -476,7 +476,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       const d = res.domain;
       if (d?.status === 'verified') {
         toast({ title: 'Domän verifierad!', description: `${hostname} är nu klar.` });
-        onDomainsChanged?.();
       } else if (d?.status === 'pending') {
         toast({ title: 'Inte klar ännu', description: getErrorText(d) || 'DNS har inte propagerats ännu. Tivly kontrollerar automatiskt.' });
       } else if (d?.status === 'failed') {
