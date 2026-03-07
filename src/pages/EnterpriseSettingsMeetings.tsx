@@ -11,8 +11,8 @@ export default function EnterpriseSettingsMeetingsPage() {
     >
       {(ctx) => (
         <EnterpriseSettingsMeeting
-          settings={ctx.data!.settings.meetingContentControls}
-          locks={ctx.data!.locks}
+          settings={ctx.data?.settings?.meetingContentControls ?? {}}
+          locks={ctx.data?.locks ?? {}}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
           customizationBoundaries={ctx.customizationBoundaries}

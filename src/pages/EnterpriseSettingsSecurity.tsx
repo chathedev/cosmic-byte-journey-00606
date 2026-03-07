@@ -11,8 +11,8 @@ export default function EnterpriseSettingsSecurityPage() {
     >
       {(ctx) => (
         <SecurityContent
-          settings={ctx.data!.settings.securityCompliance}
-          locks={ctx.data!.locks}
+          settings={ctx.data?.settings?.securityCompliance ?? {}}
+          locks={ctx.data?.locks ?? {}}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
           customizationBoundaries={ctx.customizationBoundaries}
