@@ -21,7 +21,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users, FileText } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users, FileText, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
