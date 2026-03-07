@@ -15,9 +15,7 @@ import type { IdentityAccessSettings, EnterpriseProvider, SettingsLock, Provider
 const PROVIDERS = [
   { key: 'microsoft', label: 'Microsoft Entra ID', shortLabel: 'Microsoft', description: 'Azure AD / Microsoft 365' },
   { key: 'google', label: 'Google Workspace', shortLabel: 'Google', description: 'Google Workspace SSO' },
-  { key: 'okta', label: 'Okta', shortLabel: 'Okta', description: 'Okta Identity' },
-  { key: 'oidc', label: 'OpenID Connect', shortLabel: 'OIDC', description: 'Anpassad OIDC-provider' },
-  { key: 'saml', label: 'SAML 2.0', shortLabel: 'SAML', description: 'SAML-baserad federation' },
+  { key: 'oidc', label: 'Custom OpenID Connect', shortLabel: 'OIDC', description: 'Anpassad OIDC-provider (Okta, Auth0, Keycloak m.fl.)' },
 ];
 
 const FALLBACK_POLICIES = [
