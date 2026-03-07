@@ -167,7 +167,6 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
 
   const { status: autoSaveStatus } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
-  };
 
   const addDomain = () => {
     const d = domainInput.trim().toLowerCase();
