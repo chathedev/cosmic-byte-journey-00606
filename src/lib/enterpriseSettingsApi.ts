@@ -2,7 +2,7 @@
  * Enterprise Settings API client methods
  * Covers: Settings CRUD, SSO, Custom Roles, Audit, Admin Locks
  */
-
+import { translateError } from '@/lib/errorTranslation';
 const API_BASE_URL = 'https://api.tivly.se';
 
 // ==================== TYPES ====================
