@@ -14,7 +14,7 @@ export default function EnterpriseSettingsRolesPage() {
         <RolesContent
           companyId={ctx.companyId ?? ''}
           canEdit={ctx.canEdit}
-          initialRoles={ctx.data?.roles ?? ctx.data?.settings?.customRoles ?? []}
+          initialRoles={ctx.data?.roles ?? []}
         />
       )}
     </EnterpriseSettingsLayout>

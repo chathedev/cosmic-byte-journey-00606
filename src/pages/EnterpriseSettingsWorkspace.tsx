@@ -23,7 +23,9 @@ export default function EnterpriseSettingsWorkspacePage() {
       sectionSlug="branding"
     >
       {(ctx) => {
-        const settings = ctx.data?.settings ?? ctx.data ?? {};
+        // Backend: response.data = { workspaceDisplayName, logoUrl, ... }
+        const settings = ctx.sectionData;
+        const summary = ctx.settingsSummary ?? {};
 
         return (
           <div className="space-y-6">
@@ -61,7 +63,7 @@ export default function EnterpriseSettingsWorkspacePage() {
             {activeTab === 'domains' && ctx.companyId && (
               <EnterpriseSettingsDomains
                 companyId={ctx.companyId}
-                customDomains={settings?.customDomains ?? ctx.data?.customDomains}
+                customDomains={summary?.customDomains ? { domains: summary.customDomains, defaultLoginHostname: summary.defaultLoginHostname } : undefined}
                 canEdit={ctx.canEdit}
               />
             )}
