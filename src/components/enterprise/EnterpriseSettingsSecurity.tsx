@@ -73,28 +73,25 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
     setIpAllowlist(ipAllowlist.filter(i => i !== ip));
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      await onUpdate({
-        securityCompliance: {
-          auditLogsEnabled,
-          loginHistoryEnabled,
-          autoDeleteEnabled,
-          restrictExport,
-          restrictDownload,
-          restrictExternalSharing,
-          ipAllowlistingEnabled,
-          ipAllowlist,
-          retentionDays,
-          storageRegion,
-        },
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+    await onUpdate({
+      securityCompliance: {
+        auditLogsEnabled,
+        loginHistoryEnabled,
+        autoDeleteEnabled,
+        restrictExport,
+        restrictDownload,
+        restrictExternalSharing,
+        ipAllowlistingEnabled,
+        ipAllowlist,
+        retentionDays,
+        storageRegion,
+      },
+    });
+  }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, onUpdate]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   const toggleItems: Array<{ field: string; label: string; desc: string; value: boolean; setter: (v: boolean) => void }> = [
     { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled },
