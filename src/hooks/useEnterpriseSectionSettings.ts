@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,12 +12,17 @@ import {
  * Hook for section-specific enterprise settings.
  * Calls GET /enterprise/companies/:companyId/settings/<sectionSlug>
  * and PATCH to the same section endpoint.
+ *
+ * Backend response shape for standard sections:
+ *   { company, section, data: {...}, locks, settingsSummary, setupChecklist, viewer, timestamp }
+ *
+ * The actual settings live in response.data — exposed here as `sectionData`.
  */
 export function useEnterpriseSectionSettings(sectionSlug: string) {
   const navigate = useNavigate();
   const { enterpriseMembership } = useSubscription();
   const { toast } = useToast();
-  const [data, setData] = useState<any>(null);
+  const [response, setResponse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const companyId = enterpriseMembership?.company?.id;
@@ -29,7 +34,7 @@ export function useEnterpriseSectionSettings(sectionSlug: string) {
     setLoading(true);
     try {
       const res = await getEnterpriseSectionSettings(companyId, sectionSlug);
-      setData(res);
+      setResponse(res);
     } catch (err: any) {
       if (err.code === 'enterprise_only_feature') {
         toast({ title: 'Ej tillgängligt', description: 'Enterprise-inställningar är bara tillgängliga för Enterprise-planen.', variant: 'destructive' });
@@ -42,31 +47,33 @@ export function useEnterpriseSectionSettings(sectionSlug: string) {
 
   useEffect(() => { loadSettings(); }, [loadSettings]);
 
-  // Viewer / locks from section response
-  const viewer = data?.viewer;
-  const canEdit = viewer?.canManageEnterpriseSettings ?? false;
-  const locks = data?.locks ?? {};
+  // Derived data from the response
+  const viewer = response?.viewer;
+  const canEdit = viewer?.canManageEnterpriseSettings ?? viewer?.canManageRoles ?? false;
+  const locks = response?.locks ?? {};
   const hasLocks = Object.keys(locks).length > 0;
-  const customizationBoundaries: CustomizationBoundaries | undefined = data?.customizationBoundaries ?? data?.settings?.customizationBoundaries;
+  const customizationBoundaries: CustomizationBoundaries | undefined = response?.customizationBoundaries;
+  const settingsSummary = response?.settingsSummary;
+
+  // The actual section settings — lives in response.data for standard sections
+  const sectionData = useMemo(() => response?.data ?? {}, [response]);
 
   const handleUpdate = async (patch: Record<string, any>) => {
     if (!companyId) return;
-    const previousData = data;
-    // Optimistic update
-    if (data) {
-      setData({
-        ...data,
-        settings: typeof data.settings === 'object' && data.settings
-          ? { ...data.settings, ...patch }
-          : patch,
+    const previousResponse = response;
+    // Optimistic update — patch response.data
+    if (response) {
+      setResponse({
+        ...response,
+        data: { ...response.data, ...patch },
       });
     }
     try {
       const res = await updateEnterpriseSectionSettings(companyId, sectionSlug, patch);
-      setData(res);
+      setResponse(res);
       toast({ title: 'Inställningar sparade' });
     } catch (err: any) {
-      setData(previousData);
+      setResponse(previousResponse);
       if (err.status === 423) {
         toast({ title: 'Låst inställning', description: 'Denna inställning är låst av en administratör.', variant: 'destructive' });
       } else {
@@ -130,7 +137,10 @@ export function useEnterpriseSectionSettings(sectionSlug: string) {
   };
 
   return {
-    data,
+    /** Full API response — use for accessing viewer, settingsSummary, setupChecklist, etc. */
+    data: response,
+    /** The actual section settings (response.data) — use for rendering settings UI */
+    sectionData,
     loading,
     companyId,
     isEnterprise,
@@ -138,6 +148,7 @@ export function useEnterpriseSectionSettings(sectionSlug: string) {
     hasLocks,
     locks,
     customizationBoundaries,
+    settingsSummary,
     handleUpdate,
     handleTestSSO,
     handleConnectSSO,
