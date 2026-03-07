@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Shield, Database, Globe, AlertTriangle } from 'lucide-react';
+import { Shield, Database, Globe, AlertTriangle, Lock } from 'lucide-react';
 import { CardSaveFooter } from './CardSaveFooter';
 import { useManualSave } from '@/hooks/useManualSave';
 import { Switch } from '@/components/ui/switch';
@@ -8,17 +8,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { SecurityComplianceSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
+import type { SecurityComplianceSettings, SettingsLock, CustomizationBoundaries } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
   settings: Partial<SecurityComplianceSettings>;
   locks: Record<string, SettingsLock>;
   canEdit: boolean;
   onUpdate: (patch: Record<string, any>) => Promise<void>;
+  customizationBoundaries?: CustomizationBoundaries;
+}
+
+function isLockedOn(field: string, boundaries?: CustomizationBoundaries): boolean {
+  return boundaries?.lockedOn?.includes(`securityCompliance.${field}`) ?? false;
 }
 
 // ─── Security Toggles Card ───
-function SecurityTogglesCard({ settings, locks, canEdit, onUpdate }: Props) {
+function SecurityTogglesCard({ settings, locks, canEdit, onUpdate, customizationBoundaries }: Props) {
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
   const [auditLogsEnabled, setAuditLogsEnabled] = useState(settings.auditLogsEnabled ?? false);
@@ -61,12 +66,12 @@ function SecurityTogglesCard({ settings, locks, canEdit, onUpdate }: Props) {
   const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: sync });
 
   const toggleItems = [
-    { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled },
-    { field: 'loginHistoryEnabled', label: 'Inloggningshistorik', desc: 'Logga alla SSO-inloggningar', value: loginHistoryEnabled, setter: setLoginHistoryEnabled },
-    { field: 'autoDeleteEnabled', label: 'Automatisk radering', desc: 'Radera möten efter retentionstiden', value: autoDeleteEnabled, setter: setAutoDeleteEnabled },
-    { field: 'restrictExport', label: 'Begränsa export', desc: 'Blockera export av protokoll och transkript', value: restrictExport, setter: setRestrictExport },
-    { field: 'restrictDownload', label: 'Begränsa nedladdning', desc: 'Blockera filnedladdningar', value: restrictDownload, setter: setRestrictDownload },
-    { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen', value: restrictExternalSharing, setter: setRestrictExternalSharing },
+    { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled, lockedOn: isLockedOn('auditLogsEnabled', customizationBoundaries) },
+    { field: 'loginHistoryEnabled', label: 'Inloggningshistorik', desc: 'Logga alla SSO-inloggningar', value: loginHistoryEnabled, setter: setLoginHistoryEnabled, lockedOn: isLockedOn('loginHistoryEnabled', customizationBoundaries) },
+    { field: 'autoDeleteEnabled', label: 'Automatisk radering', desc: 'Radera möten efter retentionstiden', value: autoDeleteEnabled, setter: setAutoDeleteEnabled, lockedOn: false },
+    { field: 'restrictExport', label: 'Begränsa export', desc: 'Blockera export av protokoll och transkript', value: restrictExport, setter: setRestrictExport, lockedOn: false },
+    { field: 'restrictDownload', label: 'Begränsa nedladdning', desc: 'Blockera filnedladdningar', value: restrictDownload, setter: setRestrictDownload, lockedOn: false },
+    { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen', value: restrictExternalSharing, setter: setRestrictExternalSharing, lockedOn: false },
   ];
 
   return (
@@ -78,10 +83,20 @@ function SecurityTogglesCard({ settings, locks, canEdit, onUpdate }: Props) {
           <p className="text-xs text-muted-foreground mt-0.5">Kontrollera datalagring, export och tillgång</p>
         </div>
       </div>
-      {toggleItems.map(({ field, label, desc, value, setter }) => (
+      {toggleItems.map(({ field, label, desc, value, setter, lockedOn: fieldLockedOn }) => (
         <div key={field} className="flex items-center justify-between py-1">
-          <div><p className="text-sm">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
-          <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isLocked(field) || isSaving} />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm">{label}</p>
+              {fieldLockedOn && (
+                <Badge variant="outline" className="text-[9px] gap-0.5 border-primary/30 text-primary px-1 py-0 h-4">
+                  <Lock className="w-2 h-2" />Kärnfunktion
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{desc}</p>
+          </div>
+          <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isLocked(field) || isSaving || fieldLockedOn} />
         </div>
       ))}
       <CardSaveFooter status={status} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />
@@ -203,10 +218,10 @@ function IpAllowlistCard({ settings, locks, canEdit, onUpdate }: Props) {
   );
 }
 
-export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate }: Props) {
+export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate, customizationBoundaries }: Props) {
   return (
     <div className="space-y-6">
-      <SecurityTogglesCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} />
+      <SecurityTogglesCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} customizationBoundaries={customizationBoundaries} />
       <DataStorageCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} />
       <IpAllowlistCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} />
     </div>
