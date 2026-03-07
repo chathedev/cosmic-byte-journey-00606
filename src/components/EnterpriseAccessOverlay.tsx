@@ -384,6 +384,7 @@ function InlinePaymentForm({
 
 export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAccessOverlayProps) => {
   const companyId = membership.company?.id;
+  const { logoUrl: brandingLogoUrl } = useEnterpriseBranding();
   const [liveBilling, setLiveBilling] = useState<LiveBillingStatusResponse | null>(null);
   const [isCheckingBilling, setIsCheckingBilling] = useState(false);
   const [billingCheckError, setBillingCheckError] = useState<string | null>(null);
