@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Globe, Plus, CheckCircle2, XCircle, Loader2, Trash2, ExternalLink, Shield, AlertTriangle, Copy } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Globe, Plus, CheckCircle2, XCircle, Loader2, Trash2, ExternalLink, Shield, AlertTriangle, Copy, RefreshCw, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 
 const API_BASE_URL = 'https://api.tivly.se';
@@ -29,6 +27,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const body = await res.json().catch(() => ({}));
     const err: any = new Error(body.message || body.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.code = body.code;
     throw err;
   }
   return res.json();
@@ -66,12 +65,24 @@ interface Props {
   onDomainsChanged?: () => void;
 }
 
-const STATUS_MAP: Record<string, { label: string; color: string; icon: typeof CheckCircle2 }> = {
-  verified: { label: 'Verifierad', color: 'border-green-300 text-green-700 dark:border-green-800 dark:text-green-400', icon: CheckCircle2 },
-  pending: { label: 'Väntar', color: 'border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400', icon: Loader2 },
-  failed: { label: 'Misslyckad', color: 'border-destructive/50 text-destructive', icon: XCircle },
-  removing: { label: 'Tas bort', color: 'border-muted-foreground text-muted-foreground', icon: Loader2 },
-};
+function formatTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('sv-SE') + ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+  } catch { return null; }
+}
+
+function VercelStatusBadge({ vercel }: { vercel?: any }) {
+  if (!vercel) return null;
+  const verified = vercel.verified === true || vercel.verification?.length === 0;
+  return (
+    <Badge variant="outline" className={`text-[10px] gap-0.5 ${verified ? 'border-green-300 text-green-700 dark:border-green-800 dark:text-green-400' : 'border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400'}`}>
+      {verified ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Clock className="w-2.5 h-2.5" />}
+      {verified ? 'DNS OK' : 'DNS väntar'}
+    </Badge>
+  );
+}
 
 export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, onDomainsChanged }: Props) {
   const { toast } = useToast();
@@ -83,12 +94,17 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
   const [saving, setSaving] = useState(false);
   const [verifyingHost, setVerifyingHost] = useState<string | null>(null);
   const [deletingHost, setDeletingHost] = useState<string | null>(null);
-  const [dnsInstructions, setDnsInstructions] = useState<Record<string, any>>({});
+  const [addResponse, setAddResponse] = useState<Record<string, any>>({});
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setDomains(customDomains?.domains || []);
     setDefaultLogin(customDomains?.defaultLoginHostname || null);
   }, [customDomains]);
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   const hasVerifiedDomain = domains.some(d => d.status === 'verified');
 
@@ -98,7 +114,10 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       if (res.domains) setDomains(res.domains);
       if (res.defaultLoginHostname !== undefined) setDefaultLogin(res.defaultLoginHostname);
       onDomainsChanged?.();
-    } catch {}
+      return res.domains as DomainEntry[];
+    } catch {
+      return null;
+    }
   };
 
   const handleAddDomain = async () => {
@@ -114,18 +133,48 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         body: JSON.stringify({ hostname }),
       });
       toast({ title: 'Domän tillagd', description: `${hostname} har lagts till.` });
-      if (res.domain?.dnsRecords) {
-        setDnsInstructions(prev => ({ ...prev, [hostname]: res }));
+
+      // Store add response for DNS instructions
+      if (res.instructions || res.domain?.dnsRecords) {
+        setAddResponse(prev => ({ ...prev, [hostname]: res }));
       }
+
       setHostnameInput('');
       setAddMode(null);
       setAdding(false);
       await loadDomains();
+
+      // For Tivly subdomains, auto-verify after a short delay
+      if (addMode === 'tivly') {
+        startVerificationPoll(hostname);
+      }
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
+  };
+
+  const startVerificationPoll = (hostname: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      if (attempts > 12) { // Stop after ~1 minute
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        return;
+      }
+      const updated = await loadDomains();
+      if (updated) {
+        const d = updated.find((dom: DomainEntry) => dom.hostname === hostname);
+        if (d?.status === 'verified') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          toast({ title: 'Domän verifierad!', description: `${hostname} är nu verifierad.` });
+        }
+      }
+    }, 5000);
   };
 
   const handleVerify = async (hostname: string) => {
@@ -134,11 +183,26 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(hostname)}/verify`, {
         method: 'POST',
       });
-      if (res.domain?.status === 'verified') {
+
+      const domain = res.domain;
+      if (domain?.status === 'verified') {
         toast({ title: 'Domän verifierad!', description: `${hostname} är nu verifierad och redo att användas.` });
-      } else {
-        toast({ title: 'Verifiering pågår', description: res.domain?.lastError || 'DNS har inte propagerats ännu. Försök igen om en stund.' });
+      } else if (domain?.status === 'pending') {
+        const hint = domain.lastError || 'DNS har inte propagerats ännu.';
+        toast({
+          title: 'Verifiering ej klar',
+          description: `${hint} DNS-propagering kan ta upp till 72 timmar. Försök igen om en stund.`,
+        });
+        // Start polling for this domain
+        startVerificationPoll(hostname);
+      } else if (domain?.status === 'failed') {
+        toast({
+          title: 'Verifiering misslyckades',
+          description: domain.lastError || 'Kontrollera att DNS-posterna är korrekt konfigurerade.',
+          variant: 'destructive',
+        });
       }
+
       await loadDomains();
     } catch (err: any) {
       toast({ title: 'Verifiering misslyckades', description: err.message, variant: 'destructive' });
@@ -154,6 +218,11 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         method: 'DELETE',
       });
       toast({ title: 'Domän borttagen' });
+      setAddResponse(prev => {
+        const next = { ...prev };
+        delete next[hostname];
+        return next;
+      });
       await loadDomains();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
@@ -169,7 +238,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         method: 'PATCH',
         body: JSON.stringify({ primary: true, loginEnabled: true }),
       });
-      toast({ title: 'Primär inloggningsvärd uppdaterad' });
+      toast({ title: 'Primär inloggningsvärd uppdaterad', description: `${hostname} är nu den primära inloggningsadressen.` });
       await loadDomains();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
@@ -180,8 +249,36 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      toast({ title: 'Kopierad!' });
+      toast({ title: 'Kopierad till urklipp' });
     });
+  };
+
+  // Merge DNS records from domain object and add-response instructions
+  const getDnsRecords = (domain: DomainEntry): Array<{ type: string; name: string; value: string; reason?: string }> => {
+    // Prefer domain.dnsRecords from backend
+    if (domain.dnsRecords && domain.dnsRecords.length > 0) return domain.dnsRecords;
+    // Fall back to add-response instructions
+    const resp = addResponse[domain.hostname];
+    if (resp?.instructions?.records) return resp.instructions.records;
+    if (resp?.domain?.dnsRecords) return resp.domain.dnsRecords;
+    // Check Vercel verification records
+    if (domain.vercel?.verification?.length > 0) {
+      return domain.vercel.verification.map((v: any) => ({
+        type: v.type || 'TXT',
+        name: v.domain || domain.hostname,
+        value: v.value || '',
+        reason: v.reason || 'Vercel-verifiering',
+      }));
+    }
+    return [];
+  };
+
+  const getDnsProvider = (domain: DomainEntry): { name: string | null; dashboardUrl: string | null } => {
+    const resp = addResponse[domain.hostname];
+    return {
+      name: domain.dnsProvider || resp?.instructions?.provider?.name || null,
+      dashboardUrl: resp?.instructions?.provider?.dashboardUrl || null,
+    };
   };
 
   return (
@@ -196,6 +293,11 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
             </p>
           </div>
         </div>
+        {domains.length > 0 && canEdit && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={loadDomains}>
+            <RefreshCw className="w-3 h-3" />
+          </Button>
+        )}
       </div>
 
       {/* Info banner */}
@@ -214,7 +316,10 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         <div className="flex items-center gap-2 text-xs p-2.5 rounded-lg bg-primary/5 border border-primary/10">
           <Shield className="w-3.5 h-3.5 text-primary shrink-0" />
           <span className="text-muted-foreground">Primär inloggningsvärd:</span>
-          <span className="font-medium text-foreground">{defaultLogin}</span>
+          <a href={`https://${defaultLogin}`} target="_blank" rel="noopener noreferrer" className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1">
+            {defaultLogin}
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       )}
 
@@ -222,38 +327,71 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       {domains.length > 0 && (
         <div className="space-y-3">
           {domains.map(domain => {
-            const status = STATUS_MAP[domain.status] || STATUS_MAP.pending;
-            const StatusIcon = status.icon;
             const isVerified = domain.status === 'verified';
+            const isPending = domain.status === 'pending';
+            const isFailed = domain.status === 'failed';
             const isPrimary = domain.primary || defaultLogin === domain.hostname;
-            const instructions = dnsInstructions[domain.hostname];
+            const dnsRecords = getDnsRecords(domain);
+            const provider = getDnsProvider(domain);
+            const lastChecked = formatTime(domain.lastCheckedAt);
+            const verifiedAt = formatTime(domain.verifiedAt);
+            const isPolling = verifyingHost === domain.hostname;
 
             return (
-              <div key={domain.hostname} className={`rounded-lg border p-3 space-y-2 ${isVerified ? 'border-green-200 dark:border-green-900/50' : 'border-border'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{domain.hostname}</span>
-                    <Badge variant="outline" className={`text-[10px] gap-0.5 ${status.color}`}>
-                      <StatusIcon className={`w-2.5 h-2.5 ${domain.status === 'pending' ? 'animate-spin' : ''}`} />
-                      {status.label}
-                    </Badge>
-                    {isPrimary && (
+              <div key={domain.hostname} className={`rounded-xl border p-4 space-y-3 transition-colors ${
+                isVerified ? 'border-green-200 bg-green-50/30 dark:border-green-900/50 dark:bg-green-950/10' :
+                isFailed ? 'border-destructive/30 bg-destructive/5' :
+                'border-border'
+              }`}>
+                {/* Header row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-sm font-medium truncate">{domain.hostname}</span>
+
+                    {/* Status badge */}
+                    {isVerified && (
+                      <Badge variant="outline" className="text-[10px] gap-0.5 border-green-300 text-green-700 dark:border-green-800 dark:text-green-400">
+                        <CheckCircle2 className="w-2.5 h-2.5" />Verifierad
+                      </Badge>
+                    )}
+                    {isPending && (
+                      <Badge variant="outline" className="text-[10px] gap-0.5 border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400">
+                        <Clock className="w-2.5 h-2.5" />Väntar på verifiering
+                      </Badge>
+                    )}
+                    {isFailed && (
+                      <Badge variant="outline" className="text-[10px] gap-0.5 border-destructive/50 text-destructive">
+                        <XCircle className="w-2.5 h-2.5" />Misslyckad
+                      </Badge>
+                    )}
+                    {domain.status === 'removing' && (
+                      <Badge variant="outline" className="text-[10px] gap-0.5 text-muted-foreground">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />Tas bort
+                      </Badge>
+                    )}
+
+                    {isPrimary && isVerified && (
                       <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0">Primär</Badge>
                     )}
+
                     <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
                       {domain.kind === 'tivly_subdomain' ? 'Tivly-subdomän' : 'Egen domän'}
                     </Badge>
+
+                    <VercelStatusBadge vercel={domain.vercel} />
                   </div>
-                  <div className="flex items-center gap-1">
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
                     {!isVerified && canEdit && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs gap-1"
                         onClick={() => handleVerify(domain.hostname)}
-                        disabled={verifyingHost === domain.hostname}
+                        disabled={isPolling}
                       >
-                        {verifyingHost === domain.hostname ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                        {isPolling ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                         Verifiera
                       </Button>
                     )}
@@ -283,28 +421,57 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                   </div>
                 </div>
 
-                {/* DNS records for bring-your-own */}
-                {domain.kind === 'bring_your_own' && !isVerified && domain.dnsRecords && domain.dnsRecords.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-[11px] font-medium text-muted-foreground">DNS-poster att lägga till:</p>
+                {/* Verification metadata */}
+                {(verifiedAt || lastChecked) && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                    {verifiedAt && <span>Verifierad: {verifiedAt}</span>}
+                    {lastChecked && <span>Senast kontrollerad: {lastChecked}</span>}
+                  </div>
+                )}
+
+                {/* Error message */}
+                {domain.lastError && (
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
+                    <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+                    <div className="text-[11px] text-destructive space-y-1">
+                      <p>{domain.lastError}</p>
+                      {isFailed && domain.kind === 'bring_your_own' && (
+                        <p className="text-muted-foreground">Kontrollera att DNS-posterna nedan är korrekt konfigurerade hos din domänleverantör.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* DNS Records — show for all non-verified domains that have records */}
+                {!isVerified && dnsRecords.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                      {domain.kind === 'tivly_subdomain' ? 'Verifieringsposter:' : 'DNS-poster att konfigurera:'}
+                    </p>
                     <div className="rounded-lg border border-border overflow-hidden">
                       <table className="w-full text-[11px]">
                         <thead className="bg-muted/50">
                           <tr>
-                            <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Typ</th>
-                            <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Namn</th>
-                            <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Värde</th>
+                            <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground w-16">Typ</th>
+                            <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Namn</th>
+                            <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Värde</th>
+                            {domain.kind === 'bring_your_own' && (
+                              <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground w-20">Syfte</th>
+                            )}
                             <th className="w-8"></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {domain.dnsRecords.map((rec, i) => (
+                          {dnsRecords.map((rec, i) => (
                             <tr key={i} className="border-t border-border">
-                              <td className="px-2 py-1.5 font-mono">{rec.type}</td>
-                              <td className="px-2 py-1.5 font-mono truncate max-w-[120px]">{rec.name}</td>
-                              <td className="px-2 py-1.5 font-mono truncate max-w-[180px]">{rec.value}</td>
-                              <td className="px-1 py-1.5">
-                                <button onClick={() => copyToClipboard(rec.value)} className="p-1 hover:bg-muted rounded">
+                              <td className="px-2.5 py-2 font-mono font-medium">{rec.type}</td>
+                              <td className="px-2.5 py-2 font-mono text-muted-foreground truncate max-w-[140px]" title={rec.name}>{rec.name}</td>
+                              <td className="px-2.5 py-2 font-mono truncate max-w-[200px]" title={rec.value}>{rec.value}</td>
+                              {domain.kind === 'bring_your_own' && (
+                                <td className="px-2.5 py-2 text-muted-foreground">{rec.reason || '—'}</td>
+                              )}
+                              <td className="px-1 py-2">
+                                <button onClick={() => copyToClipboard(rec.value)} className="p-1 hover:bg-muted rounded transition-colors" title="Kopiera värde">
                                   <Copy className="w-3 h-3 text-muted-foreground" />
                                 </button>
                               </td>
@@ -313,59 +480,54 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                         </tbody>
                       </table>
                     </div>
-                    {domain.dnsProvider && (
+
+                    {/* DNS provider info */}
+                    {(provider.name || provider.dashboardUrl) && (
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        {provider.name && <span>DNS-leverantör: <span className="font-medium text-foreground">{provider.name}</span></span>}
+                        {provider.dashboardUrl && (
+                          <a
+                            href={provider.dashboardUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
+                          >
+                            Öppna DNS-hantering <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Nameservers */}
+                    {domain.nameservers && domain.nameservers.length > 0 && (
                       <p className="text-[10px] text-muted-foreground">
-                        DNS-leverantör: <span className="font-medium">{domain.dnsProvider}</span>
+                        Namnservrar: {domain.nameservers.join(', ')}
+                      </p>
+                    )}
+
+                    {/* Help text */}
+                    {domain.kind === 'bring_your_own' && (
+                      <div className="flex items-start gap-1.5 p-2.5 rounded-lg bg-muted/30 border border-border">
+                        <AlertTriangle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                          Lägg till ovanstående DNS-poster hos din domänleverantör. DNS-propagering kan ta upp till 72 timmar. Klicka på "Verifiera" efter att posterna lagts till.
+                        </p>
+                      </div>
+                    )}
+
+                    {domain.kind === 'tivly_subdomain' && isPending && (
+                      <p className="text-[10px] text-muted-foreground italic">
+                        Tivly-subdomäner verifieras vanligtvis automatiskt inom några minuter.
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* Inline DNS from add response */}
-                {instructions?.instructions?.records && !isVerified && (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-[11px] font-medium text-muted-foreground">Lägg till dessa DNS-poster:</p>
-                    <div className="rounded-lg border border-border overflow-hidden">
-                      <table className="w-full text-[11px]">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Typ</th>
-                            <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Namn</th>
-                            <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Värde</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {instructions.instructions.records.map((rec: any, i: number) => (
-                            <tr key={i} className="border-t border-border">
-                              <td className="px-2 py-1.5 font-mono">{rec.type}</td>
-                              <td className="px-2 py-1.5 font-mono">{rec.name}</td>
-                              <td className="px-2 py-1.5 font-mono truncate max-w-[180px]">
-                                <button onClick={() => copyToClipboard(rec.value)} className="hover:text-primary flex items-center gap-1">
-                                  {rec.value} <Copy className="w-2.5 h-2.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {instructions.instructions?.provider?.dashboardUrl && (
-                      <a
-                        href={instructions.instructions.provider.dashboardUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80"
-                      >
-                        Öppna DNS-hantering <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {domain.lastError && (
-                  <div className="flex items-start gap-1.5 text-[11px] text-destructive">
-                    <XCircle className="w-3 h-3 mt-0.5 shrink-0" />
-                    {domain.lastError}
+                {/* Verified success state */}
+                {isVerified && (
+                  <div className="flex items-center gap-2 text-[11px] text-green-700 dark:text-green-400">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Domänen är verifierad och redo att användas{isPrimary ? ' som primär inloggningsvärd' : ''}.</span>
                   </div>
                 )}
               </div>
@@ -382,15 +544,23 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       )}
 
       {adding && !addMode && (
-        <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/20">
-          <p className="text-xs font-medium">Välj typ</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="text-xs flex-1" onClick={() => setAddMode('tivly')}>
-              Tivly-subdomän (*.tivly.se)
-            </Button>
-            <Button variant="outline" size="sm" className="text-xs flex-1" onClick={() => setAddMode('custom')}>
-              Egen domän
-            </Button>
+        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+          <p className="text-xs font-medium">Välj domäntyp</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setAddMode('tivly')}
+              className="p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-colors text-left space-y-1"
+            >
+              <p className="text-xs font-medium">Tivly-subdomän</p>
+              <p className="text-[10px] text-muted-foreground">foretag.tivly.se — ingen DNS-ändring behövs</p>
+            </button>
+            <button
+              onClick={() => setAddMode('custom')}
+              className="p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-colors text-left space-y-1"
+            >
+              <p className="text-xs font-medium">Egen domän</p>
+              <p className="text-[10px] text-muted-foreground">workspace.foretag.se — kräver DNS-konfiguration</p>
+            </button>
           </div>
           <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setAdding(false)}>
             Avbryt
@@ -399,9 +569,9 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       )}
 
       {adding && addMode && (
-        <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/20">
-          <Label className="text-xs text-muted-foreground">
-            {addMode === 'tivly' ? 'Subdomännamn' : 'Domännamn'}
+        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+          <Label className="text-xs font-medium">
+            {addMode === 'tivly' ? 'Välj subdomännamn' : 'Ange domännamn'}
           </Label>
           <div className="flex gap-2">
             <div className="flex-1 flex items-center gap-0">
@@ -410,20 +580,21 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                 onChange={e => setHostnameInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddDomain()}
                 placeholder={addMode === 'tivly' ? 'foretag' : 'workspace.foretag.se'}
-                className="h-8 text-sm rounded-r-none"
+                className="h-9 text-sm rounded-r-none"
+                autoFocus
               />
               {addMode === 'tivly' && (
-                <span className="h-8 px-2 flex items-center text-xs text-muted-foreground bg-muted border border-l-0 border-border rounded-r-md">.tivly.se</span>
+                <span className="h-9 px-3 flex items-center text-xs text-muted-foreground bg-muted border border-l-0 border-border rounded-r-md">.tivly.se</span>
               )}
             </div>
-            <Button size="sm" className="h-8 text-xs" onClick={handleAddDomain} disabled={saving || !hostnameInput.trim()}>
+            <Button size="sm" className="h-9 text-xs px-4" onClick={handleAddDomain} disabled={saving || !hostnameInput.trim()}>
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Lägg till'}
             </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
             {addMode === 'tivly'
-              ? 'Tivly-subdomäner konfigureras automatiskt. Ingen DNS-ändring behövs.'
-              : 'Du behöver lägga till DNS-poster hos din domänleverantör efter att domänen lagts till.'}
+              ? 'Tivly-subdomäner konfigureras automatiskt. Ingen DNS-ändring behövs. Verifiering sker inom några minuter.'
+              : 'Du behöver lägga till DNS-poster hos din domänleverantör. Instruktioner visas efter att domänen lagts till.'}
           </p>
           <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setAddMode(null); setAdding(false); setHostnameInput(''); }}>
             Avbryt
