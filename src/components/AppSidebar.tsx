@@ -322,7 +322,7 @@ export function AppSidebar() {
             disabled={!enterpriseMembership?.memberships || enterpriseMembership.memberships.length <= 1}
           >
             <div className="w-10 h-10 shrink-0 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-              <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
+              <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
