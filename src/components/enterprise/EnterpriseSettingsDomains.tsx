@@ -465,7 +465,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       setShowAddForm(false);
       setAddMode(null);
       setHostnameInput('');
-      onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setAdding(false); }
