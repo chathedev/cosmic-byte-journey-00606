@@ -206,13 +206,13 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
       } catch {}
     }
     setBrandingReady(true);
-  }, [companyId, isEnterprise]);
+  }, [companyId, isEnterprise, isCustomHost]);
 
   useEffect(() => { fetchBranding(); }, [fetchBranding]);
 
-  // Reset when not enterprise, or when cached company doesn't match actual company
+  // Reset when not enterprise (generic hosts only), or when cached company doesn't match actual company
   useEffect(() => {
-    if (!isEnterprise) {
+    if (!isEnterprise && !isCustomHost) {
       setLogoUrl(tivlyLogo);
       setWordmarkUrl(null);
       setFaviconUrl(null);
@@ -226,25 +226,27 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
       setFaviconUrl(null);
       setWorkspaceName(null);
     }
-  }, [isEnterprise, companyId, cachedCompanyId]);
+  }, [isEnterprise, isCustomHost, companyId, cachedCompanyId]);
 
   // Sync favicon/title whenever they change
   useEffect(() => {
-    if (isEnterprise && faviconUrl) applyFavicon(faviconUrl);
-  }, [isEnterprise, faviconUrl]);
+    if ((isEnterprise || isCustomHost) && faviconUrl) applyFavicon(faviconUrl);
+  }, [isEnterprise, isCustomHost, faviconUrl]);
 
   useEffect(() => {
-    if (isEnterprise) applyTitle(workspaceName);
-  }, [isEnterprise, workspaceName]);
+    if (isEnterprise || isCustomHost) applyTitle(workspaceName);
+  }, [isEnterprise, isCustomHost, workspaceName]);
+
+  const shouldBlockRender = !brandingReady || publicBootstrapLoading;
 
   // Show fullscreen loader until branding is resolved
-  if (!brandingReady) {
+  if (shouldBlockRender) {
     return (
       <EnterpriseBrandingContext.Provider value={{
-        logoUrl: isEnterprise ? logoUrl : tivlyLogo,
-        wordmarkUrl: isEnterprise ? wordmarkUrl : null,
-        faviconUrl: isEnterprise ? faviconUrl : null,
-        workspaceName: isEnterprise ? workspaceName : null,
+        logoUrl: (isEnterprise || isCustomHost) ? logoUrl : tivlyLogo,
+        wordmarkUrl: (isEnterprise || isCustomHost) ? wordmarkUrl : null,
+        faviconUrl: (isEnterprise || isCustomHost) ? faviconUrl : null,
+        workspaceName: (isEnterprise || isCustomHost) ? workspaceName : null,
         isEnterprise,
         brandingReady,
         refreshBranding: fetchBranding,
@@ -285,10 +287,10 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
 
   return (
     <EnterpriseBrandingContext.Provider value={{
-      logoUrl: isEnterprise ? logoUrl : tivlyLogo,
-      wordmarkUrl: isEnterprise ? wordmarkUrl : null,
-      faviconUrl: isEnterprise ? faviconUrl : null,
-      workspaceName: isEnterprise ? workspaceName : null,
+      logoUrl: (isEnterprise || isCustomHost) ? logoUrl : tivlyLogo,
+      wordmarkUrl: (isEnterprise || isCustomHost) ? wordmarkUrl : null,
+      faviconUrl: (isEnterprise || isCustomHost) ? faviconUrl : null,
+      workspaceName: (isEnterprise || isCustomHost) ? workspaceName : null,
       isEnterprise,
       brandingReady,
       refreshBranding: fetchBranding,
