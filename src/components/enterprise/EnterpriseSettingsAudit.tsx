@@ -88,7 +88,7 @@ export function EnterpriseSettingsAudit({ companyId, isAdmin }: Props) {
             SSO-inloggningar
           </h3>
           <div className="border border-border rounded-lg overflow-hidden">
-            <ScrollArea className="max-h-[300px]">
+            <ScrollArea className="h-[320px]">
               <div className="divide-y divide-border">
                 {loginHistory.map((entry, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-2.5 text-xs">
