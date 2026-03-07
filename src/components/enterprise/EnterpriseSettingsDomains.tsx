@@ -478,7 +478,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
     } finally { setAdding(false); }
   };
-  };
 
   const handleVerify = async (hostname: string) => {
     setVerifyingHost(hostname);
