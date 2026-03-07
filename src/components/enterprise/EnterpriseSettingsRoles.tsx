@@ -249,7 +249,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
 
       {/* Role Editor Dialog */}
       <Dialog open={!!editRole} onOpenChange={open => !open && setEditRole(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{isNew ? 'Skapa roll' : 'Redigera roll'}</DialogTitle>
           </DialogHeader>
