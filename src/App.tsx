@@ -85,6 +85,7 @@ import AdminSlackInsights from "./pages/AdminSlackInsights";
 import AdminIntegrations from "./pages/AdminIntegrations";
 import IntegrationSlack from "./pages/IntegrationSlack";
 import SharedProtocol from "./pages/SharedProtocol";
+import SSOCallback from "./pages/SSOCallback";
 
 const queryClient = new QueryClient({
   defaultOptions: {
