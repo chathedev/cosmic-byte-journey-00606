@@ -137,6 +137,7 @@ export function InvoicePaymentDialog({
   invoiceType,
   onSuccess
 }: InvoicePaymentDialogProps) {
+  const { logoUrl: brandingLogoUrl } = useEnterpriseBranding();
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
