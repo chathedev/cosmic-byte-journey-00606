@@ -8,11 +8,12 @@ export default function EnterpriseSettingsSecurityPage() {
       title="Säkerhet & Efterlevnad"
       description="Datalagring, åtkomstkontroll och exportregler"
       icon={<Lock className="w-5 h-5 text-primary" />}
+      sectionSlug="security-compliance"
     >
       {(ctx) => (
         <SecurityContent
-          settings={ctx.data?.settings?.securityCompliance ?? {}}
-          locks={ctx.data?.locks ?? {}}
+          settings={ctx.data?.settings ?? ctx.data ?? {}}
+          locks={ctx.locks}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
           customizationBoundaries={ctx.customizationBoundaries}

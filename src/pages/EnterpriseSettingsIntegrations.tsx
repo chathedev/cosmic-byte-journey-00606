@@ -8,11 +8,12 @@ export default function EnterpriseSettingsIntegrationsPage() {
       title="Integrationer"
       description="Teams, Zoom, Google Meet, Slack, API och webhooks"
       icon={<Link2 className="w-5 h-5 text-primary" />}
+      sectionSlug="integrations"
     >
       {(ctx) => (
         <IntegrationsContent
-          settings={ctx.data?.settings?.integrations ?? {}}
-          locks={ctx.data?.locks ?? {}}
+          settings={ctx.data?.settings ?? ctx.data ?? {}}
+          locks={ctx.locks}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
         />

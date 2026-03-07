@@ -8,18 +8,16 @@ export default function EnterpriseSettingsIdentityPage() {
       title="Identitet & SSO"
       description="Leverantörer, provisionering och domänbegränsningar"
       icon={<Shield className="w-5 h-5 text-primary" />}
+      sectionSlug="identity-access"
     >
       {(ctx) => {
-        const settings = ctx.data?.settings;
-        const identityAccess = settings?.identityAccess ?? {};
-        const adminWorkspace = settings?.adminWorkspace as any;
-        const customDomains = adminWorkspace?.customDomains;
-        const domains = customDomains?.domains ?? [];
+        const settings = ctx.data?.settings ?? ctx.data ?? {};
+        const summary = ctx.data?.settingsSummary ?? ctx.data?.summary ?? {};
 
         return (
           <IdentityContent
-            settings={identityAccess}
-            locks={ctx.data?.locks ?? {}}
+            settings={settings}
+            locks={ctx.locks}
             canEdit={ctx.canEdit}
             onUpdate={ctx.handleUpdate}
             onTestSSO={ctx.handleTestSSO}
@@ -27,9 +25,9 @@ export default function EnterpriseSettingsIdentityPage() {
             onDisableProvider={ctx.handleDisableProvider}
             onRemoveProvider={ctx.handleRemoveProvider}
             onResetProvider={ctx.handleResetProvider}
-            providerReadiness={ctx.data?.settingsSummary?.providerReadiness}
-            hasVerifiedDomain={domains.some((d: any) => d.status === 'verified')}
-            defaultLoginHostname={customDomains?.defaultLoginHostname || ctx.data?.settingsSummary?.defaultLoginHostname || null}
+            providerReadiness={summary?.providerReadiness}
+            hasVerifiedDomain={!!(settings?.customDomains ?? ctx.data?.customDomains)?.domains?.some((d: any) => d.status === 'verified')}
+            defaultLoginHostname={settings?.customDomains?.defaultLoginHostname || summary?.defaultLoginHostname || null}
           />
         );
       }}
