@@ -168,10 +168,20 @@ export default function EnterpriseSettingsPage() {
               onTestSSO={handleTestSSO}
               onConnectSSO={handleConnectSSO}
               providerReadiness={data.settingsSummary?.providerReadiness}
+              hasVerifiedDomain={!!(data.settings.adminWorkspace as any)?.customDomains?.domains?.some((d: any) => d.status === 'verified')}
+              defaultLoginHostname={(data.settings.adminWorkspace as any)?.customDomains?.defaultLoginHostname || data.settingsSummary?.defaultLoginHostname || null}
             />
           </TabsContent>
-          <TabsContent value="workspace" className="mt-6">
+          <TabsContent value="workspace" className="mt-6 space-y-6">
             <EnterpriseSettingsWorkspace settings={data.settings.adminWorkspace} locks={data.locks} canEdit={canEdit} onUpdate={handleUpdate} />
+            {companyId && (
+              <EnterpriseSettingsDomains
+                companyId={companyId}
+                customDomains={(data.settings.adminWorkspace as any)?.customDomains}
+                canEdit={canEdit}
+                onDomainsChanged={loadSettings}
+              />
+            )}
           </TabsContent>
           <TabsContent value="security" className="mt-6">
             <EnterpriseSettingsSecurity settings={data.settings.securityCompliance} locks={data.locks} canEdit={canEdit} onUpdate={handleUpdate} />
