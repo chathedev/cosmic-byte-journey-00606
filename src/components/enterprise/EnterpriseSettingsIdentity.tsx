@@ -87,7 +87,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [actionProvider, setActionProvider] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  
   const [domainInput, setDomainInput] = useState('');
   // OIDC inline config
   const [oidcIssuer, setOidcIssuer] = useState('');
