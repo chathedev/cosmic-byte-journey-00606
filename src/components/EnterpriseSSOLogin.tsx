@@ -48,9 +48,9 @@ export function EnterpriseSSOLogin({ workspace }: Props) {
   let providers: string[] = [];
 
   if (workspace.enabledProviders?.length > 0) {
-    providers = workspace.enabledProviders.filter(p => p && p !== 'email');
+    providers = workspace.enabledProviders.filter(p => p && p !== 'email' && (SUPPORTED_PROVIDERS as readonly string[]).includes(p));
   } else if (workspace.allowedProviders?.length > 0) {
-    providers = workspace.allowedProviders.filter(p => p && p !== 'email');
+    providers = workspace.allowedProviders.filter(p => p && p !== 'email' && (SUPPORTED_PROVIDERS as readonly string[]).includes(p));
   }
 
   // Fallback: if no list but primaryProvider is set
