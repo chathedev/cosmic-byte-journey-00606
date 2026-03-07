@@ -364,47 +364,47 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                         </div>
                       )}
                       {key === 'oidc' && (
-355:                         <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border">
-356:                           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">OIDC-konfiguration</p>
-357:                           {provider?.issuer && (
-358:                             <div className="text-[11px] text-muted-foreground truncate">
-359:                               Sparad issuer: <span className="font-medium text-foreground">{provider.issuer}</span>
-360:                             </div>
-361:                           )}
-362:                           <div className="space-y-1.5">
-363:                             <Label className="text-[11px] text-muted-foreground">Issuer URL</Label>
-364:                             <Input
-365:                               value={oidcIssuer}
-366:                               onChange={e => setOidcIssuer(e.target.value)}
-367:                               placeholder="https://company.okta.com/oauth2/default"
-368:                               className="h-8 text-xs"
-369:                               disabled={!canEdit || saving}
-370:                             />
-371:                           </div>
-372:                           <div className="space-y-1.5">
-373:                             <Label className="text-[11px] text-muted-foreground">Client ID</Label>
-374:                             <Input
-375:                               value={oidcClientId}
-376:                               onChange={e => setOidcClientId(e.target.value)}
-377:                               placeholder="Client ID"
-378:                               className="h-8 text-xs"
-379:                               disabled={!canEdit || saving}
-380:                             />
-381:                           </div>
-382:                           <div className="space-y-1.5">
-383:                             <Label className="text-[11px] text-muted-foreground">Client Secret</Label>
-384:                             <Input
-385:                               type="password"
-386:                               value={oidcClientSecret}
-387:                               onChange={e => setOidcClientSecret(e.target.value)}
-388:                               placeholder="Client Secret"
-389:                               className="h-8 text-xs"
-390:                               disabled={!canEdit || saving}
-391:                             />
-392:                           </div>
-393:                           <p className="text-[10px] text-muted-foreground">Backend hämtar endpoints automatiskt via <code>.well-known/openid-configuration</code></p>
-394:                         </div>
-395:                       )}
+                        <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">OIDC-konfiguration</p>
+                          {provider?.issuer && (
+                            <div className="text-[11px] text-muted-foreground truncate">
+                              Sparad issuer: <span className="font-medium text-foreground">{provider.issuer}</span>
+                            </div>
+                          )}
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Issuer URL</Label>
+                            <Input
+                              value={oidcIssuer}
+                              onChange={e => setOidcIssuer(e.target.value)}
+                              placeholder="https://company.okta.com/oauth2/default"
+                              className="h-8 text-xs"
+                              disabled={!canEdit || saving}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Client ID</Label>
+                            <Input
+                              value={oidcClientId}
+                              onChange={e => setOidcClientId(e.target.value)}
+                              placeholder="Client ID"
+                              className="h-8 text-xs"
+                              disabled={!canEdit || saving}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Client Secret</Label>
+                            <Input
+                              type="password"
+                              value={oidcClientSecret}
+                              onChange={e => setOidcClientSecret(e.target.value)}
+                              placeholder="Client Secret"
+                              className="h-8 text-xs"
+                              disabled={!canEdit || saving}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Backend hämtar endpoints automatiskt via <code>.well-known/openid-configuration</code></p>
+                        </div>
+                      )}
                       {lastTestedAt && (
                         <div className="text-[11px] text-muted-foreground">Senast testad: {lastTestedAt}</div>
                       )}
@@ -415,7 +415,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                         </div>
                       )}
 
-                      {/* Actions — these are immediate (test/connect are not buffered) */}
+                      {/* Actions */}
                       <div className="flex flex-wrap gap-2 pt-1">
                         {onTestSSO && (
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || !!actionProvider || saving}>
