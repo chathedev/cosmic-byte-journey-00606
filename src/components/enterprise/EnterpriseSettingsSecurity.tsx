@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Shield, Database, Globe, AlertTriangle } from 'lucide-react';
+import { Shield, Database, Globe, AlertTriangle, Lock } from 'lucide-react';
 import { CardSaveFooter } from './CardSaveFooter';
 import { useManualSave } from '@/hooks/useManualSave';
 import { Switch } from '@/components/ui/switch';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { SecurityComplianceSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
+import type { SecurityComplianceSettings, SettingsLock, CustomizationBoundaries } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
   settings: Partial<SecurityComplianceSettings>;
