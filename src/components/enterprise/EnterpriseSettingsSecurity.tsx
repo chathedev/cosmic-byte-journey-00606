@@ -15,6 +15,11 @@ interface Props {
   locks: Record<string, SettingsLock>;
   canEdit: boolean;
   onUpdate: (patch: Record<string, any>) => Promise<void>;
+  customizationBoundaries?: CustomizationBoundaries;
+}
+
+function isLockedOn(field: string, boundaries?: CustomizationBoundaries): boolean {
+  return boundaries?.lockedOn?.includes(`securityCompliance.${field}`) ?? false;
 }
 
 // ─── Security Toggles Card ───
