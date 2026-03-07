@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Building2, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Building2, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useEnterpriseSettings } from '@/hooks/useEnterpriseSettings';
 
@@ -22,14 +22,6 @@ export function EnterpriseSettingsLayout({ title, description, icon, children }:
           <Shield className="w-10 h-10 mx-auto text-muted-foreground/30" />
           <p className="text-muted-foreground text-sm">Enterprise-inställningar är bara tillgängliga för Enterprise-planen.</p>
         </div>
-      </div>
-    );
-  }
-
-  if (ctx.loading || !ctx.data) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -62,7 +54,7 @@ export function EnterpriseSettingsLayout({ title, description, icon, children }:
           </div>
         </div>
 
-        {!ctx.canEdit && (
+        {!ctx.loading && !ctx.canEdit && (
           <div className="mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-300">
             Du har läsbehörighet men kan inte ändra enterprise-inställningar.
           </div>
