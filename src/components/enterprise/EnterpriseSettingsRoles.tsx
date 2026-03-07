@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { translateError } from '@/lib/errorTranslation';
 import {
   getEnterpriseRoles, createEnterpriseRole, updateEnterpriseRole, deleteEnterpriseRole,
   type CustomRole,
@@ -161,7 +162,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
       }
       setEditRole(null);
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -171,7 +172,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
       setRoles(prev => prev.filter(r => r.id !== roleId));
       toast({ title: 'Roll borttagen' });
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     }
   };
 

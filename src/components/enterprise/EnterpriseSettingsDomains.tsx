@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { translateError } from '@/lib/errorTranslation';
 
 const API_BASE_URL = 'https://api.tivly.se';
 
@@ -168,7 +169,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         startVerificationPoll(hostname);
       }
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -230,7 +231,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         await refreshDomains();
       }
     } catch (err: any) {
-      toast({ title: 'Verifiering misslyckades', description: err.message, variant: 'destructive' });
+      toast({ title: 'Verifiering misslyckades', description: translateError(err.message), variant: 'destructive' });
     } finally {
       // Only clear if not polling
       if (!pollRef.current) setVerifyingHost(null);
@@ -252,7 +253,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       await refreshDomains();
       onDomainsChanged?.(); // Notify parent on delete
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     } finally {
       setDeletingHost(null);
     }
@@ -269,7 +270,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       await refreshDomains();
       onDomainsChanged?.();
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

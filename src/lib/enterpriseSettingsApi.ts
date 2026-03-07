@@ -2,7 +2,7 @@
  * Enterprise Settings API client methods
  * Covers: Settings CRUD, SSO, Custom Roles, Audit, Admin Locks
  */
-
+import { translateError } from '@/lib/errorTranslation';
 const API_BASE_URL = 'https://api.tivly.se';
 
 // ==================== TYPES ====================
@@ -241,7 +241,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const err: any = new Error(body.message || body.error || `Request failed (${res.status})`);
+    const err: any = new Error(translateError(body.message || body.error || `Request failed (${res.status})`));
     err.status = res.status;
     err.code = body.code || body.error;
     err.details = body.details;
