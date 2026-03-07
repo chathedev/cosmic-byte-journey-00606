@@ -15,6 +15,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth, AuthContext } from "@/contexts/AuthContext";
 import { SubscriptionProvider, useSubscription, SubscriptionContext } from "@/contexts/SubscriptionContext";
+import { EnterpriseBrandingProvider } from "@/contexts/EnterpriseBrandingContext";
 import { SupportProvider } from "@/contexts/SupportContext";
 import { AdminRoute } from "@/components/AdminRoute";
 import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
