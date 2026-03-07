@@ -74,6 +74,9 @@ export default function Auth() {
   const [isSignup, setIsSignup] = useState(false);
   const [onboardingEnabled, setOnboardingEnabled] = useState(false);
   const [enterpriseRedirect, setEnterpriseRedirect] = useState<{ hostname: string; origin: string } | null>(null);
+  const [workspace, setWorkspace] = useState<PublicWorkspaceInfo | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const isCustomDomain = isEnterpriseCustomDomain();
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
