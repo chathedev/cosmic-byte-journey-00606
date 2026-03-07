@@ -87,6 +87,7 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
     () => (hasCachedBranding && cached.workspaceName) || null
   );
   const [brandingReady, setBrandingReady] = useState(false);
+  const [publicBootstrapLoading, setPublicBootstrapLoading] = useState(isCustomHost);
   const [cachedCompanyId] = useState(() => cached?.companyId || null);
 
   // Apply favicon + title on mount from cache immediately (no flash)
