@@ -45,7 +45,7 @@ export interface DomainEntry {
   lastCheckedAt?: string | null;
   lastError?: string | null;
   dnsRecords?: Array<{ type: string; name: string; value: string; reason?: string }>;
-  dnsProvider?: string | null;
+  dnsProvider?: string | { key?: string; label?: string; dashboardUrl?: string } | null;
   nameservers?: string[];
   vercel?: any;
 }
