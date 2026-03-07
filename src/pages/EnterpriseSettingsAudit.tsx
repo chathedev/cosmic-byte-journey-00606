@@ -8,6 +8,7 @@ export default function EnterpriseSettingsAuditPage() {
       title="Historik & Audit"
       description="Ändringslogg, inloggningshistorik och säkerhetshändelser"
       icon={<FileText className="w-5 h-5 text-primary" />}
+      sectionSlug="audit"
     >
       {(ctx) => (
         <AuditContent companyId={ctx.companyId ?? ''} />

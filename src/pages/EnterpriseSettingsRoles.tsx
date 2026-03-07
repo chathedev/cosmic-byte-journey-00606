@@ -8,12 +8,13 @@ export default function EnterpriseSettingsRolesPage() {
       title="Roller & Behörigheter"
       description="Anpassade roller, behörighetspaket och rollmallar"
       icon={<Users className="w-5 h-5 text-primary" />}
+      sectionSlug="roles"
     >
       {(ctx) => (
         <RolesContent
           companyId={ctx.companyId ?? ''}
           canEdit={ctx.canEdit}
-          initialRoles={ctx.data?.settings?.customRoles ?? []}
+          initialRoles={ctx.data?.roles ?? ctx.data?.settings?.customRoles ?? []}
         />
       )}
     </EnterpriseSettingsLayout>

@@ -20,10 +20,10 @@ export default function EnterpriseSettingsWorkspacePage() {
       title="Arbetsyta & Domäner"
       description="Varumärke, logotyper, anpassade domäner och e-postmallar"
       icon={<Palette className="w-5 h-5 text-primary" />}
+      sectionSlug="branding"
     >
       {(ctx) => {
-        const settings = ctx.data?.settings;
-        const adminWorkspace = settings?.adminWorkspace ?? {};
+        const settings = ctx.data?.settings ?? ctx.data ?? {};
 
         return (
           <div className="space-y-6">
@@ -51,8 +51,8 @@ export default function EnterpriseSettingsWorkspacePage() {
 
             {activeTab === 'workspace' && (
               <WorkspaceContent
-                settings={adminWorkspace}
-                locks={ctx.data?.locks ?? {}}
+                settings={settings}
+                locks={ctx.locks}
                 canEdit={ctx.canEdit}
                 onUpdate={ctx.handleUpdate}
               />
@@ -61,7 +61,7 @@ export default function EnterpriseSettingsWorkspacePage() {
             {activeTab === 'domains' && ctx.companyId && (
               <EnterpriseSettingsDomains
                 companyId={ctx.companyId}
-                customDomains={(adminWorkspace as any)?.customDomains}
+                customDomains={settings?.customDomains ?? ctx.data?.customDomains}
                 canEdit={ctx.canEdit}
               />
             )}
