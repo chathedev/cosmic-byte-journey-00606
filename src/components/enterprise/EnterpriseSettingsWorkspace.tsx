@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Building2, Palette, Users, Lock, Mail, Link2, Save } from 'lucide-react';
+import { Building2, Palette, Users, Lock, Mail, Link2 } from 'lucide-react';
+import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
