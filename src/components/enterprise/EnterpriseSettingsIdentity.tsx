@@ -351,7 +351,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                           Hosted domain: <span className="font-medium text-foreground">{provider.hostedDomain}</span>
                         </div>
                       )}
-                      {key === 'okta' && provider?.issuer && (
+                      {key === 'oidc' && provider?.issuer && (
                         <div className="text-[11px] text-muted-foreground truncate">
                           Issuer: <span className="font-medium text-foreground">{provider.issuer}</span>
                         </div>
