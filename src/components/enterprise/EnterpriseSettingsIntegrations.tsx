@@ -22,7 +22,7 @@ const INTEGRATIONS = [
 ];
 
 export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
+  
 
   // Local state
   const [integrationStates, setIntegrationStates] = useState<Record<string, boolean>>({});
