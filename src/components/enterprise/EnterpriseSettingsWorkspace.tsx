@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Building2, Palette, Users, Lock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,16 @@ interface Props {
 
 export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate }: Props) {
   const [saving, setSaving] = useState(false);
+  const branding = settings.branding || {};
+  const invitePolicy = settings.invitePolicy || {};
+
+  const [workspaceName, setWorkspaceName] = useState(branding.workspaceDisplayName || '');
+  const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
+
+  useEffect(() => {
+    setWorkspaceName(branding.workspaceDisplayName || '');
+    setLogoUrl(branding.logoUrl || '');
+  }, [branding.workspaceDisplayName, branding.logoUrl]);
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
@@ -21,7 +31,6 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     if (!canEdit) return;
     setSaving(true);
     try {
-      // Build nested patch
       const parts = path.split('.');
       let patch: any = {};
       let ref = patch;
@@ -33,9 +42,6 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       await onUpdate({ adminWorkspace: patch });
     } finally { setSaving(false); }
   };
-
-  const branding = settings.branding || {};
-  const invitePolicy = settings.invitePolicy || {};
 
   return (
     <div className="space-y-6">
@@ -52,9 +58,9 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Arbetsytans namn</Label>
             <Input
-              value={branding.workspaceDisplayName || ''}
-              onBlur={e => updateField('branding.workspaceDisplayName', e.target.value)}
-              onChange={() => {}}
+              value={workspaceName}
+              onChange={e => setWorkspaceName(e.target.value)}
+              onBlur={() => updateField('branding.workspaceDisplayName', workspaceName)}
               disabled={!canEdit || isLocked('branding.workspaceDisplayName') || saving}
               className="h-9 text-sm"
               placeholder="Företagsnamn AB"
@@ -63,13 +69,26 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Logotyp-URL</Label>
             <Input
-              value={branding.logoUrl || ''}
-              onBlur={e => updateField('branding.logoUrl', e.target.value || null)}
-              onChange={() => {}}
+              value={logoUrl}
+              onChange={e => setLogoUrl(e.target.value)}
+              onBlur={() => updateField('branding.logoUrl', logoUrl || null)}
               disabled={!canEdit || saving}
               className="h-9 text-sm"
               placeholder="https://example.se/logo.png"
             />
+            {logoUrl && (
+              <div className="mt-2 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={logoUrl}
+                    alt="Logotyp"
+                    className="w-full h-full object-contain"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+                <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">{logoUrl}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <div>
