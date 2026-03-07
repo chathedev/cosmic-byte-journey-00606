@@ -164,7 +164,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   };
 
   const providers = settings.providers || {};
-  const saveFooter = <CardSaveFooter status={saveStatus} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} isSaving={isSaving} />;
+  const saveFooter = <CardSaveFooter status={saveStatus} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />;
 
   return (
     <div className="space-y-6">
