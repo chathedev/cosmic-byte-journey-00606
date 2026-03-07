@@ -438,9 +438,11 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
   const refreshDomains = useCallback(async () => {
     try {
       const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`);
-      if (res.domains) setDomains(res.domains);
-      if (res.defaultLoginHostname !== undefined) setDefaultLogin(res.defaultLoginHostname);
-      return res.domains as DomainEntry[];
+      const newDomains = res.customDomains?.domains || res.domains || [];
+      const newDefault = res.customDomains?.defaultLoginHostname ?? res.defaultLoginHostname;
+      if (newDomains.length > 0 || res.customDomains) setDomains(newDomains);
+      if (newDefault !== undefined) setDefaultLogin(newDefault);
+      return newDomains as DomainEntry[];
     } catch { return null; }
   }, [companyId]);
 
