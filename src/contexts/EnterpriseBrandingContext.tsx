@@ -99,6 +99,51 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Bootstrap branding from public workspace endpoint on custom domains
+  useEffect(() => {
+    if (!isCustomHost || typeof window === 'undefined') {
+      setPublicBootstrapLoading(false);
+      return;
+    }
+
+    let active = true;
+    getPublicWorkspace(window.location.hostname)
+      .then((ws) => {
+        if (!active) return;
+        const branding = ws.branding || {};
+        const logo = branding.logoUrl || tivlyLogo;
+        const wordmark = branding.wordmarkUrl || null;
+        const favicon = branding.faviconUrl || null;
+        const name = branding.workspaceDisplayName || null;
+
+        setLogoUrl(logo);
+        setWordmarkUrl(wordmark);
+        setFaviconUrl(favicon);
+        setWorkspaceName(name);
+
+        applyFavicon(favicon || DEFAULT_FAVICON);
+        applyTitle(name);
+
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          logoUrl: branding.logoUrl || null,
+          wordmarkUrl: wordmark,
+          faviconUrl: favicon,
+          workspaceName: name,
+          companyId: ws.companyId || cachedCompanyId || null,
+        }));
+      })
+      .catch(() => {
+        // Ignore, keep cache/default while auth flow continues
+      })
+      .finally(() => {
+        if (active) setPublicBootstrapLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isCustomHost, cachedCompanyId]);
+
   const fetchBranding = useCallback(async () => {
     if (!companyId || !isEnterprise) {
       setLogoUrl(tivlyLogo);
