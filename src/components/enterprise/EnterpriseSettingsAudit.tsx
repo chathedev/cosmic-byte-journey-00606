@@ -150,7 +150,8 @@ export function EnterpriseSettingsAudit({ companyId, isAdmin }: Props) {
     finally { setLoading(false); }
   };
 
-  const audit = data?.audit || [];
+  // API returns oldest-first; reverse to get newest-first as base order
+  const audit = useMemo(() => [...(data?.audit || [])].reverse(), [data]);
   const loginHistory = (data?.loginHistory || []) as any[];
 
   const categories = useMemo(() => {
