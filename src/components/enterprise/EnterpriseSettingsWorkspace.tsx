@@ -49,6 +49,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     setLogoUrl(branding.logoUrl || '');
     setWordmarkUrl((branding as any).wordmarkUrl || '');
     setFaviconUrl((branding as any).faviconUrl || '');
+    setPrimaryColor(branding.primaryColor || '');
+    setAccentColor((branding as any).accentColor || '');
     setLoginTitle((branding as any).loginTitle || '');
     setLoginSubtitle((branding as any).loginSubtitle || '');
     setSupportEmail((branding as any).supportEmail || '');
@@ -58,6 +60,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     setEmailBrandingEnabled(branding.emailBrandingEnabled ?? false);
     setDomainRestrictedInvites(invitePolicy.domainRestrictedInvites ?? false);
     setAllowExternalGuests(invitePolicy.allowExternalGuests ?? false);
+    setRequireApprovalForExternalGuests(invitePolicy.requireApprovalForExternalGuests ?? false);
     setTeamManagementEnabled(settings.teamManagementEnabled ?? true);
   }, [settings]);
 
