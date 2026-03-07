@@ -404,9 +404,9 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Auto-poll for any pending domains
+  // Auto-poll for any pending domains (every 3s)
   useEffect(() => {
-    const hasPending = domains.some(d => d.status !== 'verified' && d.status !== 'removing');
+    const hasPending = domains.some(d => !isDomainVerified(d) && d.status !== 'removing');
     if (!hasPending) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
@@ -415,24 +415,25 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     pollRef.current = setInterval(async () => {
       try {
         const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`);
-        if (res.domains) {
+        const newDomains = res.customDomains?.domains || res.domains || [];
+        const newDefault = res.customDomains?.defaultLoginHostname ?? res.defaultLoginHostname;
+        if (newDomains.length > 0 || res.customDomains) {
           const oldDomains = domains;
-          setDomains(res.domains);
-          if (res.defaultLoginHostname !== undefined) setDefaultLogin(res.defaultLoginHostname);
-          // Check if any domain just became verified
-          for (const d of res.domains as DomainEntry[]) {
+          setDomains(newDomains);
+          if (newDefault !== undefined) setDefaultLogin(newDefault);
+          for (const d of newDomains as DomainEntry[]) {
             const old = oldDomains.find(od => od.hostname === d.hostname);
-            if (d.status === 'verified' && old && old.status !== 'verified') {
+            if (isDomainVerified(d) && old && !isDomainVerified(old)) {
               toast({ title: 'Domän verifierad!', description: `${d.hostname} är nu klar att använda.` });
             }
           }
         }
       } catch { /* silent */ }
-    }, 15000);
+    }, 3000);
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [domains, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasVerifiedDomain = domains.some(d => d.status === 'verified');
+  const hasVerifiedDomain = domains.some(d => isDomainVerified(d));
 
   const refreshDomains = useCallback(async () => {
     try {
