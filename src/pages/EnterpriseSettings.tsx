@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Building2, Lock, Users, Video, Link2, FileText, Palette, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Building2, Lock, Users, Video, Link2, FileText, Palette, Loader2, Globe } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -16,6 +16,7 @@ import { EnterpriseSettingsAudit } from '@/components/enterprise/EnterpriseSetti
 import { EnterpriseSettingsWorkspace } from '@/components/enterprise/EnterpriseSettingsWorkspace';
 import { EnterpriseSettingsMeeting } from '@/components/enterprise/EnterpriseSettingsMeeting';
 import { EnterpriseSettingsIntegrations } from '@/components/enterprise/EnterpriseSettingsIntegrations';
+import { EnterpriseSettingsDomains } from '@/components/enterprise/EnterpriseSettingsDomains';
 
 export default function EnterpriseSettingsPage() {
   const navigate = useNavigate();
