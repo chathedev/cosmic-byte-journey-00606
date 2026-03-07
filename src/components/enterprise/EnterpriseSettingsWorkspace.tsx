@@ -3,6 +3,7 @@ import { Building2, Palette, Users, Lock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useEnterpriseBranding } from '@/contexts/EnterpriseBrandingContext';
 import type { AdminWorkspaceSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
