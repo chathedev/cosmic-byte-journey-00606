@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Globe, Plus, CheckCircle2, XCircle, Loader2, Trash2, ExternalLink,
-  Shield, AlertTriangle, Copy, RefreshCw, Clock, ArrowRight,
+  Shield, AlertTriangle, Copy, RefreshCw, Clock, ArrowRight, Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +48,6 @@ export interface DomainOnboarding {
   verificationToken?: string;
   status?: 'pending' | 'awaiting_dns' | 'verifying' | 'active' | 'failed';
   setupMethod?: 'manual' | null;
-  // Legacy — not used in product UI
   domainConnect?: any;
 }
 
@@ -139,15 +138,44 @@ function statusLabel(domain: DomainEntry): string {
   return 'Väntar';
 }
 
-// ─── Domain Detail Dialog ────────────────────────────────────────────────────
+// ─── Send to IT email helper ─────────────────────────────────────────────────
 
-function DomainDetailDialog({
-  domain,
+function buildITEmailMailto(hostname: string, records: Array<{ type: string; name: string; value: string; reason?: string }>) {
+  const subject = encodeURIComponent(`DNS-konfiguration krävs för ${hostname}`);
+  const recordLines = records.map(r =>
+    `  Typ: ${r.type}\n  Namn: ${r.name}\n  Värde: ${r.value}${r.reason ? `\n  Syfte: ${r.reason}` : ''}`
+  ).join('\n\n');
+  const body = encodeURIComponent(
+`Hej,
+
+Vi håller på att konfigurera en anpassad domän för vår arbetsyta i Tivly.
+
+Kan du lägga till följande DNS-poster för domänen ${hostname}?
+
+${recordLines}
+
+När posterna är tillagda kommer Tivly att verifiera domänen automatiskt. Propagering kan ta upp till 72 timmar.
+
+Tack på förhand!`
+  );
+  return `mailto:?subject=${subject}&body=${body}`;
+}
+
+// ─── Domain Onboarding Dialog ────────────────────────────────────────────────
+// Unified dialog: handles both adding a new domain and viewing/managing existing ones.
+// Does NOT close until domain is verified (or user explicitly dismisses).
+
+type DialogPhase = 'pick_type' | 'enter_hostname' | 'onboarding' | 'verified';
+
+function DomainOnboardingDialog({
   open,
   onOpenChange,
+  companyId,
   canEdit,
   defaultLogin,
+  existingDomain,
   addResponse,
+  onDomainAdded,
   onVerify,
   onDelete,
   onSetPrimary,
@@ -156,12 +184,14 @@ function DomainDetailDialog({
   deletingHost,
   saving,
 }: {
-  domain: DomainEntry;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  companyId: string;
   canEdit: boolean;
   defaultLogin: string | null;
+  existingDomain: DomainEntry | null;
   addResponse: Record<string, any>;
+  onDomainAdded: (hostname: string, response: any) => void;
   onVerify: (h: string) => void;
   onDelete: (h: string) => void;
   onSetPrimary: (h: string) => void;
@@ -173,19 +203,98 @@ function DomainDetailDialog({
   const { toast } = useToast();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isVerified = domain.status === 'verified';
-  const isFailed = domain.status === 'failed';
-  const isPrimary = domain.primary || defaultLogin === domain.hostname;
-  const isPolling = verifyingHost === domain.hostname;
-  const errorText = getErrorText(domain);
+  // Phase management
+  const initialPhase: DialogPhase = existingDomain
+    ? (existingDomain.status === 'verified' ? 'verified' : 'onboarding')
+    : 'pick_type';
+  const [phase, setPhase] = useState<DialogPhase>(initialPhase);
+  const [addMode, setAddMode] = useState<'tivly' | 'custom' | null>(null);
+  const [hostnameInput, setHostnameInput] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [domain, setDomain] = useState<DomainEntry | null>(existingDomain);
 
-  const onboarding: DomainOnboarding | null = domain.onboarding || addResponse[domain.hostname]?.onboarding || null;
-  const hasActiveOnboarding = onboarding && onboarding.status !== 'active' && !isVerified;
-  const obStatus = onboarding?.status || 'pending';
+  // Sync when existingDomain changes
+  useEffect(() => {
+    if (existingDomain) {
+      setDomain(existingDomain);
+      setPhase(existingDomain.status === 'verified' ? 'verified' : 'onboarding');
+    } else if (!open) {
+      setPhase('pick_type');
+      setAddMode(null);
+      setHostnameInput('');
+      setDomain(null);
+    }
+  }, [existingDomain, open]);
+
+  // Poll while in onboarding phase
+  useEffect(() => {
+    if (!open || phase !== 'onboarding') return;
+    pollRef.current = setInterval(onRefresh, 10000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [open, phase, onRefresh]);
+
+  // Update phase when domain becomes verified
+  useEffect(() => {
+    if (domain?.status === 'verified' || domain?.onboarding?.status === 'active') {
+      setPhase('verified');
+    }
+  }, [domain?.status, domain?.onboarding?.status]);
+
+  const handleAdd = async () => {
+    if (!hostnameInput.trim()) return;
+    const hostname = addMode === 'tivly'
+      ? (hostnameInput.trim().toLowerCase().replace(/\.tivly\.se$/, '') + '.tivly.se')
+      : hostnameInput.trim().toLowerCase();
+    setAdding(true);
+    try {
+      const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`, {
+        method: 'POST', body: JSON.stringify({ hostname }),
+      });
+      toast({ title: 'Domän tillagd', description: `${hostname} har lagts till.` });
+      onDomainAdded(hostname, res);
+      // Transition to onboarding phase with the new domain data
+      const newDomain: DomainEntry = res.domain || {
+        hostname, kind: addMode === 'tivly' ? 'tivly_subdomain' : 'bring_your_own',
+        status: 'pending', onboarding: res.onboarding, dnsRecords: res.instructions?.records || res.domain?.dnsRecords,
+        dnsProvider: res.instructions?.provider || null,
+      };
+      setDomain(newDomain);
+      setPhase('onboarding');
+    } catch (err: any) {
+      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+    } finally { setAdding(false); }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: 'Kopierad' });
+    });
+  };
+
+  // Prevent closing while onboarding (user must use explicit close)
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && phase === 'onboarding' && domain && domain.status !== 'verified') {
+      // Allow close but confirm
+      onOpenChange(false);
+      return;
+    }
+    onOpenChange(newOpen);
+  };
+
+  // Computed domain fields
+  const isVerified = domain?.status === 'verified';
+  const isFailed = domain?.status === 'failed';
+  const isPrimary = domain ? (domain.primary || defaultLogin === domain.hostname) : false;
+  const isPolling = domain ? verifyingHost === domain.hostname : false;
+  const errorText = domain ? getErrorText(domain) : null;
+
+  const onboarding: DomainOnboarding | null = domain?.onboarding || (domain ? addResponse[domain.hostname]?.onboarding : null) || null;
+  const obStatus = onboarding?.status || (domain?.status === 'verified' ? 'active' : 'pending');
   const progress = getOnboardingProgress(obStatus);
 
-  // DNS records — prefer backend instructions, then onboarding-derived records
+  // DNS records
   const dnsRecords = (() => {
+    if (!domain) return [];
     if (domain.dnsRecords?.length) return domain.dnsRecords;
     const resp = addResponse[domain.hostname];
     if (resp?.instructions?.records) return resp.instructions.records;
@@ -199,6 +308,7 @@ function DomainDetailDialog({
   })();
 
   const provider = (() => {
+    if (!domain) return { name: null, dashboardUrl: null };
     const resp = addResponse[domain.hostname];
     const dp = domain.dnsProvider;
     const name = typeof dp === 'object' && dp ? (dp.label || dp.key || null) : (dp || null);
@@ -221,164 +331,273 @@ function DomainDetailDialog({
     });
   }
 
+  const hasActiveOnboarding = phase === 'onboarding' && obStatus !== 'active';
   const allRecords = hasActiveOnboarding && onboardingRecords.length > 0 ? onboardingRecords : dnsRecords;
 
-  // Poll while onboarding is active
-  useEffect(() => {
-    if (!open || !hasActiveOnboarding) return;
-    pollRef.current = setInterval(onRefresh, 10000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [open, hasActiveOnboarding, onRefresh]);
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({ title: 'Kopierad' });
-    });
-  };
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-sm font-medium">
-            {statusIcon(domain)}
-            <span className="font-mono truncate">{domain.hostname}</span>
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            {domain.kind === 'tivly_subdomain' ? 'Tivly-subdomän' : 'Egen domän'}
-            {isPrimary && isVerified ? ' · Primär inloggningsvärd' : ''}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Verified */}
-          {isVerified && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              Domänen är verifierad och redo att användas.
+        {/* ── Phase: Pick type ── */}
+        {phase === 'pick_type' && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm">
+                <Globe className="w-4 h-4 text-primary" />Lägg till domän
+              </DialogTitle>
+              <DialogDescription className="text-xs">Välj domäntyp</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-1">
+              <button
+                onClick={() => { setAddMode('tivly'); setPhase('enter_hostname'); }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
+              >
+                <Shield className="w-4 h-4 text-primary shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Tivly-subdomän</p>
+                  <p className="text-[10px] text-muted-foreground">foretag.tivly.se — automatisk</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setAddMode('custom'); setPhase('enter_hostname'); }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
+              >
+                <Globe className="w-4 h-4 text-primary shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Egen domän</p>
+                  <p className="text-[10px] text-muted-foreground">workspace.foretag.se — kräver DNS</p>
+                </div>
+              </button>
             </div>
-          )}
+          </>
+        )}
 
-          {/* Onboarding progress */}
-          {hasActiveOnboarding && (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className={`font-medium ${ONBOARDING_STATUS_LABELS[obStatus]?.color || ''}`}>
-                  {ONBOARDING_STATUS_LABELS[obStatus]?.label || 'Väntar'}
-                </span>
-                <span className="text-[10px] text-muted-foreground">{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-1" />
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                {ONBOARDING_STEPS.map((step, i) => {
-                  const stepIdx = ONBOARDING_STEPS.indexOf(obStatus as any);
-                  const done = stepIdx > i || obStatus === 'active';
-                  const current = step === obStatus;
-                  return (
-                    <span key={step} className={`${done ? 'text-green-600 dark:text-green-400' : current ? 'text-foreground font-medium' : ''}`}>
-                      {done ? '✓' : current ? '●' : '○'} {ONBOARDING_STATUS_LABELS[step]?.label}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Error */}
-          {(isFailed || onboarding?.status === 'failed') && (
-            <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/20 bg-destructive/5 text-xs text-destructive">
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>{errorText || 'Konfigurationen misslyckades. Kontrollera DNS-posterna.'}</span>
-            </div>
-          )}
-
-          {/* DNS records */}
-          {!isVerified && allRecords.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[11px] font-medium text-muted-foreground">DNS-poster</p>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                Lägg till DNS-posterna nedan hos din DNS-leverantör. När posterna har slagit igenom verifierar Tivly domänen automatiskt.
-              </p>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-[11px]">
-                  <thead className="bg-muted/40">
-                    <tr>
-                      <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground w-14">Typ</th>
-                      <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Namn</th>
-                      <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Värde</th>
-                      <th className="w-7"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allRecords.map((rec: any, i: number) => (
-                      <tr key={i} className="border-t border-border">
-                        <td className="px-2.5 py-2 font-mono font-medium">{rec.type}</td>
-                        <td className="px-2.5 py-2 font-mono text-muted-foreground truncate max-w-[120px]" title={rec.name}>{rec.name}</td>
-                        <td className="px-2.5 py-2 font-mono truncate max-w-[160px]" title={rec.value}>{rec.value}</td>
-                        <td className="px-1 py-2">
-                          <button onClick={() => copyToClipboard(rec.value)} className="p-1 hover:bg-muted rounded transition-colors" title="Kopiera">
-                            <Copy className="w-3 h-3 text-muted-foreground" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {(provider.name || provider.dashboardUrl) && (
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  {provider.name && <span>DNS-leverantör: <span className="font-medium text-foreground">{provider.name}</span></span>}
-                  {provider.dashboardUrl && (
-                    <a href={provider.dashboardUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-primary hover:text-primary/80">
-                      Öppna <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
+        {/* ── Phase: Enter hostname ── */}
+        {phase === 'enter_hostname' && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm">
+                <Globe className="w-4 h-4 text-primary" />
+                {addMode === 'tivly' ? 'Tivly-subdomän' : 'Egen domän'}
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                {addMode === 'tivly' ? 'Välj ett namn för din subdomän' : 'Ange din domänadress'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs">{addMode === 'tivly' ? 'Subdomännamn' : 'Domännamn'}</Label>
+                <div className="flex items-center">
+                  <Input
+                    value={hostnameInput}
+                    onChange={e => setHostnameInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                    placeholder={addMode === 'tivly' ? 'foretag' : 'workspace.foretag.se'}
+                    className={`h-9 text-sm ${addMode === 'tivly' ? 'rounded-r-none' : ''}`}
+                    autoFocus
+                  />
+                  {addMode === 'tivly' && (
+                    <span className="h-9 px-2.5 flex items-center text-xs text-muted-foreground bg-muted border border-l-0 border-input rounded-r-md">.tivly.se</span>
                   )}
                 </div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setPhase('pick_type'); setAddMode(null); setHostnameInput(''); }}>Tillbaka</Button>
+              <Button size="sm" className="text-xs gap-1" onClick={handleAdd} disabled={adding || !hostnameInput.trim()}>
+                {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                {adding ? 'Lägger till…' : 'Lägg till'}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {/* ── Phase: Onboarding (DNS setup) ── */}
+        {phase === 'onboarding' && domain && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+                {statusIcon(domain)}
+                <span className="font-mono truncate">{domain.hostname}</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Konfigurera DNS för att aktivera domänen
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Progress */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={`font-medium ${ONBOARDING_STATUS_LABELS[obStatus]?.color || ''}`}>
+                    {ONBOARDING_STATUS_LABELS[obStatus]?.label || 'Väntar'}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">{progress}%</span>
+                </div>
+                <Progress value={progress} className="h-1" />
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                  {ONBOARDING_STEPS.map((step, i) => {
+                    const stepIdx = ONBOARDING_STEPS.indexOf(obStatus as any);
+                    const done = stepIdx > i || obStatus === 'active';
+                    const current = step === obStatus;
+                    return (
+                      <span key={step} className={`${done ? 'text-green-600 dark:text-green-400' : current ? 'text-foreground font-medium' : ''}`}>
+                        {done ? '✓' : current ? '●' : '○'} {ONBOARDING_STATUS_LABELS[step]?.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Error */}
+              {(isFailed || onboarding?.status === 'failed') && (
+                <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/20 bg-destructive/5 text-xs text-destructive">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{errorText || 'Konfigurationen misslyckades. Kontrollera DNS-posterna.'}</span>
+                </div>
               )}
+
+              {/* DNS records */}
+              {allRecords.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-medium text-muted-foreground">DNS-poster att lägga till</p>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Lägg till DNS-posterna nedan hos din DNS-leverantör. När posterna har slagit igenom verifierar Tivly domänen automatiskt.
+                  </p>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground w-14">Typ</th>
+                          <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Namn</th>
+                          <th className="text-left px-2.5 py-1.5 font-medium text-muted-foreground">Värde</th>
+                          <th className="w-7"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allRecords.map((rec: any, i: number) => (
+                          <tr key={i} className="border-t border-border">
+                            <td className="px-2.5 py-2 font-mono font-medium">{rec.type}</td>
+                            <td className="px-2.5 py-2 font-mono text-muted-foreground truncate max-w-[120px]" title={rec.name}>{rec.name}</td>
+                            <td className="px-2.5 py-2 font-mono truncate max-w-[160px]" title={rec.value}>{rec.value}</td>
+                            <td className="px-1 py-2">
+                              <button onClick={() => copyToClipboard(rec.value)} className="p-1 hover:bg-muted rounded transition-colors" title="Kopiera">
+                                <Copy className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {(provider.name || provider.dashboardUrl) && (
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      {provider.name && <span>DNS-leverantör: <span className="font-medium text-foreground">{provider.name}</span></span>}
+                      {provider.dashboardUrl && (
+                        <a href={provider.dashboardUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-primary hover:text-primary/80">
+                          Öppna <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Send to IT button */}
+                  <a
+                    href={buildITEmailMailto(domain.hostname, allRecords)}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-1"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Skicka instruktioner till IT
+                  </a>
+                </div>
+              )}
+
+              {/* Helpful note */}
               <p className="text-[10px] text-muted-foreground">
-                Du kan också klicka på <strong>Verifiera</strong> om du vill kontrollera direkt. Propagering kan ta upp till 72 timmar.
+                Tivly verifierar domänen automatiskt i bakgrunden. Du kan också klicka <strong>Verifiera</strong> för att kontrollera direkt.
               </p>
-            </div>
-          )}
 
-          {/* Metadata */}
-          {(onboarding?.apexDomain || onboarding?.hostLabel || domain.verifiedAt || domain.lastCheckedAt) && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-2 border-t border-border">
-              {onboarding?.apexDomain && <span>Apex: <span className="font-mono">{onboarding.apexDomain}</span></span>}
-              {onboarding?.hostLabel && <span>Host: <span className="font-mono">{onboarding.hostLabel}</span></span>}
-              {domain.verifiedAt && <span>Verifierad: {formatTime(domain.verifiedAt)}</span>}
-              {domain.lastCheckedAt && <span>Kontrollerad: {formatTime(domain.lastCheckedAt)}</span>}
+              {/* Metadata */}
+              {(onboarding?.apexDomain || onboarding?.hostLabel || domain.lastCheckedAt) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-2 border-t border-border">
+                  {onboarding?.apexDomain && <span>Apex: <span className="font-mono">{onboarding.apexDomain}</span></span>}
+                  {onboarding?.hostLabel && <span>Host: <span className="font-mono">{onboarding.hostLabel}</span></span>}
+                  {domain.lastCheckedAt && <span>Kontrollerad: {formatTime(domain.lastCheckedAt)}</span>}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <DialogFooter className="gap-2 sm:gap-0 pt-2">
-          {canEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 text-xs"
-              onClick={() => { onDelete(domain.hostname); onOpenChange(false); }}
-              disabled={deletingHost === domain.hostname}
-            >
-              {deletingHost === domain.hostname ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-              Ta bort
-            </Button>
-          )}
-          <div className="flex-1" />
-          {!isVerified && canEdit && (
-            <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => onVerify(domain.hostname)} disabled={isPolling}>
-              {isPolling ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-              Verifiera
-            </Button>
-          )}
-          {isVerified && !isPrimary && canEdit && (
-            <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => { onSetPrimary(domain.hostname); onOpenChange(false); }} disabled={saving}>
-              <Shield className="w-3 h-3" />Sätt som primär
-            </Button>
-          )}
-        </DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              {canEdit && (
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 text-xs"
+                  onClick={() => { onDelete(domain.hostname); onOpenChange(false); }}
+                  disabled={deletingHost === domain.hostname}
+                >
+                  {deletingHost === domain.hostname ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Ta bort
+                </Button>
+              )}
+              <div className="flex-1" />
+              {canEdit && (
+                <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => onVerify(domain.hostname)} disabled={isPolling}>
+                  {isPolling ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  Verifiera
+                </Button>
+              )}
+            </DialogFooter>
+          </>
+        )}
+
+        {/* ── Phase: Verified ── */}
+        {phase === 'verified' && domain && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="font-mono truncate">{domain.hostname}</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                {domain.kind === 'tivly_subdomain' ? 'Tivly-subdomän' : 'Egen domän'}
+                {isPrimary ? ' · Primär inloggningsvärd' : ''}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                Domänen är verifierad och redo att användas.
+              </div>
+
+              {domain.verifiedAt && (
+                <p className="text-[10px] text-muted-foreground">Verifierad: {formatTime(domain.verifiedAt)}</p>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              {canEdit && (
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 text-xs"
+                  onClick={() => { onDelete(domain.hostname); onOpenChange(false); }}
+                  disabled={deletingHost === domain.hostname}
+                >
+                  {deletingHost === domain.hostname ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Ta bort
+                </Button>
+              )}
+              <div className="flex-1" />
+              {!isPrimary && canEdit && (
+                <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => { onSetPrimary(domain.hostname); onOpenChange(false); }} disabled={saving}>
+                  <Shield className="w-3 h-3" />Sätt som primär
+                </Button>
+              )}
+              <Button variant="outline" size="sm" className="text-xs" onClick={() => onOpenChange(false)}>
+                Stäng
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -390,9 +609,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
   const { toast } = useToast();
   const [domains, setDomains] = useState<DomainEntry[]>(customDomains?.domains || []);
   const [defaultLogin, setDefaultLogin] = useState<string | null>(customDomains?.defaultLoginHostname || null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [addMode, setAddMode] = useState<'tivly' | 'custom' | null>(null);
-  const [hostnameInput, setHostnameInput] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [verifyingHost, setVerifyingHost] = useState<string | null>(null);
   const [deletingHost, setDeletingHost] = useState<string | null>(null);
@@ -427,29 +644,26 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     setRefreshing(false);
   };
 
-  const handleAddDomain = async () => {
-    if (!hostnameInput.trim()) return;
-    const hostname = addMode === 'tivly'
-      ? (hostnameInput.trim().toLowerCase().replace(/\.tivly\.se$/, '') + '.tivly.se')
-      : hostnameInput.trim().toLowerCase();
-    setSaving(true);
-    try {
-      const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains`, {
-        method: 'POST', body: JSON.stringify({ hostname }),
-      });
-      toast({ title: 'Domän tillagd', description: `${hostname} har lagts till.` });
-      if (res.instructions || res.domain?.dnsRecords || res.onboarding) {
-        setAddResponse(prev => ({ ...prev, [hostname]: res }));
-      }
-      setHostnameInput('');
-      setAddMode(null);
-      setAddDialogOpen(false);
-      await refreshDomains();
-      setSelectedDomain(hostname);
-      if (addMode === 'tivly') startVerificationPoll(hostname);
-    } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
-    } finally { setSaving(false); }
+  const openAddDialog = () => {
+    setSelectedDomain(null);
+    setDialogOpen(true);
+  };
+
+  const openDomainDetail = (hostname: string) => {
+    setSelectedDomain(hostname);
+    setDialogOpen(true);
+  };
+
+  const handleDomainAdded = async (hostname: string, response: any) => {
+    if (response.instructions || response.domain?.dnsRecords || response.onboarding) {
+      setAddResponse(prev => ({ ...prev, [hostname]: response }));
+    }
+    setSelectedDomain(hostname);
+    await refreshDomains();
+    // Start polling for tivly subdomains
+    if (hostname.endsWith('.tivly.se')) {
+      startVerificationPoll(hostname);
+    }
   };
 
   const startVerificationPoll = (hostname: string) => {
@@ -496,6 +710,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       await apiFetch(`/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(hostname)}`, { method: 'DELETE' });
       toast({ title: 'Domän borttagen' });
       setAddResponse(prev => { const next = { ...prev }; delete next[hostname]; return next; });
+      setSelectedDomain(null);
       await refreshDomains(); onDomainsChanged?.();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
@@ -514,7 +729,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     } finally { setSaving(false); }
   };
 
-  const selectedDomainData = domains.find(d => d.hostname === selectedDomain);
+  const selectedDomainData = selectedDomain ? domains.find(d => d.hostname === selectedDomain) : null;
 
   return (
     <>
@@ -536,7 +751,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
               </Button>
             )}
             {canEdit && (
-              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setAddDialogOpen(true)}>
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={openAddDialog}>
                 <Plus className="w-3.5 h-3.5" />Lägg till
               </Button>
             )}
@@ -569,7 +784,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
               return (
                 <button
                   key={domain.hostname}
-                  onClick={() => setSelectedDomain(domain.hostname)}
+                  onClick={() => openDomainDetail(domain.hostname)}
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-muted/40 transition-colors"
                 >
                   {statusIcon(domain)}
@@ -590,7 +805,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
             <Globe className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p className="text-xs">Inga domäner konfigurerade.</p>
             {canEdit && (
-              <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-xs" onClick={() => setAddDialogOpen(true)}>
+              <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-xs" onClick={openAddDialog}>
                 <Plus className="w-3.5 h-3.5" />Lägg till domän
               </Button>
             )}
@@ -598,90 +813,24 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         )}
       </div>
 
-      {/* Detail dialog */}
-      {selectedDomainData && (
-        <DomainDetailDialog
-          domain={selectedDomainData}
-          open={!!selectedDomain}
-          onOpenChange={(open) => { if (!open) setSelectedDomain(null); }}
-          canEdit={canEdit}
-          defaultLogin={defaultLogin}
-          addResponse={addResponse}
-          onVerify={handleVerify}
-          onDelete={handleDelete}
-          onSetPrimary={handleSetPrimary}
-          onRefresh={refreshDomains}
-          verifyingHost={verifyingHost}
-          deletingHost={deletingHost}
-          saving={saving}
-        />
-      )}
-
-      {/* Add Domain Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) { setAddMode(null); setHostnameInput(''); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm">
-              <Globe className="w-4 h-4 text-primary" />Lägg till domän
-            </DialogTitle>
-            <DialogDescription className="text-xs">Välj domäntyp och ange adress</DialogDescription>
-          </DialogHeader>
-
-          {!addMode ? (
-            <div className="space-y-2 py-1">
-              <button
-                onClick={() => setAddMode('tivly')}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
-              >
-                <Shield className="w-4 h-4 text-primary shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Tivly-subdomän</p>
-                  <p className="text-[10px] text-muted-foreground">foretag.tivly.se — automatisk</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setAddMode('custom')}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
-              >
-                <Globe className="w-4 h-4 text-primary shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Egen domän</p>
-                  <p className="text-[10px] text-muted-foreground">workspace.foretag.se — kräver DNS</p>
-                </div>
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3 py-1">
-              <div className="space-y-1.5">
-                <Label className="text-xs">{addMode === 'tivly' ? 'Subdomännamn' : 'Domännamn'}</Label>
-                <div className="flex items-center">
-                  <Input
-                    value={hostnameInput}
-                    onChange={e => setHostnameInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddDomain()}
-                    placeholder={addMode === 'tivly' ? 'foretag' : 'workspace.foretag.se'}
-                    className={`h-9 text-sm ${addMode === 'tivly' ? 'rounded-r-none' : ''}`}
-                    autoFocus
-                  />
-                  {addMode === 'tivly' && (
-                    <span className="h-9 px-2.5 flex items-center text-xs text-muted-foreground bg-muted border border-l-0 border-input rounded-r-md">.tivly.se</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {addMode && (
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="ghost" size="sm" className="text-xs" onClick={() => setAddMode(null)}>Tillbaka</Button>
-              <Button size="sm" className="text-xs gap-1" onClick={handleAddDomain} disabled={saving || !hostnameInput.trim()}>
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                {saving ? 'Lägger till…' : 'Lägg till'}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Unified onboarding dialog */}
+      <DomainOnboardingDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setSelectedDomain(null); }}
+        companyId={companyId}
+        canEdit={canEdit}
+        defaultLogin={defaultLogin}
+        existingDomain={selectedDomainData || null}
+        addResponse={addResponse}
+        onDomainAdded={handleDomainAdded}
+        onVerify={handleVerify}
+        onDelete={handleDelete}
+        onSetPrimary={handleSetPrimary}
+        onRefresh={refreshDomains}
+        verifyingHost={verifyingHost}
+        deletingHost={deletingHost}
+        saving={saving}
+      />
     </>
   );
 }
