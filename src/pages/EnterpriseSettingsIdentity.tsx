@@ -11,8 +11,9 @@ export default function EnterpriseSettingsIdentityPage() {
       sectionSlug="identity-access"
     >
       {(ctx) => {
-        const settings = ctx.data?.settings ?? ctx.data ?? {};
-        const summary = ctx.data?.settingsSummary ?? ctx.data?.summary ?? {};
+        // Backend: response.data = { ssoEnabled, providers, ... }
+        const settings = ctx.sectionData;
+        const summary = ctx.settingsSummary ?? {};
 
         return (
           <IdentityContent
@@ -26,8 +27,8 @@ export default function EnterpriseSettingsIdentityPage() {
             onRemoveProvider={ctx.handleRemoveProvider}
             onResetProvider={ctx.handleResetProvider}
             providerReadiness={summary?.providerReadiness}
-            hasVerifiedDomain={!!(settings?.customDomains ?? ctx.data?.customDomains)?.domains?.some((d: any) => d.status === 'verified')}
-            defaultLoginHostname={settings?.customDomains?.defaultLoginHostname || summary?.defaultLoginHostname || null}
+            hasVerifiedDomain={summary?.ssoCustomDomainReady ?? false}
+            defaultLoginHostname={summary?.defaultLoginHostname || null}
           />
         );
       }}

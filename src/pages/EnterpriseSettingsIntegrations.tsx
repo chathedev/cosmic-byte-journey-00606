@@ -12,7 +12,7 @@ export default function EnterpriseSettingsIntegrationsPage() {
     >
       {(ctx) => (
         <IntegrationsContent
-          settings={ctx.data?.settings ?? ctx.data ?? {}}
+          settings={ctx.sectionData}
           locks={ctx.locks}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}

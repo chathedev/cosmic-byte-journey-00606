@@ -12,7 +12,7 @@ export default function EnterpriseSettingsMeetingsPage() {
     >
       {(ctx) => (
         <EnterpriseSettingsMeeting
-          settings={ctx.data?.settings ?? ctx.data ?? {}}
+          settings={ctx.sectionData}
           locks={ctx.locks}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
