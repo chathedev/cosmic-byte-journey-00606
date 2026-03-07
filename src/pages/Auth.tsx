@@ -355,16 +355,20 @@ export default function Auth() {
           {/* Left panel — branding (desktop only) */}
           <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12 min-h-screen sticky top-0">
             <div className="max-w-sm space-y-8">
-              <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
+              {workspace?.branding?.logoUrl ? (
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" />
+              ) : (
+                <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
+              )}
               <div className="space-y-3">
                 <h2 className="text-2xl font-semibold text-foreground tracking-tight">
-                  Mötesprotokoll på sekunder
+                  {workspace?.branding?.loginTitle || 'Mötesprotokoll på sekunder'}
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.
+                  {workspace?.branding?.loginSubtitle || 'Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.'}
                 </p>
               </div>
-              {onboardingEnabled && (
+              {!isCustomDomain && onboardingEnabled && (
                 <div className="pt-4">
                   <a
                     href="/team/onboarding"
@@ -381,7 +385,11 @@ export default function Auth() {
           <div className="flex-1 relative flex flex-col items-center px-5 sm:px-8 py-10 sm:py-12 min-h-[100svh] md:min-h-[100dvh] lg:min-h-screen justify-start lg:justify-center">
             {/* Mobile logo */}
             <div className="lg:hidden flex justify-center mb-8">
-              <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
+              {workspace?.branding?.logoUrl ? (
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-8 w-auto" />
+              ) : (
+                <img src={tivlyLogo} alt="Tivly" className="h-8 w-auto" />
+              )}
             </div>
 
             <div className="w-full max-w-[380px] mx-auto">
