@@ -47,6 +47,15 @@ export interface WorkspaceBranding {
   termsUrl?: string;
 }
 
+export interface ProviderReadinessInfo {
+  enabled: boolean;
+  configured: boolean;
+  ready: boolean;
+  lastTestedAt: string | null;
+  lastTestResult: string | null;
+  lastError: string | null;
+}
+
 export interface PublicWorkspaceInfo {
   companyId: string;
   companyName: string;
@@ -58,6 +67,7 @@ export interface PublicWorkspaceInfo {
   allowedProviders: string[];
   enabledProviders: string[];
   primaryProvider: string | null;
+  providerReadiness: Record<string, ProviderReadinessInfo>;
   branding: WorkspaceBranding;
 }
 
