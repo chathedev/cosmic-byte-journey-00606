@@ -28,6 +28,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
   const [wordmarkUrl, setWordmarkUrl] = useState((branding as any).wordmarkUrl || '');
   const [faviconUrl, setFaviconUrl] = useState((branding as any).faviconUrl || '');
+  const [primaryColor, setPrimaryColor] = useState(branding.primaryColor || '');
+  const [accentColor, setAccentColor] = useState((branding as any).accentColor || '');
   const [loginTitle, setLoginTitle] = useState((branding as any).loginTitle || '');
   const [loginSubtitle, setLoginSubtitle] = useState((branding as any).loginSubtitle || '');
   const [supportEmail, setSupportEmail] = useState((branding as any).supportEmail || '');
@@ -37,6 +39,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const [emailBrandingEnabled, setEmailBrandingEnabled] = useState(branding.emailBrandingEnabled ?? false);
   const [domainRestrictedInvites, setDomainRestrictedInvites] = useState(invitePolicy.domainRestrictedInvites ?? false);
   const [allowExternalGuests, setAllowExternalGuests] = useState(invitePolicy.allowExternalGuests ?? false);
+  const [requireApprovalForExternalGuests, setRequireApprovalForExternalGuests] = useState(invitePolicy.requireApprovalForExternalGuests ?? false);
   const [teamManagementEnabled, setTeamManagementEnabled] = useState(settings.teamManagementEnabled ?? true);
 
   // Sync from props when settings change (e.g. after save)
