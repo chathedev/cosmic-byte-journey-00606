@@ -166,6 +166,41 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           
           {fieldRow('Ordmärke (wordmark) URL', wordmarkUrl, setWordmarkUrl, 'branding.wordmarkUrl', 'https://example.se/wordmark.png')}
           {fieldRow('Favicon URL', faviconUrl, setFaviconUrl, 'branding.faviconUrl', 'https://example.se/favicon.ico')}
+          
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Primärfärg</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={primaryColor}
+                  onChange={e => setPrimaryColor(e.target.value)}
+                  disabled={!canEdit || isLocked('branding.primaryColor') || saving}
+                  className="h-9 text-sm flex-1"
+                  placeholder="#0066FF"
+                />
+                {primaryColor && (
+                  <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: primaryColor }} />
+                )}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Accentfärg</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={accentColor}
+                  onChange={e => setAccentColor(e.target.value)}
+                  disabled={!canEdit || isLocked('branding.accentColor') || saving}
+                  className="h-9 text-sm flex-1"
+                  placeholder="#FF6600"
+                />
+                {accentColor && (
+                  <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: accentColor }} />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
