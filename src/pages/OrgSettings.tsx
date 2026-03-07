@@ -123,16 +123,6 @@ export default function OrgSettings() {
                 <span>Integrationer</span>
               </TabsTrigger>
             )}
-            {isAdminOrOwner && companyId && commercialPlan === 'enterprise' && (
-              <TabsTrigger
-                value="enterprise"
-                className="rounded-lg gap-1.5 text-xs sm:text-sm px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                onClick={() => navigate('/org/enterprise-settings')}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                <span>Enterprise</span>
-              </TabsTrigger>
-            )}
           </TabsList>
 
           {/* Team tab */}
