@@ -249,11 +249,11 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
 
       {/* Role Editor Dialog */}
       <Dialog open={!!editRole} onOpenChange={open => !open && setEditRole(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{isNew ? 'Skapa roll' : 'Redigera roll'}</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 pr-4">
+          <ScrollArea className="flex-1 min-h-0 pr-4">
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Namn</Label>
