@@ -288,6 +288,39 @@ export default function Auth() {
     return <NoAppAccessScreen onLogout={() => { setViewMode('email'); setEmail(''); setPinCode(''); }} />;
   }
 
+  if (viewMode === 'enterprise-sso-redirect' && enterpriseRedirect) {
+    return (
+      <div className="relative min-h-[100svh] bg-background flex items-center justify-center p-5">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <Shield className="w-8 h-8 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold text-foreground">Enterprise SSO krävs</h1>
+            <p className="text-sm text-muted-foreground">
+              Din organisation använder Enterprise SSO. Du behöver logga in via din organisations inloggningssida.
+            </p>
+          </div>
+          {enterpriseRedirect.origin && (
+            <a
+              href={enterpriseRedirect.origin}
+              className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Gå till {enterpriseRedirect.hostname || 'din arbetsyta'}
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          )}
+          <button
+            onClick={() => { setViewMode('email'); setEnterpriseRedirect(null); setAuthError(null); }}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Tillbaka
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-[100svh] md:min-h-[100dvh] bg-background overflow-x-hidden flex flex-col">
       {/* Main area — NO fixed height, allows natural scroll on mobile */}
