@@ -484,6 +484,10 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     try {
       const res = await apiFetch(`/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(hostname)}/verify`, { method: 'POST' });
       const d = res.domain;
+      if (d) {
+        // Optimistic: update domain in-place from response
+        setDomains(prev => prev.map(dom => dom.hostname === hostname ? { ...dom, ...d } : dom));
+      }
       if (d?.status === 'verified') {
         toast({ title: 'Domän verifierad!', description: `${hostname} är nu klar.` });
       } else if (d?.status === 'pending') {
@@ -491,7 +495,8 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       } else if (d?.status === 'failed') {
         toast({ title: 'Verifiering misslyckades', description: getErrorText(d) || 'Kontrollera DNS-posterna.', variant: 'destructive' });
       }
-      await refreshDomains();
+      // Background sync
+      refreshDomains();
     } catch (err: any) {
       toast({ title: 'Verifiering misslyckades', description: err.message, variant: 'destructive' });
     } finally { setVerifyingHost(null); }
