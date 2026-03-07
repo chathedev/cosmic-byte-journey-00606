@@ -29,8 +29,8 @@ interface Props {
   locks: Record<string, SettingsLock>;
   canEdit: boolean;
   onUpdate: (patch: Record<string, any>) => Promise<void>;
-  onTestSSO?: (provider: string) => Promise<void>;
-  onConnectSSO?: (provider: string) => Promise<void>;
+  onTestSSO?: (provider: string, config?: Record<string, any>) => Promise<void>;
+  onConnectSSO?: (provider: string, config?: Record<string, any>) => Promise<void>;
   onDisableProvider?: (provider: string) => Promise<void>;
   onRemoveProvider?: (provider: string) => Promise<void>;
   onResetProvider?: (provider: string) => Promise<void>;
@@ -87,8 +87,12 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [actionProvider, setActionProvider] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false); // for provider actions only
+  const [saving, setSaving] = useState(false);
   const [domainInput, setDomainInput] = useState('');
+  // OIDC inline config
+  const [oidcIssuer, setOidcIssuer] = useState('');
+  const [oidcClientId, setOidcClientId] = useState('');
+  const [oidcClientSecret, setOidcClientSecret] = useState('');
 
   // Local state for all identity settings
   const [ssoEnabled, setSsoEnabled] = useState(settings.ssoEnabled ?? false);
@@ -177,16 +181,24 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
     setDomainRestrictions(domainRestrictions.filter(d => d !== domain));
   };
 
+  const getOidcConfig = () => {
+    const cfg: Record<string, string> = {};
+    if (oidcIssuer.trim()) cfg.issuer = oidcIssuer.trim();
+    if (oidcClientId.trim()) cfg.clientId = oidcClientId.trim();
+    if (oidcClientSecret.trim()) cfg.clientSecret = oidcClientSecret.trim();
+    return Object.keys(cfg).length > 0 ? cfg : undefined;
+  };
+
   const handleTestProvider = async (key: string) => {
     if (!onTestSSO) return;
     setTestingProvider(key);
-    try { await onTestSSO(key); } finally { setTestingProvider(null); }
+    try { await onTestSSO(key, key === 'oidc' ? getOidcConfig() : undefined); } finally { setTestingProvider(null); }
   };
 
   const handleConnectProvider = async (key: string) => {
     if (!onConnectSSO) return;
     setConnectingProvider(key);
-    try { await onConnectSSO(key); } finally { setConnectingProvider(null); }
+    try { await onConnectSSO(key, key === 'oidc' ? getOidcConfig() : undefined); } finally { setConnectingProvider(null); }
   };
 
   const providers = settings.providers || {};
@@ -351,9 +363,46 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                           Hosted domain: <span className="font-medium text-foreground">{provider.hostedDomain}</span>
                         </div>
                       )}
-                      {key === 'oidc' && provider?.issuer && (
-                        <div className="text-[11px] text-muted-foreground truncate">
-                          Issuer: <span className="font-medium text-foreground">{provider.issuer}</span>
+                      {key === 'oidc' && (
+                        <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">OIDC-konfiguration</p>
+                          {provider?.issuer && (
+                            <div className="text-[11px] text-muted-foreground truncate">
+                              Sparad issuer: <span className="font-medium text-foreground">{provider.issuer}</span>
+                            </div>
+                          )}
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Issuer URL</Label>
+                            <Input
+                              value={oidcIssuer}
+                              onChange={e => setOidcIssuer(e.target.value)}
+                              placeholder="https://company.okta.com/oauth2/default"
+                              className="h-8 text-xs"
+                              disabled={!canEdit || saving}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Client ID</Label>
+                            <Input
+                              value={oidcClientId}
+                              onChange={e => setOidcClientId(e.target.value)}
+                              placeholder="Client ID"
+                              className="h-8 text-xs"
+                              disabled={!canEdit || saving}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Client Secret</Label>
+                            <Input
+                              type="password"
+                              value={oidcClientSecret}
+                              onChange={e => setOidcClientSecret(e.target.value)}
+                              placeholder="Client Secret"
+                              className="h-8 text-xs"
+                              disabled={!canEdit || saving}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Backend hämtar endpoints automatiskt via <code>.well-known/openid-configuration</code></p>
                         </div>
                       )}
                       {lastTestedAt && (
@@ -366,7 +415,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                         </div>
                       )}
 
-                      {/* Actions — these are immediate (test/connect are not buffered) */}
+                      {/* Actions */}
                       <div className="flex flex-wrap gap-2 pt-1">
                         {onTestSSO && (
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || !!actionProvider || saving}>

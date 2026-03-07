@@ -292,10 +292,10 @@ export function deleteEnterpriseRole(companyId: string, roleId: string): Promise
   });
 }
 
-export function testSSO(companyId: string, provider: string): Promise<SSOTestResult> {
+export function testSSO(companyId: string, provider: string, config?: Record<string, any>): Promise<SSOTestResult> {
   return apiFetch(`/enterprise/companies/${companyId}/settings/sso/test`, {
     method: 'POST',
-    body: JSON.stringify({ provider }),
+    body: JSON.stringify({ provider, ...(config || {}) }),
   });
 }
 
