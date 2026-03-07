@@ -78,6 +78,14 @@ export default function Auth() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const isCustomDomain = isEnterpriseCustomDomain();
 
+  // Determine if SSO providers are available (don't rely solely on ssoEnabled flag)
+  const hasSSO = !!(
+    workspace &&
+    (workspace.ssoEnabled ||
+      (workspace.allowedProviders?.some(p => p && p !== 'email')) ||
+      (workspace.primaryProvider && workspace.primaryProvider !== 'email'))
+  );
+
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
     const isIosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
