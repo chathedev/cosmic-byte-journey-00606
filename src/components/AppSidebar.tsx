@@ -21,7 +21,7 @@ import {
   FiX,
   FiAlertTriangle,
 } from "react-icons/fi";
-import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users, FileText } from "lucide-react";
+import { Lock, Eye, DollarSign, BarChart3, Mic, CreditCard, Users, FileText, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -89,8 +89,10 @@ export function AppSidebar() {
   const plusAccess = planLoading ? false : hasPlusAccess(user, userPlan);
   const libraryLocked = planLoading ? false : isLibraryLocked(user, userPlan);
   const agendasLocked = planLoading ? false : (!unlimited && !plusAccess);
-  
+  const commercialPlan = enterpriseMembership?.company?.planType || (enterpriseMembership?.company as any)?.plan;
 
+  const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
+    (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
   const meetingsUsed = !planLoading && userPlan ? (userPlan.meetingsUsed ?? 0) : 0;
   const meetingsLimit = !planLoading && userPlan ? (userPlan.meetingsLimit ?? null) : null;
   const meetingsLeft = meetingsLimit !== null ? Math.max(0, Number(meetingsLimit) - Number(meetingsUsed)) : null;
@@ -121,6 +123,7 @@ export function AppSidebar() {
     else if (path.startsWith("/integrations")) setSelected("Integrationer");
     else if (path === "/settings" || path.startsWith("/settings/")) setSelected("Inställningar");
     else if (path === "/enterprise/stats" || path.startsWith("/enterprise/stats/")) setSelected("Översikt");
+    else if (path === "/org/enterprise-settings" || path.startsWith("/org/enterprise-settings/")) setSelected("Enterprise");
     else if (path === "/org/settings" || path.startsWith("/org/settings/")) setSelected("Team");
     else if (path === "/org/billing" || path.startsWith("/org/billing/")) setSelected("Fakturering");
     else if (path.startsWith("/billing/invoices")) setSelected("Fakturor");
@@ -139,7 +142,7 @@ export function AppSidebar() {
     }
 
     // Auto-expand org section if on an org page
-    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices'].some(p => path.startsWith(p))) {
+    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices', '/org/enterprise-settings'].some(p => path.startsWith(p))) {
       setOrgExpanded(true);
     }
   }, [location.pathname]);
@@ -198,8 +201,6 @@ export function AppSidebar() {
         { Icon: FiZap, title: "Integrationer", path: "/integrations", locked: false },
       ];
 
-  const isEnterpriseOwnerOrAdmin = enterpriseMembership?.isMember && 
-    (enterpriseMembership.membership?.role === 'owner' || enterpriseMembership.membership?.role === 'admin');
 
   const orgSubItems = isEnterpriseViewer
     ? [
@@ -208,6 +209,7 @@ export function AppSidebar() {
     : [
         ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
         { Icon: Users, title: "Team", path: "/org/settings" },
+        ...(isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise' ? [{ Icon: Shield, title: "Enterprise", path: "/org/enterprise-settings" }] : []),
         { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
         { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
       ];
