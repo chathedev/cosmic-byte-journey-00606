@@ -67,6 +67,7 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
   const { enterpriseMembership, userPlan } = useSubscription();
   const isEnterprise = userPlan?.plan === 'enterprise' || enterpriseMembership?.isMember === true;
   const companyId = enterpriseMembership?.company?.id;
+  const isCustomHost = isEnterpriseCustomDomain();
 
   // Initialize from cache unconditionally to prevent flash
   // (companyId may not be available yet on first render)
