@@ -480,7 +480,8 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthProvider>
-      <SubscriptionProvider>
+       <SubscriptionProvider>
+        <EnterpriseBrandingProvider>
         <Suspense
           fallback={
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -494,6 +495,7 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
             <Route path="/free-trial" element={<FreeTrial />} />
           </Routes>
         </Suspense>
+        </EnterpriseBrandingProvider>
       </SubscriptionProvider>
     </AuthProvider>
   );
