@@ -606,7 +606,17 @@ export default function Auth() {
 
             {/* Footer inside the form panel */}
             <div className="hidden lg:flex w-full justify-center absolute bottom-6 left-0">
-              <p className="text-[11px] text-muted-foreground/50 text-center">© {new Date().getFullYear()} <a href="https://lyrio.se" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">Lyrio AB</a></p>
+              <p className="text-[11px] text-muted-foreground/50 text-center">
+                {isCustomDomain && workspace?.branding?.supportUrl ? (
+                  <>
+                    <a href={workspace.branding.supportUrl} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+                      Support
+                    </a>
+                    {' · '}
+                  </>
+                ) : null}
+                © {new Date().getFullYear()} <a href="https://lyrio.se" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">Lyrio AB</a>
+              </p>
             </div>
           </div>
         </div>
