@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
-import { translateError } from '@/lib/errorTranslation';
 import {
   getEnterpriseSettings, updateEnterpriseSettings, testSSO, connectSSO,
   disableSSOProvider, removeSSOProvider, resetSSOProvider,
@@ -48,7 +47,7 @@ export function useEnterpriseSettings() {
       if (err.status === 423) {
         toast({ title: 'Låst inställning', description: 'Denna inställning är låst av en administratör.', variant: 'destructive' });
       } else {
-        toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
+        toast({ title: 'Fel', description: err.message, variant: 'destructive' });
       }
     }
   };
@@ -59,7 +58,7 @@ export function useEnterpriseSettings() {
       const result = await testSSO(companyId, provider, config);
       toast({ title: result.ready ? `${provider} är redo` : `${provider} saknar konfiguration` });
     } catch (err: any) {
-      toast({ title: 'SSO-test misslyckades', description: translateError(err.message), variant: 'destructive' });
+      toast({ title: 'SSO-test misslyckades', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -69,7 +68,7 @@ export function useEnterpriseSettings() {
       const result = await connectSSO(companyId, provider, config);
       if (result.authorizationUrl) window.location.href = result.authorizationUrl;
     } catch (err: any) {
-      toast({ title: 'Anslutning misslyckades', description: translateError(err.message), variant: 'destructive' });
+      toast({ title: 'Anslutning misslyckades', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -80,7 +79,7 @@ export function useEnterpriseSettings() {
       toast({ title: `${provider} inaktiverad`, description: 'Providern är pausad men konfigurationen finns kvar.' });
       await loadSettings();
     } catch (err: any) {
-      toast({ title: 'Kunde inte inaktivera', description: translateError(err.message), variant: 'destructive' });
+      toast({ title: 'Kunde inte inaktivera', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -91,7 +90,7 @@ export function useEnterpriseSettings() {
       toast({ title: `${provider} borttagen`, description: 'Providern och dess konfiguration har raderats.' });
       await loadSettings();
     } catch (err: any) {
-      toast({ title: 'Kunde inte ta bort', description: translateError(err.message), variant: 'destructive' });
+      toast({ title: 'Kunde inte ta bort', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -102,7 +101,7 @@ export function useEnterpriseSettings() {
       toast({ title: `${provider} återställd`, description: 'Nästa anslutningsförsök kräver interaktiv godkännande.' });
       await loadSettings();
     } catch (err: any) {
-      toast({ title: 'Kunde inte återställa', description: translateError(err.message), variant: 'destructive' });
+      toast({ title: 'Kunde inte återställa', description: err.message, variant: 'destructive' });
     }
   };
 
