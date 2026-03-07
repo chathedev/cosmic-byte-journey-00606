@@ -89,32 +89,43 @@ export default function SSOCallback() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const sessionToken = readSessionToken(searchParams);
-    const errorParam = searchParams.get('error');
+    console.log('[SSOCallback] URL:', window.location.href);
+    console.log('[SSOCallback] pathname:', window.location.pathname);
+    console.log('[SSOCallback] search:', window.location.search);
+    console.log('[SSOCallback] hash:', window.location.hash);
 
-    // Only show direct error when no session token alias exists (backend can include token even on failure)
+    const sessionToken = readSessionToken(searchParams);
+    const errorParam = searchParams.get('error') || getAllSearchParams().get('error');
+
+    // Only show direct error when no session token alias exists
     if (errorParam && !sessionToken) {
-      const msg = ERROR_MESSAGES[errorParam] || searchParams.get('error_description') || 'SSO-inloggning misslyckades.';
+      const msg = ERROR_MESSAGES[errorParam] || searchParams.get('error_description') || getAllSearchParams().get('error_description') || 'SSO-inloggning misslyckades.';
       setError(msg);
       setErrorCode(errorParam);
       return;
     }
 
     if (!sessionToken) {
+      console.error('[SSOCallback] No session token found in URL');
       setError('Ingen SSO-session hittades. Försök logga in igen.');
       return;
     }
+
+    console.log('[SSOCallback] Found session token, exchanging...');
 
     (async () => {
       try {
         const result = await exchangeSSOSession(sessionToken);
         const typedResult = result as any;
+        console.log('[SSOCallback] Exchange result keys:', Object.keys(typedResult));
 
         if (typedResult.token) {
           apiClient.applyAuthToken(typedResult.token);
           setSuccess(true);
           await refreshUser();
+          // Always navigate to root on custom domains; use redirectTarget on generic domain
           const target = typedResult.redirectTarget || '/';
+          console.log('[SSOCallback] Redirecting to:', target);
           setTimeout(() => navigate(target, { replace: true }), 600);
           return;
         }
