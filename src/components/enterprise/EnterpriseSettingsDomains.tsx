@@ -491,12 +491,18 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     setDeletingHost(hostname);
     try {
       await apiFetch(`/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(hostname)}`, { method: 'DELETE' });
-      toast({ title: 'Domän borttagen' });
+      // Optimistic: remove from UI immediately
+      setDomains(prev => prev.filter(d => d.hostname !== hostname));
       setAddResponse(prev => { const next = { ...prev }; delete next[hostname]; return next; });
       if (expandedDomain === hostname) setExpandedDomain(null);
-      await refreshDomains();
+      if (defaultLogin === hostname) setDefaultLogin(null);
+      toast({ title: 'Domän borttagen' });
+      // Background sync to ensure consistency
+      refreshDomains();
     } catch (err: any) {
       toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      // Revert on error by re-fetching
+      await refreshDomains();
     } finally { setDeletingHost(null); }
   };
 
