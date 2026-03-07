@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw, Ban, Trash2, RotateCcw } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
-import { useAutoSave } from '@/hooks/useAutoSave';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -143,32 +142,57 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const isLocked = (path: string) => !!locks[`identityAccess.${path}`]?.locked;
   const getLock = (path: string) => locks[`identityAccess.${path}`];
 
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
   const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    const providerPatch: Record<string, any> = {};
-    PROVIDERS.forEach(p => {
-      const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
-      if (providerEnabled[p.key] !== orig) {
-        providerPatch[p.key] = { enabled: providerEnabled[p.key] };
-      }
-    });
-    await onUpdate({
-      identityAccess: {
-        ssoEnabled,
-        ssoOnlyLogin,
-        primaryProvider: primaryProvider || undefined,
-        fallbackPolicy,
-        jitProvisioningEnabled,
-        groupSyncEnabled,
-        scimEnabled,
-        defaultAnchorRole,
-        domainRestrictions,
-        ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
-      },
-    });
+    setSaveStatus('saving');
+    try {
+      const providerPatch: Record<string, any> = {};
+      PROVIDERS.forEach(p => {
+        const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
+        if (providerEnabled[p.key] !== orig) {
+          providerPatch[p.key] = { enabled: providerEnabled[p.key] };
+        }
+      });
+      await onUpdate({
+        identityAccess: {
+          ssoEnabled,
+          ssoOnlyLogin,
+          primaryProvider: primaryProvider || undefined,
+          fallbackPolicy,
+          jitProvisioningEnabled,
+          groupSyncEnabled,
+          scimEnabled,
+          defaultAnchorRole,
+          domainRestrictions,
+          ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
+        },
+      });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2500);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 4000);
+    }
   }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
 
-  const { status: autoSaveStatus } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
+  const handleDiscard = useCallback(() => {
+    setSsoEnabled(settings.ssoEnabled ?? false);
+    setSsoOnlyLogin(settings.ssoOnlyLogin ?? false);
+    setPrimaryProvider(settings.primaryProvider || '');
+    setFallbackPolicy(settings.fallbackPolicy || 'sso_only');
+    setJitProvisioningEnabled(settings.jitProvisioningEnabled ?? false);
+    setGroupSyncEnabled(settings.groupSyncEnabled ?? false);
+    setScimEnabled(settings.scimEnabled ?? false);
+    setDefaultAnchorRole(settings.defaultAnchorRole || 'member');
+    setDomainRestrictions(settings.domainRestrictions || []);
+    const pe: Record<string, boolean> = {};
+    const providers = settings.providers || {};
+    PROVIDERS.forEach(p => { pe[p.key] = (providers as any)[p.key]?.enabled ?? false; });
+    setProviderEnabled(pe);
+    setSaveStatus('idle');
+  }, [settings]);
 
   const addDomain = () => {
     const d = domainInput.trim().toLowerCase();
@@ -205,7 +229,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar status={autoSaveStatus} />
+      <EnterpriseSaveBar status={saveStatus} isDirty={isDirty} onSave={handleSave} onDiscard={handleDiscard} disabled={!canEdit} />
       {/* SSO Master Toggle */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start justify-between">
