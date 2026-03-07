@@ -38,9 +38,20 @@ if ('serviceWorker' in navigator) {
 
 const rootElement = document.getElementById("root")!;
 
+// Fix doubled SSO callback URLs (e.g. /auth/sso/callback/https://host/auth/sso/callback?token=...)
+const ssoCallbackPath = '/auth/sso/callback';
+if (window.location.pathname.includes(ssoCallbackPath) && window.location.pathname !== ssoCallbackPath) {
+  const fullUrl = window.location.href;
+  const lastQ = fullUrl.lastIndexOf('?');
+  const queryPart = lastQ !== -1 ? fullUrl.slice(lastQ) : '';
+  const hashPart = window.location.hash || '';
+  console.log('[main] Fixing doubled SSO callback URL:', window.location.pathname);
+  window.history.replaceState({}, document.title, ssoCallbackPath + queryPart + hashPart);
+}
+
 // Migrate legacy hash URLs (/#/feedback → /feedback)
 if (window.location.hash.startsWith("#/")) {
-  const cleanPath = window.location.hash.slice(1); // "#/feedback" → "/feedback"
+  const cleanPath = window.location.hash.slice(1);
   window.history.replaceState({}, document.title, cleanPath + window.location.search);
 }
 
