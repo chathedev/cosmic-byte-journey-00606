@@ -394,6 +394,7 @@ const AppContent = () => {
             >
               <Routes>
                 <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
+                <Route path="/auth/sso/callback" element={<SSOCallback />} />
                 <Route path="/auth/handoff" element={<AuthHandoff />} />
                 <Route path="/magic-login" element={<MagicLogin />} />
                 
