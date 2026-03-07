@@ -157,7 +157,7 @@ const SharedProtocol = () => {
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src={tivlyLogo} alt="Tivly" className="h-6 w-auto" />
+            <img src={data.branding?.logoUrl || tivlyLogo} alt={data.branding?.workspaceName || "Tivly"} className="h-6 w-auto" />
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
               Delat protokoll
             </Badge>
