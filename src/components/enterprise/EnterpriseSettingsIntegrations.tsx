@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link2, Code } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ const INTEGRATIONS = [
 ];
 
 export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
+  
 
   // Local state
   const [integrationStates, setIntegrationStates] = useState<Record<string, boolean>>({});
@@ -52,23 +53,20 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
     );
   }, [integrationStates, apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled, settings]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      const patch: Record<string, any> = { apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled };
-      INTEGRATIONS.forEach(({ key }) => {
-        patch[key] = { enabled: integrationStates[key] };
-      });
-      await onUpdate({ integrations: patch });
-    } finally {
-      setSaving(false);
-    }
-  };
+    const patch: Record<string, any> = { apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled };
+    INTEGRATIONS.forEach(({ key }) => {
+      patch[key] = { enabled: integrationStates[key] };
+    });
+    await onUpdate({ integrations: patch });
+  }, [canEdit, isDirty, apiAccessEnabled, webhooksEnabled, customIntegrationsEnabled, integrationStates, onUpdate]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
+      <EnterpriseSaveBar status={autoSaveStatus} />
       {/* Service Integrations */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">

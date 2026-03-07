@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Building2, Palette, Users, Lock, Mail, Link2 } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +18,6 @@ interface Props {
 }
 
 export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
   const { refreshBranding } = useEnterpriseBranding();
   const branding = settings.branding || {};
   const invitePolicy = settings.invitePolicy || {};
@@ -81,38 +81,35 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      await onUpdate({
-        adminWorkspace: {
-          branding: {
-            workspaceDisplayName: workspaceName || null,
-            legalEntityName: legalName || null,
-            logoUrl: logoUrl || null,
-            wordmarkUrl: wordmarkUrl || null,
-            faviconUrl: faviconUrl || null,
-            loginTitle: loginTitle || null,
-            loginSubtitle: loginSubtitle || null,
-            supportEmail: supportEmail || null,
-            supportUrl: supportUrl || null,
-            privacyUrl: privacyUrl || null,
-            termsUrl: termsUrl || null,
-            emailBrandingEnabled,
-          },
-          invitePolicy: {
-            domainRestrictedInvites,
-            allowExternalGuests,
-          },
-          teamManagementEnabled,
+    await onUpdate({
+      adminWorkspace: {
+        branding: {
+          workspaceDisplayName: workspaceName || null,
+          legalEntityName: legalName || null,
+          logoUrl: logoUrl || null,
+          wordmarkUrl: wordmarkUrl || null,
+          faviconUrl: faviconUrl || null,
+          loginTitle: loginTitle || null,
+          loginSubtitle: loginSubtitle || null,
+          supportEmail: supportEmail || null,
+          supportUrl: supportUrl || null,
+          privacyUrl: privacyUrl || null,
+          termsUrl: termsUrl || null,
+          emailBrandingEnabled,
         },
-      });
-      await refreshBranding();
-    } finally {
-      setSaving(false);
-    }
-  };
+        invitePolicy: {
+          domainRestrictedInvites,
+          allowExternalGuests,
+        },
+        teamManagementEnabled,
+      },
+    });
+    await refreshBranding();
+  }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave, debounceMs: 1200 });
 
   const fieldRow = (label: string, value: string, setter: (v: string) => void, path: string, placeholder: string) => (
     <div className="space-y-1.5">
@@ -129,7 +126,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
+      <EnterpriseSaveBar status={autoSaveStatus} />
       {/* Branding & Identity */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">

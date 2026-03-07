@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw, Ban, Trash2, RotateCcw } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,7 +89,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [actionProvider, setActionProvider] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); // for provider actions only
   const [domainInput, setDomainInput] = useState('');
 
   // Local state for all identity settings
@@ -140,35 +141,32 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const isLocked = (path: string) => !!locks[`identityAccess.${path}`]?.locked;
   const getLock = (path: string) => locks[`identityAccess.${path}`];
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      const providerPatch: Record<string, any> = {};
-      PROVIDERS.forEach(p => {
-        const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
-        if (providerEnabled[p.key] !== orig) {
-          providerPatch[p.key] = { enabled: providerEnabled[p.key] };
-        }
-      });
-      await onUpdate({
-        identityAccess: {
-          ssoEnabled,
-          ssoOnlyLogin,
-          primaryProvider: primaryProvider || undefined,
-          fallbackPolicy,
-          jitProvisioningEnabled,
-          groupSyncEnabled,
-          scimEnabled,
-          defaultAnchorRole,
-          domainRestrictions,
-          ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
-        },
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+    const providerPatch: Record<string, any> = {};
+    PROVIDERS.forEach(p => {
+      const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
+      if (providerEnabled[p.key] !== orig) {
+        providerPatch[p.key] = { enabled: providerEnabled[p.key] };
+      }
+    });
+    await onUpdate({
+      identityAccess: {
+        ssoEnabled,
+        ssoOnlyLogin,
+        primaryProvider: primaryProvider || undefined,
+        fallbackPolicy,
+        jitProvisioningEnabled,
+        groupSyncEnabled,
+        scimEnabled,
+        defaultAnchorRole,
+        domainRestrictions,
+        ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
+      },
+    });
+  }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
+
+  const { status: autoSaveStatus } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   const addDomain = () => {
     const d = domainInput.trim().toLowerCase();
@@ -197,7 +195,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
+      <EnterpriseSaveBar status={autoSaveStatus} />
       {/* SSO Master Toggle */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start justify-between">

@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Video, FileText, Mic, Sparkles, CheckCircle2 } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,6 @@ interface Props {
 }
 
 export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
   const isLocked = (path: string) => !!locks[`meetingContentControls.${path}`]?.locked;
 
   // Local state
@@ -57,30 +57,27 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
     );
   }, [recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, settings]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      await onUpdate({
-        meetingContentControls: {
-          recordingAllowed,
-          transcriptionAllowed,
-          aiSummaryAllowed,
-          speakerIdentificationAllowed,
-          protocolTemplatesEnabled,
-          approvalWorkflowEnabled,
-          requiredProtocolFields,
-          sharingPolicy: {
-            allowOrgSharedMeetings,
-            allowTeamScopedMeetings,
-            allowExternalShareLinks,
-          },
+    await onUpdate({
+      meetingContentControls: {
+        recordingAllowed,
+        transcriptionAllowed,
+        aiSummaryAllowed,
+        speakerIdentificationAllowed,
+        protocolTemplatesEnabled,
+        approvalWorkflowEnabled,
+        requiredProtocolFields,
+        sharingPolicy: {
+          allowOrgSharedMeetings,
+          allowTeamScopedMeetings,
+          allowExternalShareLinks,
         },
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+      },
+    });
+  }, [canEdit, isDirty, recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, onUpdate]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   const toggleField = (field: string, value: boolean, setter: (v: boolean) => void) => {
     setter(value);
@@ -110,7 +107,7 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
+      <EnterpriseSaveBar status={autoSaveStatus} />
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-primary/10"><Video className="w-5 h-5 text-primary" /></div>

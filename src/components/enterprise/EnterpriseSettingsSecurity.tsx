@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Shield, Database, Globe, Lock, AlertTriangle } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,6 @@ interface Props {
 }
 
 export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
   const [ipInput, setIpInput] = useState('');
 
   // Local toggle state
@@ -73,28 +73,25 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
     setIpAllowlist(ipAllowlist.filter(i => i !== ip));
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      await onUpdate({
-        securityCompliance: {
-          auditLogsEnabled,
-          loginHistoryEnabled,
-          autoDeleteEnabled,
-          restrictExport,
-          restrictDownload,
-          restrictExternalSharing,
-          ipAllowlistingEnabled,
-          ipAllowlist,
-          retentionDays,
-          storageRegion,
-        },
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+    await onUpdate({
+      securityCompliance: {
+        auditLogsEnabled,
+        loginHistoryEnabled,
+        autoDeleteEnabled,
+        restrictExport,
+        restrictDownload,
+        restrictExternalSharing,
+        ipAllowlistingEnabled,
+        ipAllowlist,
+        retentionDays,
+        storageRegion,
+      },
+    });
+  }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, onUpdate]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   const toggleItems: Array<{ field: string; label: string; desc: string; value: boolean; setter: (v: boolean) => void }> = [
     { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled },
@@ -107,7 +104,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
+      <EnterpriseSaveBar status={autoSaveStatus} />
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-primary/10"><Shield className="w-5 h-5 text-primary" /></div>
