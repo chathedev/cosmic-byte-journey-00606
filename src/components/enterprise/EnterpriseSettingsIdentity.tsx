@@ -31,6 +31,8 @@ interface Props {
   onTestSSO?: (provider: string) => Promise<void>;
   onConnectSSO?: (provider: string) => Promise<void>;
   providerReadiness?: Record<string, ProviderReadiness>;
+  hasVerifiedDomain?: boolean;
+  defaultLoginHostname?: string | null;
 }
 
 function LockedBadge({ lock }: { lock?: SettingsLock }) {
