@@ -214,7 +214,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
 
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar status={saveStatus} isDirty={isDirty} onSave={handleSave} onDiscard={handleDiscard} disabled={!canEdit} />
+      {(() => { const saveFooter = <CardSaveFooter status={saveStatus} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />; return null; })()}
       {/* SSO Master Toggle */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start justify-between">
