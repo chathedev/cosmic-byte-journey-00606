@@ -129,6 +129,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
 
   return (
     <div className="space-y-6">
+      <EnterpriseSaveBar isDirty={isDirty} saving={saving} canEdit={canEdit} onSave={handleSave} />
       {/* Branding & Identity */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
