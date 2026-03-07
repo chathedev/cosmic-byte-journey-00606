@@ -119,7 +119,7 @@ function getOnboardingProgress(status?: string): number {
 }
 
 function statusIcon(domain: DomainEntry, size = 'w-3.5 h-3.5') {
-  if (domain.status === 'verified') return <CheckCircle2 className={`${size} text-green-600 dark:text-green-400`} />;
+  if (isDomainVerified(domain)) return <CheckCircle2 className={`${size} text-green-600 dark:text-green-400`} />;
   if (domain.status === 'failed') return <XCircle className={`${size} text-destructive`} />;
   if (domain.status === 'removing') return <Loader2 className={`${size} animate-spin text-muted-foreground`} />;
   const ob = domain.onboarding;
@@ -127,8 +127,12 @@ function statusIcon(domain: DomainEntry, size = 'w-3.5 h-3.5') {
   return <Clock className={`${size} text-amber-500`} />;
 }
 
+function isDomainVerified(domain: DomainEntry): boolean {
+  return domain.status === 'verified' || domain.onboarding?.status === 'active';
+}
+
 function domainStatusLabel(domain: DomainEntry): string {
-  if (domain.status === 'verified') return 'Verifierad';
+  if (isDomainVerified(domain)) return 'Verifierad';
   if (domain.status === 'failed') return 'Misslyckad';
   if (domain.status === 'removing') return 'Tas bort';
   const ob = domain.onboarding;
