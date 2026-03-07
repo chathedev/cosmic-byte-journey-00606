@@ -115,6 +115,9 @@ export function useEnterpriseSettings() {
     handleUpdate,
     handleTestSSO,
     handleConnectSSO,
+    handleDisableProvider,
+    handleRemoveProvider,
+    handleResetProvider,
     loadSettings,
   };
 }
