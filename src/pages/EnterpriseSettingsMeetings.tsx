@@ -15,6 +15,7 @@ export default function EnterpriseSettingsMeetingsPage() {
           locks={ctx.data!.locks}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
+          customizationBoundaries={ctx.customizationBoundaries}
         />
       )}
     </EnterpriseSettingsLayout>
