@@ -48,8 +48,7 @@ export function useEnterpriseSettings() {
       if (err.status === 423) {
         toast({ title: 'Låst inställning', description: 'Denna inställning är låst av en administratör.', variant: 'destructive' });
       } else {
-        toast({ title: 'Fel', description: err.message, variant: 'destructive' });
-      }
+        toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     }
   };
 
