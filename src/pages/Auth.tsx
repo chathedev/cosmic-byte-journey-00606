@@ -75,7 +75,7 @@ export default function Auth() {
   const [onboardingEnabled, setOnboardingEnabled] = useState(false);
   const [enterpriseRedirect, setEnterpriseRedirect] = useState<{ hostname: string; origin: string } | null>(null);
   const [workspace, setWorkspace] = useState<PublicWorkspaceInfo | null>(null);
-  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState(isCustomDomain);
   const isCustomDomain = isEnterpriseCustomDomain();
 
   // Determine if SSO providers are available
