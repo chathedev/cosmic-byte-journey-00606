@@ -82,6 +82,7 @@ const SharedProtocol = () => {
           meetingDate: json.meetingDate || null,
           sharedAt: json.sharedAt || null,
           duration: json.duration || null,
+          branding: json.branding || json.meeting?.branding || null,
         });
       } catch {
         setError("Ett nätverksfel uppstod. Försök igen senare.");
