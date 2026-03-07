@@ -199,21 +199,46 @@ export interface PermissionCatalogEntry {
   group?: string;
 }
 
+export interface SetupChecklistStepCta {
+  label: string;
+  path: string;
+}
+
 export interface SetupChecklistStep {
   id: string;
+  title?: string;
   label?: string;
+  description?: string;
+  hint?: string;
+  cta?: SetupChecklistStepCta;
   completed: boolean;
+  autoCompleted?: boolean;
   order?: number;
 }
 
+export interface SetupChecklistNextStep {
+  id: string;
+  title: string;
+  description?: string;
+  hint?: string;
+  cta?: SetupChecklistStepCta;
+}
+
 export interface SetupChecklist {
+  enabled?: boolean;
+  version?: number;
+  completed?: boolean;
   steps?: SetupChecklistStep[];
   progressPercent: number;
-  nextStep?: string | null;
+  nextStep?: SetupChecklistNextStep | string | null;
+  completedSteps?: number;
   completedCount?: number;
+  totalSteps?: number;
   totalCount?: number;
+  messages?: string[];
   signals?: Record<string, any>;
   metrics?: Record<string, any>;
+  lastEvaluatedAt?: string;
 }
 
 export interface CustomizationBoundaries {
@@ -239,6 +264,48 @@ export interface SettingsCatalog {
   recommendedTemplateIds?: string[];
 }
 
+export interface CustomDomainSummary {
+  hostname: string;
+  status: string;
+  kind: string;
+  loginEnabled: boolean;
+  appEnabled: boolean;
+  primary: boolean;
+  verifiedAt?: string | null;
+}
+
+export interface SettingsSummary {
+  available?: boolean;
+  planType?: string;
+  ssoEnabled?: boolean;
+  ssoOnlyLogin?: boolean;
+  primaryProvider?: string | null;
+  allowedProviders?: string[];
+  enabledProviders?: string[];
+  providerReadiness?: Record<string, ProviderReadiness>;
+  jitProvisioningEnabled?: boolean;
+  groupSyncEnabled?: boolean;
+  scimEnabled?: boolean;
+  fallbackPolicy?: string;
+  governancePresetId?: string | null;
+  customDomainRequiredForSso?: boolean;
+  defaultLoginHostname?: string | null;
+  workspaceOrigin?: string | null;
+  verifiedCustomDomainCount?: number;
+  pendingCustomDomainCount?: number;
+  customDomains?: CustomDomainSummary[];
+  ssoCustomDomainReady?: boolean;
+  customRoleCount?: number;
+  lockCount?: number;
+  hasAdminLocks?: boolean;
+  auditEntryCount?: number;
+  loginHistoryCount?: number;
+  settingsPath?: string;
+  adminSettingsPath?: string;
+  ssoStartPath?: string;
+  [key: string]: any;
+}
+
 export interface EnterpriseSettingsResponse {
   company: { id: string; name: string; planType: string };
   settings: {
@@ -251,31 +318,37 @@ export interface EnterpriseSettingsResponse {
     customizationBoundaries?: CustomizationBoundaries;
     governanceProfile?: GovernanceProfile;
   };
-  settingsSummary?: {
-    providerReadiness?: Record<string, ProviderReadiness>;
-    enabledProviders?: string[];
-    defaultLoginHostname?: string | null;
-    workspaceOrigin?: string | null;
-    governancePresetId?: string | null;
-    customRoleCount?: number;
-    lockCount?: number;
-    hasAdminLocks?: boolean;
-    ssoEnabled?: boolean;
-    ssoOnlyLogin?: boolean;
-    primaryProvider?: string | null;
-    [key: string]: any;
-  };
+  settingsSummary?: SettingsSummary;
   catalogs?: SettingsCatalog;
   setupChecklist?: SetupChecklist;
   locks: Record<string, SettingsLock>;
   viewer: {
     email: string;
     role: string;
+    membershipSource?: string;
     customRoleIds: string[];
-    canManageEnterpriseSettings: boolean;
-    canManageMembers: boolean;
-    isTivlyAdmin: boolean;
+    customRoles?: any[];
     permissions?: Record<string, boolean>;
+    canManageMembers: boolean;
+    canManageEnterpriseSettings: boolean;
+    canManageBilling?: boolean;
+    isTivlyAdmin: boolean;
+  };
+  relatedResources?: {
+    overviewPath?: string;
+    fullSettingsPath?: string;
+    catalogPath?: string;
+    rolesPath?: string;
+    domainsPath?: string;
+    auditPath?: string;
+    setupChecklistPath?: string;
+    sections?: Array<{
+      id: string;
+      slug: string;
+      title: string;
+      path: string;
+      patchPath: string;
+    }>;
   };
   timestamp: string;
 }
