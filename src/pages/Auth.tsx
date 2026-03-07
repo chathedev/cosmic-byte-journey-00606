@@ -419,7 +419,7 @@ export default function Auth() {
                     </div>
 
                     {/* SSO buttons — only on enterprise custom domains */}
-                    {isCustomDomain && workspace?.ssoEnabled && (
+                    {isCustomDomain && workspace && hasSSO && (
                       <div className="space-y-4">
                         <EnterpriseSSOLogin workspace={workspace} />
                         
