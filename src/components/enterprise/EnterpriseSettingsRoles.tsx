@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { useToast } from '@/hooks/use-toast';
 import {
   getEnterpriseRoles, createEnterpriseRole, updateEnterpriseRole, deleteEnterpriseRole,
@@ -254,7 +254,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
             <DialogTitle>{isNew ? 'Skapa roll' : 'Redigera roll'}</DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="px-5 py-4 space-y-5">
               <div className="space-y-1.5">
                 <Label className="text-xs">Namn</Label>
@@ -293,7 +293,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
                 ))}
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="px-5 py-3 shrink-0 border-t border-border bg-muted/30">
             <Button variant="outline" size="sm" onClick={() => setEditRole(null)}>Avbryt</Button>
