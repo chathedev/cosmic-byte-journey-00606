@@ -156,7 +156,7 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
 
   useEffect(() => { fetchBranding(); }, [fetchBranding]);
 
-  // Reset when not enterprise
+  // Reset when not enterprise, or when cached company doesn't match actual company
   useEffect(() => {
     if (!isEnterprise) {
       setLogoUrl(tivlyLogo);
@@ -165,8 +165,14 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
       setWorkspaceName(null);
       applyFavicon(DEFAULT_FAVICON);
       applyTitle(null);
+    } else if (cachedCompanyId && companyId && cachedCompanyId !== companyId) {
+      // Cache was from a different company — reset to default until fetch completes
+      setLogoUrl(tivlyLogo);
+      setWordmarkUrl(null);
+      setFaviconUrl(null);
+      setWorkspaceName(null);
     }
-  }, [isEnterprise]);
+  }, [isEnterprise, companyId, cachedCompanyId]);
 
   // Sync favicon/title whenever they change
   useEffect(() => {
