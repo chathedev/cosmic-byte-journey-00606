@@ -18,7 +18,6 @@ interface Props {
 }
 
 export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate }: Props) {
-  const [saving, setSaving] = useState(false);
   const [ipInput, setIpInput] = useState('');
 
   // Local toggle state
