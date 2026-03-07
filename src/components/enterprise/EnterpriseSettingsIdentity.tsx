@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw } from 'lucide-react';
+import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw, Ban, Trash2, RotateCcw } from 'lucide-react';
 import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { IdentityAccessSettings, EnterpriseProvider, SettingsLock, ProviderReadiness } from '@/lib/enterpriseSettingsApi';
 
 const PROVIDERS = [
@@ -31,6 +32,9 @@ interface Props {
   onUpdate: (patch: Record<string, any>) => Promise<void>;
   onTestSSO?: (provider: string) => Promise<void>;
   onConnectSSO?: (provider: string) => Promise<void>;
+  onDisableProvider?: (provider: string) => Promise<void>;
+  onRemoveProvider?: (provider: string) => Promise<void>;
+  onResetProvider?: (provider: string) => Promise<void>;
   providerReadiness?: Record<string, ProviderReadiness>;
   hasVerifiedDomain?: boolean;
   defaultLoginHostname?: string | null;
@@ -80,9 +84,10 @@ function formatTestTime(iso: string | null | undefined): string | null {
   } catch { return null; }
 }
 
-export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, providerReadiness, hasVerifiedDomain, defaultLoginHostname }: Props) {
+export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, onDisableProvider, onRemoveProvider, onResetProvider, providerReadiness, hasVerifiedDomain, defaultLoginHostname }: Props) {
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [actionProvider, setActionProvider] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [domainInput, setDomainInput] = useState('');
 
@@ -366,18 +371,88 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                       )}
 
                       {/* Actions — these are immediate (test/connect are not buffered) */}
-                      <div className="flex gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-1">
                         {onTestSSO && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || saving}>
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || !!actionProvider || saving}>
                             {testingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                            Verifiera anslutning
+                            Verifiera
                           </Button>
                         )}
                         {onConnectSSO && !readiness?.ready && (
-                          <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleConnectProvider(key)} disabled={connectingProvider === key || saving}>
+                          <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleConnectProvider(key)} disabled={connectingProvider === key || !!actionProvider || saving}>
                             {connectingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
                             Konfigurera
                           </Button>
+                        )}
+                        {canEdit && onDisableProvider && readiness?.enabled && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
+                            onClick={async () => { setActionProvider(key); try { await onDisableProvider(key); } finally { setActionProvider(null); } }}
+                            disabled={!!actionProvider || saving}
+                          >
+                            {actionProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                            Inaktivera
+                          </Button>
+                        )}
+                        {canEdit && onResetProvider && readiness?.configured && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 text-muted-foreground"
+                                disabled={!!actionProvider || saving}
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                Återställ
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Återställ {label}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Detta inaktiverar providern, rensar sparad test-/godkännandestatus och kräver att nästa anslutningsförsök går igenom en interaktiv prompt. Konfigurationen (Client ID etc.) behålls.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                                <AlertDialogAction onClick={async () => { setActionProvider(key); try { await onResetProvider(key); } finally { setActionProvider(null); } }}>
+                                  Återställ
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                        {canEdit && onRemoveProvider && readiness?.configured && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5"
+                                disabled={!!actionProvider || saving}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Ta bort
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Ta bort {label}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Detta inaktiverar providern och raderar all sparad konfiguration (Client ID, tenant, issuer etc.). Du behöver konfigurera om providern från grunden efteråt.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => { setActionProvider(key); try { await onRemoveProvider(key); } finally { setActionProvider(null); } }}>
+                                  Ta bort provider
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </div>

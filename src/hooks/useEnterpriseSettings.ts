@@ -4,6 +4,7 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   getEnterpriseSettings, updateEnterpriseSettings, testSSO, connectSSO,
+  disableSSOProvider, removeSSOProvider, resetSSOProvider,
   type EnterpriseSettingsResponse,
 } from '@/lib/enterpriseSettingsApi';
 
@@ -71,6 +72,39 @@ export function useEnterpriseSettings() {
     }
   };
 
+  const handleDisableProvider = async (provider: string) => {
+    if (!companyId) return;
+    try {
+      await disableSSOProvider(companyId, provider);
+      toast({ title: `${provider} inaktiverad`, description: 'Providern är pausad men konfigurationen finns kvar.' });
+      await loadSettings();
+    } catch (err: any) {
+      toast({ title: 'Kunde inte inaktivera', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleRemoveProvider = async (provider: string) => {
+    if (!companyId) return;
+    try {
+      await removeSSOProvider(companyId, provider);
+      toast({ title: `${provider} borttagen`, description: 'Providern och dess konfiguration har raderats.' });
+      await loadSettings();
+    } catch (err: any) {
+      toast({ title: 'Kunde inte ta bort', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleResetProvider = async (provider: string) => {
+    if (!companyId) return;
+    try {
+      await resetSSOProvider(companyId, provider);
+      toast({ title: `${provider} återställd`, description: 'Nästa anslutningsförsök kräver interaktiv godkännande.' });
+      await loadSettings();
+    } catch (err: any) {
+      toast({ title: 'Kunde inte återställa', description: err.message, variant: 'destructive' });
+    }
+  };
+
   return {
     data,
     loading,
@@ -81,6 +115,9 @@ export function useEnterpriseSettings() {
     handleUpdate,
     handleTestSSO,
     handleConnectSSO,
+    handleDisableProvider,
+    handleRemoveProvider,
+    handleResetProvider,
     loadSettings,
   };
 }
