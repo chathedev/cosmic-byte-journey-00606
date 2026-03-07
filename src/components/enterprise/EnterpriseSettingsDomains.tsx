@@ -169,7 +169,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         startVerificationPoll(hostname);
       }
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
