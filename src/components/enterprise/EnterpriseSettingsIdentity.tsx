@@ -371,18 +371,88 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                       )}
 
                       {/* Actions — these are immediate (test/connect are not buffered) */}
-                      <div className="flex gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-1">
                         {onTestSSO && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || saving}>
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || !!actionProvider || saving}>
                             {testingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                            Verifiera anslutning
+                            Verifiera
                           </Button>
                         )}
                         {onConnectSSO && !readiness?.ready && (
-                          <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleConnectProvider(key)} disabled={connectingProvider === key || saving}>
+                          <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleConnectProvider(key)} disabled={connectingProvider === key || !!actionProvider || saving}>
                             {connectingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
                             Konfigurera
                           </Button>
+                        )}
+                        {canEdit && onDisableProvider && readiness?.enabled && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
+                            onClick={async () => { setActionProvider(key); try { await onDisableProvider(key); } finally { setActionProvider(null); } }}
+                            disabled={!!actionProvider || saving}
+                          >
+                            {actionProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                            Inaktivera
+                          </Button>
+                        )}
+                        {canEdit && onResetProvider && readiness?.configured && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 text-muted-foreground"
+                                disabled={!!actionProvider || saving}
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                Återställ
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Återställ {label}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Detta inaktiverar providern, rensar sparad test-/godkännandestatus och kräver att nästa anslutningsförsök går igenom en interaktiv prompt. Konfigurationen (Client ID etc.) behålls.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                                <AlertDialogAction onClick={async () => { setActionProvider(key); try { await onResetProvider(key); } finally { setActionProvider(null); } }}>
+                                  Återställ
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                        {canEdit && onRemoveProvider && readiness?.configured && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5"
+                                disabled={!!actionProvider || saving}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Ta bort
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Ta bort {label}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Detta inaktiverar providern och raderar all sparad konfiguration (Client ID, tenant, issuer etc.). Du behöver konfigurera om providern från grunden efteråt.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => { setActionProvider(key); try { await onRemoveProvider(key); } finally { setActionProvider(null); } }}>
+                                  Ta bort provider
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </div>
