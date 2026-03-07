@@ -87,6 +87,7 @@ function formatTestTime(iso: string | null | undefined): string | null {
 export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, onDisableProvider, onRemoveProvider, onResetProvider, providerReadiness, hasVerifiedDomain, defaultLoginHostname }: Props) {
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [actionProvider, setActionProvider] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [domainInput, setDomainInput] = useState('');
 
