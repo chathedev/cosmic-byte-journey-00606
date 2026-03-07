@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Shield, Database, Globe, Lock, AlertTriangle } from 'lucide-react';
-import { EnterpriseSaveBar } from './EnterpriseSaveBar';
-import { useAutoSave } from '@/hooks/useAutoSave';
+import { Shield, Database, Globe, AlertTriangle } from 'lucide-react';
+import { CardSaveFooter } from './CardSaveFooter';
+import { useManualSave } from '@/hooks/useManualSave';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,6 @@ interface Props {
 
 export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate }: Props) {
   const [ipInput, setIpInput] = useState('');
-
-  // Local toggle state
   const [auditLogsEnabled, setAuditLogsEnabled] = useState(settings.auditLogsEnabled ?? false);
   const [loginHistoryEnabled, setLoginHistoryEnabled] = useState(settings.loginHistoryEnabled ?? false);
   const [autoDeleteEnabled, setAutoDeleteEnabled] = useState(settings.autoDeleteEnabled ?? false);
@@ -33,7 +31,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
   const [storageRegion, setStorageRegion] = useState(settings.storageRegion || 'eu');
   const [euDataResidencyRequired, setEuDataResidencyRequired] = useState(settings.euDataResidencyRequired ?? false);
 
-  useEffect(() => {
+  const syncFromProps = useCallback(() => {
     setAuditLogsEnabled(settings.auditLogsEnabled ?? false);
     setLoginHistoryEnabled(settings.loginHistoryEnabled ?? false);
     setAutoDeleteEnabled(settings.autoDeleteEnabled ?? false);
@@ -46,6 +44,8 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
     setStorageRegion(settings.storageRegion || 'eu');
     setEuDataResidencyRequired(settings.euDataResidencyRequired ?? false);
   }, [settings]);
+
+  useEffect(() => { syncFromProps(); }, [syncFromProps]);
 
   const isDirty = useMemo(() => {
     return (
@@ -65,37 +65,20 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
 
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
-  const addIp = () => {
-    const ip = ipInput.trim();
-    if (!ip || ipAllowlist.includes(ip)) return;
-    setIpAllowlist([...ipAllowlist, ip]);
-    setIpInput('');
-  };
+  const addIp = () => { const ip = ipInput.trim(); if (!ip || ipAllowlist.includes(ip)) return; setIpAllowlist([...ipAllowlist, ip]); setIpInput(''); };
+  const removeIp = (ip: string) => { setIpAllowlist(ipAllowlist.filter(i => i !== ip)); };
 
-  const removeIp = (ip: string) => {
-    setIpAllowlist(ipAllowlist.filter(i => i !== ip));
-  };
-
-  const handleSave = useCallback(async () => {
+  const doSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
     await onUpdate({
       securityCompliance: {
-        auditLogsEnabled,
-        loginHistoryEnabled,
-        autoDeleteEnabled,
-        restrictExport,
-        restrictDownload,
-        restrictExternalSharing,
-        ipAllowlistingEnabled,
-        ipAllowlist,
-        retentionDays,
-        storageRegion,
-        euDataResidencyRequired,
+        auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload,
+        restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, euDataResidencyRequired,
       },
     });
   }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, euDataResidencyRequired, onUpdate]);
 
-  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
+  const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: syncFromProps });
 
   const toggleItems: Array<{ field: string; label: string; desc: string; value: boolean; setter: (v: boolean) => void }> = [
     { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled },
@@ -106,9 +89,10 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
     { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen', value: restrictExternalSharing, setter: setRestrictExternalSharing },
   ];
 
+  const saveFooter = <CardSaveFooter status={status} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />;
+
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar status={autoSaveStatus} />
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-primary/10"><Shield className="w-5 h-5 text-primary" /></div>
@@ -117,50 +101,24 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
             <p className="text-xs text-muted-foreground mt-0.5">Kontrollera datalagring, export och tillgång</p>
           </div>
         </div>
-
         {toggleItems.map(({ field, label, desc, value, setter }) => (
           <div key={field} className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-sm">{label}</p>
-              <p className="text-xs text-muted-foreground">{desc}</p>
-            </div>
-            <Switch
-              checked={value}
-              onCheckedChange={setter}
-              disabled={!canEdit || isLocked(field) || saving}
-            />
+            <div><p className="text-sm">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
+            <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isLocked(field) || isSaving} />
           </div>
         ))}
+        {saveFooter}
       </div>
 
-      {/* Retention */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-        <h4 className="text-sm font-medium flex items-center gap-2">
-          <Database className="w-4 h-4 text-primary" />
-          Datalagring
-        </h4>
+        <h4 className="text-sm font-medium flex items-center gap-2"><Database className="w-4 h-4 text-primary" />Datalagring</h4>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Retentionstid (dagar)</Label>
-          <Input
-            type="number"
-            min={30}
-            max={3650}
-            value={retentionDays}
-            onChange={e => {
-              const val = parseInt(e.target.value);
-              if (!isNaN(val)) setRetentionDays(val);
-            }}
-            disabled={!canEdit || isLocked('retentionDays') || saving}
-            className="h-9 text-sm w-32"
-          />
+          <Input type="number" min={30} max={3650} value={retentionDays} onChange={e => { const val = parseInt(e.target.value); if (!isNaN(val)) setRetentionDays(val); }} disabled={!canEdit || isLocked('retentionDays') || isSaving} className="h-9 text-sm w-32" />
         </div>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Lagringsregion</Label>
-          <Select
-            value={storageRegion}
-            onValueChange={setStorageRegion}
-            disabled={!canEdit || isLocked('storageRegion') || saving}
-          >
+          <Select value={storageRegion} onValueChange={setStorageRegion} disabled={!canEdit || isLocked('storageRegion') || isSaving}>
             <SelectTrigger className="h-9 text-sm w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="eu">🇪🇺 EU</SelectItem>
@@ -170,68 +128,41 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
           </Select>
         </div>
         <div className="flex items-center justify-between py-1">
-          <div>
-            <p className="text-sm">EU-datalagringsgaranti</p>
-            <p className="text-xs text-muted-foreground">Kräv att all data lagras inom EU</p>
-          </div>
-          <Switch
-            checked={euDataResidencyRequired}
-            onCheckedChange={setEuDataResidencyRequired}
-            disabled={!canEdit || isLocked('euDataResidencyRequired') || saving}
-          />
+          <div><p className="text-sm">EU-datalagringsgaranti</p><p className="text-xs text-muted-foreground">Kräv att all data lagras inom EU</p></div>
+          <Switch checked={euDataResidencyRequired} onCheckedChange={setEuDataResidencyRequired} disabled={!canEdit || isLocked('euDataResidencyRequired') || isSaving} />
         </div>
+        {saveFooter}
       </div>
 
-      {/* IP Allowlist */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Globe className="w-4 h-4 text-primary" />
-            IP-vitlista
-          </h4>
-          <Switch
-            checked={ipAllowlistingEnabled}
-            onCheckedChange={setIpAllowlistingEnabled}
-            disabled={!canEdit || isLocked('ipAllowlistingEnabled') || saving}
-          />
+          <h4 className="text-sm font-medium flex items-center gap-2"><Globe className="w-4 h-4 text-primary" />IP-vitlista</h4>
+          <Switch checked={ipAllowlistingEnabled} onCheckedChange={setIpAllowlistingEnabled} disabled={!canEdit || isLocked('ipAllowlistingEnabled') || isSaving} />
         </div>
-
         {ipAllowlistingEnabled && (
           <>
             <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
               <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                Var försiktig – felaktig IP-vitlistning kan låsa ute administratörer.
-              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">Var försiktig – felaktig IP-vitlistning kan låsa ute administratörer.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {ipAllowlist.map(ip => (
                 <Badge key={ip} variant="secondary" className="text-xs font-mono gap-1">
                   {ip}
-                  {canEdit && !isLocked('ipAllowlist') && (
-                    <button onClick={() => removeIp(ip)} className="ml-1 hover:text-destructive">×</button>
-                  )}
+                  {canEdit && !isLocked('ipAllowlist') && <button onClick={() => removeIp(ip)} className="ml-1 hover:text-destructive">×</button>}
                 </Badge>
               ))}
             </div>
             {canEdit && !isLocked('ipAllowlist') && (
               <div className="flex gap-2">
-                <Input
-                  value={ipInput}
-                  onChange={e => setIpInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addIp()}
-                  placeholder="203.0.113.0/24"
-                  className="h-8 text-sm flex-1 font-mono"
-                />
-                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addIp} disabled={!ipInput.trim()}>
-                  Lägg till
-                </Button>
+                <Input value={ipInput} onChange={e => setIpInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addIp()} placeholder="203.0.113.0/24" className="h-8 text-sm flex-1 font-mono" />
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addIp} disabled={!ipInput.trim()}>Lägg till</Button>
               </div>
             )}
           </>
         )}
+        {saveFooter}
       </div>
-
     </div>
   );
 }

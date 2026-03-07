@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Building2, Palette, Users, Lock, Mail, Link2 } from 'lucide-react';
-import { EnterpriseSaveBar } from './EnterpriseSaveBar';
-import { useAutoSave } from '@/hooks/useAutoSave';
+import { CardSaveFooter } from './CardSaveFooter';
+import { useManualSave } from '@/hooks/useManualSave';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +22,6 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const branding = settings.branding || {};
   const invitePolicy = settings.invitePolicy || {};
 
-  // Local state for all fields
   const [workspaceName, setWorkspaceName] = useState(branding.workspaceDisplayName || '');
   const [legalName, setLegalName] = useState((branding as any).legalEntityName || '');
   const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
@@ -42,8 +41,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
   const [requireApprovalForExternalGuests, setRequireApprovalForExternalGuests] = useState(invitePolicy.requireApprovalForExternalGuests ?? false);
   const [teamManagementEnabled, setTeamManagementEnabled] = useState(settings.teamManagementEnabled ?? true);
 
-  // Sync from props when settings change (e.g. after save)
-  useEffect(() => {
+  const syncFromProps = useCallback(() => {
     setWorkspaceName(branding.workspaceDisplayName || '');
     setLegalName((branding as any).legalEntityName || '');
     setLogoUrl(branding.logoUrl || '');
@@ -64,7 +62,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
     setTeamManagementEnabled(settings.teamManagementEnabled ?? true);
   }, [settings]);
 
-  // Dirty check
+  useEffect(() => { syncFromProps(); }, [syncFromProps]);
+
   const isDirty = useMemo(() => {
     return (
       workspaceName !== (branding.workspaceDisplayName || '') ||
@@ -90,7 +89,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
-  const handleSave = useCallback(async () => {
+  const doSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
     await onUpdate({
       adminWorkspace: {
@@ -110,18 +109,14 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           termsUrl: termsUrl || null,
           emailBrandingEnabled,
         },
-        invitePolicy: {
-          domainRestrictedInvites,
-          allowExternalGuests,
-          requireApprovalForExternalGuests,
-        },
+        invitePolicy: { domainRestrictedInvites, allowExternalGuests, requireApprovalForExternalGuests },
         teamManagementEnabled,
       },
     });
     await refreshBranding();
   }, [canEdit, isDirty, workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, primaryColor, accentColor, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, requireApprovalForExternalGuests, teamManagementEnabled, onUpdate, refreshBranding]);
 
-  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave, debounceMs: 1200 });
+  const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: syncFromProps });
 
   const fieldRow = (label: string, value: string, setter: (v: string) => void, path: string, placeholder: string) => (
     <div className="space-y-1.5">
@@ -129,16 +124,17 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       <Input
         value={value}
         onChange={e => setter(e.target.value)}
-        disabled={!canEdit || isLocked(path) || saving}
+        disabled={!canEdit || isLocked(path) || isSaving}
         className="h-9 text-sm"
         placeholder={placeholder}
       />
     </div>
   );
 
+  const saveFooter = <CardSaveFooter status={status} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />;
+
   return (
     <div className="space-y-6">
-      <EnterpriseSaveBar status={autoSaveStatus} />
       {/* Branding & Identity */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-start gap-3">
@@ -151,9 +147,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
         <div className="space-y-3">
           {fieldRow('Arbetsytans namn', workspaceName, setWorkspaceName, 'branding.workspaceDisplayName', 'Företagsnamn AB')}
           {fieldRow('Juridiskt namn', legalName, setLegalName, 'branding.legalEntityName', 'Företag AB')}
-          
           <Separator />
-          
           {fieldRow('Logotyp-URL', logoUrl, setLogoUrl, 'branding.logoUrl', 'https://example.se/logo.png')}
           {logoUrl && (
             <div className="flex items-center gap-3">
@@ -163,45 +157,27 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
               <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">{logoUrl}</span>
             </div>
           )}
-          
           {fieldRow('Ordmärke (wordmark) URL', wordmarkUrl, setWordmarkUrl, 'branding.wordmarkUrl', 'https://example.se/wordmark.png')}
           {fieldRow('Favicon URL', faviconUrl, setFaviconUrl, 'branding.faviconUrl', 'https://example.se/favicon.ico')}
-          
           <Separator />
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Primärfärg</Label>
               <div className="flex items-center gap-2">
-                <Input
-                  value={primaryColor}
-                  onChange={e => setPrimaryColor(e.target.value)}
-                  disabled={!canEdit || isLocked('branding.primaryColor') || saving}
-                  className="h-9 text-sm flex-1"
-                  placeholder="#0066FF"
-                />
-                {primaryColor && (
-                  <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: primaryColor }} />
-                )}
+                <Input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} disabled={!canEdit || isLocked('branding.primaryColor') || isSaving} className="h-9 text-sm flex-1" placeholder="#0066FF" />
+                {primaryColor && <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: primaryColor }} />}
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Accentfärg</Label>
               <div className="flex items-center gap-2">
-                <Input
-                  value={accentColor}
-                  onChange={e => setAccentColor(e.target.value)}
-                  disabled={!canEdit || isLocked('branding.accentColor') || saving}
-                  className="h-9 text-sm flex-1"
-                  placeholder="#FF6600"
-                />
-                {accentColor && (
-                  <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: accentColor }} />
-                )}
+                <Input value={accentColor} onChange={e => setAccentColor(e.target.value)} disabled={!canEdit || isLocked('branding.accentColor') || isSaving} className="h-9 text-sm flex-1" placeholder="#FF6600" />
+                {accentColor && <div className="w-9 h-9 rounded-lg border border-border shrink-0" style={{ backgroundColor: accentColor }} />}
               </div>
             </div>
           </div>
         </div>
+        {saveFooter}
       </div>
 
       {/* Login appearance */}
@@ -217,6 +193,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           {fieldRow('Inloggningstitel', loginTitle, setLoginTitle, 'branding.loginTitle', 'Välkommen till Företaget')}
           {fieldRow('Inloggningsundertext', loginSubtitle, setLoginSubtitle, 'branding.loginSubtitle', 'Logga in med ditt företagskonto')}
         </div>
+        {saveFooter}
       </div>
 
       {/* Support & Legal links */}
@@ -234,6 +211,7 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
           {fieldRow('Integritetspolicy-URL', privacyUrl, setPrivacyUrl, 'branding.privacyUrl', 'https://foretag.se/privacy')}
           {fieldRow('Användarvillkor-URL', termsUrl, setTermsUrl, 'branding.termsUrl', 'https://foretag.se/terms')}
         </div>
+        {saveFooter}
       </div>
 
       {/* Email branding */}
@@ -248,14 +226,11 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm">Aktivera e-postvarumärke</p>
-            <p className="text-xs text-muted-foreground">Använd organisationens logotyp och färger i inbjudningsmail. Tivlys standardmail (inloggningskoder) påverkas inte.</p>
+            <p className="text-xs text-muted-foreground">Använd organisationens logotyp och färger i inbjudningsmail.</p>
           </div>
-          <Switch
-            checked={emailBrandingEnabled}
-            onCheckedChange={setEmailBrandingEnabled}
-            disabled={!canEdit || saving}
-          />
+          <Switch checked={emailBrandingEnabled} onCheckedChange={setEmailBrandingEnabled} disabled={!canEdit || isSaving} />
         </div>
+        {saveFooter}
       </div>
 
       {/* Policies */}
@@ -267,58 +242,26 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
             <p className="text-xs text-muted-foreground mt-0.5">Styr vem som kan bjuda in, skapa möten och använda integrationer</p>
           </div>
         </div>
-
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm">Domänbegränsade inbjudningar</p>
-            <p className="text-xs text-muted-foreground">Kräv att inbjudna tillhör godkänd domän</p>
-          </div>
-          <Switch
-            checked={domainRestrictedInvites}
-            onCheckedChange={setDomainRestrictedInvites}
-            disabled={!canEdit || saving}
-          />
+          <div><p className="text-sm">Domänbegränsade inbjudningar</p><p className="text-xs text-muted-foreground">Kräv att inbjudna tillhör godkänd domän</p></div>
+          <Switch checked={domainRestrictedInvites} onCheckedChange={setDomainRestrictedInvites} disabled={!canEdit || isSaving} />
         </div>
-
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm">Tillåt externa gäster</p>
-            <p className="text-xs text-muted-foreground">Låt användare utanför organisationen bjudas in</p>
-          </div>
-          <Switch
-            checked={allowExternalGuests}
-            onCheckedChange={setAllowExternalGuests}
-            disabled={!canEdit || saving}
-          />
+          <div><p className="text-sm">Tillåt externa gäster</p><p className="text-xs text-muted-foreground">Låt användare utanför organisationen bjudas in</p></div>
+          <Switch checked={allowExternalGuests} onCheckedChange={setAllowExternalGuests} disabled={!canEdit || isSaving} />
         </div>
-
         {allowExternalGuests && (
           <div className="flex items-center justify-between ml-6">
-            <div>
-              <p className="text-sm">Kräv godkännande för externa gäster</p>
-              <p className="text-xs text-muted-foreground">Ägare/admin måste godkänna innan externa gäster får åtkomst</p>
-            </div>
-            <Switch
-              checked={requireApprovalForExternalGuests}
-              onCheckedChange={setRequireApprovalForExternalGuests}
-              disabled={!canEdit || saving}
-            />
+            <div><p className="text-sm">Kräv godkännande för externa gäster</p><p className="text-xs text-muted-foreground">Ägare/admin måste godkänna</p></div>
+            <Switch checked={requireApprovalForExternalGuests} onCheckedChange={setRequireApprovalForExternalGuests} disabled={!canEdit || isSaving} />
           </div>
         )}
-
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm">Teamhantering</p>
-            <p className="text-xs text-muted-foreground">Aktivera interna arbetsgrupper</p>
-          </div>
-          <Switch
-            checked={teamManagementEnabled}
-            onCheckedChange={setTeamManagementEnabled}
-            disabled={!canEdit || saving}
-          />
+          <div><p className="text-sm">Teamhantering</p><p className="text-xs text-muted-foreground">Aktivera interna arbetsgrupper</p></div>
+          <Switch checked={teamManagementEnabled} onCheckedChange={setTeamManagementEnabled} disabled={!canEdit || isSaving} />
         </div>
+        {saveFooter}
       </div>
-
     </div>
   );
 }
