@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Building2, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Building2, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useEnterpriseSettings } from '@/hooks/useEnterpriseSettings';
 
