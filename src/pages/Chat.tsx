@@ -475,10 +475,10 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
                 </p>
                 <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
                   {[
-                    { text: "Sammanfatta senaste mötet", icon: "📋" },
-                    { text: "Vilka beslut togs?", icon: "✅" },
-                    { text: "Föreslå nästa steg", icon: "💡" },
-                    { text: "Vad borde vi prata om i nästa möte?", icon: "📌" }
+                    { text: "Sammanfatta senaste mötet", icon: "fileText" },
+                    { text: "Vilka beslut togs?", icon: "checkCircle" },
+                    { text: "Föreslå nästa steg", icon: "arrowRight" },
+                    { text: "Vad borde vi prata om i nästa möte?", icon: "messageSquare" }
                   ].map(({ text, icon }) => (
                     <Button 
                       key={text} 
