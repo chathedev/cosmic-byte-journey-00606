@@ -296,6 +296,48 @@ const EnterpriseAccessCheck = () => {
   );
 };
 
+// Auto-redirect enterprise SSO-only members to their verified workspace domain
+const EnterpriseWorkspaceRedirect = () => {
+  const { enterpriseMembership } = useSubscription();
+  const { user } = useAuth();
+  const location = useLocation();
+  const redirectedRef = useRef(false);
+
+  useEffect(() => {
+    if (redirectedRef.current) return;
+    if (!user || !enterpriseMembership?.isMember) return;
+
+    // Only redirect from generic app.tivly.se
+    const host = window.location.hostname;
+    const isGeneric = host === 'app.tivly.se';
+    if (!isGeneric) return;
+
+    // Skip auth-related pages
+    if (location.pathname === '/auth' || location.pathname === '/magic-login') return;
+
+    // Check if company has enterpriseSettingsSummary with workspace origin
+    const company = enterpriseMembership.company as any;
+    const summary = company?.enterpriseSettingsSummary;
+    const workspaceOrigin = summary?.workspaceOrigin;
+    const defaultLoginHostname = summary?.defaultLoginHostname;
+    const ssoEnabled = summary?.ssoEnabled;
+    const ssoOnly = summary?.ssoOnlyLogin;
+
+    if (ssoEnabled && ssoOnly && workspaceOrigin && defaultLoginHostname) {
+      console.log('[EnterpriseWorkspaceRedirect] Redirecting to workspace:', workspaceOrigin);
+      redirectedRef.current = true;
+      const token = apiClient.getAuthToken();
+      const targetUrl = new URL(workspaceOrigin);
+      targetUrl.pathname = location.pathname;
+      targetUrl.search = location.search;
+      if (token) targetUrl.searchParams.set('authToken', token);
+      window.location.href = targetUrl.toString();
+    }
+  }, [user, enterpriseMembership, location.pathname]);
+
+  return null;
+};
+
 
 // Preferred Name Gate removed - now handled via auto-opening Settings in AppSidebar
 
