@@ -32,6 +32,9 @@ interface Props {
   onUpdate: (patch: Record<string, any>) => Promise<void>;
   onTestSSO?: (provider: string) => Promise<void>;
   onConnectSSO?: (provider: string) => Promise<void>;
+  onDisableProvider?: (provider: string) => Promise<void>;
+  onRemoveProvider?: (provider: string) => Promise<void>;
+  onResetProvider?: (provider: string) => Promise<void>;
   providerReadiness?: Record<string, ProviderReadiness>;
   hasVerifiedDomain?: boolean;
   defaultLoginHostname?: string | null;
