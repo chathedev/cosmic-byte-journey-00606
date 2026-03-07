@@ -231,7 +231,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
         await refreshDomains();
       }
     } catch (err: any) {
-      toast({ title: 'Verifiering misslyckades', description: err.message, variant: 'destructive' });
+      toast({ title: 'Verifiering misslyckades', description: translateError(err.message), variant: 'destructive' });
     } finally {
       // Only clear if not polling
       if (!pollRef.current) setVerifyingHost(null);
