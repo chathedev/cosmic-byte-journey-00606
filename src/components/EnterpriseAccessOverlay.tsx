@@ -841,7 +841,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 overflow-hidden flex items-center justify-center shadow-sm">
-              <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-3" />
+              <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-3" />
             </div>
           </div>
 
