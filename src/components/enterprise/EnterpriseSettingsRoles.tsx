@@ -162,7 +162,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
       }
       setEditRole(null);
     } catch (err: any) {
-      toast({ title: 'Fel', description: err.message, variant: 'destructive' });
+      toast({ title: 'Fel', description: translateError(err.message), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
