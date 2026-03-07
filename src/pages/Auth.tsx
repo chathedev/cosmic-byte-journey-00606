@@ -18,7 +18,7 @@ declare global {
   }
 }
 
-type ViewMode = 'email' | 'code-entry' | 'no-access';
+type ViewMode = 'email' | 'code-entry' | 'no-access' | 'enterprise-sso-redirect';
 
 function sanitizeEmail(email: string | undefined): string | null {
   const trimmed = email?.trim().toLowerCase();
