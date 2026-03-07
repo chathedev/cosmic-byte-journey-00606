@@ -84,6 +84,25 @@ export default function Auth() {
     setPlatform(isIosDomain || isIosDevice ? 'ios' : 'web');
   }, []);
 
+  // Bootstrap enterprise workspace on custom domains
+  useEffect(() => {
+    if (!isCustomDomain) return;
+    setWorkspaceLoading(true);
+    getPublicWorkspace(window.location.hostname)
+      .then(ws => {
+        setWorkspace(ws);
+        // Apply branding favicon
+        if (ws.branding?.faviconUrl) {
+          const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+          if (link) link.href = ws.branding.faviconUrl;
+        }
+      })
+      .catch(err => {
+        console.warn('[Auth] Failed to bootstrap workspace:', err);
+      })
+      .finally(() => setWorkspaceLoading(false));
+  }, [isCustomDomain]);
+
   useEffect(() => {
     apiClient.getEnterpriseOnboardingAuto()
       .then(data => setOnboardingEnabled(!!data.enabled))
