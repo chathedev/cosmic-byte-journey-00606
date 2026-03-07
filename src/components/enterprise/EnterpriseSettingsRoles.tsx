@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { translateError } from '@/lib/errorTranslation';
 import {
   getEnterpriseRoles, createEnterpriseRole, updateEnterpriseRole, deleteEnterpriseRole,
   type CustomRole,
