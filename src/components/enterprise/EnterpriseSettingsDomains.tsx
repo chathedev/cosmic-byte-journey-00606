@@ -44,6 +44,7 @@ export interface DomainEntry {
   verifiedAt?: string | null;
   lastCheckedAt?: string | null;
   lastError?: string | null;
+  lastErrorMessage?: string | null;
   dnsRecords?: Array<{ type: string; name: string; value: string; reason?: string }>;
   dnsProvider?: string | { key?: string; label?: string; dashboardUrl?: string } | null;
   nameservers?: string[];
