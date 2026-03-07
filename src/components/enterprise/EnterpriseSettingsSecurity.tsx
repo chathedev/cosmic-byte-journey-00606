@@ -66,12 +66,12 @@ function SecurityTogglesCard({ settings, locks, canEdit, onUpdate }: Props) {
   const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: sync });
 
   const toggleItems = [
-    { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled },
-    { field: 'loginHistoryEnabled', label: 'Inloggningshistorik', desc: 'Logga alla SSO-inloggningar', value: loginHistoryEnabled, setter: setLoginHistoryEnabled },
-    { field: 'autoDeleteEnabled', label: 'Automatisk radering', desc: 'Radera möten efter retentionstiden', value: autoDeleteEnabled, setter: setAutoDeleteEnabled },
-    { field: 'restrictExport', label: 'Begränsa export', desc: 'Blockera export av protokoll och transkript', value: restrictExport, setter: setRestrictExport },
-    { field: 'restrictDownload', label: 'Begränsa nedladdning', desc: 'Blockera filnedladdningar', value: restrictDownload, setter: setRestrictDownload },
-    { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen', value: restrictExternalSharing, setter: setRestrictExternalSharing },
+    { field: 'auditLogsEnabled', label: 'Granskningsloggar', desc: 'Spåra alla ändringar i inställningar', value: auditLogsEnabled, setter: setAuditLogsEnabled, lockedOn: isLockedOn('auditLogsEnabled', customizationBoundaries) },
+    { field: 'loginHistoryEnabled', label: 'Inloggningshistorik', desc: 'Logga alla SSO-inloggningar', value: loginHistoryEnabled, setter: setLoginHistoryEnabled, lockedOn: isLockedOn('loginHistoryEnabled', customizationBoundaries) },
+    { field: 'autoDeleteEnabled', label: 'Automatisk radering', desc: 'Radera möten efter retentionstiden', value: autoDeleteEnabled, setter: setAutoDeleteEnabled, lockedOn: false },
+    { field: 'restrictExport', label: 'Begränsa export', desc: 'Blockera export av protokoll och transkript', value: restrictExport, setter: setRestrictExport, lockedOn: false },
+    { field: 'restrictDownload', label: 'Begränsa nedladdning', desc: 'Blockera filnedladdningar', value: restrictDownload, setter: setRestrictDownload, lockedOn: false },
+    { field: 'restrictExternalSharing', label: 'Begränsa extern delning', desc: 'Blockera delning utanför organisationen', value: restrictExternalSharing, setter: setRestrictExternalSharing, lockedOn: false },
   ];
 
   return (
@@ -83,10 +83,20 @@ function SecurityTogglesCard({ settings, locks, canEdit, onUpdate }: Props) {
           <p className="text-xs text-muted-foreground mt-0.5">Kontrollera datalagring, export och tillgång</p>
         </div>
       </div>
-      {toggleItems.map(({ field, label, desc, value, setter }) => (
+      {toggleItems.map(({ field, label, desc, value, setter, lockedOn: fieldLockedOn }) => (
         <div key={field} className="flex items-center justify-between py-1">
-          <div><p className="text-sm">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
-          <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isLocked(field) || isSaving} />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm">{label}</p>
+              {fieldLockedOn && (
+                <Badge variant="outline" className="text-[9px] gap-0.5 border-primary/30 text-primary px-1 py-0 h-4">
+                  <Lock className="w-2 h-2" />Kärnfunktion
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{desc}</p>
+          </div>
+          <Switch checked={value} onCheckedChange={setter} disabled={!canEdit || isLocked(field) || isSaving || fieldLockedOn} />
         </div>
       ))}
       <CardSaveFooter status={status} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />
