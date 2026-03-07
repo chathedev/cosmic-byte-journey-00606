@@ -142,7 +142,7 @@ export function AppSidebar() {
     }
 
     // Auto-expand org section if on an org page
-    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices', '/org/enterprise-settings'].some(p => path.startsWith(p))) {
+    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices', '/enterprise/settings'].some(p => path.startsWith(p))) {
       setOrgExpanded(true);
     }
   }, [location.pathname]);
