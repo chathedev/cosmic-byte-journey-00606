@@ -606,9 +606,11 @@ const App = () => {
             <PublicPagesShell>
               <AuthProvider>
                 <SubscriptionProvider>
+                  <EnterpriseBrandingProvider>
                   <SupportProvider>
                     <AppContent />
                   </SupportProvider>
+                  </EnterpriseBrandingProvider>
                 </SubscriptionProvider>
               </AuthProvider>
             </PublicPagesShell>
