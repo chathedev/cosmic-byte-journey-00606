@@ -57,30 +57,27 @@ export function EnterpriseSettingsMeeting({ settings, locks, canEdit, onUpdate }
     );
   }, [recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, settings]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      await onUpdate({
-        meetingContentControls: {
-          recordingAllowed,
-          transcriptionAllowed,
-          aiSummaryAllowed,
-          speakerIdentificationAllowed,
-          protocolTemplatesEnabled,
-          approvalWorkflowEnabled,
-          requiredProtocolFields,
-          sharingPolicy: {
-            allowOrgSharedMeetings,
-            allowTeamScopedMeetings,
-            allowExternalShareLinks,
-          },
+    await onUpdate({
+      meetingContentControls: {
+        recordingAllowed,
+        transcriptionAllowed,
+        aiSummaryAllowed,
+        speakerIdentificationAllowed,
+        protocolTemplatesEnabled,
+        approvalWorkflowEnabled,
+        requiredProtocolFields,
+        sharingPolicy: {
+          allowOrgSharedMeetings,
+          allowTeamScopedMeetings,
+          allowExternalShareLinks,
         },
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+      },
+    });
+  }, [canEdit, isDirty, recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, requiredProtocolFields, allowOrgSharedMeetings, allowTeamScopedMeetings, allowExternalShareLinks, onUpdate]);
+
+  const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
   const toggleField = (field: string, value: boolean, setter: (v: boolean) => void) => {
     setter(value);
