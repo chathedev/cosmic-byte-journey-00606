@@ -42,6 +42,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       }
       ref[parts[parts.length - 1]] = value;
       await onUpdate({ adminWorkspace: patch });
+      // Refresh branding context so logo/name updates across the app
+      await refreshBranding();
     } finally { setSaving(false); }
   };
 
