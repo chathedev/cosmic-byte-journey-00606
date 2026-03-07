@@ -11,8 +11,8 @@ export default function EnterpriseSettingsIntegrationsPage() {
     >
       {(ctx) => (
         <IntegrationsContent
-          settings={ctx.data!.settings.integrations}
-          locks={ctx.data!.locks}
+          settings={ctx.data?.settings?.integrations ?? {}}
+          locks={ctx.data?.locks ?? {}}
           canEdit={ctx.canEdit}
           onUpdate={ctx.handleUpdate}
         />
