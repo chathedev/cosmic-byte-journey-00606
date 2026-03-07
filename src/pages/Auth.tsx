@@ -364,7 +364,9 @@ export default function Auth() {
           <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12 min-h-screen sticky top-0">
             <div className="max-w-sm space-y-8">
               {workspace?.branding?.logoUrl ? (
-                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" />
+                <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" onError={(e) => { (e.target as HTMLImageElement).src = tivlyLogo; }} />
+              ) : workspace?.branding?.workspaceDisplayName ? (
+                <h2 className="text-xl font-bold text-foreground">{workspace.branding.workspaceDisplayName}</h2>
               ) : (
                 <img src={tivlyLogo} alt="Tivly" className="h-10 w-auto" />
               )}
