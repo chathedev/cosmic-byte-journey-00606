@@ -402,14 +402,6 @@ export default function Auth() {
                   {workspace?.branding?.loginSubtitle || 'Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.'}
                 </p>
               </div>
-            </div>
-          </div>
-                  >
-                    Tivly för team <ArrowRight className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right panel — auth form */}
