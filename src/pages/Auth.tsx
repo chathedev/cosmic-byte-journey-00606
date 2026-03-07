@@ -402,6 +402,7 @@ export default function Auth() {
                   {workspace?.branding?.loginSubtitle || 'Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.'}
                 </p>
               </div>
+            </div>
           </div>
 
           {/* Right panel — auth form */}
