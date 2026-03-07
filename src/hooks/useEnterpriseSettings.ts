@@ -4,8 +4,9 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   getEnterpriseSettings, updateEnterpriseSettings, testSSO, connectSSO,
-  disableSSOProvider, removeSSOProvider, resetSSOProvider,
-  type EnterpriseSettingsResponse,
+  disableSSOProvider, removeSSOProvider, resetSSOProvider, applyGovernancePreset,
+  type EnterpriseSettingsResponse, type SetupChecklist, type SettingsCatalog,
+  type CustomizationBoundaries, type GovernanceProfile,
 } from '@/lib/enterpriseSettingsApi';
 
 export function useEnterpriseSettings() {
@@ -37,9 +38,14 @@ export function useEnterpriseSettings() {
 
   useEffect(() => { loadSettings(); }, [loadSettings]);
 
+  // Derived data
+  const setupChecklist: SetupChecklist | undefined = data?.setupChecklist ?? (data as any)?.setupChecklist;
+  const catalogs: SettingsCatalog | undefined = data?.catalogs;
+  const customizationBoundaries: CustomizationBoundaries | undefined = data?.settings?.customizationBoundaries;
+  const governanceProfile: GovernanceProfile | undefined = data?.settings?.governanceProfile;
+
   const handleUpdate = async (patch: Record<string, any>) => {
     if (!companyId) return;
-    // Optimistic: merge patch into local data immediately
     const previousData = data;
     if (data) {
       setData({
@@ -62,13 +68,23 @@ export function useEnterpriseSettings() {
       setData(res);
       toast({ title: 'Inställningar sparade' });
     } catch (err: any) {
-      // Revert on error
       setData(previousData);
       if (err.status === 423) {
         toast({ title: 'Låst inställning', description: 'Denna inställning är låst av en administratör.', variant: 'destructive' });
       } else {
         toast({ title: 'Fel', description: err.message, variant: 'destructive' });
       }
+    }
+  };
+
+  const handleApplyPreset = async (presetId: string) => {
+    if (!companyId) return;
+    try {
+      const res = await applyGovernancePreset(companyId, presetId);
+      setData(res);
+      toast({ title: 'Governance-profil tillämpad' });
+    } catch (err: any) {
+      toast({ title: 'Kunde inte tillämpa profil', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -132,7 +148,12 @@ export function useEnterpriseSettings() {
     isEnterprise,
     canEdit: data?.viewer?.canManageEnterpriseSettings ?? false,
     hasLocks: Object.keys(data?.locks || {}).length > 0,
+    setupChecklist,
+    catalogs,
+    customizationBoundaries,
+    governanceProfile,
     handleUpdate,
+    handleApplyPreset,
     handleTestSSO,
     handleConnectSSO,
     handleDisableProvider,

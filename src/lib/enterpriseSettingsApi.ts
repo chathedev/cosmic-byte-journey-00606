@@ -1,6 +1,6 @@
 /**
  * Enterprise Settings API client methods
- * Covers: Settings CRUD, SSO, Custom Roles, Audit, Admin Locks
+ * Covers: Settings CRUD, SSO, Custom Roles, Audit, Admin Locks, Governance, Catalogs
  */
 
 const API_BASE_URL = 'https://api.tivly.se';
@@ -67,8 +67,18 @@ export interface IdentityAccessSettings {
 export interface AdminWorkspaceSettings {
   branding?: {
     workspaceDisplayName?: string;
+    legalEntityName?: string;
     logoUrl?: string | null;
+    wordmarkUrl?: string | null;
+    faviconUrl?: string | null;
     primaryColor?: string;
+    accentColor?: string;
+    loginTitle?: string;
+    loginSubtitle?: string;
+    supportEmail?: string;
+    supportUrl?: string;
+    privacyUrl?: string;
+    termsUrl?: string;
     emailBrandingEnabled?: boolean;
   };
   teamManagementEnabled?: boolean;
@@ -84,6 +94,13 @@ export interface AdminWorkspaceSettings {
   };
   integrationUsagePolicy?: {
     allowedUsers?: string[];
+  };
+  customDomains?: {
+    requireCustomDomainForSso?: boolean;
+    allowTivlySubdomain?: boolean;
+    allowBringYourOwnDomain?: boolean;
+    defaultLoginHostname?: string | null;
+    domains?: any[];
   };
 }
 
@@ -158,6 +175,70 @@ export interface ProviderReadiness {
   lastError: string | null;
 }
 
+export interface GovernancePreset {
+  id: string;
+  name: string;
+  description: string;
+  highlights?: string[];
+  outcomes?: string[];
+  settings?: Record<string, any>;
+}
+
+export interface RoleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  basePreset: string;
+  permissions: Record<string, boolean>;
+}
+
+export interface PermissionCatalogEntry {
+  key: string;
+  label: string;
+  description?: string;
+  group?: string;
+}
+
+export interface SetupChecklistStep {
+  id: string;
+  label?: string;
+  completed: boolean;
+  order?: number;
+}
+
+export interface SetupChecklist {
+  steps?: SetupChecklistStep[];
+  progressPercent: number;
+  nextStep?: string | null;
+  completedCount?: number;
+  totalCount?: number;
+  signals?: Record<string, any>;
+  metrics?: Record<string, any>;
+}
+
+export interface CustomizationBoundaries {
+  lockedOn?: string[];
+  lockedValues?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface GovernanceProfile {
+  policyPresetId?: string | null;
+  appliedAt?: string | null;
+  appliedBy?: string | null;
+}
+
+export interface SettingsCatalog {
+  policyPresets?: GovernancePreset[];
+  permissionCatalog?: PermissionCatalogEntry[];
+  presets?: Array<{ value: string; label: string }>;
+  permissionKeys?: string[];
+  presetPermissions?: Record<string, Record<string, boolean>>;
+  anchorRolePermissions?: Record<string, Record<string, boolean>>;
+  roleTemplates?: RoleTemplate[];
+  recommendedTemplateIds?: string[];
+}
+
 export interface EnterpriseSettingsResponse {
   company: { id: string; name: string; planType: string };
   settings: {
@@ -167,12 +248,25 @@ export interface EnterpriseSettingsResponse {
     meetingContentControls: Partial<MeetingContentSettings>;
     integrations: Partial<IntegrationSettings>;
     customRoles: CustomRole[];
+    customizationBoundaries?: CustomizationBoundaries;
+    governanceProfile?: GovernanceProfile;
   };
   settingsSummary?: {
     providerReadiness?: Record<string, ProviderReadiness>;
     enabledProviders?: string[];
+    defaultLoginHostname?: string | null;
+    workspaceOrigin?: string | null;
+    governancePresetId?: string | null;
+    customRoleCount?: number;
+    lockCount?: number;
+    hasAdminLocks?: boolean;
+    ssoEnabled?: boolean;
+    ssoOnlyLogin?: boolean;
+    primaryProvider?: string | null;
     [key: string]: any;
   };
+  catalogs?: SettingsCatalog;
+  setupChecklist?: SetupChecklist;
   locks: Record<string, SettingsLock>;
   viewer: {
     email: string;
@@ -268,8 +362,37 @@ export function getEnterpriseAudit(companyId: string): Promise<AuditResponse> {
   return apiFetch(`/enterprise/companies/${companyId}/settings/audit`);
 }
 
-export function getEnterpriseRoles(companyId: string): Promise<{ roles: CustomRole[] }> {
+export function getEnterpriseSetupChecklist(companyId: string): Promise<{ setupChecklist: SetupChecklist }> {
+  return apiFetch(`/enterprise/companies/${companyId}/setup-checklist`);
+}
+
+export function getEnterpriseCatalog(companyId: string): Promise<SettingsCatalog> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/catalog`);
+}
+
+export function applyGovernancePreset(companyId: string, presetId: string): Promise<EnterpriseSettingsResponse> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/policies/${presetId}/apply`, {
+    method: 'POST',
+  });
+}
+
+export function getEnterpriseRoles(companyId: string): Promise<{
+  roles: CustomRole[];
+  roleTemplates?: RoleTemplate[];
+  recommendedTemplateIds?: string[];
+  permissionCatalog?: PermissionCatalogEntry[];
+  presets?: Array<{ value: string; label: string }>;
+  permissionKeys?: string[];
+  presetPermissions?: Record<string, Record<string, boolean>>;
+  anchorRolePermissions?: Record<string, Record<string, boolean>>;
+}> {
   return apiFetch(`/enterprise/companies/${companyId}/settings/roles`);
+}
+
+export function bootstrapEnterpriseRoles(companyId: string): Promise<{ roles: CustomRole[] }> {
+  return apiFetch(`/enterprise/companies/${companyId}/settings/roles/bootstrap`, {
+    method: 'POST',
+  });
 }
 
 export function createEnterpriseRole(companyId: string, role: Partial<CustomRole>): Promise<{ role: CustomRole }> {
