@@ -254,7 +254,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
             <DialogTitle>{isNew ? 'Skapa roll' : 'Redigera roll'}</DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="px-5 py-4 space-y-5">
               <div className="space-y-1.5">
                 <Label className="text-xs">Namn</Label>
@@ -293,7 +293,7 @@ export function EnterpriseSettingsRoles({ companyId, canEdit, initialRoles }: Pr
                 ))}
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="px-5 py-3 shrink-0 border-t border-border bg-muted/30">
             <Button variant="outline" size="sm" onClick={() => setEditRole(null)}>Avbryt</Button>
