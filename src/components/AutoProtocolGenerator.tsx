@@ -121,6 +121,7 @@ export const AutoProtocolGenerator = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const { userPlan, enterpriseMembership } = useSubscription();
+  const { logoUrl: brandingLogoUrl, workspaceName: brandingWorkspaceName, isEnterprise: isBrandedEnterprise } = useEnterpriseBranding();
   const hasGeneratedRef = useRef(false);
   
   const isEnterprise = userPlan?.plan === 'enterprise' || enterpriseMembership?.isMember === true;
