@@ -209,7 +209,7 @@ export function AppSidebar() {
     : [
         ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
         { Icon: Users, title: "Team", path: "/org/settings" },
-        ...(isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise' ? [{ Icon: Shield, title: "Enterprise", path: "/org/enterprise-settings" }] : []),
+        ...(isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise' ? [{ Icon: Shield, title: "Enterprise", path: "/enterprise/settings" }] : []),
         { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
         { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
       ];

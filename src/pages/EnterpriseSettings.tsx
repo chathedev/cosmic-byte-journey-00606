@@ -1,71 +1,58 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Building2, Lock, Palette, Video, Link2, Users, FileText, Loader2, ChevronRight, Globe } from 'lucide-react';
+import { ArrowLeft, Shield, Building2, Lock, Palette, Video, Link2, Users, FileText, Globe, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useEnterpriseSettings } from '@/hooks/useEnterpriseSettings';
+import { cn } from '@/lib/utils';
 
 const sections = [
   {
     key: 'identity',
     title: 'Identitet & SSO',
-    description: 'Single sign-on, leverantörer och provisionering',
+    subtitle: 'Leverantörer, provisionering, domänbegränsningar',
     icon: Shield,
-    color: 'text-blue-600 dark:text-blue-400',
-    bg: 'bg-blue-50 dark:bg-blue-950/30',
-    path: '/org/enterprise-settings/identity',
+    path: '/enterprise/settings/identity',
   },
   {
     key: 'workspace',
     title: 'Arbetsyta & Domäner',
-    description: 'Branding, logotyper och anpassade domäner',
+    subtitle: 'Varumärke, logotyper, anpassade domäner',
     icon: Palette,
-    color: 'text-purple-600 dark:text-purple-400',
-    bg: 'bg-purple-50 dark:bg-purple-950/30',
-    path: '/org/enterprise-settings/workspace',
+    path: '/enterprise/settings/workspace',
   },
   {
     key: 'security',
     title: 'Säkerhet & Efterlevnad',
-    description: 'Datalagring, IP-begränsningar och exportkontroller',
+    subtitle: 'Datalagring, åtkomstkontroll, export',
     icon: Lock,
-    color: 'text-amber-600 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-950/30',
-    path: '/org/enterprise-settings/security',
+    path: '/enterprise/settings/security',
   },
   {
     key: 'meeting',
     title: 'Möten & Innehåll',
-    description: 'Inspelning, transkribering, AI och delningspolicyer',
+    subtitle: 'Inspelning, AI-sammanfattning, delning',
     icon: Video,
-    color: 'text-green-600 dark:text-green-400',
-    bg: 'bg-green-50 dark:bg-green-950/30',
-    path: '/org/enterprise-settings/meetings',
+    path: '/enterprise/settings/meetings',
   },
   {
     key: 'integrations',
     title: 'Integrationer',
-    description: 'Teams, Zoom, Google Meet, Slack och API-åtkomst',
+    subtitle: 'Teams, Zoom, Meet, Slack, API',
     icon: Link2,
-    color: 'text-cyan-600 dark:text-cyan-400',
-    bg: 'bg-cyan-50 dark:bg-cyan-950/30',
-    path: '/org/enterprise-settings/integrations',
+    path: '/enterprise/settings/integrations',
   },
   {
     key: 'roles',
     title: 'Roller & Behörigheter',
-    description: 'Anpassade roller och behörighetspaket',
+    subtitle: 'Anpassade roller och rättighetspaket',
     icon: Users,
-    color: 'text-rose-600 dark:text-rose-400',
-    bg: 'bg-rose-50 dark:bg-rose-950/30',
-    path: '/org/enterprise-settings/roles',
+    path: '/enterprise/settings/roles',
   },
   {
     key: 'audit',
     title: 'Historik & Audit',
-    description: 'Ändringslogg och säkerhetshändelser',
+    subtitle: 'Ändringslogg och säkerhetshändelser',
     icon: FileText,
-    color: 'text-slate-600 dark:text-slate-400',
-    bg: 'bg-slate-50 dark:bg-slate-950/30',
-    path: '/org/enterprise-settings/audit',
+    path: '/enterprise/settings/audit',
   },
 ] as const;
 
@@ -76,101 +63,124 @@ export default function EnterpriseSettingsPage() {
   if (!ctx.isEnterprise) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <Shield className="w-10 h-10 mx-auto text-muted-foreground/30" />
-          <p className="text-muted-foreground text-sm">Enterprise-inställningar är bara tillgängliga för Enterprise-planen.</p>
+        <div className="text-center space-y-3">
+          <Shield className="w-8 h-8 mx-auto text-muted-foreground/20" />
+          <p className="text-sm text-muted-foreground">Enterprise-inställningar kräver Enterprise-planen.</p>
         </div>
       </div>
     );
   }
 
-  // Quick stats from settings summary (safe even when data is null)
   const summary = ctx.data?.settingsSummary;
   const ssoEnabled = summary?.ssoEnabled;
   const lockCount = summary?.lockCount || 0;
   const customRoleCount = summary?.customRoleCount || 0;
   const defaultLoginHostname = summary?.defaultLoginHostname;
   const companyName = ctx.data?.company?.name;
+  const setupChecklist = (ctx.data as any)?.setupChecklist;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full max-w-3xl mx-auto px-4 py-8 sm:px-6">
+
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <button onClick={() => navigate('/org/settings')} className="p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+        <div className="flex items-start gap-4 mb-10">
+          <button onClick={() => navigate('/org/settings')} className="p-1.5 -ml-1.5 mt-0.5 rounded-lg hover:bg-muted transition-colors">
+            <ArrowLeft className="w-4 h-4 text-muted-foreground" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold">Enterprise</h1>
-            {companyName ? (
-              <p className="text-sm text-muted-foreground mt-0.5 truncate">{companyName}</p>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-semibold tracking-tight">Enterprise</h1>
+              <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 font-medium">
+                <Building2 className="w-3 h-3 mr-1" />Enterprise
+              </Badge>
+            </div>
+            {ctx.loading ? (
+              <div className="h-4 w-36 bg-muted rounded mt-1.5 animate-pulse" />
             ) : (
-              <div className="h-4 w-32 bg-muted rounded animate-pulse mt-1" />
+              <p className="text-sm text-muted-foreground mt-0.5">{companyName || 'Konfiguration'}</p>
             )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="secondary" className="bg-primary/15 text-primary text-xs gap-1">
-              <Building2 className="w-3 h-3" />Enterprise
-            </Badge>
           </div>
         </div>
 
+        {/* Read-only notice */}
         {!ctx.loading && !ctx.canEdit && (
-          <div className="mb-6 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-300">
-            Du har läsbehörighet men kan inte ändra enterprise-inställningar.
+          <div className="mb-6 p-3 rounded-lg border border-amber-200/60 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/10 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            Du har läsbehörighet men kan inte ändra inställningar.
           </div>
         )}
 
-        {/* Quick status bar */}
+        {/* Status indicators */}
         {ctx.data ? (
-          <div className="flex flex-wrap gap-3 mb-8">
+          <div className="flex flex-wrap items-center gap-2 mb-8">
             {ssoEnabled && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
-                <Shield className="w-3 h-3" />SSO aktivt
-              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-950/20 text-[11px] font-medium text-green-700 dark:text-green-400 border border-green-200/60 dark:border-green-900/40">
+                <CheckCircle2 className="w-3 h-3" />SSO aktivt
+              </span>
             )}
             {defaultLoginHostname && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-xs text-foreground">
-                <Globe className="w-3 h-3 text-primary" />
-                <span className="font-mono text-[11px]">{defaultLoginHostname}</span>
-              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/50 text-[11px] font-mono text-foreground/80 border border-border">
+                <Globe className="w-3 h-3 text-muted-foreground" />{defaultLoginHostname}
+              </span>
             )}
             {lockCount > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-400">
-                <Lock className="w-3 h-3" />{lockCount} låsta fält
-              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50/50 dark:bg-amber-950/10 text-[11px] font-medium text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40">
+                <Lock className="w-3 h-3" />{lockCount} låsta
+              </span>
             )}
             {customRoleCount > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400">
-                <Users className="w-3 h-3" />{customRoleCount} roller
-              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/50 text-[11px] font-medium text-foreground/80 border border-border">
+                <Users className="w-3 h-3 text-muted-foreground" />{customRoleCount} roller
+              </span>
             )}
           </div>
         ) : (
-          <div className="flex gap-3 mb-8 animate-pulse">
-            <div className="h-8 w-24 bg-muted rounded-full" />
-            <div className="h-8 w-32 bg-muted rounded-full" />
+          <div className="flex gap-2 mb-8">
+            <div className="h-7 w-20 bg-muted rounded-md animate-pulse" />
+            <div className="h-7 w-28 bg-muted rounded-md animate-pulse" />
           </div>
         )}
 
-        {/* Section grid */}
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* Setup checklist progress */}
+        {setupChecklist && setupChecklist.progressPercent < 100 && (
+          <div className="mb-8 p-4 rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-foreground">Konfigurationsframsteg</span>
+              <span className="text-[11px] text-muted-foreground">{setupChecklist.progressPercent}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${setupChecklist.progressPercent}%` }}
+              />
+            </div>
+            {setupChecklist.nextStep && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Nästa: {setupChecklist.nextStep.replace(/_/g, ' ')}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Navigation grid */}
+        <div className="space-y-1.5">
           {sections.map((section) => {
             const Icon = section.icon;
             return (
               <button
                 key={section.key}
                 onClick={() => navigate(section.path)}
-                className="group flex items-start gap-3.5 p-4 rounded-xl border border-border bg-card hover:border-primary/20 hover:shadow-sm transition-all text-left"
+                className="group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl border border-transparent hover:border-border hover:bg-card transition-all text-left"
               >
-                <div className={`p-2 rounded-lg ${section.bg} shrink-0`}>
-                  <Icon className={`w-4 h-4 ${section.color}`} />
+                <div className="p-2 rounded-lg bg-muted/60 group-hover:bg-primary/10 transition-colors shrink-0">
+                  <Icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium group-hover:text-primary transition-colors">{section.title}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{section.description}</p>
+                  <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{section.title}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{section.subtitle}</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary/50 mt-0.5 shrink-0 transition-colors" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground/20 group-hover:text-muted-foreground/60 transition-colors shrink-0" />
               </button>
             );
           })}
