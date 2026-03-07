@@ -371,6 +371,7 @@ const AppContent = () => {
       <MaintenanceOverlay />
       <SupportBanner />
       <EnterpriseAccessCheck />
+      <EnterpriseWorkspaceRedirect />
       <IOSAppPromoDialog />
       <OpenInAppBanner />
       <WelcomeGate>
