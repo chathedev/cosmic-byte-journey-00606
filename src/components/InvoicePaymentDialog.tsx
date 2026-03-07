@@ -205,7 +205,7 @@ export function InvoicePaymentDialog({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-                <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
+                <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
               </div>
               <div>
                 <DialogTitle className="font-semibold text-foreground">Tivly Enterprise</DialogTitle>
