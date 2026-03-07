@@ -72,6 +72,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       logoUrl !== (branding.logoUrl || '') ||
       wordmarkUrl !== ((branding as any).wordmarkUrl || '') ||
       faviconUrl !== ((branding as any).faviconUrl || '') ||
+      primaryColor !== (branding.primaryColor || '') ||
+      accentColor !== ((branding as any).accentColor || '') ||
       loginTitle !== ((branding as any).loginTitle || '') ||
       loginSubtitle !== ((branding as any).loginSubtitle || '') ||
       supportEmail !== ((branding as any).supportEmail || '') ||
@@ -81,9 +83,10 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       emailBrandingEnabled !== (branding.emailBrandingEnabled ?? false) ||
       domainRestrictedInvites !== (invitePolicy.domainRestrictedInvites ?? false) ||
       allowExternalGuests !== (invitePolicy.allowExternalGuests ?? false) ||
+      requireApprovalForExternalGuests !== (invitePolicy.requireApprovalForExternalGuests ?? false) ||
       teamManagementEnabled !== (settings.teamManagementEnabled ?? true)
     );
-  }, [workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, teamManagementEnabled, settings]);
+  }, [workspaceName, legalName, logoUrl, wordmarkUrl, faviconUrl, primaryColor, accentColor, loginTitle, loginSubtitle, supportEmail, supportUrl, privacyUrl, termsUrl, emailBrandingEnabled, domainRestrictedInvites, allowExternalGuests, requireApprovalForExternalGuests, teamManagementEnabled, settings]);
 
   const isLocked = (path: string) => !!locks[`adminWorkspace.${path}`]?.locked;
 
