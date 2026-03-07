@@ -74,9 +74,9 @@ export default function Auth() {
   const [isSignup, setIsSignup] = useState(false);
   const [onboardingEnabled, setOnboardingEnabled] = useState(false);
   const [enterpriseRedirect, setEnterpriseRedirect] = useState<{ hostname: string; origin: string } | null>(null);
-  const [workspace, setWorkspace] = useState<PublicWorkspaceInfo | null>(null);
-  const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const isCustomDomain = isEnterpriseCustomDomain();
+  const [workspace, setWorkspace] = useState<PublicWorkspaceInfo | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(isCustomDomain);
 
   // Determine if SSO providers are available
   const hasSSO = !!(
@@ -349,6 +349,15 @@ export default function Auth() {
             Tillbaka
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // Show loading while bootstrapping workspace on custom domains
+  if (isCustomDomain && workspaceLoading) {
+    return (
+      <div className="min-h-[100svh] bg-background flex items-center justify-center">
+        <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
       </div>
     );
   }
