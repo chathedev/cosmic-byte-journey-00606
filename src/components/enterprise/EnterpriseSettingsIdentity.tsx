@@ -27,6 +27,38 @@ interface Props {
   defaultLoginHostname?: string | null;
 }
 
+interface IdentityProviderCardProps {
+  providerKey: string;
+  label: string;
+  description: string;
+  provider?: EnterpriseProvider;
+  readiness?: ProviderReadiness;
+  enabled: boolean;
+  originalEnabled: boolean;
+  isPrimary: boolean;
+  canEdit: boolean;
+  actionProvider: string | null;
+  testingProvider: string | null;
+  connectingProvider: string | null;
+  onEnabledChange: (enabled: boolean) => void;
+  onSaveEnabled: () => Promise<void>;
+  onDiscardEnabled: () => void;
+  onTestSSO?: (provider: string, config?: Record<string, any>) => Promise<void>;
+  onConnectSSO?: (provider: string, config?: Record<string, any>) => Promise<void>;
+  onDisableProvider?: (provider: string) => Promise<void>;
+  onRemoveProvider?: (provider: string) => Promise<void>;
+  onResetProvider?: (provider: string) => Promise<void>;
+  setActionProvider: (provider: string | null) => void;
+  setTestingProvider: (provider: string | null) => void;
+  setConnectingProvider: (provider: string | null) => void;
+  oidcIssuer: string;
+  oidcClientId: string;
+  oidcClientSecret: string;
+  setOidcIssuer: (value: string) => void;
+  setOidcClientId: (value: string) => void;
+  setOidcClientSecret: (value: string) => void;
+}
+
 const PROVIDERS = [
   { key: 'microsoft', label: 'Microsoft Entra ID', shortLabel: 'Microsoft', description: 'Azure AD / Microsoft 365' },
   { key: 'google', label: 'Google Workspace', shortLabel: 'Google', description: 'Google Workspace SSO' },
@@ -66,7 +98,186 @@ function StatusIndicator({ readiness, provider }: { readiness?: ProviderReadines
 
 function formatTestTime(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  try { const d = new Date(iso); return d.toLocaleDateString('sv-SE') + ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); } catch { return null; }
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('sv-SE') + ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return null;
+  }
+}
+
+function IdentityProviderCard({
+  providerKey,
+  label,
+  description,
+  provider,
+  readiness,
+  enabled,
+  originalEnabled,
+  isPrimary,
+  canEdit,
+  actionProvider,
+  testingProvider,
+  connectingProvider,
+  onEnabledChange,
+  onSaveEnabled,
+  onDiscardEnabled,
+  onTestSSO,
+  onConnectSSO,
+  onDisableProvider,
+  onRemoveProvider,
+  onResetProvider,
+  setActionProvider,
+  setTestingProvider,
+  setConnectingProvider,
+  oidcIssuer,
+  oidcClientId,
+  oidcClientSecret,
+  setOidcIssuer,
+  setOidcClientId,
+  setOidcClientSecret,
+}: IdentityProviderCardProps) {
+  const isDirty = enabled !== originalEnabled;
+  const lastTestedAt = formatTestTime(readiness?.lastTestedAt ?? provider?.lastTestedAt);
+
+  const getOidcConfig = useCallback(() => {
+    const cfg: Record<string, string> = {};
+    if (oidcIssuer.trim()) cfg.issuer = oidcIssuer.trim();
+    if (oidcClientId.trim()) cfg.clientId = oidcClientId.trim();
+    if (oidcClientSecret.trim()) cfg.clientSecret = oidcClientSecret.trim();
+    return Object.keys(cfg).length > 0 ? cfg : undefined;
+  }, [oidcIssuer, oidcClientId, oidcClientSecret]);
+
+  const doSave = useCallback(async () => {
+    if (!isDirty) return;
+    await onSaveEnabled();
+  }, [isDirty, onSaveEnabled]);
+
+  const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: onDiscardEnabled });
+
+  const handleTestProvider = useCallback(async () => {
+    if (!onTestSSO) return;
+    setTestingProvider(providerKey);
+    try {
+      await onTestSSO(providerKey, providerKey === 'oidc' ? getOidcConfig() : undefined);
+    } finally {
+      setTestingProvider(null);
+    }
+  }, [onTestSSO, providerKey, setTestingProvider, getOidcConfig]);
+
+  const handleConnectProvider = useCallback(async () => {
+    if (!onConnectSSO) return;
+    setConnectingProvider(providerKey);
+    try {
+      await onConnectSSO(providerKey, providerKey === 'oidc' ? getOidcConfig() : undefined);
+    } finally {
+      setConnectingProvider(null);
+    }
+  }, [onConnectSSO, providerKey, setConnectingProvider, getOidcConfig]);
+
+  return (
+    <div className={`rounded-xl border p-4 space-y-3 transition-colors ${enabled ? 'border-primary/30 bg-card shadow-sm' : 'border-border bg-card/50'}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${enabled ? 'bg-primary/10' : 'bg-muted/50'}`}>
+            <Key className={`w-4 h-4 ${enabled ? 'text-primary' : 'text-muted-foreground'}`} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{label}</span>
+              {isPrimary && <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0">Primär</Badge>}
+            </div>
+            <p className="text-[11px] text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusIndicator readiness={readiness} provider={provider} />
+          <Switch checked={enabled} onCheckedChange={onEnabledChange} disabled={!canEdit || isSaving} />
+        </div>
+      </div>
+
+      {enabled && (
+        <div className="space-y-3">
+          {provider?.clientIdConfigured && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><CheckCircle2 className="w-3 h-3 text-green-500" />Client ID konfigurerad</div>
+          )}
+          {providerKey === 'microsoft' && provider?.tenantMode && (
+            <div className="text-[11px] text-muted-foreground">Tenant-läge: <span className="font-medium text-foreground">{provider.tenantMode}</span>{provider.enforceOrganizationAccountOnly && <span className="ml-2 text-muted-foreground">(Organisationskonton)</span>}</div>
+          )}
+          {providerKey === 'google' && provider?.hostedDomain && (
+            <div className="text-[11px] text-muted-foreground">Hosted domain: <span className="font-medium text-foreground">{provider.hostedDomain}</span></div>
+          )}
+          {providerKey === 'oidc' && (
+            <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">OIDC-konfiguration</p>
+              {provider?.issuer && <div className="text-[11px] text-muted-foreground truncate">Sparad issuer: <span className="font-medium text-foreground">{provider.issuer}</span></div>}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">Issuer URL</Label>
+                <Input value={oidcIssuer} onChange={e => setOidcIssuer(e.target.value)} placeholder="https://company.okta.com/oauth2/default" className="h-8 text-xs" disabled={!canEdit || isSaving} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">Client ID</Label>
+                <Input value={oidcClientId} onChange={e => setOidcClientId(e.target.value)} placeholder="Client ID" className="h-8 text-xs" disabled={!canEdit || isSaving} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">Client Secret</Label>
+                <Input type="password" value={oidcClientSecret} onChange={e => setOidcClientSecret(e.target.value)} placeholder="Client Secret" className="h-8 text-xs" disabled={!canEdit || isSaving} />
+              </div>
+              <p className="text-[10px] text-muted-foreground">Backend hämtar endpoints automatiskt via <code>.well-known/openid-configuration</code></p>
+            </div>
+          )}
+          {lastTestedAt && <div className="text-[11px] text-muted-foreground">Senast testad: {lastTestedAt}</div>}
+          {readiness?.lastError && (
+            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
+              <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" /><p className="text-[11px] text-destructive">{readiness.lastError}</p>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {onTestSSO && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={handleTestProvider} disabled={testingProvider === providerKey || !!actionProvider || isSaving}>
+                {testingProvider === providerKey ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}Verifiera
+              </Button>
+            )}
+            {onConnectSSO && !readiness?.ready && (
+              <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={handleConnectProvider} disabled={connectingProvider === providerKey || !!actionProvider || isSaving}>
+                {connectingProvider === providerKey ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}Konfigurera
+              </Button>
+            )}
+            {canEdit && onDisableProvider && readiness?.enabled && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
+                onClick={async () => { setActionProvider(providerKey); try { await onDisableProvider(providerKey); } finally { setActionProvider(null); } }} disabled={!!actionProvider || isSaving}>
+                {actionProvider === providerKey ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}Inaktivera
+              </Button>
+            )}
+            {canEdit && onResetProvider && readiness?.configured && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-muted-foreground" disabled={!!actionProvider || isSaving}><RotateCcw className="w-3 h-3" />Återställ</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader><AlertDialogTitle>Återställ {label}?</AlertDialogTitle><AlertDialogDescription>Detta inaktiverar providern, rensar sparad test-/godkännandestatus och kräver att nästa anslutningsförsök går igenom en interaktiv prompt.</AlertDialogDescription></AlertDialogHeader>
+                  <AlertDialogFooter><AlertDialogCancel>Avbryt</AlertDialogCancel><AlertDialogAction onClick={async () => { setActionProvider(providerKey); try { await onResetProvider(providerKey); } finally { setActionProvider(null); } }}>Återställ</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {canEdit && onRemoveProvider && readiness?.configured && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5" disabled={!!actionProvider || isSaving}><Trash2 className="w-3 h-3" />Ta bort</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader><AlertDialogTitle>Ta bort {label}?</AlertDialogTitle><AlertDialogDescription>Detta raderar all sparad konfiguration. Du behöver konfigurera om providern från grunden.</AlertDialogDescription></AlertDialogHeader>
+                  <AlertDialogFooter><AlertDialogCancel>Avbryt</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => { setActionProvider(providerKey); try { await onRemoveProvider(providerKey); } finally { setActionProvider(null); } }}>Ta bort provider</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        </div>
+      )}
+
+      <CardSaveFooter status={status} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />
+    </div>
+  );
 }
 
 export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, onDisableProvider, onRemoveProvider, onResetProvider, providerReadiness, hasVerifiedDomain, defaultLoginHostname }: Props) {
@@ -89,7 +300,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const [domainRestrictions, setDomainRestrictions] = useState<string[]>(settings.domainRestrictions || []);
   const [providerEnabled, setProviderEnabled] = useState<Record<string, boolean>>({});
 
-  const syncFromProps = useCallback(() => {
+  useEffect(() => {
     setSsoEnabled(settings.ssoEnabled ?? false);
     setSsoOnlyLogin(settings.ssoOnlyLogin ?? false);
     setPrimaryProvider(settings.primaryProvider || '');
@@ -99,72 +310,144 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
     setScimEnabled(settings.scimEnabled ?? false);
     setDefaultAnchorRole(settings.defaultAnchorRole || 'member');
     setDomainRestrictions(settings.domainRestrictions || []);
-    const pe: Record<string, boolean> = {};
-    const provs = settings.providers || {};
-    PROVIDERS.forEach(p => { pe[p.key] = (provs as any)[p.key]?.enabled ?? false; });
-    setProviderEnabled(pe);
+
+    const nextProviderEnabled: Record<string, boolean> = {};
+    const providerSettings = settings.providers || {};
+    PROVIDERS.forEach((provider) => {
+      nextProviderEnabled[provider.key] = (providerSettings as any)[provider.key]?.enabled ?? false;
+    });
+    setProviderEnabled(nextProviderEnabled);
   }, [settings]);
-
-  useEffect(() => { syncFromProps(); }, [syncFromProps]);
-
-  const isDirty = useMemo(() => {
-    const provs = settings.providers || {};
-    const providersDirty = PROVIDERS.some(p => providerEnabled[p.key] !== ((provs as any)[p.key]?.enabled ?? false));
-    return (
-      ssoEnabled !== (settings.ssoEnabled ?? false) || ssoOnlyLogin !== (settings.ssoOnlyLogin ?? false) ||
-      primaryProvider !== (settings.primaryProvider || '') || fallbackPolicy !== (settings.fallbackPolicy || 'sso_only') ||
-      jitProvisioningEnabled !== (settings.jitProvisioningEnabled ?? false) || groupSyncEnabled !== (settings.groupSyncEnabled ?? false) ||
-      scimEnabled !== (settings.scimEnabled ?? false) || defaultAnchorRole !== (settings.defaultAnchorRole || 'member') ||
-      JSON.stringify(domainRestrictions) !== JSON.stringify(settings.domainRestrictions || []) || providersDirty
-    );
-  }, [ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings]);
 
   const isLocked = (path: string) => !!locks[`identityAccess.${path}`]?.locked;
   const getLock = (path: string) => locks[`identityAccess.${path}`];
 
-  const doSave = useCallback(async () => {
-    if (!canEdit || !isDirty) return;
-    const providerPatch: Record<string, any> = {};
-    PROVIDERS.forEach(p => {
-      const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
-      if (providerEnabled[p.key] !== orig) providerPatch[p.key] = { enabled: providerEnabled[p.key] };
-    });
+  const ssoCardDirty = useMemo(() => (
+    ssoEnabled !== (settings.ssoEnabled ?? false) ||
+    ssoOnlyLogin !== (settings.ssoOnlyLogin ?? false) ||
+    primaryProvider !== (settings.primaryProvider || '') ||
+    fallbackPolicy !== (settings.fallbackPolicy || 'sso_only')
+  ), [ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, settings]);
+
+  const saveSsoCard = useCallback(async () => {
+    if (!canEdit || !ssoCardDirty) return;
     await onUpdate({
       identityAccess: {
-        ssoEnabled, ssoOnlyLogin, primaryProvider: primaryProvider || undefined, fallbackPolicy,
-        jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions,
-        ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
+        ssoEnabled,
+        ssoOnlyLogin,
+        primaryProvider: primaryProvider || undefined,
+        fallbackPolicy,
       },
     });
-  }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
+  }, [canEdit, ssoCardDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, onUpdate]);
 
-  const { status: saveStatus, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: syncFromProps });
+  const discardSsoCard = useCallback(() => {
+    setSsoEnabled(settings.ssoEnabled ?? false);
+    setSsoOnlyLogin(settings.ssoOnlyLogin ?? false);
+    setPrimaryProvider(settings.primaryProvider || '');
+    setFallbackPolicy(settings.fallbackPolicy || 'sso_only');
+  }, [settings]);
 
-  const addDomain = () => { const d = domainInput.trim().toLowerCase(); if (!d || domainRestrictions.includes(d)) return; setDomainRestrictions([...domainRestrictions, d]); setDomainInput(''); };
-  const removeDomain = (domain: string) => { setDomainRestrictions(domainRestrictions.filter(d => d !== domain)); };
+  const ssoSave = useManualSave({ onSave: saveSsoCard, onDiscard: discardSsoCard });
 
-  const getOidcConfig = () => {
-    const cfg: Record<string, string> = {};
-    if (oidcIssuer.trim()) cfg.issuer = oidcIssuer.trim();
-    if (oidcClientId.trim()) cfg.clientId = oidcClientId.trim();
-    if (oidcClientSecret.trim()) cfg.clientSecret = oidcClientSecret.trim();
-    return Object.keys(cfg).length > 0 ? cfg : undefined;
-  };
+  const userProvisioningDirty = useMemo(() => (
+    jitProvisioningEnabled !== (settings.jitProvisioningEnabled ?? false) ||
+    groupSyncEnabled !== (settings.groupSyncEnabled ?? false) ||
+    scimEnabled !== (settings.scimEnabled ?? false)
+  ), [jitProvisioningEnabled, groupSyncEnabled, scimEnabled, settings]);
 
-  const handleTestProvider = async (key: string) => {
-    if (!onTestSSO) return;
-    setTestingProvider(key);
-    try { await onTestSSO(key, key === 'oidc' ? getOidcConfig() : undefined); } finally { setTestingProvider(null); }
-  };
+  const saveUserProvisioning = useCallback(async () => {
+    if (!canEdit || !userProvisioningDirty) return;
+    await onUpdate({
+      identityAccess: {
+        jitProvisioningEnabled,
+        groupSyncEnabled,
+        scimEnabled,
+      },
+    });
+  }, [canEdit, userProvisioningDirty, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, onUpdate]);
 
-  const handleConnectProvider = async (key: string) => {
-    if (!onConnectSSO) return;
-    setConnectingProvider(key);
-    try { await onConnectSSO(key, key === 'oidc' ? getOidcConfig() : undefined); } finally { setConnectingProvider(null); }
-  };
+  const discardUserProvisioning = useCallback(() => {
+    setJitProvisioningEnabled(settings.jitProvisioningEnabled ?? false);
+    setGroupSyncEnabled(settings.groupSyncEnabled ?? false);
+    setScimEnabled(settings.scimEnabled ?? false);
+  }, [settings]);
+
+  const userProvisioningSave = useManualSave({ onSave: saveUserProvisioning, onDiscard: discardUserProvisioning });
+
+  const domainRestrictionsDirty = useMemo(() => (
+    JSON.stringify(domainRestrictions) !== JSON.stringify(settings.domainRestrictions || [])
+  ), [domainRestrictions, settings]);
+
+  const saveDomainRestrictions = useCallback(async () => {
+    if (!canEdit || !domainRestrictionsDirty) return;
+    await onUpdate({
+      identityAccess: {
+        domainRestrictions,
+      },
+    });
+  }, [canEdit, domainRestrictionsDirty, domainRestrictions, onUpdate]);
+
+  const discardDomainRestrictions = useCallback(() => {
+    setDomainRestrictions(settings.domainRestrictions || []);
+    setDomainInput('');
+  }, [settings]);
+
+  const domainRestrictionsSave = useManualSave({ onSave: saveDomainRestrictions, onDiscard: discardDomainRestrictions });
+
+  const defaultRoleDirty = useMemo(() => (
+    defaultAnchorRole !== (settings.defaultAnchorRole || 'member')
+  ), [defaultAnchorRole, settings]);
+
+  const saveDefaultRole = useCallback(async () => {
+    if (!canEdit || !defaultRoleDirty) return;
+    await onUpdate({
+      identityAccess: {
+        defaultAnchorRole,
+      },
+    });
+  }, [canEdit, defaultRoleDirty, defaultAnchorRole, onUpdate]);
+
+  const discardDefaultRole = useCallback(() => {
+    setDefaultAnchorRole(settings.defaultAnchorRole || 'member');
+  }, [settings]);
+
+  const defaultRoleSave = useManualSave({ onSave: saveDefaultRole, onDiscard: discardDefaultRole });
+
+  const saveProviderEnabled = useCallback(async (providerKey: string) => {
+    if (!canEdit) return;
+    const originalEnabled = (settings.providers as any)?.[providerKey]?.enabled ?? false;
+    const currentEnabled = providerEnabled[providerKey] ?? false;
+    if (currentEnabled === originalEnabled) return;
+
+    await onUpdate({
+      identityAccess: {
+        providers: {
+          [providerKey]: {
+            enabled: currentEnabled,
+          },
+        },
+      },
+    });
+  }, [canEdit, providerEnabled, settings.providers, onUpdate]);
+
+  const discardProviderEnabled = useCallback((providerKey: string) => {
+    const originalEnabled = (settings.providers as any)?.[providerKey]?.enabled ?? false;
+    setProviderEnabled((prev) => ({ ...prev, [providerKey]: originalEnabled }));
+  }, [settings.providers]);
+
+  const addDomain = useCallback(() => {
+    const domain = domainInput.trim().toLowerCase();
+    if (!domain || domainRestrictions.includes(domain)) return;
+    setDomainRestrictions((prev) => [...prev, domain]);
+    setDomainInput('');
+  }, [domainInput, domainRestrictions]);
+
+  const removeDomain = useCallback((domain: string) => {
+    setDomainRestrictions((prev) => prev.filter((d) => d !== domain));
+  }, []);
 
   const providers = settings.providers || {};
-  const saveFooter = <CardSaveFooter status={saveStatus} isDirty={isDirty} onSave={save} onDiscard={discard} disabled={!canEdit} />;
 
   return (
     <div className="space-y-6">
@@ -180,7 +463,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
           </div>
           <div className="flex items-center gap-2">
             <LockedBadge lock={getLock('ssoEnabled')} />
-            <Switch checked={ssoEnabled} onCheckedChange={setSsoEnabled} disabled={!canEdit || isLocked('ssoEnabled') || isSaving || !hasVerifiedDomain} />
+            <Switch checked={ssoEnabled} onCheckedChange={setSsoEnabled} disabled={!canEdit || isLocked('ssoEnabled') || ssoSave.isSaving || !hasVerifiedDomain} />
           </div>
         </div>
 
@@ -209,7 +492,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
               <div><p className="text-sm font-medium">Kräv SSO-inloggning</p><p className="text-xs text-muted-foreground">Blockera vanlig e-post/magic-link för enterprise-medlemmar</p></div>
               <div className="flex items-center gap-2">
                 <LockedBadge lock={getLock('ssoOnlyLogin')} />
-                <Switch checked={ssoOnlyLogin} onCheckedChange={setSsoOnlyLogin} disabled={!canEdit || isLocked('ssoOnlyLogin') || isSaving} />
+                <Switch checked={ssoOnlyLogin} onCheckedChange={setSsoOnlyLogin} disabled={!canEdit || isLocked('ssoOnlyLogin') || ssoSave.isSaving} />
               </div>
             </div>
             {ssoOnlyLogin && (
@@ -220,14 +503,14 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             )}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Primär provider</Label>
-              <Select value={primaryProvider} onValueChange={setPrimaryProvider} disabled={!canEdit || isLocked('primaryProvider') || isSaving}>
+              <Select value={primaryProvider} onValueChange={setPrimaryProvider} disabled={!canEdit || isLocked('primaryProvider') || ssoSave.isSaving}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Välj provider" /></SelectTrigger>
                 <SelectContent>{PROVIDERS.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Fallback-policy</Label>
-              <Select value={fallbackPolicy} onValueChange={setFallbackPolicy} disabled={!canEdit || isLocked('fallbackPolicy') || isSaving}>
+              <Select value={fallbackPolicy} onValueChange={setFallbackPolicy} disabled={!canEdit || isLocked('fallbackPolicy') || ssoSave.isSaving}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>{FALLBACK_POLICIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
@@ -235,7 +518,8 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             </div>
           </>
         )}
-        {saveFooter}
+
+        <CardSaveFooter status={ssoSave.status} isDirty={ssoCardDirty} onSave={ssoSave.save} onDiscard={ssoSave.discard} disabled={!canEdit} />
       </div>
 
       {/* Provider Cards */}
@@ -243,116 +527,40 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-foreground">Identity Providers</h4>
           <div className="grid gap-3">
-            {PROVIDERS.map(({ key, label, description }) => {
-              const provider = (providers as any)[key] as EnterpriseProvider | undefined;
-              const readiness = providerReadiness?.[key];
-              const isEnabled = providerEnabled[key] ?? false;
-              const isPrimary = primaryProvider === key;
-              const lastTestedAt = formatTestTime(readiness?.lastTestedAt ?? provider?.lastTestedAt);
-
-              return (
-                <div key={key} className={`rounded-xl border p-4 space-y-3 transition-colors ${isEnabled ? 'border-primary/30 bg-card shadow-sm' : 'border-border bg-card/50'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isEnabled ? 'bg-primary/10' : 'bg-muted/50'}`}>
-                        <Key className={`w-4 h-4 ${isEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{label}</span>
-                          {isPrimary && <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0">Primär</Badge>}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">{description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusIndicator readiness={readiness} provider={provider} />
-                      <Switch checked={isEnabled} onCheckedChange={v => setProviderEnabled(prev => ({ ...prev, [key]: v }))} disabled={!canEdit || isSaving} />
-                    </div>
-                  </div>
-
-                  {isEnabled && (
-                    <div className="space-y-3">
-                      {provider?.clientIdConfigured && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><CheckCircle2 className="w-3 h-3 text-green-500" />Client ID konfigurerad</div>
-                      )}
-                      {key === 'microsoft' && provider?.tenantMode && (
-                        <div className="text-[11px] text-muted-foreground">Tenant-läge: <span className="font-medium text-foreground">{provider.tenantMode}</span>{provider.enforceOrganizationAccountOnly && <span className="ml-2 text-muted-foreground">(Organisationskonton)</span>}</div>
-                      )}
-                      {key === 'google' && provider?.hostedDomain && (
-                        <div className="text-[11px] text-muted-foreground">Hosted domain: <span className="font-medium text-foreground">{provider.hostedDomain}</span></div>
-                      )}
-                      {key === 'oidc' && (
-                        <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border">
-                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">OIDC-konfiguration</p>
-                          {provider?.issuer && <div className="text-[11px] text-muted-foreground truncate">Sparad issuer: <span className="font-medium text-foreground">{provider.issuer}</span></div>}
-                          <div className="space-y-1.5">
-                            <Label className="text-[11px] text-muted-foreground">Issuer URL</Label>
-                            <Input value={oidcIssuer} onChange={e => setOidcIssuer(e.target.value)} placeholder="https://company.okta.com/oauth2/default" className="h-8 text-xs" disabled={!canEdit || isSaving} />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[11px] text-muted-foreground">Client ID</Label>
-                            <Input value={oidcClientId} onChange={e => setOidcClientId(e.target.value)} placeholder="Client ID" className="h-8 text-xs" disabled={!canEdit || isSaving} />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[11px] text-muted-foreground">Client Secret</Label>
-                            <Input type="password" value={oidcClientSecret} onChange={e => setOidcClientSecret(e.target.value)} placeholder="Client Secret" className="h-8 text-xs" disabled={!canEdit || isSaving} />
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">Backend hämtar endpoints automatiskt via <code>.well-known/openid-configuration</code></p>
-                        </div>
-                      )}
-                      {lastTestedAt && <div className="text-[11px] text-muted-foreground">Senast testad: {lastTestedAt}</div>}
-                      {readiness?.lastError && (
-                        <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
-                          <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" /><p className="text-[11px] text-destructive">{readiness.lastError}</p>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {onTestSSO && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleTestProvider(key)} disabled={testingProvider === key || !!actionProvider || isSaving}>
-                            {testingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}Verifiera
-                          </Button>
-                        )}
-                        {onConnectSSO && !readiness?.ready && (
-                          <Button variant="default" size="sm" className="h-7 text-xs gap-1.5" onClick={() => handleConnectProvider(key)} disabled={connectingProvider === key || !!actionProvider || isSaving}>
-                            {connectingProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}Konfigurera
-                          </Button>
-                        )}
-                        {canEdit && onDisableProvider && readiness?.enabled && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
-                            onClick={async () => { setActionProvider(key); try { await onDisableProvider(key); } finally { setActionProvider(null); } }} disabled={!!actionProvider || isSaving}>
-                            {actionProvider === key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}Inaktivera
-                          </Button>
-                        )}
-                        {canEdit && onResetProvider && readiness?.configured && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-muted-foreground" disabled={!!actionProvider || isSaving}><RotateCcw className="w-3 h-3" />Återställ</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Återställ {label}?</AlertDialogTitle><AlertDialogDescription>Detta inaktiverar providern, rensar sparad test-/godkännandestatus och kräver att nästa anslutningsförsök går igenom en interaktiv prompt.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter><AlertDialogCancel>Avbryt</AlertDialogCancel><AlertDialogAction onClick={async () => { setActionProvider(key); try { await onResetProvider(key); } finally { setActionProvider(null); } }}>Återställ</AlertDialogAction></AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                        {canEdit && onRemoveProvider && readiness?.configured && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5" disabled={!!actionProvider || isSaving}><Trash2 className="w-3 h-3" />Ta bort</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Ta bort {label}?</AlertDialogTitle><AlertDialogDescription>Detta raderar all sparad konfiguration. Du behöver konfigurera om providern från grunden.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter><AlertDialogCancel>Avbryt</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => { setActionProvider(key); try { await onRemoveProvider(key); } finally { setActionProvider(null); } }}>Ta bort provider</AlertDialogAction></AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {saveFooter}
-                </div>
-              );
-            })}
+            {PROVIDERS.map(({ key, label, description }) => (
+              <IdentityProviderCard
+                key={key}
+                providerKey={key}
+                label={label}
+                description={description}
+                provider={(providers as any)[key] as EnterpriseProvider | undefined}
+                readiness={providerReadiness?.[key]}
+                enabled={providerEnabled[key] ?? false}
+                originalEnabled={(providers as any)[key]?.enabled ?? false}
+                isPrimary={primaryProvider === key}
+                canEdit={canEdit}
+                actionProvider={actionProvider}
+                testingProvider={testingProvider}
+                connectingProvider={connectingProvider}
+                onEnabledChange={(value) => setProviderEnabled((prev) => ({ ...prev, [key]: value }))}
+                onSaveEnabled={() => saveProviderEnabled(key)}
+                onDiscardEnabled={() => discardProviderEnabled(key)}
+                onTestSSO={onTestSSO}
+                onConnectSSO={onConnectSSO}
+                onDisableProvider={onDisableProvider}
+                onRemoveProvider={onRemoveProvider}
+                onResetProvider={onResetProvider}
+                setActionProvider={setActionProvider}
+                setTestingProvider={setTestingProvider}
+                setConnectingProvider={setConnectingProvider}
+                oidcIssuer={oidcIssuer}
+                oidcClientId={oidcClientId}
+                oidcClientSecret={oidcClientSecret}
+                setOidcIssuer={setOidcIssuer}
+                setOidcClientId={setOidcClientId}
+                setOidcClientSecret={setOidcClientSecret}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -362,17 +570,17 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         <h4 className="text-sm font-medium flex items-center gap-2"><Zap className="w-4 h-4 text-primary" />Automatisk användarhantering</h4>
         <div className="flex items-center justify-between">
           <div><p className="text-sm">JIT-provisionering</p><p className="text-xs text-muted-foreground">Skapa konton automatiskt vid första SSO-inloggning</p></div>
-          <Switch checked={jitProvisioningEnabled} onCheckedChange={setJitProvisioningEnabled} disabled={!canEdit || isLocked('jitProvisioningEnabled') || isSaving} />
+          <Switch checked={jitProvisioningEnabled} onCheckedChange={setJitProvisioningEnabled} disabled={!canEdit || isLocked('jitProvisioningEnabled') || userProvisioningSave.isSaving} />
         </div>
         <div className="flex items-center justify-between">
           <div><p className="text-sm">Gruppsynkronisering</p><p className="text-xs text-muted-foreground">Synka grupper från identity provider</p></div>
-          <Switch checked={groupSyncEnabled} onCheckedChange={setGroupSyncEnabled} disabled={!canEdit || isLocked('groupSyncEnabled') || isSaving} />
+          <Switch checked={groupSyncEnabled} onCheckedChange={setGroupSyncEnabled} disabled={!canEdit || isLocked('groupSyncEnabled') || userProvisioningSave.isSaving} />
         </div>
         <div className="flex items-center justify-between">
           <div><p className="text-sm">SCIM</p><p className="text-xs text-muted-foreground">Automatisk användarhantering via SCIM</p></div>
-          <Switch checked={scimEnabled} onCheckedChange={setScimEnabled} disabled={!canEdit || isLocked('scimEnabled') || isSaving} />
+          <Switch checked={scimEnabled} onCheckedChange={setScimEnabled} disabled={!canEdit || isLocked('scimEnabled') || userProvisioningSave.isSaving} />
         </div>
-        {saveFooter}
+        <CardSaveFooter status={userProvisioningSave.status} isDirty={userProvisioningDirty} onSave={userProvisioningSave.save} onDiscard={userProvisioningSave.discard} disabled={!canEdit} />
       </div>
 
       {/* Domain Restrictions */}
@@ -391,7 +599,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addDomain} disabled={!domainInput.trim()}>Lägg till</Button>
           </div>
         )}
-        {saveFooter}
+        <CardSaveFooter status={domainRestrictionsSave.status} isDirty={domainRestrictionsDirty} onSave={domainRestrictionsSave.save} onDiscard={domainRestrictionsSave.discard} disabled={!canEdit} />
       </div>
 
       {/* Default role */}
@@ -400,7 +608,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
         <p className="text-xs text-muted-foreground">Vilken roll ska nya användare tilldelas vid automatisk provisionering</p>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Standardroll (anchor)</Label>
-          <Select value={defaultAnchorRole} onValueChange={setDefaultAnchorRole} disabled={!canEdit || isSaving}>
+          <Select value={defaultAnchorRole} onValueChange={setDefaultAnchorRole} disabled={!canEdit || defaultRoleSave.isSaving}>
             <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="member">Medlem</SelectItem>
@@ -409,7 +617,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             </SelectContent>
           </Select>
         </div>
-        {saveFooter}
+        <CardSaveFooter status={defaultRoleSave.status} isDirty={defaultRoleDirty} onSave={defaultRoleSave.save} onDiscard={defaultRoleSave.discard} disabled={!canEdit} />
       </div>
     </div>
   );
