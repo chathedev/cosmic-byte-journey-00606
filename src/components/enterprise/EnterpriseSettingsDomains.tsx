@@ -680,7 +680,7 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                 >
                   {statusIcon(domain)}
                   <span className="text-sm font-mono truncate flex-1 min-w-0">{domain.hostname}</span>
-                  {isPrimary && domain.status === 'verified' && (
+                  {isPrimary && isDomainVerified(domain) && (
                     <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary/15 text-primary border-0 shrink-0">Primär</Badge>
                   )}
                   <span className="text-[10px] text-muted-foreground shrink-0">{domainStatusLabel(domain)}</span>
