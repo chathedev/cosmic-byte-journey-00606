@@ -12,10 +12,10 @@ interface Props {
 }
 
 const INTEGRATIONS = [
-  { key: 'microsoftTeams', label: 'Microsoft Teams', icon: '🏢' },
-  { key: 'googleMeet', label: 'Google Meet', icon: '📹' },
-  { key: 'zoom', label: 'Zoom', icon: '🔵' },
-  { key: 'slack', label: 'Slack', icon: '💬' },
+  { key: 'microsoftTeams', label: 'Microsoft Teams' },
+  { key: 'googleMeet', label: 'Google Meet' },
+  { key: 'zoom', label: 'Zoom' },
+  { key: 'slack', label: 'Slack' },
 ];
 
 export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpdate }: Props) {
