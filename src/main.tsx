@@ -40,44 +40,49 @@ const rootElement = document.getElementById("root")!;
 
 const SSO_CALLBACK_PATH = '/auth/sso/callback';
 
+/**
+ * Normalize malformed SSO callback URLs (doubled paths from IdP redirects).
+ * Also extracts any query params embedded in the doubled path portion.
+ */
 function normalizeDoubledSSOCallbackUrl(): void {
   const { pathname, search, hash } = window.location;
   if (!pathname.startsWith(SSO_CALLBACK_PATH)) return;
 
-  const decodedPath = (() => {
-    try {
-      return decodeURIComponent(pathname);
-    } catch {
-      return pathname;
-    }
-  })();
+  // Check if path is clean already
+  const rest = pathname.slice(SSO_CALLBACK_PATH.length);
+  if (rest === '' || rest === '/') return;
 
-  const hasTrailingSlashOnly = pathname === `${SSO_CALLBACK_PATH}/`;
-  const hasExtraSegments = pathname !== SSO_CALLBACK_PATH && !hasTrailingSlashOnly;
-  const looksEmbeddedUrl =
-    decodedPath.includes(`${SSO_CALLBACK_PATH}/http://`) ||
-    decodedPath.includes(`${SSO_CALLBACK_PATH}/https://`) ||
-    decodedPath.includes(`${SSO_CALLBACK_PATH}/${window.location.origin}`);
-
-  if (!hasTrailingSlashOnly && !hasExtraSegments && !looksEmbeddedUrl) return;
-
+  // Path has extra segments — likely a doubled callback URL
   console.warn('[main] Normalizing malformed SSO callback URL:', pathname);
-  window.history.replaceState({}, document.title, `${SSO_CALLBACK_PATH}${search}${hash}`);
+
+  // Try to extract query params from the embedded URL
+  // e.g. /auth/sso/callback/https://host/auth/sso/callback?sessionToken=abc
+  let finalSearch = search;
+  const fullRaw = pathname + search + hash;
+  // Find the LAST '?' which may contain the real params
+  const embeddedQIdx = rest.indexOf('?');
+  if (embeddedQIdx !== -1 && !search) {
+    // Params were in the path portion (browser didn't parse them as query)
+    finalSearch = rest.slice(embeddedQIdx);
+  }
+
+  window.history.replaceState({}, document.title, `${SSO_CALLBACK_PATH}${finalSearch}${hash}`);
 }
 
+// Handle 404 redirects from 404.html FIRST (before normalization)
+const redirectPath = sessionStorage.getItem('redirectPath');
+if (redirectPath) {
+  sessionStorage.removeItem('redirectPath');
+  window.history.replaceState({}, document.title, redirectPath);
+}
+
+// Now normalize SSO callback URLs (runs on the restored path)
 normalizeDoubledSSOCallbackUrl();
 
 // Migrate legacy hash URLs (/#/feedback → /feedback)
 if (window.location.hash.startsWith("#/")) {
   const cleanPath = window.location.hash.slice(1);
   window.history.replaceState({}, document.title, cleanPath + window.location.search);
-}
-
-// Handle 404 redirects from 404.html
-const redirectPath = sessionStorage.getItem('redirectPath');
-if (redirectPath) {
-  sessionStorage.removeItem('redirectPath');
-  window.history.replaceState({}, document.title, redirectPath);
 }
 
 // Show content once React is ready to render
