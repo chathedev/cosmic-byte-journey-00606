@@ -67,27 +67,29 @@ export function EnterpriseBrandingProvider({ children }: { children: ReactNode }
   const isEnterprise = userPlan?.plan === 'enterprise' || enterpriseMembership?.isMember === true;
   const companyId = enterpriseMembership?.company?.id;
 
-  // Initialize everything from cache to avoid flash
+  // Initialize from cache unconditionally to prevent flash
+  // (companyId may not be available yet on first render)
   const cached = readCache();
-  const cachedMatchesCompany = cached && cached.companyId === companyId;
+  const hasCachedBranding = cached && cached.logoUrl;
 
   const [logoUrl, setLogoUrl] = useState<string>(
-    () => (cachedMatchesCompany && cached.logoUrl) ? cached.logoUrl : tivlyLogo
+    () => (hasCachedBranding && cached.logoUrl) ? cached.logoUrl : tivlyLogo
   );
   const [wordmarkUrl, setWordmarkUrl] = useState<string | null>(
-    () => (cachedMatchesCompany && cached.wordmarkUrl) || null
+    () => (hasCachedBranding && cached.wordmarkUrl) || null
   );
   const [faviconUrl, setFaviconUrl] = useState<string | null>(
-    () => (cachedMatchesCompany && cached.faviconUrl) || null
+    () => (hasCachedBranding && cached.faviconUrl) || null
   );
   const [workspaceName, setWorkspaceName] = useState<string | null>(
-    () => (cachedMatchesCompany && cached.workspaceName) || null
+    () => (hasCachedBranding && cached.workspaceName) || null
   );
   const [brandingReady, setBrandingReady] = useState(false);
+  const [cachedCompanyId] = useState(() => cached?.companyId || null);
 
   // Apply favicon + title on mount from cache immediately (no flash)
   useEffect(() => {
-    if (isEnterprise && cachedMatchesCompany) {
+    if (hasCachedBranding) {
       if (cached.faviconUrl) applyFavicon(cached.faviconUrl);
       applyTitle(cached.workspaceName || null);
     }
