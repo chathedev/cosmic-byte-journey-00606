@@ -181,16 +181,24 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
     setDomainRestrictions(domainRestrictions.filter(d => d !== domain));
   };
 
+  const getOidcConfig = () => {
+    const cfg: Record<string, string> = {};
+    if (oidcIssuer.trim()) cfg.issuer = oidcIssuer.trim();
+    if (oidcClientId.trim()) cfg.clientId = oidcClientId.trim();
+    if (oidcClientSecret.trim()) cfg.clientSecret = oidcClientSecret.trim();
+    return Object.keys(cfg).length > 0 ? cfg : undefined;
+  };
+
   const handleTestProvider = async (key: string) => {
     if (!onTestSSO) return;
     setTestingProvider(key);
-    try { await onTestSSO(key); } finally { setTestingProvider(null); }
+    try { await onTestSSO(key, key === 'oidc' ? getOidcConfig() : undefined); } finally { setTestingProvider(null); }
   };
 
   const handleConnectProvider = async (key: string) => {
     if (!onConnectSSO) return;
     setConnectingProvider(key);
-    try { await onConnectSSO(key); } finally { setConnectingProvider(null); }
+    try { await onConnectSSO(key, key === 'oidc' ? getOidcConfig() : undefined); } finally { setConnectingProvider(null); }
   };
 
   const providers = settings.providers || {};
