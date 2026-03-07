@@ -143,42 +143,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const isLocked = (path: string) => !!locks[`identityAccess.${path}`]?.locked;
   const getLock = (path: string) => locks[`identityAccess.${path}`];
 
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-
-  const handleSave = useCallback(async () => {
-    if (!canEdit || !isDirty) return;
-    setSaveStatus('saving');
-    try {
-      const providerPatch: Record<string, any> = {};
-      PROVIDERS.forEach(p => {
-        const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
-        if (providerEnabled[p.key] !== orig) {
-          providerPatch[p.key] = { enabled: providerEnabled[p.key] };
-        }
-      });
-      await onUpdate({
-        identityAccess: {
-          ssoEnabled,
-          ssoOnlyLogin,
-          primaryProvider: primaryProvider || undefined,
-          fallbackPolicy,
-          jitProvisioningEnabled,
-          groupSyncEnabled,
-          scimEnabled,
-          defaultAnchorRole,
-          domainRestrictions,
-          ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
-        },
-      });
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2500);
-    } catch {
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 4000);
-    }
-  }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
-
-  const handleDiscard = useCallback(() => {
+  const syncFromProps = useCallback(() => {
     setSsoEnabled(settings.ssoEnabled ?? false);
     setSsoOnlyLogin(settings.ssoOnlyLogin ?? false);
     setPrimaryProvider(settings.primaryProvider || '');
@@ -189,11 +154,30 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
     setDefaultAnchorRole(settings.defaultAnchorRole || 'member');
     setDomainRestrictions(settings.domainRestrictions || []);
     const pe: Record<string, boolean> = {};
-    const providers = settings.providers || {};
-    PROVIDERS.forEach(p => { pe[p.key] = (providers as any)[p.key]?.enabled ?? false; });
+    const provs = settings.providers || {};
+    PROVIDERS.forEach(p => { pe[p.key] = (provs as any)[p.key]?.enabled ?? false; });
     setProviderEnabled(pe);
-    setSaveStatus('idle');
   }, [settings]);
+
+  const doSave = useCallback(async () => {
+    if (!canEdit || !isDirty) return;
+    const providerPatch: Record<string, any> = {};
+    PROVIDERS.forEach(p => {
+      const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
+      if (providerEnabled[p.key] !== orig) {
+        providerPatch[p.key] = { enabled: providerEnabled[p.key] };
+      }
+    });
+    await onUpdate({
+      identityAccess: {
+        ssoEnabled, ssoOnlyLogin, primaryProvider: primaryProvider || undefined, fallbackPolicy,
+        jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions,
+        ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
+      },
+    });
+  }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
+
+  const { status: saveStatus, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: syncFromProps });
 
   const addDomain = () => {
     const d = domainInput.trim().toLowerCase();
