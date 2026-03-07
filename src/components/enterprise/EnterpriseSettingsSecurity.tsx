@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Shield, Database, Globe, Lock, AlertTriangle, Save } from 'lucide-react';
+import { Shield, Database, Globe, Lock, AlertTriangle } from 'lucide-react';
+import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

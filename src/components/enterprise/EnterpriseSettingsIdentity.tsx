@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw, Save } from 'lucide-react';
+import { Shield, Globe, Users, Zap, Key, AlertTriangle, CheckCircle2, XCircle, Loader2, Lock, ExternalLink, RefreshCw } from 'lucide-react';
+import { EnterpriseSaveBar } from './EnterpriseSaveBar';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
