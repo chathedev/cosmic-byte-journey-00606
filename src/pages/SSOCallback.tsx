@@ -11,8 +11,39 @@ const ERROR_MESSAGES: Record<string, string> = {
   enterprise_sso_domain_restriction: 'Din e-postdomän är inte godkänd för denna arbetsyta.',
   enterprise_sso_disabled: 'SSO är inte aktiverat för denna arbetsyta.',
   enterprise_sso_provider_not_ready: 'SSO-providern är inte korrekt konfigurerad. Kontakta din administratör.',
+  session_expired: 'SSO-sessionen har gått ut. Försök logga in igen.',
+  enterprise_sso_callback_failed: 'SSO-inloggning misslyckades i callback-steget. Försök igen.',
   invalid_session: 'SSO-sessionen har gått ut. Försök logga in igen.',
 };
+
+const SSO_TOKEN_KEYS = ['sessionToken', 'enterpriseSsoSession', 'ssoSession', 'session_token', 'token'] as const;
+
+function readParam(searchParams: URLSearchParams, key: string): string | null {
+  const value = searchParams.get(key);
+  return value && value.trim() ? value.trim() : null;
+}
+
+function readSessionToken(searchParams: URLSearchParams): string | null {
+  for (const key of SSO_TOKEN_KEYS) {
+    const fromRouter = readParam(searchParams, key);
+    if (fromRouter) return fromRouter;
+  }
+
+  const rawParams = new URLSearchParams(window.location.search);
+  for (const key of SSO_TOKEN_KEYS) {
+    const fromRaw = readParam(rawParams, key);
+    if (fromRaw) return fromRaw;
+  }
+
+  const rawHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+  const hashParams = new URLSearchParams(rawHash.startsWith('?') ? rawHash.slice(1) : rawHash);
+  for (const key of SSO_TOKEN_KEYS) {
+    const fromHash = readParam(hashParams, key);
+    if (fromHash) return fromHash;
+  }
+
+  return null;
+}
 
 export default function SSOCallback() {
   const [searchParams] = useSearchParams();
@@ -23,10 +54,10 @@ export default function SSOCallback() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const sessionToken = searchParams.get('session_token') || searchParams.get('token');
+    const sessionToken = readSessionToken(searchParams);
     const errorParam = searchParams.get('error');
 
-    // Handle error passed via redirect query param
+    // Only show direct error when no session token alias exists (backend can include token even on failure)
     if (errorParam && !sessionToken) {
       const msg = ERROR_MESSAGES[errorParam] || searchParams.get('error_description') || 'SSO-inloggning misslyckades.';
       setError(msg);
@@ -42,18 +73,28 @@ export default function SSOCallback() {
     (async () => {
       try {
         const result = await exchangeSSOSession(sessionToken);
-        if (result.token) {
-          apiClient.applyAuthToken(result.token);
+        const typedResult = result as any;
+
+        if (typedResult.token) {
+          apiClient.applyAuthToken(typedResult.token);
           setSuccess(true);
           await refreshUser();
-          const target = result.redirectTarget || '/';
+          const target = typedResult.redirectTarget || '/';
           setTimeout(() => navigate(target, { replace: true }), 600);
-        } else {
-          setError('SSO-inloggning misslyckades. Inget token mottaget.');
+          return;
         }
+
+        if (typedResult.error || typedResult.code) {
+          const code = typedResult.error || typedResult.code;
+          setErrorCode(code);
+          setError(ERROR_MESSAGES[code] || typedResult.message || 'SSO-inloggning misslyckades.');
+          return;
+        }
+
+        setError('SSO-inloggning misslyckades. Inget token mottaget.');
       } catch (err: any) {
         console.error('[SSOCallback] Exchange failed:', err);
-        const code = err.code || '';
+        const code = err.code || err.error || '';
         setErrorCode(code);
         setError(ERROR_MESSAGES[code] || err.message || 'SSO-inloggning misslyckades. Försök igen.');
       }
@@ -97,3 +138,4 @@ export default function SSOCallback() {
     </div>
   );
 }
+
