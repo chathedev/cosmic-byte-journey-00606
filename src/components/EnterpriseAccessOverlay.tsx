@@ -678,7 +678,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
                 {/* Logo and company info */}
                 <div className="flex items-center gap-4 mb-8 lg:mb-12">
                   <div className="w-14 h-14 lg:w-16 lg:h-16 rounded-xl bg-background/80 overflow-hidden flex items-center justify-center shadow-sm border border-border/50">
-                    <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-2" />
+                    <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
                   </div>
                   <div>
                     <h1 className="text-lg lg:text-xl font-semibold text-foreground">Tivly Enterprise</h1>
