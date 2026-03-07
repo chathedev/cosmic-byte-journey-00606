@@ -149,15 +149,6 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
         </div>
       </div>
 
-      {/* Save button */}
-      {canEdit && isDirty && (
-        <div className="sticky bottom-4 flex justify-end z-10">
-          <Button onClick={handleSave} disabled={saving} className="gap-2 shadow-lg">
-            <Save className="w-4 h-4" />
-            {saving ? 'Sparar…' : 'Spara ändringar'}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
