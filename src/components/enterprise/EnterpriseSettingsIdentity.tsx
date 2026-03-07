@@ -141,34 +141,32 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
   const isLocked = (path: string) => !!locks[`identityAccess.${path}`]?.locked;
   const getLock = (path: string) => locks[`identityAccess.${path}`];
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!canEdit || !isDirty) return;
-    setSaving(true);
-    try {
-      const providerPatch: Record<string, any> = {};
-      PROVIDERS.forEach(p => {
-        const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
-        if (providerEnabled[p.key] !== orig) {
-          providerPatch[p.key] = { enabled: providerEnabled[p.key] };
-        }
-      });
-      await onUpdate({
-        identityAccess: {
-          ssoEnabled,
-          ssoOnlyLogin,
-          primaryProvider: primaryProvider || undefined,
-          fallbackPolicy,
-          jitProvisioningEnabled,
-          groupSyncEnabled,
-          scimEnabled,
-          defaultAnchorRole,
-          domainRestrictions,
-          ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
-        },
-      });
-    } finally {
-      setSaving(false);
-    }
+    const providerPatch: Record<string, any> = {};
+    PROVIDERS.forEach(p => {
+      const orig = (settings.providers as any)?.[p.key]?.enabled ?? false;
+      if (providerEnabled[p.key] !== orig) {
+        providerPatch[p.key] = { enabled: providerEnabled[p.key] };
+      }
+    });
+    await onUpdate({
+      identityAccess: {
+        ssoEnabled,
+        ssoOnlyLogin,
+        primaryProvider: primaryProvider || undefined,
+        fallbackPolicy,
+        jitProvisioningEnabled,
+        groupSyncEnabled,
+        scimEnabled,
+        defaultAnchorRole,
+        domainRestrictions,
+        ...(Object.keys(providerPatch).length > 0 ? { providers: providerPatch } : {}),
+      },
+    });
+  }, [canEdit, isDirty, ssoEnabled, ssoOnlyLogin, primaryProvider, fallbackPolicy, jitProvisioningEnabled, groupSyncEnabled, scimEnabled, defaultAnchorRole, domainRestrictions, providerEnabled, settings, onUpdate]);
+
+  const { status: autoSaveStatus } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
   };
 
   const addDomain = () => {
