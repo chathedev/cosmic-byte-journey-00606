@@ -3,6 +3,7 @@ import { Building2, Palette, Users, Lock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useEnterpriseBranding } from '@/contexts/EnterpriseBrandingContext';
 import type { AdminWorkspaceSettings, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 
 export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate }: Props) {
   const [saving, setSaving] = useState(false);
+  const { refreshBranding } = useEnterpriseBranding();
   const branding = settings.branding || {};
   const invitePolicy = settings.invitePolicy || {};
 
@@ -40,6 +42,8 @@ export function EnterpriseSettingsWorkspace({ settings, locks, canEdit, onUpdate
       }
       ref[parts[parts.length - 1]] = value;
       await onUpdate({ adminWorkspace: patch });
+      // Refresh branding context so logo/name updates across the app
+      await refreshBranding();
     } finally { setSaving(false); }
   };
 

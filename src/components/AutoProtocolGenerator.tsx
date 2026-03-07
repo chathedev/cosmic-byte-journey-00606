@@ -14,6 +14,7 @@ import { ConfirmCloseProtocolDialog } from "@/components/ConfirmCloseProtocolDia
 import { backendApi } from "@/lib/backendApi";
 import { analyzeMeetingAI, generateMeetingTitleAI } from "@/lib/geminiApi";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useEnterpriseBranding } from "@/contexts/EnterpriseBrandingContext";
 import {
   computeSpeakerIndexOffset,
   lookupSpeakerNameMap,
@@ -120,6 +121,7 @@ export const AutoProtocolGenerator = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const { userPlan, enterpriseMembership } = useSubscription();
+  const { logoUrl: brandingLogoUrl, workspaceName: brandingWorkspaceName, isEnterprise: isBrandedEnterprise } = useEnterpriseBranding();
   const hasGeneratedRef = useRef(false);
   
   const isEnterprise = userPlan?.plan === 'enterprise' || enterpriseMembership?.isMember === true;
@@ -741,8 +743,27 @@ export const AutoProtocolGenerator = ({
       );
     }
 
-    // Branding footer — only for non-enterprise users
-    if (!isEnterprise) {
+    // Branding footer — enterprise with custom branding gets their name, non-enterprise gets tivly
+    if (isEnterprise && brandingWorkspaceName) {
+      documentChildren.push(
+        new Paragraph({
+          text: "",
+          spacing: { before: 800 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `dokumenterat av ${brandingWorkspaceName}`,
+              color: "AAAAAA",
+              size: 14,
+              font: "Helvetica",
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400 },
+        })
+      );
+    } else if (!isEnterprise) {
       documentChildren.push(
         new Paragraph({
           text: "",

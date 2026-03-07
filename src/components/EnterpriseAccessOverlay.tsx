@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import tivlyLogo from '@/assets/tivly-logo.png';
+import { useEnterpriseBranding } from '@/contexts/EnterpriseBrandingContext';
 
 // Enterprise billing uses the Tivly Enterprise Stripe account
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
@@ -383,6 +384,7 @@ function InlinePaymentForm({
 
 export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAccessOverlayProps) => {
   const companyId = membership.company?.id;
+  const { logoUrl: brandingLogoUrl } = useEnterpriseBranding();
   const [liveBilling, setLiveBilling] = useState<LiveBillingStatusResponse | null>(null);
   const [isCheckingBilling, setIsCheckingBilling] = useState(false);
   const [billingCheckError, setBillingCheckError] = useState<string | null>(null);
@@ -551,7 +553,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
       <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 overflow-hidden flex items-center justify-center">
-            <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-3" />
+            <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-3" />
           </div>
           <div className="flex items-center justify-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -676,7 +678,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
                 {/* Logo and company info */}
                 <div className="flex items-center gap-4 mb-8 lg:mb-12">
                   <div className="w-14 h-14 lg:w-16 lg:h-16 rounded-xl bg-background/80 overflow-hidden flex items-center justify-center shadow-sm border border-border/50">
-                    <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-2" />
+                    <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
                   </div>
                   <div>
                     <h1 className="text-lg lg:text-xl font-semibold text-foreground">Tivly Enterprise</h1>
@@ -839,7 +841,7 @@ export const EnterpriseAccessOverlay = ({ membership, isAdmin }: EnterpriseAcces
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 overflow-hidden flex items-center justify-center shadow-sm">
-              <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-3" />
+              <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-3" />
             </div>
           </div>
 

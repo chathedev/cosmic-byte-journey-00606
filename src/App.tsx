@@ -15,6 +15,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlanBadge } from "@/components/PlanBadge";
 import { AuthProvider, useAuth, AuthContext } from "@/contexts/AuthContext";
 import { SubscriptionProvider, useSubscription, SubscriptionContext } from "@/contexts/SubscriptionContext";
+import { EnterpriseBrandingProvider } from "@/contexts/EnterpriseBrandingContext";
 import { SupportProvider } from "@/contexts/SupportContext";
 import { AdminRoute } from "@/components/AdminRoute";
 import { IOSWelcomeScreen } from "@/components/IOSWelcomeScreen";
@@ -479,7 +480,8 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthProvider>
-      <SubscriptionProvider>
+       <SubscriptionProvider>
+        <EnterpriseBrandingProvider>
         <Suspense
           fallback={
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -493,6 +495,7 @@ const PublicPagesShell = ({ children }: { children: React.ReactNode }) => {
             <Route path="/free-trial" element={<FreeTrial />} />
           </Routes>
         </Suspense>
+        </EnterpriseBrandingProvider>
       </SubscriptionProvider>
     </AuthProvider>
   );
@@ -511,11 +514,13 @@ const App = () => {
               <PublicPagesShell>
                 <AuthProvider>
                   <SubscriptionProvider>
+                    <EnterpriseBrandingProvider>
                     <SupportProvider>
                       <AdminBypassGate>
                         <AppContent />
                       </AdminBypassGate>
                     </SupportProvider>
+                    </EnterpriseBrandingProvider>
                   </SubscriptionProvider>
                 </AuthProvider>
               </PublicPagesShell>
@@ -601,9 +606,11 @@ const App = () => {
             <PublicPagesShell>
               <AuthProvider>
                 <SubscriptionProvider>
+                  <EnterpriseBrandingProvider>
                   <SupportProvider>
                     <AppContent />
                   </SupportProvider>
+                  </EnterpriseBrandingProvider>
                 </SubscriptionProvider>
               </AuthProvider>
             </PublicPagesShell>

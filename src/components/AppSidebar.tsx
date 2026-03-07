@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { isMobileDevice } from "@/utils/mobileDetection";
 import { OrgSwitcherDialog } from "@/components/OrgSwitcherDialog";
 import tivlyLogo from "@/assets/tivly-logo.png";
+import { useEnterpriseBranding } from "@/contexts/EnterpriseBrandingContext";
 import { getCommercialPlanLabel } from "@/lib/commercialPlan";
 
 export function AppSidebar() {
@@ -53,6 +54,7 @@ export function AppSidebar() {
   const scrollYRef = useRef(0);
   const { user, logout } = useAuth();
   const { userPlan, isLoading: planLoading, refreshPlan, enterpriseMembership, switchCompany } = useSubscription();
+  const { logoUrl: brandingLogoUrl } = useEnterpriseBranding();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -320,7 +322,7 @@ export function AppSidebar() {
             disabled={!enterpriseMembership?.memberships || enterpriseMembership.memberships.length <= 1}
           >
             <div className="w-10 h-10 shrink-0 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-              <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
+              <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">

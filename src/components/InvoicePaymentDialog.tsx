@@ -14,6 +14,7 @@ import {
   Building2
 } from "lucide-react";
 import tivlyLogo from "@/assets/tivly-logo.png";
+import { useEnterpriseBranding } from "@/contexts/EnterpriseBrandingContext";
 
 // Enterprise billing uses the Tivly Enterprise Stripe account
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51QH6igLnfTyXNYdEPTKgwYTUNqaCdfAxxKm3muIlm6GmLVvguCeN71I6udCVwiMouKam1BSyvJ4EyELKDjAsdIUo00iMqzDhqu';
@@ -136,6 +137,7 @@ export function InvoicePaymentDialog({
   invoiceType,
   onSuccess
 }: InvoicePaymentDialogProps) {
+  const { logoUrl: brandingLogoUrl } = useEnterpriseBranding();
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -203,7 +205,7 @@ export function InvoicePaymentDialog({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary overflow-hidden flex items-center justify-center">
-                <img src={tivlyLogo} alt="Tivly" className="w-full h-full object-contain p-1" />
+                <img src={brandingLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
               </div>
               <div>
                 <DialogTitle className="font-semibold text-foreground">Tivly Enterprise</DialogTitle>
