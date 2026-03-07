@@ -235,7 +235,7 @@ export const MeetingChat = ({ transcript, meetingTitle, onClose, isEnterprise = 
                   
                   {msg.role === "user" && (
                     <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">
-                      <span className="text-xs">👤</span>
+                      <User className="w-3.5 h-3.5 text-muted-foreground" />
                     </div>
                   )}
                 </div>

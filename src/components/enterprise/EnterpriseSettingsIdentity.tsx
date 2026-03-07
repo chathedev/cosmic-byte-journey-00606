@@ -10,11 +10,11 @@ import { Separator } from '@/components/ui/separator';
 import type { IdentityAccessSettings, EnterpriseProvider, SettingsLock } from '@/lib/enterpriseSettingsApi';
 
 const PROVIDERS = [
-  { key: 'microsoft', label: 'Microsoft', icon: '🏢' },
-  { key: 'google', label: 'Google', icon: '🔍' },
-  { key: 'okta', label: 'Okta', icon: '🔐' },
-  { key: 'oidc', label: 'OIDC', icon: '🔗' },
-  { key: 'saml', label: 'SAML', icon: '📜' },
+  { key: 'microsoft', label: 'Microsoft' },
+  { key: 'google', label: 'Google' },
+  { key: 'okta', label: 'Okta' },
+  { key: 'oidc', label: 'OIDC' },
+  { key: 'saml', label: 'SAML' },
 ];
 
 const FALLBACK_POLICIES = [

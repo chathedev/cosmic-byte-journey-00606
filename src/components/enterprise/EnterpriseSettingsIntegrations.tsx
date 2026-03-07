@@ -33,12 +33,14 @@ export function EnterpriseSettingsIntegrations({ settings, locks, canEdit, onUpd
           </div>
         </div>
 
-        {INTEGRATIONS.map(({ key, label, icon }) => {
+        {INTEGRATIONS.map(({ key, label }) => {
           const integration = (settings as any)?.[key] || {};
           return (
             <div key={key} className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{icon}</span>
+                <div className="w-5 h-5 rounded bg-muted flex items-center justify-center">
+                  <Link2 className="w-3 h-3 text-muted-foreground" />
+                </div>
                 <div>
                   <p className="text-sm">{label}</p>
                   {integration.allowedRoles?.length > 0 && (

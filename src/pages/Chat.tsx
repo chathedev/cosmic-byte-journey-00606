@@ -329,7 +329,7 @@ ${contextPrefix}${transcriptContext ? `\n\nMÖTESINNEHÅLL:\n${transcriptContext
       );
       return [
         ...updated,
-        { role: "assistant" as const, content: `Perfekt! Jag tittar nu på **${meetingTitle}**. Vad vill du veta om det mötet? 📋` }
+        { role: "assistant" as const, content: `Perfekt! Jag tittar nu på **${meetingTitle}**. Vad vill du veta om det mötet?` }
       ];
     });
   };
