@@ -435,11 +435,11 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
                 )}
 
                 {/* Error message */}
-                {domain.lastError && (
+                {(domain.lastError || domain.lastErrorMessage) && (
                   <div className="flex items-start gap-2 p-2.5 rounded-lg border border-destructive/20 bg-destructive/5">
                     <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
                     <div className="text-[11px] text-destructive space-y-1">
-                      <p>{domain.lastError}</p>
+                      <p>{typeof domain.lastError === 'string' ? domain.lastError : domain.lastErrorMessage || 'Verifiering misslyckades'}</p>
                       {isFailed && domain.kind === 'bring_your_own' && (
                         <p className="text-muted-foreground">Kontrollera att DNS-posterna nedan är korrekt konfigurerade hos din domänleverantör.</p>
                       )}
