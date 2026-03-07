@@ -218,10 +218,10 @@ function IpAllowlistCard({ settings, locks, canEdit, onUpdate }: Props) {
   );
 }
 
-export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate }: Props) {
+export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate, customizationBoundaries }: Props) {
   return (
     <div className="space-y-6">
-      <SecurityTogglesCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} />
+      <SecurityTogglesCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} customizationBoundaries={customizationBoundaries} />
       <DataStorageCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} />
       <IpAllowlistCard settings={settings} locks={locks} canEdit={canEdit} onUpdate={onUpdate} />
     </div>
