@@ -90,9 +90,10 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
         ipAllowlist,
         retentionDays,
         storageRegion,
+        euDataResidencyRequired,
       },
     });
-  }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, onUpdate]);
+  }, [canEdit, isDirty, auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, euDataResidencyRequired, onUpdate]);
 
   const { status: autoSaveStatus, saving } = useAutoSave({ isDirty, canEdit, onSave: handleSave });
 
