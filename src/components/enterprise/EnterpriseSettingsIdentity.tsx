@@ -157,7 +157,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Välj provider" /></SelectTrigger>
                 <SelectContent>
                   {PROVIDERS.map(p => (
-                    <SelectItem key={p.key} value={p.key}>{p.icon} {p.label}</SelectItem>
+                    <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
