@@ -386,7 +386,7 @@ export default function Auth() {
 
           {/* Left panel — branding (desktop only) */}
           <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-muted/40 border-r border-border items-center justify-center p-12 min-h-screen sticky top-0">
-            <div className="max-w-sm space-y-8">
+            <div className="max-w-sm space-y-6">
               {workspace?.branding?.logoUrl ? (
                 <img src={workspace.branding.logoUrl} alt={workspace.branding.workspaceDisplayName || 'Workspace'} className="h-10 w-auto" onError={(e) => { (e.target as HTMLImageElement).src = tivlyLogo; }} />
               ) : workspace?.branding?.workspaceDisplayName ? (
@@ -402,11 +402,8 @@ export default function Auth() {
                   {workspace?.branding?.loginSubtitle || 'Spela in, transkribera och generera professionella protokoll med AI. Spara timmar varje vecka.'}
                 </p>
               </div>
-              {!isCustomDomain && onboardingEnabled && (
-                <div className="pt-4">
-                  <a
-                    href="/team/onboarding"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+            </div>
+          </div>
                   >
                     Tivly för team <ArrowRight className="h-3.5 w-3.5" />
                   </a>
