@@ -84,20 +84,13 @@ export default function EnterpriseSettingsPage() {
     );
   }
 
-  if (ctx.loading || !ctx.data) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Quick stats from settings summary
-  const summary = ctx.data.settingsSummary;
+  // Quick stats from settings summary (safe even when data is null)
+  const summary = ctx.data?.settingsSummary;
   const ssoEnabled = summary?.ssoEnabled;
   const lockCount = summary?.lockCount || 0;
   const customRoleCount = summary?.customRoleCount || 0;
   const defaultLoginHostname = summary?.defaultLoginHostname;
+  const companyName = ctx.data?.company?.name;
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,7 +102,11 @@ export default function EnterpriseSettingsPage() {
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-semibold">Enterprise</h1>
-            <p className="text-sm text-muted-foreground mt-0.5 truncate">{ctx.data.company?.name}</p>
+            {companyName ? (
+              <p className="text-sm text-muted-foreground mt-0.5 truncate">{companyName}</p>
+            ) : (
+              <div className="h-4 w-32 bg-muted rounded animate-pulse mt-1" />
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Badge variant="secondary" className="bg-primary/15 text-primary text-xs gap-1">
@@ -118,36 +115,43 @@ export default function EnterpriseSettingsPage() {
           </div>
         </div>
 
-        {!ctx.canEdit && (
+        {!ctx.loading && !ctx.canEdit && (
           <div className="mb-6 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-300">
             Du har läsbehörighet men kan inte ändra enterprise-inställningar.
           </div>
         )}
 
         {/* Quick status bar */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          {ssoEnabled && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
-              <Shield className="w-3 h-3" />SSO aktivt
-            </div>
-          )}
-          {defaultLoginHostname && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-xs text-foreground">
-              <Globe className="w-3 h-3 text-primary" />
-              <span className="font-mono text-[11px]">{defaultLoginHostname}</span>
-            </div>
-          )}
-          {lockCount > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-400">
-              <Lock className="w-3 h-3" />{lockCount} låsta fält
-            </div>
-          )}
-          {customRoleCount > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400">
-              <Users className="w-3 h-3" />{customRoleCount} roller
-            </div>
-          )}
-        </div>
+        {ctx.data ? (
+          <div className="flex flex-wrap gap-3 mb-8">
+            {ssoEnabled && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
+                <Shield className="w-3 h-3" />SSO aktivt
+              </div>
+            )}
+            {defaultLoginHostname && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-xs text-foreground">
+                <Globe className="w-3 h-3 text-primary" />
+                <span className="font-mono text-[11px]">{defaultLoginHostname}</span>
+              </div>
+            )}
+            {lockCount > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-400">
+                <Lock className="w-3 h-3" />{lockCount} låsta fält
+              </div>
+            )}
+            {customRoleCount > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400">
+                <Users className="w-3 h-3" />{customRoleCount} roller
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex gap-3 mb-8 animate-pulse">
+            <div className="h-8 w-24 bg-muted rounded-full" />
+            <div className="h-8 w-32 bg-muted rounded-full" />
+          </div>
+        )}
 
         {/* Section grid */}
         <div className="grid gap-3 sm:grid-cols-2">
