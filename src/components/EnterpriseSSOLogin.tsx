@@ -21,26 +21,19 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const OktaIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="10" stroke="#007DC1" strokeWidth="2.5" fill="none"/>
-    <circle cx="12" cy="12" r="4" fill="#007DC1"/>
-  </svg>
-);
-
-const SSOIcon = () => (
+const OIDCIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
   </svg>
 );
 
+const SUPPORTED_PROVIDERS = ['microsoft', 'google', 'oidc'] as const;
+
 const PROVIDER_META: Record<string, { label: string; icon: () => JSX.Element; bgHover: string }> = {
-  microsoft: { label: 'Microsoft', icon: MicrosoftIcon, bgHover: 'hover:bg-muted/80' },
-  google: { label: 'Google', icon: GoogleIcon, bgHover: 'hover:bg-muted/80' },
-  okta: { label: 'Okta', icon: OktaIcon, bgHover: 'hover:bg-muted/80' },
-  oidc: { label: 'SSO', icon: SSOIcon, bgHover: 'hover:bg-muted/80' },
-  saml: { label: 'SSO', icon: SSOIcon, bgHover: 'hover:bg-muted/80' },
+  microsoft: { label: 'Microsoft Entra ID', icon: MicrosoftIcon, bgHover: 'hover:bg-muted/80' },
+  google: { label: 'Google Workspace', icon: GoogleIcon, bgHover: 'hover:bg-muted/80' },
+  oidc: { label: 'OpenID Connect', icon: OIDCIcon, bgHover: 'hover:bg-muted/80' },
 };
 
 interface Props {
@@ -55,9 +48,9 @@ export function EnterpriseSSOLogin({ workspace }: Props) {
   let providers: string[] = [];
 
   if (workspace.enabledProviders?.length > 0) {
-    providers = workspace.enabledProviders.filter(p => p && p !== 'email');
+    providers = workspace.enabledProviders.filter(p => p && p !== 'email' && (SUPPORTED_PROVIDERS as readonly string[]).includes(p));
   } else if (workspace.allowedProviders?.length > 0) {
-    providers = workspace.allowedProviders.filter(p => p && p !== 'email');
+    providers = workspace.allowedProviders.filter(p => p && p !== 'email' && (SUPPORTED_PROVIDERS as readonly string[]).includes(p));
   }
 
   // Fallback: if no list but primaryProvider is set
