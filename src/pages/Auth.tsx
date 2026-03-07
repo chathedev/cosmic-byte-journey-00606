@@ -405,49 +405,74 @@ export default function Auth() {
                   >
                     <div className="text-center space-y-1.5">
                       <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-                        {isSignup ? 'Skapa konto' : 'Välkommen tillbaka'}
+                        {workspace?.branding?.workspaceDisplayName
+                          ? `Logga in på ${workspace.branding.workspaceDisplayName}`
+                          : isSignup ? 'Skapa konto' : 'Välkommen tillbaka'}
                       </h1>
                       <p className="text-sm text-muted-foreground">
-                        {isSignup
-                          ? 'Ange din e-post så skapar vi ett konto åt dig.'
-                          : 'Logga in med din e-postadress.'}
+                        {workspace?.ssoOnlyLogin
+                          ? 'Använd din organisations SSO för att logga in.'
+                          : isSignup
+                            ? 'Ange din e-post så skapar vi ett konto åt dig.'
+                            : 'Logga in med din e-postadress.'}
                       </p>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
-                          E-postadress
-                        </Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none z-10" />
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="namn@foretag.se"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            onFocus={(e) => scrollInputIntoView(e.currentTarget)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
-                            disabled={loading}
-                            className="h-11 text-base pl-10 rounded-lg bg-background border-border focus:border-primary touch-manipulation"
-                          />
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={handleRequestCode}
-                        disabled={loading || !email.trim()}
-                        className="w-full h-11 rounded-lg text-sm font-medium"
-                        type="button"
-                      >
-                        {loading ? (
-                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</>
-                        ) : (
-                          <>{isSignup ? 'Skapa konto' : 'Skicka kod'}</>
+                    {/* SSO buttons — only on enterprise custom domains */}
+                    {isCustomDomain && workspace?.ssoEnabled && (
+                      <div className="space-y-4">
+                        <EnterpriseSSOLogin workspace={workspace} />
+                        
+                        {!workspace.ssoOnlyLogin && (
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t border-border" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-background px-3 text-muted-foreground">eller</span>
+                            </div>
+                          </div>
                         )}
-                      </Button>
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Email login — hidden when SSO-only on custom domain */}
+                    {!(isCustomDomain && workspace?.ssoOnlyLogin) && (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
+                            E-postadress
+                          </Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none z-10" />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="namn@foretag.se"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              onFocus={(e) => scrollInputIntoView(e.currentTarget)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRequestCode(); } }}
+                              disabled={loading}
+                              className="h-11 text-base pl-10 rounded-lg bg-background border-border focus:border-primary touch-manipulation"
+                            />
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={handleRequestCode}
+                          disabled={loading || !email.trim()}
+                          className="w-full h-11 rounded-lg text-sm font-medium"
+                          type="button"
+                        >
+                          {loading ? (
+                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Skickar...</>
+                          ) : (
+                            <>{isSignup ? 'Skapa konto' : 'Skicka kod'}</>
+                          )}
+                        </Button>
+                      </div>
+                    )}
 
                     <AnimatePresence>
                       {authError && (
@@ -460,18 +485,21 @@ export default function Auth() {
                       )}
                     </AnimatePresence>
 
-                    <div className="pt-2">
-                      <p className="text-center text-sm text-muted-foreground">
-                        {isSignup ? (
-                          <>Har du redan konto?{' '}<button onClick={() => setIsSignup(false)} className="text-primary font-medium hover:text-primary/80 transition-colors">Logga in</button></>
-                        ) : (
-                          <>Nytt här?{' '}<button onClick={() => setIsSignup(true)} className="text-primary font-medium hover:text-primary/80 transition-colors">Skapa konto</button></>
-                        )}
-                      </p>
-                    </div>
+                    {/* Signup/login toggle — only on generic domain */}
+                    {!isCustomDomain && (
+                      <div className="pt-2">
+                        <p className="text-center text-sm text-muted-foreground">
+                          {isSignup ? (
+                            <>Har du redan konto?{' '}<button onClick={() => setIsSignup(false)} className="text-primary font-medium hover:text-primary/80 transition-colors">Logga in</button></>
+                          ) : (
+                            <>Nytt här?{' '}<button onClick={() => setIsSignup(true)} className="text-primary font-medium hover:text-primary/80 transition-colors">Skapa konto</button></>
+                          )}
+                        </p>
+                      </div>
+                    )}
 
-                    {/* Enterprise link — mobile only */}
-                    {onboardingEnabled && (
+                    {/* Enterprise link — mobile only, generic domain only */}
+                    {!isCustomDomain && onboardingEnabled && (
                       <div className="lg:hidden text-center pt-2">
                         <a
                           href="/team/onboarding"
