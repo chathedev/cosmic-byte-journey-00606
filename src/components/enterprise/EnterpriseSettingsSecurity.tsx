@@ -58,9 +58,10 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
       ipAllowlistingEnabled !== (settings.ipAllowlistingEnabled ?? false) ||
       JSON.stringify(ipAllowlist) !== JSON.stringify(settings.ipAllowlist || []) ||
       retentionDays !== (settings.retentionDays ?? 365) ||
-      storageRegion !== (settings.storageRegion || 'eu')
+      storageRegion !== (settings.storageRegion || 'eu') ||
+      euDataResidencyRequired !== (settings.euDataResidencyRequired ?? false)
     );
-  }, [auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, settings]);
+  }, [auditLogsEnabled, loginHistoryEnabled, autoDeleteEnabled, restrictExport, restrictDownload, restrictExternalSharing, ipAllowlistingEnabled, ipAllowlist, retentionDays, storageRegion, euDataResidencyRequired, settings]);
 
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
