@@ -94,12 +94,10 @@ function DataStorageCard({ settings, locks, canEdit, onUpdate }: Props) {
   const isLocked = (path: string) => !!locks[`securityCompliance.${path}`]?.locked;
 
   const [retentionDays, setRetentionDays] = useState(settings.retentionDays ?? 365);
-  const [storageRegion, setStorageRegion] = useState(settings.storageRegion || 'eu');
   const [euDataResidencyRequired, setEuDataResidencyRequired] = useState(settings.euDataResidencyRequired ?? false);
 
   const sync = useCallback(() => {
     setRetentionDays(settings.retentionDays ?? 365);
-    setStorageRegion(settings.storageRegion || 'eu');
     setEuDataResidencyRequired(settings.euDataResidencyRequired ?? false);
   }, [settings]);
 
@@ -107,14 +105,13 @@ function DataStorageCard({ settings, locks, canEdit, onUpdate }: Props) {
 
   const isDirty = useMemo(() =>
     retentionDays !== (settings.retentionDays ?? 365) ||
-    storageRegion !== (settings.storageRegion || 'eu') ||
     euDataResidencyRequired !== (settings.euDataResidencyRequired ?? false),
-  [retentionDays, storageRegion, euDataResidencyRequired, settings]);
+  [retentionDays, euDataResidencyRequired, settings]);
 
   const doSave = useCallback(async () => {
     if (!isDirty) return;
-    await onUpdate({ securityCompliance: { retentionDays, storageRegion, euDataResidencyRequired } });
-  }, [isDirty, retentionDays, storageRegion, euDataResidencyRequired, onUpdate]);
+    await onUpdate({ securityCompliance: { retentionDays, storageRegion: 'eu', euDataResidencyRequired } });
+  }, [isDirty, retentionDays, euDataResidencyRequired, onUpdate]);
 
   const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: sync });
 
@@ -127,14 +124,12 @@ function DataStorageCard({ settings, locks, canEdit, onUpdate }: Props) {
       </div>
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Lagringsregion</Label>
-        <Select value={storageRegion} onValueChange={setStorageRegion} disabled={!canEdit || isLocked('storageRegion') || isSaving}>
-          <SelectTrigger className="h-9 text-sm w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="eu">🇪🇺 EU</SelectItem>
-            <SelectItem value="us">🇺🇸 US</SelectItem>
-            <SelectItem value="auto">🌍 Auto</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-border bg-muted/50 w-40 text-sm">
+          <span>🇪🇺</span>
+          <span className="font-medium">EU</span>
+          <Badge variant="secondary" className="text-[10px] ml-auto">Fast</Badge>
+        </div>
+        <p className="text-[11px] text-muted-foreground">All data lagras inom EU. Kontakta support för frågor.</p>
       </div>
       <div className="flex items-center justify-between py-1">
         <div><p className="text-sm">EU-datalagringsgaranti</p><p className="text-xs text-muted-foreground">Kräv att all data lagras inom EU</p></div>

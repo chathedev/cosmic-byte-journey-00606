@@ -20,7 +20,6 @@ function ControlsCard({ settings, locks, canEdit, onUpdate }: Props) {
   const [recordingAllowed, setRecordingAllowed] = useState(settings.recordingAllowed ?? true);
   const [transcriptionAllowed, setTranscriptionAllowed] = useState(settings.transcriptionAllowed ?? true);
   const [aiSummaryAllowed, setAiSummaryAllowed] = useState(settings.aiSummaryAllowed ?? true);
-  const [speakerIdentificationAllowed, setSpeakerIdentificationAllowed] = useState(settings.speakerIdentificationAllowed ?? false);
   const [protocolTemplatesEnabled, setProtocolTemplatesEnabled] = useState(settings.protocolTemplatesEnabled ?? true);
   const [approvalWorkflowEnabled, setApprovalWorkflowEnabled] = useState(settings.approvalWorkflowEnabled ?? false);
 
@@ -28,7 +27,6 @@ function ControlsCard({ settings, locks, canEdit, onUpdate }: Props) {
     setRecordingAllowed(settings.recordingAllowed ?? true);
     setTranscriptionAllowed(settings.transcriptionAllowed ?? true);
     setAiSummaryAllowed(settings.aiSummaryAllowed ?? true);
-    setSpeakerIdentificationAllowed(settings.speakerIdentificationAllowed ?? false);
     setProtocolTemplatesEnabled(settings.protocolTemplatesEnabled ?? true);
     setApprovalWorkflowEnabled(settings.approvalWorkflowEnabled ?? false);
   }, [settings]);
@@ -39,20 +37,19 @@ function ControlsCard({ settings, locks, canEdit, onUpdate }: Props) {
     recordingAllowed !== (settings.recordingAllowed ?? true) ||
     transcriptionAllowed !== (settings.transcriptionAllowed ?? true) ||
     aiSummaryAllowed !== (settings.aiSummaryAllowed ?? true) ||
-    speakerIdentificationAllowed !== (settings.speakerIdentificationAllowed ?? false) ||
     protocolTemplatesEnabled !== (settings.protocolTemplatesEnabled ?? true) ||
     approvalWorkflowEnabled !== (settings.approvalWorkflowEnabled ?? false),
-  [recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, settings]);
+  [recordingAllowed, transcriptionAllowed, aiSummaryAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, settings]);
 
   const doSave = useCallback(async () => {
     if (!isDirty) return;
     await onUpdate({
       meetingContentControls: {
-        recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed,
+        recordingAllowed, transcriptionAllowed, aiSummaryAllowed,
         protocolTemplatesEnabled, approvalWorkflowEnabled,
       },
     });
-  }, [isDirty, recordingAllowed, transcriptionAllowed, aiSummaryAllowed, speakerIdentificationAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, onUpdate]);
+  }, [isDirty, recordingAllowed, transcriptionAllowed, aiSummaryAllowed, protocolTemplatesEnabled, approvalWorkflowEnabled, onUpdate]);
 
   const { status, save, discard, isSaving } = useManualSave({ onSave: doSave, onDiscard: sync });
 
@@ -60,7 +57,6 @@ function ControlsCard({ settings, locks, canEdit, onUpdate }: Props) {
     { field: 'recordingAllowed', label: 'Inspelning', desc: 'Tillåt inspelning av möten', icon: Video, value: recordingAllowed, setter: setRecordingAllowed },
     { field: 'transcriptionAllowed', label: 'Transkribering', desc: 'Tillåt automatisk transkribering', icon: Mic, value: transcriptionAllowed, setter: setTranscriptionAllowed },
     { field: 'aiSummaryAllowed', label: 'AI-sammanfattning', desc: 'Tillåt AI-genererade sammanfattningar', icon: Sparkles, value: aiSummaryAllowed, setter: setAiSummaryAllowed },
-    { field: 'speakerIdentificationAllowed', label: 'Talaridentifiering', desc: 'Tillåt identifiering av talare', icon: Mic, value: speakerIdentificationAllowed, setter: setSpeakerIdentificationAllowed },
     { field: 'protocolTemplatesEnabled', label: 'Protokollmallar', desc: 'Aktivera mallbibliotek för protokoll', icon: FileText, value: protocolTemplatesEnabled, setter: setProtocolTemplatesEnabled },
     { field: 'approvalWorkflowEnabled', label: 'Godkännandeflöde', desc: 'Kräv godkännande innan protokoll publiceras', icon: CheckCircle2, value: approvalWorkflowEnabled, setter: setApprovalWorkflowEnabled },
   ];

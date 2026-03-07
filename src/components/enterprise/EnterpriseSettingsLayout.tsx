@@ -26,14 +26,6 @@ export function EnterpriseSettingsLayout({ title, description, icon, children }:
     );
   }
 
-  if (ctx.loading || !ctx.data) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
@@ -62,7 +54,7 @@ export function EnterpriseSettingsLayout({ title, description, icon, children }:
           </div>
         </div>
 
-        {!ctx.canEdit && (
+        {!ctx.loading && !ctx.canEdit && (
           <div className="mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-300">
             Du har läsbehörighet men kan inte ändra enterprise-inställningar.
           </div>
