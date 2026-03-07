@@ -145,6 +145,13 @@ export default function SSOCallback() {
     }
 
     if (!sessionToken) {
+      if (apiClient.isAuthenticated()) {
+        console.warn('[SSOCallback] Missing session token, but auth token exists. Redirecting home.');
+        setSuccess(true);
+        setTimeout(() => navigate('/', { replace: true }), 250);
+        return;
+      }
+
       console.error('[SSOCallback] No session token found in URL');
       setError('Ingen SSO-session hittades. Försök logga in igen.');
       return;
