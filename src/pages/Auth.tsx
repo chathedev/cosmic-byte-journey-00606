@@ -177,6 +177,16 @@ export default function Auth() {
         setViewMode('code-entry');
         setPinCode('');
       } else {
+        const errorBody = await response.json().catch(() => ({}));
+        const errorCode = errorBody.code || errorBody.error || '';
+        if (errorCode === 'enterprise_sso_required') {
+          setEnterpriseRedirect({
+            hostname: errorBody.loginHostname || '',
+            origin: errorBody.workspaceOrigin || '',
+          });
+          setViewMode('enterprise-sso-redirect');
+          return;
+        }
         setAuthError('Kunde inte skicka verifieringskod. Försök igen.');
       }
     } catch {
