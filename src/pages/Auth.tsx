@@ -626,8 +626,24 @@ export default function Auth() {
             </div>
 
             {/* Footer inside the form panel */}
-            <div className="hidden lg:flex w-full justify-center absolute bottom-6 left-0">
+            <div className="w-full flex justify-center mt-8 lg:mt-0 lg:absolute lg:bottom-6 lg:left-0">
               <p className="text-[11px] text-muted-foreground/50 text-center">
+                {isCustomDomain && workspace?.branding?.privacyUrl ? (
+                  <>
+                    <a href={workspace.branding.privacyUrl} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+                      Integritetspolicy
+                    </a>
+                    {' · '}
+                  </>
+                ) : null}
+                {isCustomDomain && workspace?.branding?.termsUrl ? (
+                  <>
+                    <a href={workspace.branding.termsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+                      Villkor
+                    </a>
+                    {' · '}
+                  </>
+                ) : null}
                 {isCustomDomain && workspace?.branding?.supportUrl ? (
                   <>
                     <a href={workspace.branding.supportUrl} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
