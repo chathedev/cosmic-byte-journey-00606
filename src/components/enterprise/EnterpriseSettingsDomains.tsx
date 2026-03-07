@@ -166,7 +166,7 @@ function OnboardingStatusWidget({
   const [showManual, setShowManual] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const status = onboarding.status || 'pending';
+  const status: string = onboarding.status || 'pending';
   const dc = onboarding.domainConnect;
   const isDomainConnectAvailable = dc?.available === true;
   const isAutomatic = onboarding.setupMethod === 'domain_connect';
