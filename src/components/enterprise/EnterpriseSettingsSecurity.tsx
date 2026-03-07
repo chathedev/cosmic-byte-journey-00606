@@ -31,6 +31,7 @@ export function EnterpriseSettingsSecurity({ settings, locks, canEdit, onUpdate 
   const [ipAllowlist, setIpAllowlist] = useState<string[]>(settings.ipAllowlist || []);
   const [retentionDays, setRetentionDays] = useState(settings.retentionDays ?? 365);
   const [storageRegion, setStorageRegion] = useState(settings.storageRegion || 'eu');
+  const [euDataResidencyRequired, setEuDataResidencyRequired] = useState(settings.euDataResidencyRequired ?? false);
 
   useEffect(() => {
     setAuditLogsEnabled(settings.auditLogsEnabled ?? false);
