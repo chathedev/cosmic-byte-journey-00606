@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Globe, Plus, CheckCircle2, XCircle, Loader2, Trash2, ExternalLink,
-  Shield, AlertTriangle, Copy, RefreshCw, Clock, Zap, ArrowRight, ChevronDown, ChevronUp,
+  Shield, AlertTriangle, Copy, RefreshCw, Clock, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,21 +40,6 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface DomainConnectInfo {
-  supported?: boolean;
-  available?: boolean;
-  providerName?: string | null;
-  providerId?: string | null;
-  settingsUrl?: string | null;
-  urlSyncUX?: string | null;
-  urlAPI?: string | null;
-  templateSupported?: boolean;
-  templateUrl?: string | null;
-  connectUrl?: string | null;
-  lastCheckedAt?: string | null;
-  lastError?: string | null;
-}
-
 export interface DomainOnboarding {
   tenantId?: string;
   hostname?: string;
@@ -62,8 +47,9 @@ export interface DomainOnboarding {
   hostLabel?: string;
   verificationToken?: string;
   status?: 'pending' | 'awaiting_dns' | 'verifying' | 'active' | 'failed';
-  setupMethod?: 'domain_connect' | 'manual' | null;
-  domainConnect?: DomainConnectInfo;
+  setupMethod?: 'manual' | null;
+  // Legacy — not used in product UI
+  domainConnect?: any;
 }
 
 export interface DomainEntry {
@@ -128,9 +114,9 @@ const ONBOARDING_STEPS = ['pending', 'awaiting_dns', 'verifying', 'active'] as c
 
 function getOnboardingProgress(status?: string): number {
   if (!status) return 0;
-  const idx = ONBOARDING_STEPS.indexOf(status as any);
   if (status === 'active') return 100;
   if (status === 'failed') return 0;
+  const idx = ONBOARDING_STEPS.indexOf(status as any);
   if (idx < 0) return 0;
   return Math.round(((idx + 1) / ONBOARDING_STEPS.length) * 100);
 }
@@ -159,7 +145,6 @@ function DomainDetailDialog({
   domain,
   open,
   onOpenChange,
-  companyId,
   canEdit,
   defaultLogin,
   addResponse,
@@ -174,7 +159,6 @@ function DomainDetailDialog({
   domain: DomainEntry;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  companyId: string;
   canEdit: boolean;
   defaultLogin: string | null;
   addResponse: Record<string, any>;
@@ -187,8 +171,6 @@ function DomainDetailDialog({
   saving: boolean;
 }) {
   const { toast } = useToast();
-  const [connectLoading, setConnectLoading] = useState(false);
-  const [showManual, setShowManual] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isVerified = domain.status === 'verified';
@@ -197,16 +179,12 @@ function DomainDetailDialog({
   const isPolling = verifyingHost === domain.hostname;
   const errorText = getErrorText(domain);
 
-  // Onboarding
   const onboarding: DomainOnboarding | null = domain.onboarding || addResponse[domain.hostname]?.onboarding || null;
   const hasActiveOnboarding = onboarding && onboarding.status !== 'active' && !isVerified;
   const obStatus = onboarding?.status || 'pending';
-  const dc = onboarding?.domainConnect;
-  const isDomainConnectAvailable = dc?.available === true;
-  const isAutomatic = onboarding?.setupMethod === 'domain_connect';
   const progress = getOnboardingProgress(obStatus);
 
-  // DNS records
+  // DNS records — prefer backend instructions, then onboarding-derived records
   const dnsRecords = (() => {
     if (domain.dnsRecords?.length) return domain.dnsRecords;
     const resp = addResponse[domain.hostname];
@@ -228,39 +206,7 @@ function DomainDetailDialog({
     return { name: name || resp?.instructions?.provider?.name || null, dashboardUrl: url || resp?.instructions?.provider?.dashboardUrl || null };
   })();
 
-  // Poll for onboarding
-  useEffect(() => {
-    if (!open || !hasActiveOnboarding) return;
-    pollRef.current = setInterval(onRefresh, 10000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [open, hasActiveOnboarding, onRefresh]);
-
-  const handleDomainConnect = async () => {
-    setConnectLoading(true);
-    try {
-      const res = await apiFetch(
-        `/enterprise/companies/${companyId}/settings/domains/${encodeURIComponent(domain.hostname)}/domain-connect-url`,
-        { method: 'POST' }
-      );
-      if (res.connectUrl) {
-        window.location.href = res.connectUrl;
-      } else {
-        toast({ title: 'Fel', description: 'Ingen anslutnings-URL returnerades.', variant: 'destructive' });
-      }
-    } catch (err: any) {
-      toast({ title: 'Anslutning misslyckades', description: err.message, variant: 'destructive' });
-    } finally {
-      setConnectLoading(false);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({ title: 'Kopierad' });
-    });
-  };
-
-  // Build onboarding DNS records
+  // Build onboarding DNS records as fallback
   const onboardingRecords: Array<{ type: string; name: string; value: string; reason?: string }> = [];
   if (onboarding?.hostname) {
     onboardingRecords.push({
@@ -277,6 +223,19 @@ function DomainDetailDialog({
 
   const allRecords = hasActiveOnboarding && onboardingRecords.length > 0 ? onboardingRecords : dnsRecords;
 
+  // Poll while onboarding is active
+  useEffect(() => {
+    if (!open || !hasActiveOnboarding) return;
+    pollRef.current = setInterval(onRefresh, 10000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [open, hasActiveOnboarding, onRefresh]);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: 'Kopierad' });
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -292,7 +251,7 @@ function DomainDetailDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Verified state */}
+          {/* Verified */}
           {isVerified && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 text-xs text-green-700 dark:text-green-400">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -325,45 +284,21 @@ function DomainDetailDialog({
             </div>
           )}
 
-          {/* Domain Connect auto option */}
-          {hasActiveOnboarding && isDomainConnectAvailable && !isAutomatic && canEdit && (
-            <div className="space-y-2">
-              <button
-                onClick={handleDomainConnect}
-                disabled={connectLoading}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
-              >
-                <Zap className="w-4 h-4 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium">Anslut automatiskt</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {dc?.providerName ? `Via ${dc.providerName} (Domain Connect)` : 'Via Domain Connect'}
-                  </p>
-                </div>
-                {connectLoading ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <ArrowRight className="w-3.5 h-3.5 text-primary" />}
-              </button>
-              <button
-                onClick={() => setShowManual(!showManual)}
-                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showManual ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                {showManual ? 'Dölj manuell konfiguration' : 'Eller konfigurera manuellt'}
-              </button>
-            </div>
-          )}
-
-          {/* Error state */}
+          {/* Error */}
           {(isFailed || onboarding?.status === 'failed') && (
             <div className="flex items-start gap-2 p-3 rounded-lg border border-destructive/20 bg-destructive/5 text-xs text-destructive">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>{errorText || dc?.lastError || 'Konfigurationen misslyckades. Kontrollera DNS-posterna.'}</span>
+              <span>{errorText || 'Konfigurationen misslyckades. Kontrollera DNS-posterna.'}</span>
             </div>
           )}
 
-          {/* DNS records table */}
-          {((!isDomainConnectAvailable || showManual || isAutomatic || !hasActiveOnboarding) && !isVerified && allRecords.length > 0) && (
+          {/* DNS records */}
+          {!isVerified && allRecords.length > 0 && (
             <div className="space-y-2">
               <p className="text-[11px] font-medium text-muted-foreground">DNS-poster</p>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Lägg till DNS-posterna nedan hos din DNS-leverantör. När posterna har slagit igenom verifierar Tivly domänen automatiskt.
+              </p>
               <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-[11px]">
                   <thead className="bg-muted/40">
@@ -392,7 +327,7 @@ function DomainDetailDialog({
               </div>
               {(provider.name || provider.dashboardUrl) && (
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  {provider.name && <span>DNS: <span className="font-medium text-foreground">{provider.name}</span></span>}
+                  {provider.name && <span>DNS-leverantör: <span className="font-medium text-foreground">{provider.name}</span></span>}
                   {provider.dashboardUrl && (
                     <a href={provider.dashboardUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-primary hover:text-primary/80">
                       Öppna <ExternalLink className="w-2.5 h-2.5" />
@@ -400,8 +335,8 @@ function DomainDetailDialog({
                   )}
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                Lägg till posterna hos din DNS-leverantör. Propagering kan ta upp till 72 timmar.
+              <p className="text-[10px] text-muted-foreground">
+                Du kan också klicka på <strong>Verifiera</strong> om du vill kontrollera direkt. Propagering kan ta upp till 72 timmar.
               </p>
             </div>
           )}
@@ -411,14 +346,13 @@ function DomainDetailDialog({
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-2 border-t border-border">
               {onboarding?.apexDomain && <span>Apex: <span className="font-mono">{onboarding.apexDomain}</span></span>}
               {onboarding?.hostLabel && <span>Host: <span className="font-mono">{onboarding.hostLabel}</span></span>}
-              {dc?.providerName && <span>DNS: {dc.providerName}</span>}
               {domain.verifiedAt && <span>Verifierad: {formatTime(domain.verifiedAt)}</span>}
               {domain.lastCheckedAt && <span>Kontrollerad: {formatTime(domain.lastCheckedAt)}</span>}
             </div>
           )}
         </div>
 
-        {/* Footer actions */}
+        {/* Footer */}
         <DialogFooter className="gap-2 sm:gap-0 pt-2">
           {canEdit && (
             <Button
@@ -487,11 +421,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
     } catch { return null; }
   }, [companyId]);
 
-  const fullRefresh = useCallback(async () => {
-    await refreshDomains();
-    onDomainsChanged?.();
-  }, [refreshDomains, onDomainsChanged]);
-
   const handleManualRefresh = async () => {
     setRefreshing(true);
     await refreshDomains();
@@ -516,7 +445,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
       setAddMode(null);
       setAddDialogOpen(false);
       await refreshDomains();
-      // Open setup dialog for the new domain
       setSelectedDomain(hostname);
       if (addMode === 'tivly') startVerificationPoll(hostname);
     } catch (err: any) {
@@ -634,7 +562,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
           </div>
         )}
 
-        {/* Compact domain rows */}
         {domains.length > 0 && (
           <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
             {domains.map(domain => {
@@ -677,7 +604,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
           domain={selectedDomainData}
           open={!!selectedDomain}
           onOpenChange={(open) => { if (!open) setSelectedDomain(null); }}
-          companyId={companyId}
           canEdit={canEdit}
           defaultLogin={defaultLogin}
           addResponse={addResponse}
