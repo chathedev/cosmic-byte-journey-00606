@@ -420,7 +420,6 @@ export function EnterpriseSettingsDomains({ companyId, customDomains, canEdit, o
             const old = oldDomains.find(od => od.hostname === d.hostname);
             if (d.status === 'verified' && old && old.status !== 'verified') {
               toast({ title: 'Domän verifierad!', description: `${d.hostname} är nu klar att använda.` });
-              onDomainsChanged?.();
             }
           }
         }
