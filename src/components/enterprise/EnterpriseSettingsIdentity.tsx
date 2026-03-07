@@ -294,7 +294,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
       </div>
 
       {/* Provider Cards */}
-      {settings.ssoEnabled && (
+      {settings.ssoEnabled && hasVerifiedDomain && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-foreground">Identity Providers</h4>
           <div className="grid gap-3">
