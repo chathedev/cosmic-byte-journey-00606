@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, ArrowRight, Mail } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle2, ArrowLeft, ArrowRight, Mail, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { apiClient } from '@/lib/api';
@@ -18,7 +18,7 @@ declare global {
   }
 }
 
-type ViewMode = 'email' | 'code-entry' | 'no-access';
+type ViewMode = 'email' | 'code-entry' | 'no-access' | 'enterprise-sso-redirect';
 
 function sanitizeEmail(email: string | undefined): string | null {
   const trimmed = email?.trim().toLowerCase();
@@ -71,6 +71,7 @@ export default function Auth() {
   const verifyingRef = useRef(false);
   const [isSignup, setIsSignup] = useState(false);
   const [onboardingEnabled, setOnboardingEnabled] = useState(false);
+  const [enterpriseRedirect, setEnterpriseRedirect] = useState<{ hostname: string; origin: string } | null>(null);
 
   useEffect(() => {
     const isIosDomain = window.location.hostname === 'io.tivly.se';
@@ -176,6 +177,16 @@ export default function Auth() {
         setViewMode('code-entry');
         setPinCode('');
       } else {
+        const errorBody = await response.json().catch(() => ({}));
+        const errorCode = errorBody.code || errorBody.error || '';
+        if (errorCode === 'enterprise_sso_required') {
+          setEnterpriseRedirect({
+            hostname: errorBody.loginHostname || '',
+            origin: errorBody.workspaceOrigin || '',
+          });
+          setViewMode('enterprise-sso-redirect');
+          return;
+        }
         setAuthError('Kunde inte skicka verifieringskod. Försök igen.');
       }
     } catch {
@@ -275,6 +286,39 @@ export default function Auth() {
 
   if (viewMode === 'no-access') {
     return <NoAppAccessScreen onLogout={() => { setViewMode('email'); setEmail(''); setPinCode(''); }} />;
+  }
+
+  if (viewMode === 'enterprise-sso-redirect' && enterpriseRedirect) {
+    return (
+      <div className="relative min-h-[100svh] bg-background flex items-center justify-center p-5">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <Shield className="w-8 h-8 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold text-foreground">Enterprise SSO krävs</h1>
+            <p className="text-sm text-muted-foreground">
+              Din organisation använder Enterprise SSO. Du behöver logga in via din organisations inloggningssida.
+            </p>
+          </div>
+          {enterpriseRedirect.origin && (
+            <a
+              href={enterpriseRedirect.origin}
+              className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Gå till {enterpriseRedirect.hostname || 'din arbetsyta'}
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          )}
+          <button
+            onClick={() => { setViewMode('email'); setEnterpriseRedirect(null); setAuthError(null); }}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Tillbaka
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

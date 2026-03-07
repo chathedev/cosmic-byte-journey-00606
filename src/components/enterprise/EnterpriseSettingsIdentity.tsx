@@ -31,6 +31,8 @@ interface Props {
   onTestSSO?: (provider: string) => Promise<void>;
   onConnectSSO?: (provider: string) => Promise<void>;
   providerReadiness?: Record<string, ProviderReadiness>;
+  hasVerifiedDomain?: boolean;
+  defaultLoginHostname?: string | null;
 }
 
 function LockedBadge({ lock }: { lock?: SettingsLock }) {
@@ -103,7 +105,7 @@ function formatTestTime(iso: string | null | undefined): string | null {
   } catch { return null; }
 }
 
-export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, providerReadiness }: Props) {
+export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate, onTestSSO, onConnectSSO, providerReadiness, hasVerifiedDomain, defaultLoginHostname }: Props) {
   const [saving, setSaving] = useState(false);
   const [domainInput, setDomainInput] = useState('');
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
@@ -197,12 +199,30 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
             <Switch
               checked={settings.ssoEnabled ?? false}
               onCheckedChange={(v) => handleToggle('ssoEnabled', v)}
-              disabled={!canEdit || isLocked('ssoEnabled') || saving}
+              disabled={!canEdit || isLocked('ssoEnabled') || saving || !hasVerifiedDomain}
             />
           </div>
         </div>
 
-        {settings.ssoEnabled && (
+        {!hasVerifiedDomain && (
+          <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="text-xs text-amber-700 dark:text-amber-300">
+              <p className="font-medium">Verifierad domän krävs</p>
+              <p className="mt-0.5">Lägg till och verifiera en anpassad domän under fliken "Arbetsyta" innan SSO kan aktiveras. Enterprise SSO är inte tillgängligt på app.tivly.se.</p>
+            </div>
+          </div>
+        )}
+
+        {defaultLoginHostname && hasVerifiedDomain && (
+          <div className="flex items-center gap-2 text-xs p-2.5 rounded-lg bg-primary/5 border border-primary/10">
+            <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span className="text-muted-foreground">SSO-inloggning sker på:</span>
+            <span className="font-medium text-foreground">{defaultLoginHostname}</span>
+          </div>
+        )}
+
+        {settings.ssoEnabled && hasVerifiedDomain && (
           <>
             <Separator />
             {/* SSO Only */}
@@ -274,7 +294,7 @@ export function EnterpriseSettingsIdentity({ settings, locks, canEdit, onUpdate,
       </div>
 
       {/* Provider Cards */}
-      {settings.ssoEnabled && (
+      {settings.ssoEnabled && hasVerifiedDomain && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-foreground">Identity Providers</h4>
           <div className="grid gap-3">

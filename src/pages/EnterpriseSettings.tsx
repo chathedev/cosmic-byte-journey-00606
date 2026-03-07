@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Building2, Lock, Users, Video, Link2, FileText, Palette, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Building2, Lock, Users, Video, Link2, FileText, Palette, Loader2, Globe } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -16,6 +16,7 @@ import { EnterpriseSettingsAudit } from '@/components/enterprise/EnterpriseSetti
 import { EnterpriseSettingsWorkspace } from '@/components/enterprise/EnterpriseSettingsWorkspace';
 import { EnterpriseSettingsMeeting } from '@/components/enterprise/EnterpriseSettingsMeeting';
 import { EnterpriseSettingsIntegrations } from '@/components/enterprise/EnterpriseSettingsIntegrations';
+import { EnterpriseSettingsDomains } from '@/components/enterprise/EnterpriseSettingsDomains';
 
 export default function EnterpriseSettingsPage() {
   const navigate = useNavigate();
@@ -167,10 +168,20 @@ export default function EnterpriseSettingsPage() {
               onTestSSO={handleTestSSO}
               onConnectSSO={handleConnectSSO}
               providerReadiness={data.settingsSummary?.providerReadiness}
+              hasVerifiedDomain={!!(data.settings.adminWorkspace as any)?.customDomains?.domains?.some((d: any) => d.status === 'verified')}
+              defaultLoginHostname={(data.settings.adminWorkspace as any)?.customDomains?.defaultLoginHostname || data.settingsSummary?.defaultLoginHostname || null}
             />
           </TabsContent>
-          <TabsContent value="workspace" className="mt-6">
+          <TabsContent value="workspace" className="mt-6 space-y-6">
             <EnterpriseSettingsWorkspace settings={data.settings.adminWorkspace} locks={data.locks} canEdit={canEdit} onUpdate={handleUpdate} />
+            {companyId && (
+              <EnterpriseSettingsDomains
+                companyId={companyId}
+                customDomains={(data.settings.adminWorkspace as any)?.customDomains}
+                canEdit={canEdit}
+                onDomainsChanged={loadSettings}
+              />
+            )}
           </TabsContent>
           <TabsContent value="security" className="mt-6">
             <EnterpriseSettingsSecurity settings={data.settings.securityCompliance} locks={data.locks} canEdit={canEdit} onUpdate={handleUpdate} />
