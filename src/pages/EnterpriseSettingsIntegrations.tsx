@@ -7,7 +7,7 @@ export default function EnterpriseSettingsIntegrationsPage() {
     <EnterpriseSettingsLayout
       title="Integrationer"
       description="Teams, Zoom, Google Meet, Slack, API och webhooks"
-      icon={<Link2 className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />}
+      icon={<Link2 className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
         <IntegrationsContent

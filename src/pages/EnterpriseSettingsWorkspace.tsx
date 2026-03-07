@@ -18,12 +18,11 @@ export default function EnterpriseSettingsWorkspacePage() {
   return (
     <EnterpriseSettingsLayout
       title="Arbetsyta & Domäner"
-      description="Branding, logotyper, anpassade domäner och e-postmallar"
-      icon={<Palette className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
+      description="Varumärke, logotyper, anpassade domäner och e-postmallar"
+      icon={<Palette className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
         <div className="space-y-6">
-          {/* Tab navigation */}
           <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border w-fit">
             {TABS.map((tab) => {
               const Icon = tab.icon;
@@ -46,7 +45,6 @@ export default function EnterpriseSettingsWorkspacePage() {
             })}
           </div>
 
-          {/* Tab content */}
           {activeTab === 'workspace' && (
             <WorkspaceContent
               settings={ctx.data!.settings.adminWorkspace}

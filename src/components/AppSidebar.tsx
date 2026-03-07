@@ -123,7 +123,7 @@ export function AppSidebar() {
     else if (path.startsWith("/integrations")) setSelected("Integrationer");
     else if (path === "/settings" || path.startsWith("/settings/")) setSelected("Inställningar");
     else if (path === "/enterprise/stats" || path.startsWith("/enterprise/stats/")) setSelected("Översikt");
-    else if (path.startsWith("/org/enterprise-settings")) setSelected("Enterprise");
+    else if (path.startsWith("/enterprise/settings")) setSelected("Enterprise");
     else if (path === "/org/settings" || path.startsWith("/org/settings/")) setSelected("Team");
     else if (path === "/org/billing" || path.startsWith("/org/billing/")) setSelected("Fakturering");
     else if (path.startsWith("/billing/invoices")) setSelected("Fakturor");
@@ -142,7 +142,7 @@ export function AppSidebar() {
     }
 
     // Auto-expand org section if on an org page
-    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices', '/org/enterprise-settings'].some(p => path.startsWith(p))) {
+    if (['/enterprise/stats', '/org/settings', '/org/billing', '/billing/invoices', '/enterprise/settings'].some(p => path.startsWith(p))) {
       setOrgExpanded(true);
     }
   }, [location.pathname]);
@@ -209,7 +209,7 @@ export function AppSidebar() {
     : [
         ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
         { Icon: Users, title: "Team", path: "/org/settings" },
-        ...(isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise' ? [{ Icon: Shield, title: "Enterprise", path: "/org/enterprise-settings" }] : []),
+        ...(isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise' ? [{ Icon: Shield, title: "Enterprise", path: "/enterprise/settings" }] : []),
         { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
         { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
       ];

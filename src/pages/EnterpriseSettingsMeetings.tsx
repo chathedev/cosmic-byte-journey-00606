@@ -7,7 +7,7 @@ export default function EnterpriseSettingsMeetingsPage() {
     <EnterpriseSettingsLayout
       title="Möten & Innehåll"
       description="Inspelning, transkribering, AI och delningspolicyer"
-      icon={<Video className="w-5 h-5 text-green-600 dark:text-green-400" />}
+      icon={<Video className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
         <EnterpriseSettingsMeeting

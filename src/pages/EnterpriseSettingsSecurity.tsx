@@ -6,8 +6,8 @@ export default function EnterpriseSettingsSecurityPage() {
   return (
     <EnterpriseSettingsLayout
       title="Säkerhet & Efterlevnad"
-      description="Datalagring, IP-begränsningar och exportkontroller"
-      icon={<Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
+      description="Datalagring, åtkomstkontroll och exportregler"
+      icon={<Lock className="w-5 h-5 text-primary" />}
     >
       {(ctx) => (
         <SecurityContent
