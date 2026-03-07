@@ -251,6 +251,23 @@ export default function OrgSettings() {
             </TabsContent>
           )}
         </Tabs>
+
+        {/* Enterprise settings link card */}
+        {isAdminOrOwner && companyId && commercialPlan === 'enterprise' && (
+          <button
+            onClick={() => navigate('/org/enterprise-settings')}
+            className="mt-6 w-full rounded-xl border border-border bg-card p-5 flex items-center gap-4 hover:bg-muted/50 transition-colors text-left group"
+          >
+            <div className="p-2.5 rounded-lg bg-primary/10 shrink-0">
+              <Shield className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-sm">Enterprise-inställningar</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">SSO, anpassade roller, säkerhet, domäner och styrning</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+          </button>
+        )}
       </div>
     </div>
   );
