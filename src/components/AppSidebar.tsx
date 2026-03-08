@@ -209,10 +209,12 @@ export function AppSidebar() {
     : [
         ...(isEnterpriseOwner ? [{ Icon: BarChart3, title: "Översikt", path: "/enterprise/stats" }] : []),
         { Icon: Users, title: "Team", path: "/org/settings" },
-        ...(isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise' ? [{ Icon: Shield, title: "Enterprise", path: "/enterprise/settings" }] : []),
         { Icon: CreditCard, title: "Fakturering", path: "/org/billing" },
         { Icon: FileText, title: "Fakturor", path: "/billing/invoices" },
       ];
+
+  // Enterprise settings shown as standalone link below org section
+  const showEnterpriseLink = !isEnterpriseViewer && isEnterpriseOwnerOrAdmin && commercialPlan === 'enterprise';
 
   const adminItems = [
     { Icon: FiUsers, title: "Användare", path: "/admin/users" },
@@ -432,6 +434,40 @@ export function AppSidebar() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Enterprise Settings - Standalone prominent link */}
+            {showEnterpriseLink && !collapsed && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleNavigation('/enterprise/settings', 'Enterprise')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-sm transition-all duration-150 ${
+                    selected === 'Enterprise'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                >
+                  <Shield className="text-lg shrink-0" />
+                  <span className="text-sm truncate">Enterprise</span>
+                </button>
+              </div>
+            )}
+
+            {/* Enterprise Settings - Collapsed icon */}
+            {showEnterpriseLink && collapsed && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleNavigation('/enterprise/settings', 'Enterprise')}
+                  className={`w-full flex items-center justify-center px-3 py-2.5 rounded-sm transition-all duration-150 ${
+                    selected === 'Enterprise'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                  title="Enterprise"
+                >
+                  <Shield className="text-lg shrink-0" />
+                </button>
               </div>
             )}
 
