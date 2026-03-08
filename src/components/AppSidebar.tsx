@@ -437,7 +437,38 @@ export function AppSidebar() {
               </div>
             )}
 
-            {/* Enterprise Org Icon Only - Collapsed State */}
+            {/* Enterprise Settings - Standalone prominent link */}
+            {showEnterpriseLink && !collapsed && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleNavigation('/enterprise/settings', 'Enterprise')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-sm transition-all duration-150 ${
+                    selected === 'Enterprise'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                >
+                  <Shield className="text-lg shrink-0" />
+                  <span className="text-sm truncate">Enterprise</span>
+                </button>
+              </div>
+            )}
+
+            {/* Enterprise Settings - Collapsed icon */}
+            {showEnterpriseLink && collapsed && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleNavigation('/enterprise/settings', 'Enterprise')}
+                  className={`w-full flex items-center justify-center px-3 py-2.5 rounded-sm transition-all duration-150 ${
+                    selected === 'Enterprise'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                  title="Enterprise"
+                >
+                  <Shield className="text-lg shrink-0" />
+                </button>
+              </div>
             {enterpriseMembership?.isMember && collapsed && (
               <div className="mt-4 pt-4 border-t border-border">
                 <button
