@@ -469,6 +469,9 @@ export function AppSidebar() {
                   <Shield className="text-lg shrink-0" />
                 </button>
               </div>
+            )}
+
+            {/* Enterprise Org Icon Only - Collapsed State */}
             {enterpriseMembership?.isMember && collapsed && (
               <div className="mt-4 pt-4 border-t border-border">
                 <button
